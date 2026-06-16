@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .px-screen {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

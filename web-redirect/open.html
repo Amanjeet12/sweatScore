@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fff8f4">
+<title>Opening SweatScore…</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;padding:0;min-height:100%;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    color:#1A1A1A;
+    background:#fff8f4;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    line-height:1.5;
+  }
+  .page{
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:32px 24px 48px;
+    background:
+      radial-gradient(ellipse at top, #FFEEE1 0%, #fff8f4 55%, #fff8f4 100%);
+  }
+  .card{
+    width:100%;
+    max-width:420px;
+    text-align:center;
+  }
+  .icon-pulse{
+    width:96px;height:96px;
+    border-radius:28px;
+    background:linear-gradient(135deg,#F76B1C 0%,#F3882C 100%);
+    margin:0 auto 24px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 12px 40px rgba(247,107,28,.35);
+    position:relative;
+  }
+  .icon-pulse::after{
+    content:'';
+    position:absolute;
+    inset:-8px;
+    border-radius:36px;
+    border:2px solid rgba(247,107,28,.35);
+    animation:pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{transform:scale(.95);opacity:.8;}
+    100%{transform:scale(1.15);opacity:0;}
+  }
+  h1{
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:-.02em;
+    line-height:1.15;
+    margin:0 0 12px;
+    color:#1A1A1A;
+  }
+  p.sub{
+    font-size:15px;
+    color:#5A5A5A;
+    margin:0 0 32px;
+    line-height:1.5;
+  }
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    width:100%;
+    padding:16px 24px;
+    border-radius:999px;
+    font-family:inherit;
+    font-weight:700;
+    font-size:16px;
+    text-decoration:none;
+    cursor:pointer;
+    border:none;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{
+    background:linear-gradient(135deg,#F76B1C 0%,#F3882C 100%);
+    color:#fff;
+    box-shadow:0 10px 24px rgba(247,107,28,.32);
+  }
+  .btn-primary:hover{box-shadow:0 14px 30px rgba(247,107,28,.4);}
+  .divider{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin:24px 0 16px;
+    color:#8A8A8A;
+    font-size:12px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .divider::before,.divider::after{
+    content:'';
+    flex:1;
+    height:1px;
+    background:#E8DCD0;
+  }
+  .stores{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .store-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    padding:14px 20px;
+    border-radius:14px;
+    background:#1A1A1A;
+    color:#fff;
+    text-decoration:none;
+    font-weight:600;
+    font-size:14px;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .store-btn:hover{background:#2A2A2A;}
+  .store-btn:active{transform:translateY(1px);}
+  .store-btn svg{flex-shrink:0;}
+  .store-btn .label{
+    display:flex;flex-direction:column;align-items:flex-start;line-height:1.1;
+  }
+  .store-btn .label small{
+    font-size:10px;font-weight:500;opacity:.75;text-transform:uppercase;letter-spacing:.04em;
+  }
+  .store-btn .label span{font-size:15px;font-weight:700;}
+  .footer{
+    margin-top:36px;
+    font-size:12px;
+    color:#9A9A9A;
+  }
+  .footer a{color:#5A5A5A;text-decoration:none;font-weight:600;}
+  @media (max-width:380px){
+    h1{font-size:24px;}
+    .icon-pulse{width:80px;height:80px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+
+    <div class="icon-pulse" aria-hidden="true">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2L4.5 13.5h6L11 22l8.5-11.5h-6L13 2z" fill="#fff"/>
+      </svg>
+    </div>
+
+    <h1>Opening the app…</h1>
+    <p class="sub">If SweatScore doesn't open automatically, tap the button below. Don't have the app yet? Download it free.</p>
+
+    <a id="openBtn" class="btn btn-primary" href="#">Open SweatScore</a>
+
+    <div class="divider">Or download</div>
+
+    <div class="stores">
+      <a id="iosBtn" class="store-btn" href="https://apps.apple.com/us/app/sweatscore/id6744372181" style="display:none">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+        </svg>
+        <div class="label"><small>Download on the</small><span>App Store</span></div>
+      </a>
+      <a id="androidBtn" class="store-btn" href="https://play.google.com/store/apps/details?id=com.sweatscore.sweatscoreapp" style="display:none">
+        <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92z" fill="#34A853"/>
+          <path d="M16.81 8.99l-2.926 1.706L5.617 2.43 14.62 7.4l2.19 1.59z" fill="#EA4335"/>
+          <path d="M16.81 15.01l-2.19 1.59-9.003 4.97 8.267-8.266 2.926 1.706z" fill="#FBBC04"/>
+          <path d="M20.16 10.81l-3.35 1.19 3.35 1.19c.79.45.79 1.59 0 2.04l-3.35 1.78-2.926-1.706L16.81 12l-2.926-1.706L16.81 8.99l3.35 1.78c.79.45.79 1.59 0 2.04z" fill="#4285F4"/>
+        </svg>
+        <div class="label"><small>Get it on</small><span>Google Play</span></div>
+      </a>
+    </div>
+
+    <p class="footer">Need help? <a href="mailto:hello@sweatscore.com">hello@sweatscore.com</a></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var IOS_STORE     = "https://apps.apple.com/us/app/sweatscore/id6744372181";
+  var ANDROID_STORE = "https://play.google.com/store/apps/details?id=com.sweatscore.sweatscoreapp";
+  var SCHEME        = "sweatscore-app";
+  var ANDROID_PKG   = "com.sweatscore.sweatscoreapp";
+  var FALLBACK_MS   = 1800;
+
+  // to=<key> -> deeplink path (group "(tabs)" stripped by Expo Router)
+  var ROUTES = {
+    "paywall":               "dashboard/paywall",
+    "rewards-paywall":       "rewards/paywall",
+    "hub-paywall":           "hub/paywall",
+    "share-paywall":         "share/paywall",
+    "notifications-paywall": "notifications/paywall",
+    "dashboard":             "dashboard",
+    "rewards":               "rewards",
+    "hub":                   "hub"
+  };
+
+  function qs(name) {
+    var m = location.search.match(new RegExp("[?&]" + name + "=([^&#]+)"));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  var to    = qs("to") || "paywall";
+  var path  = ROUTES[to] || ROUTES.paywall;
+  var ua    = navigator.userAgent || "";
+  var isIOS     = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  var isAndroid = /Android/i.test(ua);
+
+  var schemeUrl = SCHEME + ":///" + path;
+  var intentUrl = "intent://" + path + "#Intent;scheme=" + SCHEME +
+                  ";package=" + ANDROID_PKG +
+                  ";S.browser_fallback_url=" + encodeURIComponent(ANDROID_STORE) + ";end";
+
+  var openBtn    = document.getElementById("openBtn");
+  var iosBtn     = document.getElementById("iosBtn");
+  var androidBtn = document.getElementById("androidBtn");
+
+  if (isIOS)     iosBtn.style.display     = "flex";
+  if (isAndroid) androidBtn.style.display = "flex";
+  if (!isIOS && !isAndroid) {
+    iosBtn.style.display     = "flex";
+    androidBtn.style.display = "flex";
+  }
+
+  openBtn.href = isAndroid ? intentUrl : schemeUrl;
+  openBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    tryOpen();
+  });
+
+  function tryOpen() {
+    if (isAndroid) {
+      window.location.href = intentUrl;
+      return;
+    }
+    var start = Date.now();
+    window.location.href = schemeUrl;
+    setTimeout(function () {
+      if (Date.now() - start < FALLBACK_MS + 250 && !document.hidden && isIOS) {
+        window.location.href = IOS_STORE;
+      }
+    }, FALLBACK_MS);
+  }
+
+  setTimeout(tryOpen, 80);
+})();
+</script>
+</body>
+</html>
