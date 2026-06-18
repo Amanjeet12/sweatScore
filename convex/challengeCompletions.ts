@@ -398,13 +398,30 @@ export const getPublishedChallenges = query({
     const challenges = await challengesQuery.collect();
 
     // Filter out expired challenges and resolve cover image URLs
-    const results = [];
+    const results : any[] = [];
+
     for (const challenge of challenges) {
       if (challenge.endDate && todayStr >= challenge.endDate) continue;
+
       const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
+
+      let userCompletedCount = 0;
+
+      if (userId) {
+        const userCompletions = await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_challenge_date', (q) =>
+            q.eq('userId', userId).eq('challengeId', challenge._id)
+          )
+          .collect();
+
+        userCompletedCount = userCompletions.length;
+      }
+
       results.push({
         ...challenge,
         coverImageUrl,
+        userCompletedCount,
       });
     }
 

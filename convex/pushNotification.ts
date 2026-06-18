@@ -87,7 +87,7 @@ export const sendPushNotification = internalAction({
     const interpolatedBody = interpolate(body, args.options ?? {});
 
     for (const userId of args.userId) {
-      await pushNotifications.sendPushNotification(ctx, {
+      await pushNotifications.sendPushNotification(ctx as any , {
         userId,
         notification: {
           title: interpolatedTitle,
@@ -108,7 +108,7 @@ export const sendMarketingPushNotification = internalAction({
   handler: async (ctx, args) => {
     const pushNotifications = new PushNotifications(components.pushNotifications);
 
-    await pushNotifications.sendPushNotification(ctx, {
+    await pushNotifications.sendPushNotification(ctx as any , {
       userId: args.userId,
       notification: {
         title: args.title,

@@ -92,36 +92,52 @@ export const RevenueCatProvider = ({ children }: any) => {
 
   useEffect(() => {
     const init = async () => {
-      // Use more logging during debug if want!
-      Purchases.setLogLevel(LOG_LEVEL.ERROR);
+      try {
+        // Use more logging during debug if want!
+        Purchases.setLogLevel(LOG_LEVEL.ERROR);
 
-      if (Platform.OS === 'android') {
-        await Purchases.configure({ apiKey: APIKeys.google });
-      } else {
-        await Purchases.configure({ apiKey: APIKeys.apple });
-      }
-      setIsReady(true);
+        // Skip if API keys are not configured
+        const hasValidKeys =
+          (Platform.OS === 'android' && APIKeys.google) ||
+          (Platform.OS === 'ios' && APIKeys.apple);
 
-      // Admin bypass runs first and does not depend on the store.
-      const isAdmin = await syncAdminAsPro();
-
-      // Listen for customer updates
-      Purchases.addCustomerInfoUpdateListener(async (info) => {
-        updateCustomerInformation(info);
-      });
-
-      // Load all offerings and the user object with entitlements
-      await loadOfferings();
-
-      // Explicitly fetch customer info so isPro is resolved even when the
-      // update listener doesn't fire at launch. Skip for admins — already set.
-      if (!isAdmin) {
-        try {
-          const info = await Purchases.getCustomerInfo();
-          await updateCustomerInformation(info);
-        } catch (e) {
-          console.warn('[RevenueCat] getCustomerInfo failed', e);
+        if (!hasValidKeys) {
+          console.warn('[RevenueCat] API keys not configured, skipping initialization');
+          setIsReady(true);
+          return;
         }
+
+        if (Platform.OS === 'android') {
+          await Purchases.configure({ apiKey: APIKeys.google });
+        } else {
+          await Purchases.configure({ apiKey: APIKeys.apple });
+        }
+
+        // Admin bypass runs first and does not depend on the store.
+        const isAdmin = await syncAdminAsPro();
+
+        // Listen for customer updates
+        Purchases.addCustomerInfoUpdateListener(async (info) => {
+          updateCustomerInformation(info);
+        });
+
+        // Load all offerings and the user object with entitlements
+        await loadOfferings();
+
+        // Explicitly fetch customer info so isPro is resolved even when the
+        // update listener doesn't fire at launch. Skip for admins — already set.
+        if (!isAdmin) {
+          try {
+            const info = await Purchases.getCustomerInfo();
+            await updateCustomerInformation(info);
+          } catch (e) {
+            console.warn('[RevenueCat] getCustomerInfo failed', e);
+          }
+        }
+      } catch (e) {
+        console.warn('[RevenueCat] initialization failed', e);
+      } finally {
+        setIsReady(true);
       }
     };
 

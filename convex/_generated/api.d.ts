@@ -46,14 +46,6 @@ import type {
   FunctionReference,
 } from "convex/server";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 declare const fullApi: ApiFromModules<{
   ResendOTP: typeof ResendOTP;
   TestOTP: typeof TestOTP;
@@ -87,165 +79,34 @@ declare const fullApi: ApiFromModules<{
   "utils/streak": typeof utils_streak;
   "utils/timezone": typeof utils_timezone;
 }>;
-declare const fullApiWithMounts: typeof fullApi;
 
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "internal">
 >;
 
 export declare const components: {
-  pushNotifications: {
-    public: {
-      deleteNotificationsForUser: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"; userId: string },
-        any
-      >;
-      getNotification: FunctionReference<
-        "query",
-        "internal",
-        { id: string; logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR" },
-        null | {
-          _creationTime: number;
-          body?: string;
-          categoryIdentifier?: string;
-          data?: any;
-          numPreviousFailures: number;
-          sound?: string;
-          state:
-            | "awaiting_delivery"
-            | "in_progress"
-            | "delivered"
-            | "needs_retry"
-            | "failed"
-            | "maybe_delivered"
-            | "unable_to_deliver";
-          subtitle?: string;
-          title: string;
-        }
-      >;
-      getNotificationsForUser: FunctionReference<
-        "query",
-        "internal",
-        {
-          limit?: number;
-          logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR";
-          userId: string;
-        },
-        Array<{
-          _creationTime: number;
-          body?: string;
-          categoryIdentifier?: string;
-          data?: any;
-          id: string;
-          numPreviousFailures: number;
-          sound?: string;
-          state:
-            | "awaiting_delivery"
-            | "in_progress"
-            | "delivered"
-            | "needs_retry"
-            | "failed"
-            | "maybe_delivered"
-            | "unable_to_deliver";
-          subtitle?: string;
-          title: string;
-        }>
-      >;
-      getStatusForUser: FunctionReference<
-        "query",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"; userId: string },
-        { hasToken: boolean; paused: boolean }
-      >;
-      pauseNotificationsForUser: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"; userId: string },
-        null
-      >;
-      recordPushNotificationToken: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR";
-          pushToken: string;
-          userId: string;
-        },
-        null
-      >;
-      removePushNotificationToken: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"; userId: string },
-        null
-      >;
-      restart: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR" },
-        boolean
-      >;
-      sendPushNotification: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          allowUnregisteredTokens?: boolean;
-          logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR";
-          notification: {
-            body?: string;
-            categoryIdentifier?: string;
-            data?: any;
-            sound?: string;
-            subtitle?: string;
-            title: string;
-          };
-          userId: string;
-        },
-        string | null
-      >;
-      shutdown: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR" },
-        { data?: any; message: string }
-      >;
-      unpauseNotificationsForUser: FunctionReference<
-        "mutation",
-        "internal",
-        { logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR"; userId: string },
-        null
-      >;
-    };
-  };
-  shardedCounter: {
-    public: {
-      add: FunctionReference<
-        "mutation",
-        "internal",
-        { count: number; name: string; shard?: number; shards?: number },
-        number
-      >;
-      count: FunctionReference<"query", "internal", { name: string }, number>;
-      estimateCount: FunctionReference<
-        "query",
-        "internal",
-        { name: string; readFromShards?: number; shards?: number },
-        any
-      >;
-      rebalance: FunctionReference<
-        "mutation",
-        "internal",
-        { name: string; shards?: number },
-        any
-      >;
-      reset: FunctionReference<"mutation", "internal", { name: string }, any>;
-    };
-  };
+  pushNotifications: import("@convex-dev/expo-push-notifications/_generated/component.js").ComponentApi<"pushNotifications">;
+  shardedCounter: import("@convex-dev/sharded-counter/_generated/component.js").ComponentApi<"shardedCounter">;
 };

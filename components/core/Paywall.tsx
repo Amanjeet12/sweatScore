@@ -5,7 +5,14 @@ import * as Localization from 'expo-localization';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { PurchasesPackage } from 'react-native-purchases';
 
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
@@ -13,65 +20,86 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { CatchPromise } from '~/utils/catch-promise';
 
+const MONTHLY_PACKAGE_ID = '$rc_monthly';
+const ANNUAL_PACKAGE_ID = '$rc_annual';
+
 export default function Paywall() {
-  const { redirectTo } = useLocalSearchParams<{ redirectTo: string }>();
+  const { redirectTo } = useLocalSearchParams<{ redirectTo?: string }>();
+
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
   const { packages, purchasePackage } = useRevenueCat();
   const syncToEnduranceZone = useAction(api.users.syncToEnduranceZone);
 
-  // Find monthly and annual packages
-  const monthlyPackage = useMemo(
-    () => packages.find((pkg) => pkg.identifier === '$rc_monthly'),
-    [packages]
-  );
-  const annualPackage = useMemo(
-    () => packages.find((pkg) => pkg.identifier === '$rc_annual'),
-    [packages]
-  );
+  if (__DEV__) {
+    console.log('Available packages from RevenueCat:', packages);
+  }
 
-  // Set annual package as default when packages load
+  const monthlyPackage = useMemo(() => {
+    return packages.find((pkg) => pkg.identifier === MONTHLY_PACKAGE_ID);
+  }, [packages]);
+
+  const annualPackage = useMemo(() => {
+    return packages.find((pkg) => pkg.identifier === ANNUAL_PACKAGE_ID);
+  }, [packages]);
+
+  const isPackagesLoading = packages.length === 0;
+
   useEffect(() => {
-    if (annualPackage && !selectedPackage) {
-      setSelectedPackage(annualPackage);
-    }
-  }, [annualPackage, selectedPackage]);
+    if (selectedPackage) return;
 
-  // Calculate savings percentage
+    if (annualPackage) {
+      setSelectedPackage(annualPackage);
+      return;
+    }
+
+    if (monthlyPackage) {
+      setSelectedPackage(monthlyPackage);
+    }
+  }, [annualPackage, monthlyPackage, selectedPackage]);
+
   const savingsPercentage = useMemo(() => {
     if (!monthlyPackage || !annualPackage) return 0;
+
     const monthlyPerYear = monthlyPackage.product.price * 12;
     const annualPrice = annualPackage.product.price;
+
     if (!monthlyPerYear || !annualPrice) return 0;
+    if (annualPrice >= monthlyPerYear) return 0;
+
     const savings = ((monthlyPerYear - annualPrice) / monthlyPerYear) * 100;
     return Math.round(savings);
   }, [monthlyPackage, annualPackage]);
 
   const handlePurchase = async () => {
+    if (!selectedPackage || !purchasePackage || isLoading) return;
+
     setIsLoading(true);
-    if (selectedPackage && purchasePackage) {
-      const [err, _] = await CatchPromise(purchasePackage(selectedPackage));
-      if (err) {
-        setIsLoading(false);
-        return;
+
+    const [purchaseErr] = await CatchPromise(purchasePackage(selectedPackage));
+
+    if (purchaseErr) {
+      if (__DEV__) {
+        console.log('Purchase error:', purchaseErr);
       }
 
-      // Purchase successful - sync to Endurance Zone to update level
-      const userCountry = Localization.getLocales()[0]?.regionCode || 'UK';
-      await CatchPromise(syncToEnduranceZone({ country: userCountry }));
-      // Note: We don't block redirect if sync fails - it will retry when user visits Win tab
-
-      // Redirect after a short delay
-      setTimeout(() => {
-        setIsLoading(false);
-        if (redirectTo) {
-          router.replace(redirectTo as any);
-        } else {
-          router.back();
-        }
-      }, 500);
-    } else {
       setIsLoading(false);
+      Alert.alert('Purchase failed', 'Unable to complete the purchase. Please try again.');
+      return;
+    }
+
+    const userCountry = Localization.getLocales()[0]?.regionCode || 'UK';
+
+    // Do not block redirect if sync fails.
+    await CatchPromise(syncToEnduranceZone({ country: userCountry }));
+
+    setIsLoading(false);
+
+    if (redirectTo) {
+      router.replace(redirectTo as any);
+    } else {
+      router.back();
     }
   };
 
@@ -98,6 +126,10 @@ export default function Paywall() {
     },
   ];
 
+  const isAnnualSelected = selectedPackage?.identifier === ANNUAL_PACKAGE_ID;
+  const isMonthlySelected = selectedPackage?.identifier === MONTHLY_PACKAGE_ID;
+  const isCtaDisabled = !selectedPackage || !purchasePackage || isLoading || isPackagesLoading;
+
   return (
     <ScrollView className="flex-1 bg-[#FFF7F6]" showsVerticalScrollIndicator={false}>
       <View style={{ position: 'relative' }}>
@@ -110,6 +142,7 @@ export default function Paywall() {
             aspectRatio: 828 / 680,
           }}
         />
+
         <LinearGradient
           colors={['rgba(255,247,246,0)', '#FFF7F6']}
           style={{
@@ -123,20 +156,14 @@ export default function Paywall() {
       </View>
 
       <View className="rounded-t-3xl bg-[#FFF7F6] px-6 pb-8 pt-6">
-        {/* Header */}
         <View className="items-center">
           <Text
             className="text-center text-xl text-[#1A1A1A]"
             style={{ fontFamily: 'Inter_700Bold' }}>
             Move Daily. Earn Points. Go Further.
           </Text>
-          {/* <Text className="mt-2 text-center text-sm text-gray-600">
-            Convert your points into cash and rewards.{'\n'}Move more. Stay consistent. Start
-            winning.
-          </Text> */}
         </View>
 
-        {/* Features List */}
         <View className="mx-6 mt-4 flex-col gap-y-4">
           {features.map((feature, index) => (
             <View key={index} className="flex-row items-center justify-center gap-x-4">
@@ -145,10 +172,9 @@ export default function Paywall() {
                 style={{ backgroundColor: '#FFF0E6' }}>
                 {feature.icon}
               </View>
+
               <View className="flex-1">
-                <Text
-                  className="text-base text-[#1A1A1A]"
-                  style={{ fontFamily: 'Inter_700Bold' }}>
+                <Text className="text-base text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
                   {feature.title}
                 </Text>
                 <Text className="text-sm text-gray-600">{feature.description}</Text>
@@ -157,25 +183,25 @@ export default function Paywall() {
           ))}
         </View>
 
-        {/* Pricing Options - Switch Style */}
         <View className="mt-10" style={{ position: 'relative' }}>
-          {/* Best Value Badge */}
-          <View
-            className="absolute top-0 z-10"
-            style={{
-              left: '12%',
-              transform: [{ translateY: -16 }],
-            }}>
+          {annualPackage && (
             <View
+              className="absolute top-0 z-10"
               style={{
-                backgroundColor: '#FF5C1A',
-                borderRadius: 9999,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
+                left: '12%',
+                transform: [{ translateY: -16 }],
               }}>
-              <Text className="text-sm font-semibold text-white">Best value</Text>
+              <View
+                style={{
+                  backgroundColor: '#FF5C1A',
+                  borderRadius: 9999,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                }}>
+                <Text className="text-sm font-semibold text-white">Best value</Text>
+              </View>
             </View>
-          </View>
+          )}
 
           <View
             className="flex-row gap-x-2 rounded-full bg-white p-1"
@@ -191,54 +217,59 @@ export default function Paywall() {
                     elevation: 3,
                   }),
             }}>
-            {/* Annual Plan */}
             <TouchableOpacity
-              onPress={() => annualPackage && setSelectedPackage(annualPackage)}
+              disabled={!annualPackage || isLoading}
+              onPress={() => {
+                if (annualPackage) setSelectedPackage(annualPackage);
+              }}
               className="flex-1 items-center justify-center rounded-full px-4"
               style={{
-                backgroundColor:
-                  selectedPackage?.identifier === '$rc_annual' ? '#FFEEE1' : 'transparent',
-                borderWidth: selectedPackage?.identifier === '$rc_annual' ? 1 : 0,
-                borderColor:
-                  selectedPackage?.identifier === '$rc_annual' ? '#FF5C1A' : 'transparent',
+                backgroundColor: isAnnualSelected ? '#FFEEE1' : 'transparent',
+                borderWidth: isAnnualSelected ? 1 : 0,
+                borderColor: isAnnualSelected ? '#FF5C1A' : 'transparent',
                 height: 50,
+                opacity: annualPackage ? 1 : 0.5,
               }}>
               <View className="items-center">
                 <Text className="text-base font-bold text-[#1A1A1A]">
-                  Annual — {annualPackage?.product.priceString || '$74.99'}
+                  Annual — {annualPackage?.product.priceString ?? 'Loading...'}
                 </Text>
-                <Text className="text-xs text-gray-600">Save {savingsPercentage}%</Text>
+
+                <Text className="text-xs text-gray-600">
+                  {savingsPercentage > 0 ? `Save ${savingsPercentage}%` : 'Best yearly price'}
+                </Text>
               </View>
             </TouchableOpacity>
 
-            {/* Monthly Plan */}
             <TouchableOpacity
-              onPress={() => monthlyPackage && setSelectedPackage(monthlyPackage)}
+              disabled={!monthlyPackage || isLoading}
+              onPress={() => {
+                if (monthlyPackage) setSelectedPackage(monthlyPackage);
+              }}
               className="flex-1 items-center justify-center rounded-full px-6"
               style={{
-                backgroundColor:
-                  selectedPackage?.identifier === '$rc_monthly' ? '#FFEEE1' : 'transparent',
-                borderWidth: selectedPackage?.identifier === '$rc_monthly' ? 1 : 0,
-                borderColor:
-                  selectedPackage?.identifier === '$rc_monthly' ? '#FF5C1A' : 'transparent',
+                backgroundColor: isMonthlySelected ? '#FFEEE1' : 'transparent',
+                borderWidth: isMonthlySelected ? 1 : 0,
+                borderColor: isMonthlySelected ? '#FF5C1A' : 'transparent',
                 height: 50,
+                opacity: monthlyPackage ? 1 : 0.5,
               }}>
               <View className="items-center">
                 <Text className="text-base font-bold text-[#1A1A1A]">
-                  Monthly — {monthlyPackage?.product.priceString || '$8.99'}
+                  Monthly — {monthlyPackage?.product.priceString ?? 'Loading...'}
                 </Text>
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* CTA Button */}
         <View className="mt-4">
           <TouchableOpacity
             onPress={handlePurchase}
-            disabled={!selectedPackage || isLoading}
+            disabled={isCtaDisabled}
             style={{
               borderRadius: 9999,
+              opacity: isCtaDisabled ? 0.6 : 1,
               ...(Platform.OS === 'ios'
                 ? {
                     shadowColor: '#000000',
@@ -263,13 +294,14 @@ export default function Paywall() {
                   <ActivityIndicator size={20} color="#fff" />
                 </View>
               ) : (
-                <Text className="text-2xl font-bold text-white">Let&apos;s Go</Text>
+                <Text className="text-2xl font-bold text-white">
+                  {isPackagesLoading ? 'Loading plans...' : "Let's Go"}
+                </Text>
               )}
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Footer Text */}
         <View className="mt-2">
           <Text className="text-center text-base text-gray-600">
             Cancel anytime. Instant access.

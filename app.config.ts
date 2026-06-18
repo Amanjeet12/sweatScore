@@ -8,6 +8,4 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   name: 'SweatScore',
   slug: 'sweatscore-app',
-  newArchEnabled: true,
-
 });

@@ -69,7 +69,7 @@ function ChallengeCardWithData({
       challenge={challenge}
       completedToday={cooldown?.completedToday ?? false}
       lastCompletedAt={cooldown?.lastCompletedAt ?? null}
-      totalCompletions={challenge.totalCompletions ?? 0}
+      totalCompletions={challenge.userCompletedCount  ?? 0}
       isPremium={isPremium}
       onPress={handlePress}
     />

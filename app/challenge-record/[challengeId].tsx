@@ -310,6 +310,7 @@ export default function DuetRecordingScreen() {
           const persistentUri = `${FileSystem.documentDirectory}duet-${Date.now()}.mp4`;
           await FileSystem.copyAsync({ from: video.uri, to: persistentUri });
           await FileSystem.deleteAsync(video.uri, { idempotent: true });
+          console.log('[DuetRecord] Moved recording to persistent URI:', persistentUri);
           setRecordedVideoUri(persistentUri);
           setState('post-record');
         } catch (copyErr) {
