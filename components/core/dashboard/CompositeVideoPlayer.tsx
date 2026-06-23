@@ -6,28 +6,29 @@ import { Dimensions, Pressable, View } from 'react-native';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 interface CompositeVideoPlayerProps {
-  adminVideoUrl: string;
-  userVideoUrl: string;
+  leftVideoUrl: string;
+  rightVideoUrl: string;
   aspectRatio?: number;
-  existingAdminPlayer?: VideoPlayer;
-  mirrorUser?: boolean;
+  existingLeftPlayer?: VideoPlayer;
+  mirrorRight?: boolean;
 }
 
 export default function CompositeVideoPlayer({
-  adminVideoUrl,
-  userVideoUrl,
+  leftVideoUrl,
+  rightVideoUrl,
   aspectRatio = 1,
-  existingAdminPlayer,
-  mirrorUser = false,
+  existingLeftPlayer,
+  mirrorRight = false,
 }: CompositeVideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const ownAdminPlayer = useVideoPlayer(existingAdminPlayer ? null : adminVideoUrl, (p) => {
+  const ownLeftPlayer = useVideoPlayer(existingLeftPlayer ? null : leftVideoUrl, (p) => {
     p.loop = true;
   });
-  const adminPlayer = existingAdminPlayer ?? ownAdminPlayer;
 
-  const userPlayer = useVideoPlayer(userVideoUrl, (p) => {
+  const leftPlayer = existingLeftPlayer ?? ownLeftPlayer;
+
+  const rightPlayer = useVideoPlayer(rightVideoUrl, (p) => {
     p.loop = true;
     p.volume = 0;
   });
@@ -37,15 +38,15 @@ export default function CompositeVideoPlayer({
 
   const handlePress = () => {
     if (isPlaying) {
-      adminPlayer.pause();
-      userPlayer.pause();
+      leftPlayer.pause();
+      rightPlayer.pause();
       setIsPlaying(false);
     } else {
-      adminPlayer.currentTime = 0;
-      userPlayer.currentTime = 0;
-      adminPlayer.loop = true;
-      adminPlayer.play();
-      userPlayer.play();
+      leftPlayer.currentTime = 0;
+      rightPlayer.currentTime = 0;
+      leftPlayer.loop = true;
+      leftPlayer.play();
+      rightPlayer.play();
       setIsPlaying(true);
     }
   };
@@ -63,8 +64,14 @@ export default function CompositeVideoPlayer({
           overflow: 'hidden',
         }}>
         <VideoView
-          player={adminPlayer}
-          style={{ width: halfWidth, height }}
+          player={leftPlayer}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: halfWidth,
+            height,
+          }}
           contentFit="cover"
           nativeControls={false}
         />
@@ -81,8 +88,15 @@ export default function CompositeVideoPlayer({
           overflow: 'hidden',
         }}>
         <VideoView
-          player={userPlayer}
-          style={{ width: halfWidth, height, ...(mirrorUser ? { transform: [{ scaleX: -1 }] } : {}) }}
+          player={rightPlayer}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            width: halfWidth,
+            height,
+            transform: mirrorRight ? [{ scaleX: -1 }] : [],
+          }}
           contentFit="cover"
           nativeControls={false}
         />

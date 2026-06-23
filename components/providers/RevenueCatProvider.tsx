@@ -2,7 +2,6 @@ import { useMutation, useConvex } from 'convex/react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import Purchases, { CustomerInfo, LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
-
 import { api } from '~/convex/_generated/api';
 import { CatchPromiseWithType } from '~/utils/catch-promise';
 

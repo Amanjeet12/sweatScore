@@ -63,7 +63,7 @@ export default function ChallengesScreen() {
           title: '',
           headerTitle: () => (
             <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
-              Move With Us
+              Moves
             </Text>
           ),
           headerShadowVisible: false,

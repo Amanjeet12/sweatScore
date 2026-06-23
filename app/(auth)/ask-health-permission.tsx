@@ -18,6 +18,7 @@ import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 import { healthPermissions, healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
+import { hasActiveSubscription } from '~/utils/subscription';
 
 export default function AskHealthPermission() {
   const appState = useRef(AppState.currentState);
@@ -68,7 +69,7 @@ export default function AskHealthPermission() {
       if (!isInitialized) {
         alert('Error initializing Health Connect');
         router.dismissAll();
-        router.replace({ pathname: '/(tabs)/dashboard' });
+        await handleSkip();
         return;
       }
 
@@ -81,24 +82,55 @@ export default function AskHealthPermission() {
   const handleSuccess = async (showSuccess: string) => {
     await updateOnboarded({ onboarded: true });
     await updateUserAutoSyncEnabled({ enabled: true });
+
     storeData('autoSync', { enabled: true });
 
     const user = await convex.query(api.users.current);
-    setCurrentUser(user);
+    await setCurrentUser(user);
+
+    const isSubscribed = await hasActiveSubscription(user);
 
     router.dismissAll();
-    router.replace({ pathname: '/(tabs)/dashboard', params: { showSuccess } });
+
+    if (isSubscribed) {
+      router.replace({
+        pathname: '/(tabs)/dashboard',
+        params: { showSuccess },
+      });
+    } else {
+      router.replace({
+        pathname: '/subscription',
+        params: {
+          redirectTo: '/(tabs)/dashboard',
+        },
+      });
+    }
   };
 
   const handleSkip = async () => {
     await updateOnboarded({ onboarded: true });
     await updateUserAutoSyncEnabled({ enabled: false });
+
     storeData('autoSync', { enabled: false });
+
     const user = await convex.query(api.users.current);
-    setCurrentUser(user);
+    await setCurrentUser(user);
+
+    const isSubscribed = await hasActiveSubscription(user);
 
     router.dismissAll();
-    router.replace({ pathname: '/(tabs)/dashboard' });
+
+    if (isSubscribed) {
+      router.replace('/(tabs)/dashboard');
+    } else {
+      router.replace({
+        pathname: '/subscription',
+        params: {
+          redirectTo: '/(tabs)/dashboard',
+          showBackToLogin: 'true',
+        },
+      });
+    }
   };
 
   useEffect(() => {
@@ -171,8 +203,8 @@ export default function AskHealthPermission() {
               <View className="flex-1">
                 <Text className="font-body text-base text-[#1A1A1A]">
                   <Text className="font-bold">Heart rate</Text> — to calculate Active Minutes (1
-                  point per 5 min in your personal cardio zone). Required for the points on the
-                  Earn and Track screens.
+                  point per 5 min in your personal cardio zone). Required for the points on the Earn
+                  and Track screens.
                 </Text>
               </View>
             </View>

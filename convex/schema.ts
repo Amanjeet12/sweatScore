@@ -223,9 +223,20 @@ const schema = defineSchema({
     challengeId: v.id('challenges'),
     date: v.string(),
     pointsEarned: v.number(),
+
+    // User's personal uploaded video
     videoStorageId: v.optional(v.id('_storage')),
+
+    // Generated transformation/composite video
     compositeVideoStorageId: v.optional(v.id('_storage')),
     thumbnailStorageId: v.optional(v.id('_storage')),
+
+    // New transformation tracking fields
+    attemptNumber: v.optional(v.number()),
+    day1CompletionId: v.optional(v.id('challengeCompletions')),
+    comparisonBaseVideoStorageId: v.optional(v.id('_storage')),
+    comparisonMode: v.optional(v.union(v.literal('day1_baseline'), v.literal('day1_vs_current'))),
+
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
     removed: v.optional(v.boolean()),
@@ -299,8 +310,7 @@ const schema = defineSchema({
     firstActiveDate: v.optional(v.string()),
     lastActiveDate: v.optional(v.string()),
     updatedAt: v.number(),
-  })
-    .index('by_user', ['userId']),
+  }).index('by_user', ['userId']),
   appVersionConfig: defineTable({
     platform: v.union(v.literal('ios'), v.literal('android')),
     latestVersion: v.string(),

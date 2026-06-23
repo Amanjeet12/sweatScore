@@ -16,6 +16,7 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { cn } from '~/utils/cn';
 import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
+import { hasActiveSubscription } from '~/utils/subscription';
 
 export default function Verify() {
   const convex = useConvex();
@@ -59,12 +60,26 @@ export default function Verify() {
       await signIn(provider, { email, code });
       await delay(500);
       const user = await convex.query(api.users.current);
-      setCurrentUser(user);
+      await setCurrentUser(user);
+
       router.dismissAll();
       if (!user?.onboarded) {
-        router.replace({ pathname: '/(auth)/setup-profile' });
+        router.replace('/(auth)/setup-profile');
+        return;
+      }
+
+      const isSubscribed = await hasActiveSubscription(user);
+
+      if (isSubscribed) {
+        router.replace('/(tabs)/dashboard');
       } else {
-        router.replace({ pathname: '/(tabs)/dashboard' });
+        router.replace({
+          pathname: '/subscription',
+          params: {
+            redirectTo: '/(tabs)/dashboard',
+            showBackToLogin: 'true',
+          },
+        });
       }
     } catch (error) {
       setError('Invalid code');

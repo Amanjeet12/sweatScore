@@ -204,15 +204,16 @@ export default function TabDashboard() {
                 />
               </View>
             )}
+            <View className=" bg-[#F9F9F9] mt-5 pv-5">
+              <TodaysSweat refreshKey={refreshKey} />
+            </View>
             <View className="mt-4 bg-[#F9F9F9]">
               <WeeklyStreakCard />
             </View>
-            <View className="mt-4 bg-[#F9F9F9]">
+            <View className="mt-4 bg-[#F9F9F9] mb-5">
               <MoveWithUs />
             </View>
-            <View className="mt-4 bg-[#F9F9F9] pb-8">
-              <TodaysSweat refreshKey={refreshKey} />
-            </View>
+
             {showUpdateBanner ? <View style={{ height: 64 }} /> : null}
           </View>
         </ScrollView>

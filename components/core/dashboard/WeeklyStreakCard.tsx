@@ -23,30 +23,49 @@ export default function WeeklyStreakCard() {
     convexQuery(api.challengeCompletions.getUserStreaksForMonth, {})
   );
 
-  const streakBonusPoints = useQuery(api.admin.getAppConfig, { key: 'streakBonusPoints' });
+  const streakBonusPoints = useQuery(api.admin.getAppConfig, {
+    key: 'streakBonusPoints',
+  });
 
   return (
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       {/* Header row */}
       <View className="flex-row items-start justify-between">
-        <View className="flex-row items-center gap-x-2">
-          <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Weekly Streak</Text>
-          <TouchableOpacity onPress={() => setShowStreakInfo(true)}>
-            <Info size={20} color="#c7c7c7" weight="fill" />
-          </TouchableOpacity>
+        {/* Left title */}
+        <View className="flex-1 pr-2">
+          <View className="flex-row items-center">
+            <Text
+              className="font-heading text-xl  font-bold text-[#1A1A1A]"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}>
+              Weekly Streak
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setShowStreakInfo(true)}
+              className="ml-1"
+            >
+              <Info size={20} color="#c7c7c7" weight="fill" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View className="items-end">
-          <View className="flex-row items-center gap-x-1">
-            <Text className="font-body text-sm font-bold text-primary-500">
+
+        {/* Right streak */}
+        <View className="shrink-0 items-end">
+          <View className="flex-row items-center">
+            <Text className="font-body text-[9px] font-bold text-primary-500">
               {streakData?.weeklyStreaks ?? 0} Weeks Streak
             </Text>
+
             <Image
               source={require('~/assets/icons/Flame.png')}
-              style={{ width: 16, height: 16 }}
+              style={{ width: 11, height: 11, marginLeft: 2 }}
               contentFit="contain"
             />
           </View>
-          <Text className="font-body text-sm text-[#313131]">
+
+          <Text className="font-body text-[9px] text-[#313131]">
             {streakData?.currentWeekDays ?? 0}/5 days
           </Text>
         </View>

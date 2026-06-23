@@ -149,6 +149,24 @@ export const completeChallenge = mutation({
     const rawPoints = challenge.points + repostBonus;
     const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
 
+    const previousCompletions = await ctx.db
+      .query('challengeCompletions')
+      .withIndex('by_user_challenge_date', (q) =>
+        q.eq('userId', userId).eq('challengeId', args.challengeId)
+      )
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
+
+    const sortedPreviousCompletions = previousCompletions.sort(
+      (a, b) => a._creationTime - b._creationTime
+    );
+
+    const attemptNumber = sortedPreviousCompletions.length + 1;
+
+    const day1Completion = sortedPreviousCompletions.find(
+      (completion) => completion.videoStorageId
+    );
+
     const completionId = await ctx.db.insert('challengeCompletions', {
       userId,
       challengeId: args.challengeId,
@@ -157,6 +175,16 @@ export const completeChallenge = mutation({
       videoStorageId: args.videoStorageId,
       allowRepost: args.allowRepost,
       caption: args.caption,
+      removed: false,
+
+      attemptNumber,
+      comparisonMode: day1Completion?.videoStorageId ? 'day1_vs_current' : 'day1_baseline',
+
+      ...(day1Completion?._id ? { day1CompletionId: day1Completion._id } : {}),
+
+      ...(day1Completion?.videoStorageId
+        ? { comparisonBaseVideoStorageId: day1Completion.videoStorageId }
+        : {}),
     });
 
     // Increment total completion count on the challenge
@@ -182,12 +210,52 @@ export const completeChallenge = mutation({
 
     // Schedule video merge via Trigger.dev — post will be created after merge completes
     if (args.videoStorageId) {
-      const adminVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
       const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
-      if (adminVideoUrl && userVideoUrl) {
+
+      const day1VideoUrl = day1Completion?.videoStorageId
+        ? await ctx.storage.getUrl(day1Completion.videoStorageId)
+        : null;
+
+      // Important:
+      // We keep old Trigger payload names: adminVideoUrl + userVideoUrl.
+      // But adminVideoUrl can now be either:
+      // 1. User's Day 1 video, if available
+      // 2. Instructor video, if this is the first attempt
+      const adminVideoUrl = day1VideoUrl
+        ? day1VideoUrl
+        : await ctx.storage.getUrl(challenge.instructionalVideo);
+
+      console.log('Transformation merge check:', {
+        userId,
+        challengeId: args.challengeId,
+        completionId,
+        attemptNumber,
+        day1CompletionId: day1Completion?._id,
+        day1VideoStorageId: day1Completion?.videoStorageId,
+        hasDay1VideoUrl: Boolean(day1VideoUrl),
+        hasAdminVideoUrl: Boolean(adminVideoUrl),
+        hasUserVideoUrl: Boolean(userVideoUrl),
+        leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
+      });
+
+      if (!adminVideoUrl || !userVideoUrl) {
+        console.log('Video merge skipped. Missing video URL.', {
+          completionId,
+          hasAdminVideoUrl: Boolean(adminVideoUrl),
+          hasUserVideoUrl: Boolean(userVideoUrl),
+        });
+      } else {
+        console.log('Scheduling video merge...', {
+          completionId,
+          attemptNumber,
+          leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
+        });
+
         await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
+          // Keep old production payload names
           adminVideoUrl,
           userVideoUrl,
+
           challengeCompletionId: completionId,
           userId,
           caption: args.caption?.trim() || '',
@@ -398,7 +466,7 @@ export const getPublishedChallenges = query({
     const challenges = await challengesQuery.collect();
 
     // Filter out expired challenges and resolve cover image URLs
-    const results : any[] = [];
+    const results: any[] = [];
 
     for (const challenge of challenges) {
       if (challenge.endDate && todayStr >= challenge.endDate) continue;
@@ -487,6 +555,61 @@ export const getPointsEarnedToday = query({
       cap: dailyCap,
       isCapped: !isPremium && earned >= dailyCap,
       isPremium,
+    };
+  },
+});
+
+export const getChallengeProgress = query({
+  args: {
+    challengeId: v.id('challenges'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      return {
+        completedCount: 0,
+        nextAttemptNumber: 1,
+        attemptTitle: 'First time doing this duet',
+        day1CompletionId: null,
+        day1VideoUrl: null,
+        lastVideoUrl: null,
+      };
+    }
+
+    const completions = await ctx.db
+      .query('challengeCompletions')
+      .withIndex('by_user_challenge_date', (q) =>
+        q.eq('userId', userId).eq('challengeId', args.challengeId)
+      )
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
+
+    const sorted = completions.sort((a, b) => a._creationTime - b._creationTime);
+
+    const day1Completion = sorted.find((completion) => completion.videoStorageId);
+    const lastCompletion = [...sorted].reverse().find((completion) => completion.videoStorageId);
+
+    const day1VideoUrl = day1Completion?.videoStorageId
+      ? await ctx.storage.getUrl(day1Completion.videoStorageId)
+      : null;
+
+    const lastVideoUrl = lastCompletion?.videoStorageId
+      ? await ctx.storage.getUrl(lastCompletion.videoStorageId)
+      : null;
+
+    const nextAttemptNumber = sorted.length + 1;
+
+    return {
+      completedCount: sorted.length,
+      nextAttemptNumber,
+      attemptTitle:
+        sorted.length === 0
+          ? 'First time doing this duet'
+          : `Day 1 vs Attempt ${nextAttemptNumber}`,
+      day1CompletionId: day1Completion?._id ?? null,
+      day1VideoUrl,
+      lastVideoUrl,
     };
   },
 });

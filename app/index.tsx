@@ -10,6 +10,7 @@ import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
 import { getData, storeData } from '~/utils/storage';
+import { hasActiveSubscription } from '~/utils/subscription';
 
 export default function Home() {
   const convex = useConvex();
@@ -19,30 +20,62 @@ export default function Home() {
 
   const authenticateUser = async () => {
     setIsLoading(true);
-    const user = await convex.query(api.users.current);
 
-    if (user) {
+    try {
+      const user = await convex.query(api.users.current);
+
+      if (!user) return;
+
       await activateUser();
-      setCurrentUser(user);
+
+      // Wait until RevenueCat identifies this user.
+      await setCurrentUser(user);
+
       storeData('autoSync', {
         enabled: user.autoSyncEnabled ?? true,
       });
 
       router.dismissAll();
 
-      if (!user?.name || !user?.birthdate) {
-        router.replace({ pathname: '/(auth)/setup-profile' });
-      } else if (!user?.activityGoal) {
-        router.replace({ pathname: '/(auth)/setup-activity-goal' });
-      } else if (!user?.expoPushToken && !getData('skipPushPermission')) {
-        router.replace({ pathname: '/(auth)/ask-push-permission' });
-      } else if (!user?.onboarded) {
-        router.replace({ pathname: '/(auth)/ask-health-permission' });
-      } else {
-        router.replace({ pathname: '/(tabs)/dashboard' });
+      if (!user.name || !user.birthdate) {
+        router.replace('/(auth)/setup-profile');
+        return;
       }
+
+      if (!user.activityGoal) {
+        router.replace('/(auth)/setup-activity-goal');
+        return;
+      }
+
+      if (!user.expoPushToken && !getData('skipPushPermission')) {
+        router.replace('/(auth)/ask-push-permission');
+        return;
+      }
+
+      if (!user.onboarded) {
+        router.replace('/(auth)/ask-health-permission');
+        return;
+      }
+
+      // Onboarding is complete. Now enforce subscription.
+      const isSubscribed = await hasActiveSubscription(user);
+
+      if (isSubscribed) {
+        router.replace('/(tabs)/dashboard');
+      } else {
+        router.replace({
+          pathname: '/subscription',
+          params: {
+            redirectTo: '/(tabs)/dashboard',
+            showBackToLogin: 'true',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -98,9 +131,7 @@ export default function Home() {
                       }
                     : { elevation: 4 }),
                 }}>
-                <Text
-                  className="text-2xl text-white"
-                  style={{ fontFamily: 'Inter_700Bold' }}>
+                <Text className="text-2xl text-white" style={{ fontFamily: 'Inter_700Bold' }}>
                   Start Today
                 </Text>
               </Pressable>
@@ -130,9 +161,7 @@ export default function Home() {
                 <Text className="text-lg text-white">
                   Back for more?{' '}
                   <Link href="/(auth)/email">
-                    <Text
-                      className="text-lg text-white"
-                      style={{ fontFamily: 'Inter_700Bold' }}>
+                    <Text className="text-lg text-white" style={{ fontFamily: 'Inter_700Bold' }}>
                       Log in here.
                     </Text>
                   </Link>
