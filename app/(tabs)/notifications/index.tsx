@@ -88,7 +88,13 @@ export default function TabRank() {
     );
   }
 
-  const entries = (results as Entry[]).filter((e) => e.userId !== currentUser?._id);
+  const allEntries = results as Entry[];
+
+  const meEntryFromList = allEntries.find((e) => e.userId === currentUser?._id);
+
+  const myRank = (header.me as { rank?: number } | null | undefined)?.rank ?? meEntryFromList?.rank;
+
+  const entries = allEntries.filter((e) => e.userId !== currentUser?._id);
   const visibleEntries = isPro ? entries : entries.slice(0, FREE_VISIBLE_COUNT);
   const hiddenEntries = isPro
     ? []
@@ -99,6 +105,8 @@ export default function TabRank() {
     if (status === 'CanLoadMore') loadMore(PREMIUM_PAGE_SIZE);
   };
 
+  const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
+
   const ListHeader = (
     <View>
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
@@ -107,9 +115,11 @@ export default function TabRank() {
       <Podium podium={header.podium} onPressEntry={goToUser} />
       <View className="overflow-hidden rounded-t-3xl bg-white">
         <MeRow
+          rank={myRank}
           avatarUri={currentUser?.image ?? undefined}
           displayTotalPoints={header.me?.displayTotalPoints ?? 0}
           targetPoints={header.targetPoints}
+          userName={userName}
           onPress={currentUser?._id ? () => goToUser(currentUser._id) : undefined}
         />
       </View>
@@ -124,6 +134,7 @@ export default function TabRank() {
             {hiddenEntries.map((e) => (
               <RankRow
                 key={e.userId}
+                rank={e.rank}
                 name={e.name}
                 avatarUri={e.image}
                 displayTotalPoints={e.displayTotalPoints}
@@ -154,6 +165,7 @@ export default function TabRank() {
           renderItem={({ item }: { item: Entry }) => (
             <View className="bg-white">
               <RankRow
+                rank={item.rank}
                 name={item.name}
                 avatarUri={item.image}
                 displayTotalPoints={item.displayTotalPoints}

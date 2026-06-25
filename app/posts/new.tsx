@@ -264,7 +264,7 @@ export default function NewPost() {
                   multiline
                   autoFocus
                   className="border-0 bg-transparent text-base"
-                  placeholder={`What's on your mind, ${userName}? Share your progress or just check in with the group`}
+                  placeholder={`What's on your mind, ${userName} ? Share your progress or just check in with the group`}
                   value={body}
                   onChangeText={(text) => {
                     setError(null);

@@ -116,9 +116,9 @@ export default function ChallengeCard({
             <Text className="font-heading text-lg font-bold text-white" numberOfLines={1}>
               {challenge.name}
             </Text>
-            <Text className="font-body text-sm text-white">with {challenge.createdBy}</Text>
+            <Text className="font-body text-sm text-white">{challenge?.tag}</Text>
           </View>
-          <Text className="font-body text-sm text-white">{totalCompletions} completed</Text>
+          <Text className="font-body text-sm text-white">{totalCompletions} Done</Text>
         </View>
       </View>
     </TouchableOpacity>

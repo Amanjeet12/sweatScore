@@ -1,10 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LegendList } from '@legendapp/list';
 import { usePaginatedQuery, useQuery } from 'convex/react';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, View, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,6 +15,7 @@ import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
 const TabShare = () => {
@@ -23,6 +23,7 @@ const TabShare = () => {
   const { postId } = useLocalSearchParams();
   const [channel, setChannel] = useState<number>(0);
   const { isPro } = useRevenueCat();
+  const currentUser = useAuthStore((state) => state.currentUser);
 
   const pinnedPost = useQuery(api.posts.getPinnedPost);
 
@@ -38,6 +39,15 @@ const TabShare = () => {
     }
   };
 
+  const handleCreatePost = () => {
+    if (!isPro) {
+      router.push('/(tabs)/share/paywall');
+      return;
+    }
+
+    router.push('/posts/new');
+  };
+
   const renderPinnedPost = () => {
     if (!pinnedPost) return null;
 
@@ -50,6 +60,7 @@ const TabShare = () => {
 
   useEffect(() => {
     const CommunityGuidelinesShown = storage.getBoolean('communityGuidelinesShown');
+
     if (!CommunityGuidelinesShown && isPro) {
       router.push({
         pathname: '/legals/community-guidelines',
@@ -66,8 +77,6 @@ const TabShare = () => {
     }
   }, [postId]);
 
-  // Stop any playing community video when the user navigates away from this
-  // screen (other tab or pushing a new screen on top).
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -75,6 +84,10 @@ const TabShare = () => {
       };
     }, [])
   );
+
+  const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
+  const userInitial = userName.charAt(0).toUpperCase();
+  const userImage = currentUser?.image?.trim();
 
   return (
     <MenuProvider>
@@ -85,54 +98,59 @@ const TabShare = () => {
             headerShadowVisible: false,
           }}
         />
+
         <View
           className="flex-1 flex-col"
           style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-          <View className="mt-4 border-b border-b-[#EEEAE5] pb-4">
-            <View className="mb-4 flex-row items-center justify-between px-4">
-              <View>
-                <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Community</Text>
-                <Text className="font-body text-sm text-[#838383]">Sweat Sisters</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (!isPro) {
-                    router.push('/(tabs)/share/paywall');
-                    return;
-                  }
-                  router.push('/posts/new');
-                }}
-                className="h-10 w-10 overflow-hidden rounded-full">
-                <LinearGradient
-                  colors={['#FF8A65', '#FF5C1A']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="add" size={24} color="white" />
-                </LinearGradient>
-              </TouchableOpacity>
+          <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] px-4 pb-5 pt-5">
+            <View>
+              <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">Community</Text>
+              <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
             </View>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleCreatePost}
+              className="mt-4 flex-row items-center rounded-full border border-[#EEE3DA] bg-white px-3 py-2.5">
+              <View style={styles.avatar}>
+                {userImage ? (
+                  <Image
+                    source={{ uri: userImage }}
+                    style={StyleSheet.absoluteFillObject}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text className="font-heading text-sm font-bold text-white">{userInitial}</Text>
+                )}
+              </View>
+
+              <Text className="flex-1 font-body text-sm text-[#8B8B8B]">
+                What&apos;s on your mind{' '}
+                <Text className="font-body text-sm font-bold text-[#8B8B8B]">
+                  {userName ?? 'User'}?
+                </Text>
+              </Text>
+            </TouchableOpacity>
           </View>
+
           {status === 'LoadingFirstPage' ? (
             <ScreenLoading className="bg-transparent" />
           ) : (
-            <>
-              <View className="flex-1 flex-col bg-white">
-                <LegendList
-                  showsVerticalScrollIndicator={false}
-                  data={results}
-                  renderItem={({ item }: { item: (typeof results)[number] }) => (
-                    <PostRow post={item} />
-                  )}
-                  keyExtractor={(item) => item._id.toString()}
-                  ListHeaderComponent={renderPinnedPost}
-                  ListFooterComponent={<View className="mb-4" />}
-                  onEndReached={loadMorePages}
-                  onEndReachedThreshold={2.0}
-                  recycleItems
-                />
-              </View>
-            </>
+            <View className="flex-1 flex-col bg-white">
+              <LegendList
+                showsVerticalScrollIndicator={false}
+                data={results}
+                renderItem={({ item }: { item: (typeof results)[number] }) => (
+                  <PostRow post={item} />
+                )}
+                keyExtractor={(item) => item._id.toString()}
+                ListHeaderComponent={renderPinnedPost}
+                ListFooterComponent={<View className="mb-4" />}
+                onEndReached={loadMorePages}
+                onEndReachedThreshold={2.0}
+                recycleItems
+              />
+            </View>
           )}
         </View>
       </SafeAreaView>
@@ -140,4 +158,16 @@ const TabShare = () => {
   );
 };
 
+const styles = StyleSheet.create({
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF5C1A',
+  },
+});
 export default TabShare;

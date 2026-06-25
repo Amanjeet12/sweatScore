@@ -1,8 +1,9 @@
-import { WarningCircle, CheckCircle } from 'phosphor-react-native';
-import { View } from 'react-native';
+import { CheckCircle, WarningCircle } from 'phosphor-react-native';
+import { View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '../ui/text';
-import { Toast, ToastDescription } from '../ui/toast';
+import { Toast } from '../ui/toast';
 
 import { colors } from '~/utils/constants';
 
@@ -12,22 +13,61 @@ interface ToastProps {
 }
 
 export const ToastMessage = ({ message, action }: ToastProps) => {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isError = action === 'error';
+
   return (
-    <Toast action={action} variant="outline">
-      <ToastDescription className="text-center font-semibold">
-        <View className="flex-row items-center gap-x-2">
-          <View>
-            {action === 'error' ? (
-              <WarningCircle size={24} color={colors.error} weight="duotone" />
-            ) : (
-              <CheckCircle size={24} color={colors.success} weight="duotone" />
-            )}
-          </View>
-          <View>
-            <Text className="text-center font-semibold">{message}</Text>
-          </View>
+    <Toast
+      action={action}
+      variant="solid"
+      className="rounded-2xl border-0 px-4 py-3"
+      style={{
+        marginTop: insets.top + 10,
+        width: width - 32,
+        maxWidth: width - 32,
+        alignSelf: 'center',
+        backgroundColor: isError ? '#FEF2F2' : '#F0FDF4',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+      }}>
+      <View
+        style={{
+          width: '100%',
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            marginRight: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: isError ? '#FEE2E2' : '#DCFCE7',
+          }}>
+          {isError ? (
+            <WarningCircle size={22} color={colors.error} weight="duotone" />
+          ) : (
+            <CheckCircle size={22} color={colors.success} weight="duotone" />
+          )}
         </View>
-      </ToastDescription>
+
+        <Text
+          style={{
+            flex: 1,
+            flexShrink: 1,
+            color: isError ? '#991B1B' : '#166534',
+            fontSize: 14,
+            lineHeight: 20,
+            fontWeight: '600',
+          }}>
+          {message}
+        </Text>
+      </View>
     </Toast>
   );
 };

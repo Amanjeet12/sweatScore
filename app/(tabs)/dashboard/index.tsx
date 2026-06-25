@@ -5,7 +5,15 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, RefreshControl, ScrollView, View, Platform, AppState } from 'react-native';
+import {
+  Linking,
+  RefreshControl,
+  ScrollView,
+  View,
+  Platform,
+  AppState,
+  TouchableOpacity,
+} from 'react-native';
 import { getSdkStatus, SdkAvailabilityStatus } from 'react-native-health-connect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +35,9 @@ import { useRefreshStore } from '~/store/useRefreshStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { storage } from '~/utils/storage';
+
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowRight } from 'phosphor-react-native';
 
 function getCurrentWeekMondayStr(): string {
   const now = new Date();
@@ -204,13 +215,46 @@ export default function TabDashboard() {
                 />
               </View>
             )}
-            <View className=" bg-[#F9F9F9] mt-5 pv-5">
+            <View className=" pv-5 mt-5 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />
             </View>
             <View className="mt-4 bg-[#F9F9F9]">
               <WeeklyStreakCard />
             </View>
-            <View className="mt-4 bg-[#F9F9F9] mb-5">
+            {/* <View className="mt-4 bg-[#F9F9F9] px-5">
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/(tabs)/dashboard/workouts')}
+                className="my-4 overflow-hidden rounded-2xl"
+                style={{
+                  shadowColor: '#F97316',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.18,
+                  shadowRadius: 12,
+                  elevation: 5,
+                }}>
+                <LinearGradient
+                  colors={['#F97316', '#FB923C']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  className="rounded-2xl p-5">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1 pr-4">
+                      <Text className="text-xl font-bold text-white">Learn from Creators</Text>
+
+                      <Text className="mt-1 text-sm font-medium text-white/85">
+                        Browse expert workouts made for you
+                      </Text>
+                    </View>
+
+                    <View className="h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                      <ArrowRight size={22} color="white" weight="bold" />
+                    </View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View> */}
+            <View className="mb-5 mt-4 bg-[#F9F9F9]">
               <MoveWithUs />
             </View>
 
