@@ -14,13 +14,7 @@ import { CHALLENGE_TAGS } from '~/convex/challenges';
 
 const ALL_FILTERS = ['All', ...CHALLENGE_TAGS] as const;
 
-function ChallengeCardWithData({
-  challenge,
-  isPremium,
-}: {
-  challenge: any;
-  isPremium: boolean;
-}) {
+function ChallengeCardWithData({ challenge, isPremium }: { challenge: any; isPremium: boolean }) {
   const cooldown = useQuery(api.challengeCompletions.getChallengeCooldown, {
     challengeId: challenge._id,
   });
@@ -63,7 +57,7 @@ export default function ChallengesScreen() {
           title: '',
           headerTitle: () => (
             <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
-              Moves
+              Progress Videos{' '}
             </Text>
           ),
           headerShadowVisible: false,
@@ -117,9 +111,7 @@ export default function ChallengesScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <ChallengeCardWithData challenge={item} isPremium={isPro} />
-          )}
+          renderItem={({ item }) => <ChallengeCardWithData challenge={item} isPremium={isPro} />}
           ListEmptyComponent={
             <Text className="mt-8 text-center text-base text-gray-500">No challenges found</Text>
           }

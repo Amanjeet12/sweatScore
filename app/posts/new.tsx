@@ -152,28 +152,33 @@ export default function NewPost() {
       allowsEditing: true,
       quality: 0.5,
       selectionLimit: 1,
-      videoMaxDuration: 300,
+      videoMaxDuration: 60, // 60 seconds
       preferredAssetRepresentationMode:
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
     });
 
     if (!result.canceled) {
       const localmedia = result.assets[0];
-      if (localmedia.duration && localmedia.duration > 300000) {
-        setError('Video must be 5 minutes or less');
+
+      // duration comes in milliseconds, so 60 seconds = 60000 ms
+      if (localmedia.duration && localmedia.duration > 60000) {
+        setError('Video must be 1 minute or less');
         setMediaLoading(false);
         return;
       }
+
       setMedia(localmedia);
       setMediaLoading(false);
 
-      // Generate thumbnail from video
       try {
-        const thumb = await VideoThumbnails.getThumbnailAsync(localmedia.uri, { time: 0 });
+        const thumb = await VideoThumbnails.getThumbnailAsync(localmedia.uri, {
+          time: 0,
+        });
+
         setMediaUri(thumb.uri);
 
-        // Upload thumbnail
         const [thumbErr, thumbUploadUrl] = await CatchPromise(generateUploadUrl());
+
         if (!thumbErr && thumbUploadUrl) {
           const thumbTask = FileSystem.createUploadTask(thumbUploadUrl, thumb.uri, {
             fieldName: 'file',
@@ -181,6 +186,7 @@ export default function NewPost() {
             uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
             headers: { 'Content-Type': 'image/jpeg' },
           });
+
           const thumbResult = await thumbTask.uploadAsync();
           setThumbnailKey(JSON.parse(thumbResult?.body ?? '{}').storageId);
         }

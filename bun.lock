@@ -40,6 +40,7 @@
         "convex": "^1.22.0",
         "date-fns": "^4.1.0",
         "expo": "~52.0.47",
+        "expo-av": "~15.0.2",
         "expo-blur": "~14.0.3",
         "expo-camera": "~16.0.18",
         "expo-constants": "~17.0.8",
@@ -1615,6 +1616,8 @@
     "expo-application": ["expo-application@6.0.2", "", { "peerDependencies": { "expo": "*" } }, "sha512-qcj6kGq3mc7x5yIb5KxESurFTJCoEKwNEL34RdPEvTB/xhl7SeVZlu05sZBqxB1V4Ryzq/LsCb7NHNfBbb3L7A=="],
 
     "expo-asset": ["expo-asset@11.0.5", "", { "dependencies": { "@expo/image-utils": "^0.6.5", "expo-constants": "~17.0.8", "invariant": "^2.2.4", "md5-file": "^3.2.3" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-TL60LmMBGVzs3NQcO8ylWqBumMh4sx0lmeJsn7+9C88fylGDhyyVnKZ1PyTXo9CVDBkndutZx2JUEQWM9BaiXw=="],
+
+    "expo-av": ["expo-av@15.0.2", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*", "react-native-web": "*" }, "optionalPeers": ["react-native-web"] }, "sha512-AHIHXdqLgK1dfHZF0JzX3YSVySGMrWn9QtPzaVjw54FAzvXfMt4sIoq4qRL/9XWCP9+ICcCs/u3EcvmxQjrfcA=="],
 
     "expo-blur": ["expo-blur@14.0.3", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-BL3xnqBJbYm3Hg9t/HjNjdeY7N/q8eK5tsLYxswWG1yElISWZmMvrXYekl7XaVCPfyFyz8vQeaxd7q74ZY3Wrw=="],
 

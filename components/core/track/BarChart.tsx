@@ -14,19 +14,30 @@ import { formatPoints } from '~/utils/formatter';
 
 const CHART_HEIGHT = 220;
 const BAR_WIDTH = 28;
+const DEFAULT_GREY = '#D9D9D9';
 
 export type Bar = {
   label: string;
   value: number;
   showMedal: boolean;
+  color?: string;
 };
 
 export type BarChartProps = {
   bars: Bar[];
 };
 
-function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue: number }) {
-  const targetHeight = (bar.value / maxValue) * CHART_HEIGHT;
+function BarColumn({
+  bar,
+  index,
+  maxValue,
+}: {
+  bar: Bar;
+  index: number;
+  maxValue: number;
+}) {
+  const targetHeight = bar.value > 0 ? (bar.value / maxValue) * CHART_HEIGHT : 0;
+
   const h = useSharedValue(0);
   const opacity = useSharedValue(0);
 
@@ -34,14 +45,23 @@ function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue
     h.value = 0;
     h.value = withDelay(
       index * 50,
-      withTiming(targetHeight, { duration: 500, easing: Easing.out(Easing.cubic) })
+      withTiming(targetHeight, {
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+      })
     );
+
     opacity.value = 0;
     opacity.value = withDelay(index * 50 + 300, withTiming(1, { duration: 250 }));
   }, [targetHeight, bar.value, index]);
 
-  const barStyle = useAnimatedStyle(() => ({ height: h.value }));
-  const labelStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const barStyle = useAnimatedStyle(() => ({
+    height: h.value,
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
     <View className="items-center" style={{ flex: 1 }}>
@@ -50,7 +70,8 @@ function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue
           height: CHART_HEIGHT + 40,
           justifyContent: 'flex-end',
           alignItems: 'center',
-        }}>
+        }}
+      >
         <Animated.View style={[labelStyle, { alignItems: 'center', marginBottom: 2 }]}>
           {bar.showMedal && (
             <Image
@@ -59,18 +80,20 @@ function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue
               contentFit="contain"
             />
           )}
+
           {bar.value > 0 && (
             <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
               {formatPoints(bar.value)}
             </Text>
           )}
         </Animated.View>
+
         <Animated.View
           style={[
             barStyle,
             {
               width: BAR_WIDTH,
-              backgroundColor: '#F76B1C',
+              backgroundColor: bar.color ?? DEFAULT_GREY,
               borderTopLeftRadius: 4,
               borderTopRightRadius: 4,
             },
@@ -88,12 +111,13 @@ export default function BarChart({ bars }: BarChartProps) {
     <View style={{ minHeight: CHART_HEIGHT + 80 }}>
       <View className="flex-row items-end" style={{ height: CHART_HEIGHT + 40 }}>
         {bars.map((bar, i) => (
-          <BarColumn key={bar.label} bar={bar} index={i} maxValue={maxValue} />
+          <BarColumn key={`${bar.label}-${i}`} bar={bar} index={i} maxValue={maxValue} />
         ))}
       </View>
+
       <View className="flex-row" style={{ marginTop: 8 }}>
-        {bars.map((bar) => (
-          <View key={`label-${bar.label}`} style={{ flex: 1, alignItems: 'center' }}>
+        {bars.map((bar, i) => (
+          <View key={`label-${bar.label}-${i}`} style={{ flex: 1, alignItems: 'center' }}>
             <Text className="font-body text-sm text-[#838383]">{bar.label}</Text>
           </View>
         ))}

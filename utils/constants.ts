@@ -80,7 +80,7 @@ export const healthPermissionsAndroid = [
 ];
 
 export const externalLinks = {
-  whatsappSupport: 'https://api.whatsapp.com/message/KQX7LB4AQN7WM1',
+  whatsappSupport: 'https://wa.me/447495584972',
   startEarningPoints:
     'https://support.sweatscore.com/en/help/articles/4312979-droplet-how-to-earn-sweat-points',
   rewardsPage: 'https://sweatscore.com/rewards',

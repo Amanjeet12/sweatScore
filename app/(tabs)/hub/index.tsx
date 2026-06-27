@@ -61,7 +61,7 @@ export default function TabSweat() {
 
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
         <View className="items-center px-6 py-4">
-          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Moves</Text>
+          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Progress Videos</Text>
         </View>
       </View>
 

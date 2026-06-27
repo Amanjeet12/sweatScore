@@ -21,7 +21,7 @@ export default function MoveWithUs() {
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       {/* Header row */}
       <View className="flex-row items-center justify-between">
-        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Move</Text>
+        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Progress</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard/challenges')}>
           <Text className="font-body text-sm font-medium text-primary-500">See all</Text>
         </TouchableOpacity>

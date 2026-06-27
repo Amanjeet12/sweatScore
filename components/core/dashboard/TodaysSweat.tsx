@@ -237,7 +237,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
         />
 
         <SweatProgressRow
-          title="Moves"
+          title="Progress"
           value={selectedStats.moves}
           target={selectedTargets.moves}
           completed={selectedStats.moves >= selectedTargets.moves}

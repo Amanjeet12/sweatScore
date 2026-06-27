@@ -8,7 +8,7 @@ const TABS: { id: Category; label: string }[] = [
   { id: 'points', label: 'Points' },
   { id: 'steps', label: 'Steps' },
   { id: 'activeMinutes', label: 'Active Min' },
-  { id: 'moves', label: 'Moves' },
+  { id: 'moves', label: 'Progress' },
 ];
 
 export type CategoryTabsProps = {
@@ -21,8 +21,12 @@ export default function CategoryTabs({ value, onChange }: CategoryTabsProps) {
     <View className="flex-row items-center justify-between">
       {TABS.map((t) => {
         const active = value === t.id;
+
         return (
-          <TouchableOpacity key={t.id} onPress={() => onChange(t.id)} activeOpacity={0.7}>
+          <TouchableOpacity
+            key={t.id}
+            onPress={() => onChange(t.id)}
+            activeOpacity={0.7}>
             <Text
               className={
                 active

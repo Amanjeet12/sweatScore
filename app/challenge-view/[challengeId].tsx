@@ -197,7 +197,7 @@ export default function ChallengeViewScreen() {
                     params: { challengeId },
                   });
                 }}>
-                <ButtonText className="text-lg font-bold text-white">Let's Go!</ButtonText>
+                <ButtonText className="text-lg font-bold text-white">Record progress</ButtonText>
               </LoadingButton>
             )}
           </View>

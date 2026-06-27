@@ -102,6 +102,7 @@ export default function AskHealthPermission() {
         pathname: '/subscription',
         params: {
           redirectTo: '/(tabs)/dashboard',
+          showBackToLogin: 'true',
         },
       });
     }

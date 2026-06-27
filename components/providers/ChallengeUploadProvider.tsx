@@ -289,9 +289,9 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         await deleteLocalVideo(job.videoUri);
 
         if (result?.pointsEarned > 0) {
-          showToast(`Challenge submitted. +${result.pointsEarned} pts added.`, 'success');
+          showToast(`Progress submitted. +${result.pointsEarned} pts added.`, 'success');
         } else {
-          showToast('Challenge submitted successfully.', 'success');
+          showToast('Progress submitted successfully.', 'success');
         }
       } catch (error) {
         const latestJob = jobsRef.current.find((candidate) => candidate.id === jobId);

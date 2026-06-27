@@ -23,32 +23,36 @@ export default function AskPushPermission() {
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
 
   const registerForPushNotificationsAsync = async () => {
-    setIsLoading(true);
-    let token;
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
-      if (finalStatus !== 'granted') {
-        setIsLoading(false);
-        return;
-      }
-
-      token = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig?.extra?.eas.projectId,
-      });
-    } else {
-      setIsLoading(false);
+    if (!Device.isDevice) {
       alert('Must be using a physical device for Push notifications');
+      return;
     }
 
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      return;
+    }
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
+
+    if (!projectId) {
+      console.log('Expo projectId missing');
+      return;
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+
     if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('default', {
+      await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
@@ -56,17 +60,28 @@ export default function AskPushPermission() {
       });
     }
 
-    if (token && token.data) {
+    if (token?.data) {
       await CatchPromise(updateExpoPushToken({ expoPushToken: token.data }));
     }
-    setIsLoading(false);
   };
 
   const handleAllow = async () => {
-    await registerForPushNotificationsAsync();
-    const user = await convex.query(api.users.current);
-    setCurrentUser(user);
-    router.push('/(auth)/ask-health-permission');
+    setIsLoading(true);
+
+    try {
+      await registerForPushNotificationsAsync();
+
+      const user = await convex.query(api.users.current);
+
+      if (user) {
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.log('Push permission error:', error);
+    } finally {
+      setIsLoading(false);
+      router.replace('/(auth)/ask-health-permission');
+    }
   };
 
   const handleSkip = async () => {

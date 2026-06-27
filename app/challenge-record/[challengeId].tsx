@@ -28,6 +28,7 @@ import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
+import { Audio } from 'expo-av';
 
 const COUNTDOWN_SECONDS = 5;
 const MIN_STOP_RECORDING_SECONDS = 5;
@@ -62,7 +63,7 @@ export default function DuetRecordingScreen() {
   const cancelledByUserRef = useRef(false);
   const preserveRecordedVideoOnUnmountRef = useRef(false);
   const recordedVideoUriRef = useRef<string | null>(null);
-
+  const countdownSoundRef = useRef<Audio.Sound | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
@@ -162,6 +163,39 @@ export default function DuetRecordingScreen() {
 
     return () => subscription.remove();
   }, [state]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCountdownSound = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
+          shouldPlay: false,
+          volume: 1,
+        });
+
+        if (isMounted) {
+          countdownSoundRef.current = sound;
+        } else {
+          await sound.unloadAsync();
+        }
+      } catch {
+        // Sound is optional. Recording should still work.
+      }
+    };
+
+    void loadCountdownSound();
+
+    return () => {
+      isMounted = false;
+      countdownSoundRef.current?.unloadAsync().catch(() => {});
+      countdownSoundRef.current = null;
+    };
+  }, []);
 
   const stopRecording = useCallback(() => {
     if (!isRecordingRef.current) return;
@@ -278,6 +312,20 @@ export default function DuetRecordingScreen() {
     }
   }, []);
 
+  const playCountdownSound = useCallback(async () => {
+    try {
+      const sound = countdownSoundRef.current;
+
+      if (!sound) return;
+
+      await sound.stopAsync();
+      await sound.setPositionAsync(0);
+      await sound.playAsync();
+    } catch {
+      // Ignore sound errors.
+    }
+  }, []);
+
   const startCountdown = useCallback(() => {
     if (existingUploadJob) {
       Alert.alert(
@@ -294,6 +342,9 @@ export default function DuetRecordingScreen() {
     setState('countdown');
     setCountdownValue(COUNTDOWN_SECONDS);
 
+    // Plays 4 sec sound immediately after Start Recording click
+    void playCountdownSound();
+
     let count = COUNTDOWN_SECONDS;
 
     countdownRef.current = setInterval(() => {
@@ -309,7 +360,7 @@ export default function DuetRecordingScreen() {
         void startRecording();
       }
     }, 1000);
-  }, [existingUploadJob, startRecording]);
+  }, [existingUploadJob, playCountdownSound, startRecording]);
 
   const handleSwitchCamera = useCallback(() => {
     if (isRecordingRef.current) return;
@@ -318,6 +369,8 @@ export default function DuetRecordingScreen() {
   }, []);
 
   const handleCancel = useCallback(() => {
+    countdownSoundRef.current?.stopAsync().catch(() => {});
+
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
@@ -600,7 +653,7 @@ export default function DuetRecordingScreen() {
             <LoadingButton
               variant="solid"
               size="xl"
-              action="negative"
+              action="primary"
               className="h-14 w-full"
               onPress={stopRecording}>
               <ButtonText className="text-lg font-bold text-white">Stop Recording</ButtonText>
@@ -757,7 +810,7 @@ export default function DuetRecordingScreen() {
               disabled={isSubmitting || isCaptionMissing}
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
-                Submit Day {progress?.nextAttemptNumber} for {totalPoints} pts
+                Submit Round {progress?.nextAttemptNumber} for {totalPoints} pts
               </ButtonText>
             </LoadingButton>
 
