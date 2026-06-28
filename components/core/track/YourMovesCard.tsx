@@ -44,6 +44,7 @@ export default function YourMovesCard() {
                   pointsEarned={row.pointsEarned}
                   createdAt={row.createdAt}
                   compositeVideoUrl={row.compositeVideoUrl}
+                  timesCompleted={row.timesCompleted}
                 />
               ))}
             </>
@@ -61,6 +62,7 @@ export default function YourMovesCard() {
                   pointsEarned={row.pointsEarned}
                   createdAt={row.createdAt}
                   compositeVideoUrl={row.compositeVideoUrl}
+                  timesCompleted={row.timesCompleted}
                 />
               ))}
             </>
@@ -79,6 +81,7 @@ export default function YourMovesCard() {
                     pointsEarned={row.pointsEarned}
                     createdAt={row.createdAt}
                     compositeVideoUrl={row.compositeVideoUrl}
+                    timesCompleted={row.timesCompleted}
                   />
                 ))}
               </>

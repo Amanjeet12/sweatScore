@@ -68,6 +68,7 @@ function isRetryableChallengeUploadError(message: string) {
     'unauthorized',
     'user not found',
     'saved recording could not be found',
+    'daily challenge limit reached',
   ];
 
   return !nonRetryableFragments.some((fragment) => normalized.includes(fragment));
@@ -142,7 +143,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
     (message: string, action: 'error' | 'success') => {
       toast.show({
         placement: 'top',
-        duration: 3500,
+        duration: 5500,
         render: () => <ToastMessage message={message} action={action} />,
       });
     },
@@ -392,7 +393,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
       saveJobs((current) => [...current, nextJob]);
 
-      showToast('Upload started in the background. You can keep using the app.', 'success');
+      showToast('Uploading your video. Please keep the app open until it finishes.', 'success');
     },
     [isHydrated, saveJobs, showToast]
   );

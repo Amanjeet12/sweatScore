@@ -110,7 +110,7 @@ export default function Home() {
                 <Text
                   className="text-center text-3xl text-white"
                   style={{ fontFamily: 'Inter_700Bold' }}>
-                  Move Together.{'\n'}Go Further.
+                 Your Comeback {'\n'}Starts Now.
                 </Text>
               </View>
 
@@ -132,7 +132,7 @@ export default function Home() {
                     : { elevation: 4 }),
                 }}>
                 <Text className="text-2xl text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-                  Start Today
+                  Get Started
                 </Text>
               </Pressable>
 

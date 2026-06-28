@@ -37,14 +37,14 @@ export default function WeeklyStreakCard() {
   const weeklyStreaks = streakData?.weeklyStreaks ?? 0;
   const currentWeekDays = streakData?.currentWeekDays ?? 0;
 
+  const weekLabel = weeklyStreaks === 1 ? 'Week' : 'Weeks';
+
   return (
     <View className="rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       <View className="flex-row items-center justify-between">
         <View className="min-w-0 flex-1 pr-3">
           <View className="flex-row items-center">
-            <Text
-              className="font-heading text-xl font-bold text-[#1A1A1A]"
-              numberOfLines={1}>
+            <Text className="font-heading text-xl font-bold text-[#1A1A1A]" numberOfLines={1}>
               Your Streak
             </Text>
 
@@ -59,10 +59,8 @@ export default function WeeklyStreakCard() {
 
         <View style={{ width: 92 }} className="items-end">
           <View className="flex-row items-center">
-            <Text
-              className="font-body text-xs font-bold text-primary-500"
-              numberOfLines={1}>
-              {weeklyStreaks} Streak
+            <Text className="font-body text-xs font-bold text-primary-500" numberOfLines={1}>
+              {weeklyStreaks} {weekLabel}
             </Text>
 
             <Image
@@ -85,9 +83,7 @@ export default function WeeklyStreakCard() {
               <View key={day} className="items-center">
                 <View className="h-9 w-9 rounded-full bg-[#EFEFEF]" />
 
-                <Text className="mt-1 font-body text-[10px] text-[#313131]">
-                  {day}
-                </Text>
+                <Text className="mt-1 font-body text-[10px] text-[#313131]">{day}</Text>
               </View>
             ))}
           </View>

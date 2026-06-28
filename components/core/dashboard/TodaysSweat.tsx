@@ -3,7 +3,7 @@ import { useQuery as useTanstackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { LockSimple } from 'phosphor-react-native';
+import { Check, LockSimple } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
@@ -85,6 +85,7 @@ const getWeekStats = (overview: any): SweatStats => {
     emptyStats
   );
 };
+
 export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
   const [period, setPeriod] = useState<Period>('today');
   const [showTooltip, setShowTooltip] = useState(false);
@@ -123,15 +124,16 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
 
   const todayRow =
     overview?.currentWeek?.days?.find((day: any) => day?.isToday) ??
-    overview?.currentWeek?.days?.[getTodayWeekIndex()];4
+    overview?.currentWeek?.days?.[getTodayWeekIndex()];
+
+  const hasPointsForDate = pointsForDate !== undefined;
 
   const todayStats: SweatStats = {
-    steps: Math.max(toNumber(pointsForDate?.totalSteps), toNumber(todayRow?.steps)),
+    steps: hasPointsForDate ? toNumber(pointsForDate?.totalSteps) : toNumber(todayRow?.steps),
 
-    activeMinutes: Math.max(
-      toNumber(pointsForDate?.totalSteps ?? pointsForDate?.totalZone2Minutes),
-      toNumber(todayRow?.activeMinutes)
-    ),
+    activeMinutes: hasPointsForDate
+      ? toNumber(pointsForDate?.totalZone2Minutes)
+      : toNumber(todayRow?.activeMinutes ?? todayRow?.zone2Minutes),
 
     moves: toNumber(todayRow?.moves),
 
@@ -225,6 +227,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
           value={selectedStats.steps}
           target={selectedTargets.steps}
           completed={selectedStats.steps >= selectedTargets.steps}
+          period={period}
           showDivider
         />
 
@@ -233,14 +236,16 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
           value={selectedStats.activeMinutes}
           target={selectedTargets.activeMinutes}
           completed={selectedStats.activeMinutes >= selectedTargets.activeMinutes}
+          period={period}
           showDivider
         />
 
         <SweatProgressRow
-          title="Progress"
+          title="Progress Videos"
           value={selectedStats.moves}
           target={selectedTargets.moves}
           completed={selectedStats.moves >= selectedTargets.moves}
+          period={period}
         />
       </View>
 
@@ -280,12 +285,14 @@ function SweatProgressRow({
   value,
   target,
   completed,
+  period,
   showDivider,
 }: {
   title: string;
   value: number;
   target: number;
   completed: boolean;
+  period: Period;
   showDivider?: boolean;
 }) {
   const safeTarget = Math.max(1, target);
@@ -301,13 +308,16 @@ function SweatProgressRow({
             height: 32,
             backgroundColor: completed ? '#FFECE4' : '#F1F1F1',
           }}>
-          {completed && (
-            <Image
-              source={require('~/assets/icons/Flame.png')}
-              style={{ width: 22, height: 22 }}
-              contentFit="contain"
-            />
-          )}
+          {completed &&
+            (period === 'week' ? (
+              <Check size={18} color="#FF4B1F" weight="bold" />
+            ) : (
+              <Image
+                source={require('~/assets/icons/Flame.png')}
+                style={{ width: 22, height: 22 }}
+                contentFit="contain"
+              />
+            ))}
         </View>
 
         <View className="flex-1">

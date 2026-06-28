@@ -188,7 +188,8 @@ export default function AskHealthPermission() {
               Let&apos;s track your sweat
             </Text>
             <Text className="mb-5 text-center font-body text-base text-[#5A5A5A]">
-              SweatScore needs these to count your daily points:
+              You earn points for daily activity. Connect your health data so your steps and active
+              minutes count.{' '}
             </Text>
 
             <View className="mb-2 flex-row">

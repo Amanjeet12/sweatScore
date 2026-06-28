@@ -1,12 +1,11 @@
 export const CHALLENGE_TAGS = [
-  'Dance',
   'Jump Rope',
-  'Legs',
-  'Steps',
-  'Abs',
-  'Arms',
-  'HIIT',
+  'Lower Body',
+  'Upper Body',
   'Full Body',
+  'Core',
+  'Cardio',
+  'Flexibility',
 ] as const;
 
 export type ChallengeTag = (typeof CHALLENGE_TAGS)[number];

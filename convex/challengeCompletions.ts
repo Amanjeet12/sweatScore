@@ -9,6 +9,8 @@ import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timez
 import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
+const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
+const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2774t0e00j19t16f2mpty1bd89g4cn' as Id<'_storage'>;
 
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
@@ -144,6 +146,16 @@ export const completeChallenge = mutation({
       throw new ConvexError('Already completed today');
     }
 
+    const todayCompletions = await ctx.db
+      .query('challengeCompletions')
+      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
+
+    if (todayCompletions.length >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
+      throw new ConvexError('Daily challenge limit reached');
+    }
+
     // Record completion
     const repostBonus = args.allowRepost ? 3 : 0;
     const rawPoints = challenge.points + repostBonus;
@@ -221,9 +233,11 @@ export const completeChallenge = mutation({
       // But adminVideoUrl can now be either:
       // 1. User's Day 1 video, if available
       // 2. Instructor video, if this is the first attempt
-      const adminVideoUrl = day1VideoUrl
-        ? day1VideoUrl
-        : await ctx.storage.getUrl(challenge.instructionalVideo);
+      const firstAttemptVideoUrl =
+        (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
+        (await ctx.storage.getUrl(challenge.instructionalVideo));
+
+      const adminVideoUrl = day1VideoUrl ? day1VideoUrl : firstAttemptVideoUrl;
 
       console.log('Transformation merge check:', {
         userId,
@@ -574,8 +588,22 @@ export const getChallengeProgress = query({
         day1CompletionId: null,
         day1VideoUrl: null,
         lastVideoUrl: null,
+        dailyCompletionCount: 0,
+        dailyLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
+        dailyLimitReached: false,
       };
     }
+
+    const user = await ctx.db.get(userId);
+    const todayStr = formatDateInTZ(new Date(), user?.timezone);
+
+    const todayCompletions = await ctx.db
+      .query('challengeCompletions')
+      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
+
+    const dailyCompletionCount = todayCompletions.length;
 
     const completions = await ctx.db
       .query('challengeCompletions')
@@ -610,6 +638,9 @@ export const getChallengeProgress = query({
       day1CompletionId: day1Completion?._id ?? null,
       day1VideoUrl,
       lastVideoUrl,
+      dailyCompletionCount,
+      dailyLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
+      dailyLimitReached: dailyCompletionCount >= MAX_DAILY_CHALLENGE_COMPLETIONS,
     };
   },
 });

@@ -63,7 +63,7 @@ export default function DuetRecordingScreen() {
   const [allowRepost, setAllowRepost] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
-
+  const FIRST_ATTEMPT_VIDEO_URL = 'https://beloved-stoat-88.convex.cloud/api/storage/9bb29022-8171-4a43-b0c3-33928f06d809';
   const cameraRef = useRef<CameraView>(null);
   const postRecordScrollRef = useRef<ScrollView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -92,6 +92,9 @@ export default function DuetRecordingScreen() {
 
   const { enqueueChallengeUpload, getJobForChallenge } = useChallengeUploadQueue();
   const existingUploadJob = getJobForChallenge(challengeId ?? '');
+  const dailyLimitReached = progress?.dailyLimitReached === true;
+  const dailyLimit = progress?.dailyLimit ?? 5;
+  const dailyCompletionCount = progress?.dailyCompletionCount ?? 0;
 
   const debugRecordingState = useCallback(
     (label: string) => {
@@ -612,6 +615,13 @@ export default function DuetRecordingScreen() {
   }, []);
 
   const startCountdown = useCallback(() => {
+    if (dailyLimitReached) {
+      Alert.alert(
+        'Daily limit reached',
+        `You have reached your limit for today. You can complete up to ${dailyLimit} challenges per day.`
+      );
+      return;
+    }
     debugRecordingState('startCountdown pressed');
 
     if (existingUploadJob) {
@@ -647,7 +657,14 @@ export default function DuetRecordingScreen() {
         startRecording().catch(() => {});
       }
     }, 1000);
-  }, [debugRecordingState, existingUploadJob, playCountdownSound, startRecording]);
+  }, [
+    debugRecordingState,
+    dailyLimit,
+    dailyLimitReached,
+    existingUploadJob,
+    playCountdownSound,
+    startRecording,
+  ]);
 
   const handleSwitchCamera = useCallback(() => {
     if (isRecordingRef.current) return;
@@ -741,7 +758,7 @@ export default function DuetRecordingScreen() {
     }, 250);
   }, []);
 
-  if (challenge === undefined) {
+  if (challenge === undefined || progress === undefined) {
     return <ScreenLoading />;
   }
 
@@ -961,15 +978,30 @@ export default function DuetRecordingScreen() {
               bottom: insets.bottom + 20,
               paddingHorizontal: 24,
             }}>
+            {dailyLimitReached && (
+              <Text className="mb-3 text-center font-body text-sm font-semibold text-white">
+                You reached your limit for today. Come back tomorrow.
+              </Text>
+            )}
+
+            {/* {!dailyLimitReached && (
+              <Text className="mb-3 text-center font-body text-xs font-semibold text-white">
+                {dailyCompletionCount}/{dailyLimit} challenges completed today
+              </Text>
+            )} */}
+
             <LoadingButton
               variant="solid"
               size="xl"
               action="primary"
               className="mt-5 h-14 w-full"
+              disabled={dailyLimitReached}
               onPress={startCountdown}>
               <View className="flex-row items-center gap-x-2">
                 <Record size={20} color="#FFFFFF" weight="fill" />
-                <ButtonText className="text-lg font-bold text-white">Start Recording</ButtonText>
+                <ButtonText className="text-lg font-bold text-white">
+                  {dailyLimitReached ? 'Daily Limit Reached' : 'Start Recording'}
+                </ButtonText>
               </View>
             </LoadingButton>
           </View>
@@ -1021,7 +1053,7 @@ export default function DuetRecordingScreen() {
               </Text>
 
               <Text className="mt-1 text-center font-body text-sm text-[#686868]">
-                Review your video, add a caption, then submit your day.
+                Review your video then submit your progress
               </Text>
             </View>
           </View>
@@ -1029,7 +1061,11 @@ export default function DuetRecordingScreen() {
           {recordedVideoUri && challenge.instructionalVideoUrl && (
             <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-white">
               <CompositeVideoPlayer
-                leftVideoUrl={progress?.day1VideoUrl ?? challenge.instructionalVideoUrl}
+                leftVideoUrl={
+                  progress?.day1VideoUrl ||
+                  FIRST_ATTEMPT_VIDEO_URL ||
+                  challenge.instructionalVideoUrl
+                }
                 rightVideoUrl={recordedVideoUri}
                 mirrorRight={false}
               />

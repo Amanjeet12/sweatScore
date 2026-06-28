@@ -9,6 +9,7 @@ import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
@@ -28,12 +29,29 @@ export default function ChallengeViewScreen() {
     challengeId: challengeId as Id<'challenges'>,
   });
 
+  const progress = useQuery(api.challengeCompletions.getChallengeProgress, {
+    challengeId: challengeId as Id<'challenges'>,
+  });
+
   const { isPro } = useRevenueCat();
   const currentTab = useTabStore((state) => state.currentTab);
+
+  const { getJobForChallenge, retryChallengeUpload } = useChallengeUploadQueue();
+
+  const uploadJob = getJobForChallenge(challengeId ?? '');
+  const hasFailedUpload = uploadJob?.status === 'failed';
+  const hasActiveUpload =
+    uploadJob?.status === 'queued' ||
+    uploadJob?.status === 'uploading' ||
+    uploadJob?.status === 'finalizing';
 
   const player = useVideoPlayer(challenge?.instructionalVideoUrl ?? null, (p) => {
     p.loop = false;
   });
+
+  const dailyLimitReached = progress?.dailyLimitReached === true;
+  const dailyLimit = progress?.dailyLimit ?? 5;
+  const dailyCompletionCount = progress?.dailyCompletionCount ?? 0;
 
   const handlePlay = useCallback(() => {
     if (player) {
@@ -76,7 +94,7 @@ export default function ChallengeViewScreen() {
         }}
       />
 
-      {challenge === undefined ? (
+      {challenge === undefined || cooldown === undefined || progress === undefined ? (
         <ScreenLoading />
       ) : challenge === null ? (
         <View className="flex-1 items-center justify-center">
@@ -87,7 +105,6 @@ export default function ChallengeViewScreen() {
           className="flex-1"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Video / Thumbnail */}
           <View className="mt-4">
             {isPlaying ? (
               <VideoView
@@ -112,7 +129,7 @@ export default function ChallengeViewScreen() {
                     }}
                     contentFit="cover"
                   />
-                  {/* Play button overlay */}
+
                   <View
                     style={{
                       position: 'absolute',
@@ -138,16 +155,47 @@ export default function ChallengeViewScreen() {
             )}
           </View>
 
-          {/* Description */}
           <View className="mt-6 px-8">
             <Text className="text-center font-body text-base text-[#313131]">
               {challenge.description}
             </Text>
           </View>
 
-          {/* CTA — eligibility aware */}
           <View className="mt-6 px-8">
-            {challenge.isLocked && !isPro ? (
+            {hasFailedUpload ? (
+              <>
+                <LoadingButton
+                  variant="solid"
+                  size="xl"
+                  action="primary"
+                  className="h-14 w-full"
+                  onPress={() => {
+                    safePausePlayer();
+                    retryChallengeUpload(challengeId);
+                  }}>
+                  <ButtonText className="text-lg font-bold text-white">Retry Upload</ButtonText>
+                </LoadingButton>
+
+                <Text className="mt-2 text-center font-body text-sm text-[#E5484D]">
+                  Upload failed. Tap retry and keep the app open while your video uploads.
+                </Text>
+              </>
+            ) : hasActiveUpload ? (
+              <>
+                <LoadingButton
+                  variant="outline"
+                  size="xl"
+                  action="secondary"
+                  className="h-14 w-full"
+                  disabled>
+                  <ButtonText className="text-lg font-bold text-[#838383]">Uploading...</ButtonText>
+                </LoadingButton>
+
+                <Text className="mt-2 text-center font-body text-sm text-[#838383]">
+                  Please keep the app open while your video uploads.
+                </Text>
+              </>
+            ) : challenge.isLocked && !isPro ? (
               <>
                 <LoadingButton
                   variant="solid"
@@ -165,11 +213,12 @@ export default function ChallengeViewScreen() {
                     <ButtonText className="text-lg font-bold text-white">Unlock Duet</ButtonText>
                   </View>
                 </LoadingButton>
+
                 <Text className="mt-2 text-center font-body text-sm text-[#838383]">
                   This duet is for premium members
                 </Text>
               </>
-            ) : cooldown?.completedToday ? (
+            ) : cooldown.completedToday ? (
               <>
                 <LoadingButton
                   variant="outline"
@@ -181,28 +230,53 @@ export default function ChallengeViewScreen() {
                     Completed Today
                   </ButtonText>
                 </LoadingButton>
+
                 <Text className="mt-2 text-center font-body text-sm text-[#838383]">
                   Come back tomorrow to try again!
                 </Text>
               </>
+            ) : dailyLimitReached ? (
+              <>
+                <LoadingButton
+                  variant="outline"
+                  size="xl"
+                  action="secondary"
+                  className="h-14 w-full"
+                  disabled>
+                  <ButtonText className="text-lg font-bold text-[#838383]">
+                    Today&apos;s Limit Reached
+                  </ButtonText>
+                </LoadingButton>
+
+                <Text className="mt-2 text-center font-body text-sm text-[#838383]">
+                  You completed {dailyCompletionCount}/{dailyLimit} challenges today. Come back
+                  tomorrow.
+                </Text>
+              </>
             ) : (
-              <LoadingButton
-                variant="solid"
-                size="xl"
-                action="primary"
-                className="h-14 w-full"
-                onPress={() => {
-                  router.push({
-                    pathname: '/challenge-record/[challengeId]',
-                    params: { challengeId },
-                  });
-                }}>
-                <ButtonText className="text-lg font-bold text-white">Record progress</ButtonText>
-              </LoadingButton>
+              <>
+                <LoadingButton
+                  variant="solid"
+                  size="xl"
+                  action="primary"
+                  className="h-14 w-full"
+                  onPress={() => {
+                    safePausePlayer();
+                    router.push({
+                      pathname: '/challenge-record/[challengeId]',
+                      params: { challengeId },
+                    });
+                  }}>
+                  <ButtonText className="text-lg font-bold text-white">Record progress</ButtonText>
+                </LoadingButton>
+
+                <Text className="mt-2 text-center font-body text-sm text-[#838383]">
+                  {dailyCompletionCount}/{dailyLimit} challenges completed today
+                </Text>
+              </>
             )}
           </View>
 
-          {/* Watch on YouTube link */}
           {challenge.youtubeUrl && (
             <TouchableOpacity
               className="mt-4 flex-row items-center justify-center gap-x-1"

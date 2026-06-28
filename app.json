@@ -5,6 +5,7 @@
     "owner": "sweatscore",
     "version": "1.1.0",
     "scheme": "sweatscore-app",
+    "newArchEnabled": true,
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -28,8 +29,18 @@
       [
         "react-native-share",
         {
-          "ios": ["fb", "instagram", "instagram-stories", "facebook-stories", "tiktoksharesdk"],
-          "android": ["com.instagram.android", "com.facebook.katana", "com.zhiliaoapp.musically"]
+          "ios": [
+            "fb",
+            "instagram",
+            "instagram-stories",
+            "facebook-stories",
+            "tiktoksharesdk"
+          ],
+          "android": [
+            "com.instagram.android",
+            "com.facebook.katana",
+            "com.zhiliaoapp.musically"
+          ]
         }
       ],
       "expo-localization",
@@ -71,12 +82,21 @@
     },
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sweatscore.sweatscoreapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "fb",
+          "instagram",
+          "instagram-stories",
+          "facebook-stories",
+          "tiktoksharesdk"
+        ]
       },
       "icon": {
         "dark": "./assets/ios-dark.png",
@@ -93,9 +113,18 @@
       "package": "com.sweatscore.sweatscoreapp",
       "permissions": [
         "android.permission.health.READ_STEPS",
-        "android.permission.health.READ_HEART_RATE"
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
@@ -109,6 +138,12 @@
       "eas": {
         "projectId": "685b5f2b-f462-4de3-ba5e-d33edcc8085a"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/685b5f2b-f462-4de3-ba5e-d33edcc8085a"
     }
   }
 }
