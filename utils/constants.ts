@@ -1,4 +1,4 @@
-import AppleHealthKit, { HealthKitPermissions } from 'react-native-health';
+import type { HealthKitPermissions } from 'react-native-health';
 
 export const colors = {
   primary: '#FF5C1A',
@@ -66,10 +66,7 @@ export const leaderboardThreshold = 10;
 
 export const healthPermissions = {
   permissions: {
-    read: [
-      AppleHealthKit.Constants.Permissions.StepCount,
-      AppleHealthKit.Constants.Permissions.HeartRate,
-    ],
+    read: ['StepCount', 'HeartRate'],
     write: [],
   },
 } as HealthKitPermissions;

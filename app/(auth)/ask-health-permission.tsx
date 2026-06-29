@@ -9,8 +9,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
-import { getAppleHealthKit } from '~/utils/apple-health-kit';
-import { healthPermissions, healthPermissionsAndroid } from '~/utils/constants';
+import { initializeAppleHealthKit, isAppleHealthAvailable } from '~/utils/apple-health-kit';
+import { healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
 import { hasActiveSubscription } from '~/utils/subscription';
 
@@ -40,39 +40,6 @@ function withTimeout<T>(
   });
 }
 
-async function isAppleHealthAvailable() {
-  return new Promise<boolean>((resolve, reject) => {
-    const AppleHealthKit = getAppleHealthKit();
-    if (!AppleHealthKit) {
-      resolve(false);
-      return;
-    }
-
-    AppleHealthKit.isAvailable((err, isAvailable) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve(Boolean(isAvailable));
-    });
-  });
-}
-
-async function requestAppleHealthPermissions() {
-  return new Promise<boolean>((resolve) => {
-    const AppleHealthKit = getAppleHealthKit();
-    if (!AppleHealthKit) {
-      resolve(false);
-      return;
-    }
-
-    AppleHealthKit.initHealthKit(healthPermissions, (err) => {
-      resolve(!err);
-    });
-  });
-}
-
 export default function AskHealthPermission() {
   const appState = useRef(AppState.currentState);
   const convex = useConvex();
@@ -99,7 +66,7 @@ export default function AskHealthPermission() {
           return;
         }
 
-        const hasPermissions = await requestAppleHealthPermissions();
+        const hasPermissions = await initializeAppleHealthKit();
         if (!hasPermissions) {
           Alert.alert(
             'Permissions not enabled',

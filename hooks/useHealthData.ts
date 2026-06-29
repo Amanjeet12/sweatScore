@@ -3,8 +3,11 @@ import type { HealthInputOptions } from 'react-native-health';
 import type { TimeRangeFilter } from 'react-native-health-connect/src/types/base.types';
 
 import { getDayRangeISO } from '@/utils/timezone';
-import { getAppleHealthKit } from '~/utils/apple-health-kit';
-import { healthPermissions } from '~/utils/constants';
+import {
+  getAppleHealthKit,
+  initializeAppleHealthKit,
+  isAppleHealthAvailable,
+} from '~/utils/apple-health-kit';
 import { getData } from '~/utils/storage';
 
 function getHealthConnect() {
@@ -13,15 +16,19 @@ function getHealthConnect() {
 }
 
 // Promisify HealthKit methods for iOS
-function promisifyHealthKitMethod<T>(
-  method: Function,
+function callHealthKitMethod<T>(
+  method: (options: HealthInputOptions, callback: (err: string, results: any) => void) => void,
   options: any,
   defaultValue: T,
+  methodName: string,
   aggregateFn?: (results: any) => T
 ): Promise<T> {
   return new Promise<T>((resolve) => {
     method(options, (err: any, results: any) => {
-      if (err) return resolve(defaultValue);
+      if (err) {
+        console.warn(`Apple Health ${methodName} failed:`, err);
+        return resolve(defaultValue);
+      }
       if (aggregateFn) return resolve(aggregateFn(results));
       resolve(results.value ?? defaultValue);
     });
@@ -113,16 +120,12 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
   const elevenAmRange = get11amRangeISO(date, timeZone);
 
   // Check availability
-  const isAvailable = await new Promise<boolean>((resolve) => {
-    AppleHealthKit.isAvailable((err, available) => resolve(!err && !!available));
-  });
-  if (!isAvailable) return { steps, zone2Minutes, hasPermissions };
+  const isAvailable = await isAppleHealthAvailable();
+  if (!isAvailable) return { steps, zone2Minutes, stepsTill11am, hasPermissions };
 
   // Request permissions
-  const permissionsGranted = await new Promise<boolean>((resolve) => {
-    AppleHealthKit.initHealthKit(healthPermissions, (err) => resolve(!err));
-  });
-  if (!permissionsGranted) return { steps, zone2Minutes, hasPermissions };
+  const permissionsGranted = await initializeAppleHealthKit();
+  if (!permissionsGranted) return { steps, zone2Minutes, stepsTill11am, hasPermissions };
   hasPermissions = true;
 
   const options: HealthInputOptions = {
@@ -132,13 +135,19 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
     includeManuallyAdded: false,
   };
 
-  steps = await promisifyHealthKitMethod<number>(AppleHealthKit.getStepCount, options, 0);
+  steps = await callHealthKitMethod<number>(
+    AppleHealthKit.getStepCount.bind(AppleHealthKit),
+    options,
+    0,
+    'getStepCount'
+  );
 
   // Get heart rate samples and calculate Zone 2 minutes
-  const heartRateSamples = await promisifyHealthKitMethod<any[]>(
-    AppleHealthKit.getHeartRateSamples,
+  const heartRateSamples = await callHealthKitMethod<any[]>(
+    AppleHealthKit.getHeartRateSamples.bind(AppleHealthKit),
     options,
     [],
+    'getHeartRateSamples',
     (results) => results
   );
 
@@ -147,14 +156,15 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
   }
 
   // Fetch data till 11am using getDailyStepCountSamples
-  const stepSamplesTill11am = await promisifyHealthKitMethod<any[]>(
-    AppleHealthKit.getDailyStepCountSamples,
+  const stepSamplesTill11am = await callHealthKitMethod<any[]>(
+    AppleHealthKit.getDailyStepCountSamples.bind(AppleHealthKit),
     {
       startDate: elevenAmRange.startDate,
       endDate: elevenAmRange.endDate,
       includeManuallyAdded: false,
     },
     [],
+    'getDailyStepCountSamples',
     (results) => results
   );
 
