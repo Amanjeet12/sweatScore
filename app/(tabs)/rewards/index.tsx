@@ -57,9 +57,9 @@ export default function TabTrack() {
               <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Track</Text>
               <Text className="font-body text-base text-[#838383]">Your Progress</Text>
             </View>
-            <TouchableOpacity onPress={goToProfile} activeOpacity={0.7}>
+            {/* <TouchableOpacity onPress={goToProfile} activeOpacity={0.7}>
               <Avatar uri={currentUser?.image ?? undefined} size={56} />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           <YourStreakCard

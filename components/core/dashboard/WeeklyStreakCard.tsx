@@ -62,12 +62,6 @@ export default function WeeklyStreakCard() {
             <Text className="font-body text-xs font-bold text-primary-500" numberOfLines={1}>
               {weeklyStreaks} {weekLabel}
             </Text>
-
-            <Image
-              source={require('~/assets/icons/Flame.png')}
-              style={{ width: 13, height: 13, marginLeft: 3 }}
-              contentFit="contain"
-            />
           </View>
 
           <Text className="mt-0.5 font-body text-[10px] text-[#313131]">

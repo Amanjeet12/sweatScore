@@ -192,7 +192,7 @@ export default function AskHealthPermission() {
               minutes count.{' '}
             </Text>
 
-            <View className="mb-2 flex-row">
+            {/* <View className="mb-2 flex-row">
               <Text className="font-body text-base text-[#1A1A1A]">• </Text>
               <View className="flex-1">
                 <Text className="font-body text-base text-[#1A1A1A]">
@@ -209,7 +209,7 @@ export default function AskHealthPermission() {
                   and Track screens.
                 </Text>
               </View>
-            </View>
+            </View> */}
 
             <TouchableOpacity
               activeOpacity={0.8}

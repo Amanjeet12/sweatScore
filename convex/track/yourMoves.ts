@@ -1,6 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
-import { query } from '../_generated/server';
+
 import { Id } from '../_generated/dataModel';
+import { query } from '../_generated/server';
 import { formatDateInTZ, getMondayInTZ, ymdUTC } from '../utils/timezone';
 
 type CompletionRow = {
@@ -12,7 +13,7 @@ type CompletionRow = {
   challengeName: string;
   coverImageUrl: string | null;
   compositeVideoUrl: string | null;
-  timesCompleted: number; // how many times this challenge is done by user in this result range
+  timesCompleted: number; // This is now the row's own round number
 };
 
 export const getYourMoves = query({
@@ -43,18 +44,36 @@ export const getYourMoves = query({
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
 
-    // Count how many times each challenge appears for this user in current month range.
-    const challengeDoneCount = new Map<string, number>();
+    const allUserCompletions = await ctx.db
+      .query('challengeCompletions')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
 
-    for (const r of rows) {
-      const key = String(r.challengeId);
-      challengeDoneCount.set(key, (challengeDoneCount.get(key) ?? 0) + 1);
+    const completionsByChallenge = new Map<string, typeof allUserCompletions>();
+
+    for (const completion of allUserCompletions) {
+      const challengeKey = String(completion.challengeId);
+      const existing = completionsByChallenge.get(challengeKey) ?? [];
+
+      existing.push(completion);
+      completionsByChallenge.set(challengeKey, existing);
     }
 
-    const challengeCache = new Map<
-      string,
-      { name: string; coverImage: Id<'_storage'> | null }
-    >();
+    const roundNumberByCompletionId = new Map<string, number>();
+
+    for (const completions of completionsByChallenge.values()) {
+      completions.sort((a, b) => a._creationTime - b._creationTime);
+
+      completions.forEach((completion, index) => {
+        roundNumberByCompletionId.set(
+          String(completion._id),
+          completion.attemptNumber ?? index + 1
+        );
+      });
+    }
+
+    const challengeCache = new Map<string, { name: string; coverImage: Id<'_storage'> | null }>();
 
     for (const r of rows) {
       const key = String(r.challengeId);
@@ -70,9 +89,7 @@ export const getYourMoves = query({
 
     const urlCache = new Map<string, string | null>();
 
-    const resolveUrl = async (
-      id: Id<'_storage'> | null | undefined
-    ): Promise<string | null> => {
+    const resolveUrl = async (id: Id<'_storage'> | null | undefined): Promise<string | null> => {
       if (!id) return null;
 
       const key = String(id);
@@ -102,7 +119,7 @@ export const getYourMoves = query({
         challengeName: chal.name,
         coverImageUrl,
         compositeVideoUrl,
-        timesCompleted: challengeDoneCount.get(challengeKey) ?? 1,
+        timesCompleted: roundNumberByCompletionId.get(String(r._id)) ?? 1,
       });
     }
 
@@ -120,8 +137,7 @@ export const getYourMoves = query({
       }
     }
 
-    const sortDesc = (a: CompletionRow, b: CompletionRow) =>
-      b.createdAt - a.createdAt;
+    const sortDesc = (a: CompletionRow, b: CompletionRow) => b.createdAt - a.createdAt;
 
     today.sort(sortDesc);
     earlierThisWeek.sort(sortDesc);

@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,7 +12,9 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { CHALLENGE_TAGS } from '~/convex/challenges';
 
-const ALL_FILTERS = ['All', ...CHALLENGE_TAGS] as const;
+const YOUR_PROGRESS_FILTER = 'Your’s Progress';
+
+const ALL_FILTERS = ['All', YOUR_PROGRESS_FILTER, ...CHALLENGE_TAGS] as const;
 
 function ChallengeCardWithData({
   challenge,
@@ -27,6 +29,7 @@ function ChallengeCardWithData({
 
   const handlePress = () => {
     if (cooldown?.completedToday) return;
+
     router.push({
       pathname: '/challenge-view/[challengeId]' as any,
       params: { challengeId: challenge._id },
@@ -51,9 +54,22 @@ export default function TabSweat() {
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const { isPro } = useRevenueCat();
 
+  const queryTag =
+    selectedTag === 'All' || selectedTag === YOUR_PROGRESS_FILTER ? undefined : selectedTag;
+
   const challenges = useQuery(api.challengeCompletions.getPublishedChallenges, {
-    tag: selectedTag === 'All' ? undefined : selectedTag,
+    tag: queryTag,
   });
+
+  const visibleChallenges = useMemo(() => {
+    if (!challenges) return [];
+
+    if (selectedTag === YOUR_PROGRESS_FILTER) {
+      return challenges.filter((challenge) => (challenge.userCompletedCount ?? 0) > 0);
+    }
+
+    return challenges;
+  }, [challenges, selectedTag]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
@@ -65,7 +81,6 @@ export default function TabSweat() {
         </View>
       </View>
 
-      {/* Tag filter pills */}
       <View className="px-screen mt-2">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row gap-x-2">
@@ -90,19 +105,26 @@ export default function TabSweat() {
         </ScrollView>
       </View>
 
-      {/* Challenge list */}
       {challenges === undefined ? (
         <ScreenLoading />
       ) : (
         <FlatList
           className="mt-4"
-          data={challenges}
+          data={visibleChallenges}
           keyExtractor={(item) => item._id}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingBottom: 40 }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            gap: 16,
+            paddingBottom: 40,
+          }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => <ChallengeCardWithData challenge={item} isPremium={isPro} />}
           ListEmptyComponent={
-            <Text className="mt-8 text-center text-base text-gray-500">No challenges found</Text>
+            <Text className="mt-8 text-center text-base text-gray-500">
+              {selectedTag === YOUR_PROGRESS_FILTER
+                ? 'No completed progress videos yet'
+                : 'No challenges found'}
+            </Text>
           }
         />
       )}

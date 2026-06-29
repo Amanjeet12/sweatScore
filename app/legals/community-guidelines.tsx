@@ -33,8 +33,7 @@ export default function CommunityGuidelines() {
           <View>
             <Text className="font-lsBold text-lg">COMMUNITY GUIDELINES</Text>
             <Text className="font-ls mt-2">
-              Welcome to the sisterhood. These guidelines keep our space kind, hype, and
-              drama-free.
+              Welcome to the sisterhood. These guidelines keep our space kind, hype, and drama-free.
             </Text>
           </View>
 
@@ -66,8 +65,8 @@ export default function CommunityGuidelines() {
           <View>
             <Text className="text-lg font-bold">🎬 4. Record with respect</Text>
             <Text className="font-ls mt-2">
-              Video and duet features are here to build community, not to expose or embarrass
-              anyone. When you record and share:
+              Progress videos are here to build community and celebrate your journey, not to expose
+              or embarrass anyone. When you record and share:
             </Text>
             <Text className="font-ls mt-2">
               • Only record yourself. Do not record other people without their explicit consent.
@@ -81,24 +80,23 @@ export default function CommunityGuidelines() {
           </View>
 
           <View>
-            <Text className="text-lg font-bold">👯‍♀️ 5. Duet with good energy</Text>
+            <Text className="text-lg font-bold">💪🏾 5. Show up as you are</Text>
             <Text className="font-ls mt-2">
-              Duets are your chance to show up, move, and share your workout moment. When you
-              record a duet with a SweatScore workout:
+              Your progress videos are your moment — your journey, your pace. When you record and
+              share:
             </Text>
             <Text className="font-ls mt-2">
-              • Keep it real and keep it kind. Duets are for participation, not parody
+              • Keep it real and keep it kind. This is about your progress, not perfection.
             </Text>
             <Text className="font-ls">
-              • Don't use duet recordings to mock, misrepresent, or undermine the workout, the
-              instructor, or SweatScore
+              • Don't use your videos to mock or undermine the workout, the moves, or SweatScore.
             </Text>
             <Text className="font-ls">
-              • Once you share a duet, the same content rules apply. No degrading, offensive, or
-              harmful material
+              • The same content rules apply once you share. No degrading, offensive, or harmful
+              material.
             </Text>
             <Text className="font-ls">
-              • If you choose to download and share your duet outside the app, you're responsible
+              • If you choose to download and share your video outside the app, you're responsible
               for how that content is used.
             </Text>
           </View>
@@ -111,8 +109,8 @@ export default function CommunityGuidelines() {
             </Text>
             <Text className="font-ls mt-2">
               Downloaded content is for personal use only. Screen recording, redistributing, or
-              using someone else's SweatScore content elsewhere without consent is not okay and
-              may violate their privacy and our Terms of Use.
+              using someone else's SweatScore content elsewhere without consent is not okay and may
+              violate their privacy and our Terms of Use.
             </Text>
           </View>
 

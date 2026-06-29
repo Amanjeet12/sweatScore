@@ -134,11 +134,11 @@ export default function MoveRow({
       </View>
 
       <View className="items-end gap-y-2">
-        <View className="rounded-full bg-primary-500 px-3 py-1">
+        {/* <View className="rounded-full bg-primary-500 px-3 py-1">
           <Text className="font-body text-sm font-bold text-white">
             {pointsEarned} pts
           </Text>
-        </View>
+        </View> */}
 
         {compositeVideoUrl && (
           <View className="flex-row items-center gap-x-3">

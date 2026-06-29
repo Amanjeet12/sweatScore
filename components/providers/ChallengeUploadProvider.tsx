@@ -143,7 +143,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
     (message: string, action: 'error' | 'success') => {
       toast.show({
         placement: 'top',
-        duration: 5500,
+        duration: 7500,
         render: () => <ToastMessage message={message} action={action} />,
       });
     },
@@ -289,10 +289,16 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         removeJob(jobId);
         await deleteLocalVideo(job.videoUri);
 
-        if (result?.pointsEarned > 0) {
-          showToast(`Progress submitted. +${result.pointsEarned} pts added.`, 'success');
+        if (result?.isDay1Baseline) {
+          if (result.pointsEarned > 0) {
+            showToast(`+${result.pointsEarned} pts added successfully.`, 'success');
+          } else {
+            showToast('Progress saved successfully.', 'success');
+          }
+        } else if (result?.pointsEarned > 0) {
+          showToast(`+${result.pointsEarned} pts added. Your video will be live soon.`, 'success');
         } else {
-          showToast('Progress submitted successfully.', 'success');
+          showToast('Progress submitted successfully. Your video will be live soon.', 'success');
         }
       } catch (error) {
         const latestJob = jobsRef.current.find((candidate) => candidate.id === jobId);

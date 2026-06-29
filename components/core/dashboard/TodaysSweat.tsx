@@ -168,6 +168,10 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
         shadowOpacity: 0.06,
         shadowRadius: 18,
       }}>
+      <Text className="font-heading text-xl font-bold text-[#1A1A1A] mb-4" numberOfLines={1}>
+        Your Activity
+      </Text>
+
       <View className="flex-row items-center justify-between">
         <View className="flex-row rounded-2xl bg-[#EEEEEE] p-0.5">
           <TouchableOpacity
@@ -299,7 +303,7 @@ function SweatProgressRow({
   const progress = Math.min(100, (value / safeTarget) * 100);
 
   return (
-    <View className={showDivider ? 'mb-4 border-b border-[#F0EDEA] pb-4' : ''}>
+    <View className={showDivider ? 'mb-4 pb-4' : ''}>
       <View className="flex-row items-center">
         <View
           className="mr-4 items-center justify-center rounded-full"
@@ -314,7 +318,7 @@ function SweatProgressRow({
             ) : (
               <Image
                 source={require('~/assets/icons/Flame.png')}
-                style={{ width: 22, height: 22 }}
+                style={{ width: 16, height: 16 }}
                 contentFit="contain"
               />
             ))}

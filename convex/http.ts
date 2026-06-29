@@ -30,6 +30,25 @@ export const createChallengePost = internalMutation({
     caption: v.string(),
   },
   handler: async (ctx, args) => {
+    const completion = await ctx.db.get(args.challengeCompletionId);
+
+    if (!completion) {
+      return null;
+    }
+
+    // Do everything for Day 1, but do not post it to community/feed.
+    if (completion.attemptNumber === 1 || completion.comparisonMode === 'day1_baseline') {
+      console.log('Skipping Day 1 challenge post', {
+        challengeCompletionId: args.challengeCompletionId,
+        challengeId: args.challengeId,
+        userId: args.userId,
+        attemptNumber: completion.attemptNumber,
+        comparisonMode: completion.comparisonMode,
+      });
+
+      return null;
+    }
+
     const postId = await ctx.db.insert('posts', {
       userId: args.userId,
       createdAt: Date.now(),
@@ -38,6 +57,7 @@ export const createChallengePost = internalMutation({
       challengeId: args.challengeId,
       challengeCompletionId: args.challengeCompletionId,
     });
+
     return postId;
   },
 });
@@ -278,6 +298,7 @@ http.route({
 
 const createChallengePostEndpoint = httpAction(async (ctx, request) => {
   const authHeader = request.headers.get('Authorization');
+
   if (authHeader !== `Bearer ${process.env.TRIGGER_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
@@ -293,6 +314,20 @@ const createChallengePostEndpoint = httpAction(async (ctx, request) => {
     caption,
   });
 
+  if (!postId) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        skipped: true,
+        reason: 'day_1_video_not_posted',
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
   return new Response(JSON.stringify({ success: true, postId }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -307,11 +342,26 @@ http.route({
 
 const sendChallengeNotificationEndpoint = httpAction(async (ctx, request) => {
   const authHeader = request.headers.get('Authorization');
+
   if (authHeader !== `Bearer ${process.env.TRIGGER_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   const { userId, postId } = await request.json();
+
+  if (!postId) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        skipped: true,
+        reason: 'no_post_created',
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
 
   await ctx.runMutation(internal.http.sendChallengeNotification, {
     userId,

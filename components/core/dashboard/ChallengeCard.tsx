@@ -14,6 +14,7 @@ interface ChallengeCardProps {
     coverImageUrl: string | null;
     points: number;
     isLocked: boolean;
+    tag?: string;
   };
   completedToday: boolean;
   lastCompletedAt: number | null;
@@ -21,6 +22,23 @@ interface ChallengeCardProps {
   isPremium: boolean;
   onPress: () => void;
   fullWidth?: boolean;
+}
+
+function formatLastDone(lastCompletedAt: number | null) {
+  if (!lastCompletedAt) return null;
+
+  const now = Date.now();
+  const diffMs = Math.max(0, now - lastCompletedAt);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMinutes < 1) return 'Last done just now';
+  if (diffMinutes < 60) return `Last done ${diffMinutes} min ago`;
+  if (diffHours < 24) return `Last done ${diffHours}h ago`;
+  if (diffDays === 1) return 'Last done 1 day ago';
+
+  return `Last done ${diffDays} days ago`;
 }
 
 export default function ChallengeCard({
@@ -32,18 +50,19 @@ export default function ChallengeCard({
   onPress,
   fullWidth = false,
 }: ChallengeCardProps) {
-  // Hours until midnight (next day reset)
   const cooldownHours = completedToday
     ? (() => {
         const now = new Date();
         const midnight = new Date(now);
         midnight.setDate(midnight.getDate() + 1);
         midnight.setHours(0, 0, 0, 0);
+
         return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (60 * 60 * 1000)));
       })()
     : 0;
 
   const isLocked = challenge.isLocked && !isPremium;
+  const lastDoneText = formatLastDone(lastCompletedAt);
 
   return (
     <TouchableOpacity
@@ -51,7 +70,6 @@ export default function ChallengeCard({
       activeOpacity={0.9}
       style={{ width: fullWidth ? '100%' : SCREEN_WIDTH * 0.7 }}
       className="overflow-hidden rounded-2xl">
-      {/* Cover Image */}
       {challenge.coverImageUrl && (
         <Image
           source={{ uri: challenge.coverImageUrl }}
@@ -64,7 +82,6 @@ export default function ChallengeCard({
         />
       )}
 
-      {/* Gradient Overlay */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.6)']}
         style={{
@@ -76,12 +93,10 @@ export default function ChallengeCard({
         }}
       />
 
-      {/* Points badge — top right */}
       <View className="absolute right-3 top-3 rounded-full bg-primary-500 px-3 py-1">
         <Text className="font-body text-xs font-semibold text-white">{challenge.points} pts</Text>
       </View>
 
-      {/* Pro badge — top left */}
       {isLocked && (
         <View
           className="absolute left-3 top-3 items-center justify-center rounded-full px-3 py-1"
@@ -90,7 +105,6 @@ export default function ChallengeCard({
         </View>
       )}
 
-      {/* Cooldown overlay — center with dark scrim */}
       {completedToday && (
         <View
           style={{
@@ -109,16 +123,25 @@ export default function ChallengeCard({
         </View>
       )}
 
-      {/* Bottom content */}
       <View className="absolute bottom-0 left-0 right-0 px-4 pb-4">
         <View className="flex-row items-end justify-between">
           <View style={{ flex: 1, marginRight: 8 }}>
             <Text className="font-heading text-lg font-bold text-white" numberOfLines={1}>
               {challenge.name}
             </Text>
-            <Text className="font-body text-sm text-white">{challenge?.tag}</Text>
+
+            <Text className="font-body text-sm text-white">{challenge.tag}</Text>
           </View>
-          <Text className="font-body text-sm text-white">{totalCompletions} Done</Text>
+
+          <View className="items-end">
+            <Text className="font-body text-sm font-semibold text-white">
+              {totalCompletions} Done
+            </Text>
+
+            {lastDoneText && (
+              <Text className="mt-0.5 font-body text-sm text-white/80">{lastDoneText}</Text>
+            )}
+          </View>
         </View>
       </View>
     </TouchableOpacity>

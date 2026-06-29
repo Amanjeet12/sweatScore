@@ -10,7 +10,6 @@ import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
-const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2774t0e00j19t16f2mpty1bd89g4cn' as Id<'_storage'>;
 
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
@@ -233,9 +232,7 @@ export const completeChallenge = mutation({
       // But adminVideoUrl can now be either:
       // 1. User's Day 1 video, if available
       // 2. Instructor video, if this is the first attempt
-      const firstAttemptVideoUrl =
-        (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
-        (await ctx.storage.getUrl(challenge.instructionalVideo));
+      const firstAttemptVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
 
       const adminVideoUrl = day1VideoUrl ? day1VideoUrl : firstAttemptVideoUrl;
 
@@ -278,7 +275,13 @@ export const completeChallenge = mutation({
       }
     }
 
-    return { success: true, pointsEarned: totalPoints, completionId };
+    return {
+      success: true,
+      pointsEarned: totalPoints,
+      completionId,
+      attemptNumber,
+      isDay1Baseline: attemptNumber === 1,
+    };
   },
 });
 
@@ -397,25 +400,40 @@ export const getChallengeCooldown = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
+
     if (!userId) {
-      return { completedToday: false, lastCompletedAt: null };
+      return {
+        completedToday: false,
+        lastCompletedAt: null,
+      };
     }
 
     const user = await ctx.db.get(userId);
     const todayStr = formatDateInTZ(new Date(), user?.timezone);
 
-    const completion = await ctx.db
+    const completions = await ctx.db
       .query('challengeCompletions')
       .withIndex('by_user_challenge_date', (q) =>
-        q.eq('userId', userId).eq('challengeId', args.challengeId).eq('date', todayStr)
+        q.eq('userId', userId).eq('challengeId', args.challengeId)
       )
-      .unique();
+      .filter((q) => q.neq(q.field('removed'), true))
+      .collect();
 
-    if (completion) {
-      return { completedToday: true, lastCompletedAt: completion._creationTime };
+    if (completions.length === 0) {
+      return {
+        completedToday: false,
+        lastCompletedAt: null,
+      };
     }
 
-    return { completedToday: false, lastCompletedAt: null };
+    const latestCompletion = completions.sort((a, b) => b._creationTime - a._creationTime)[0];
+
+    const completedToday = completions.some((completion) => completion.date === todayStr);
+
+    return {
+      completedToday,
+      lastCompletedAt: latestCompletion._creationTime,
+    };
   },
 });
 

@@ -41,9 +41,7 @@ const EARLY_NATIVE_STOP_GRACE_SECONDS = 1;
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 
 function getDefaultCaption(round?: number, exerciseName?: string) {
-  return `Done and dusted! Keeping my streak alive. Round ${round ?? 1} of ${
-    exerciseName ?? 'this exercise'
-  } done 🔥`;
+  return `Round ${round ?? 1} of ${exerciseName ?? 'this exercise'} done 🔥`;
 }
 
 export default function DuetRecordingScreen() {
@@ -63,7 +61,6 @@ export default function DuetRecordingScreen() {
   const [allowRepost, setAllowRepost] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
-  const FIRST_ATTEMPT_VIDEO_URL = 'https://beloved-stoat-88.convex.cloud/api/storage/9bb29022-8171-4a43-b0c3-33928f06d809';
   const cameraRef = useRef<CameraView>(null);
   const postRecordScrollRef = useRef<ScrollView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -883,7 +880,7 @@ export default function DuetRecordingScreen() {
               alignItems: 'center',
             }}>
             <Text className="font-heading text-xl font-bold text-white">
-              Day {progress?.nextAttemptNumber ?? 1}
+              Round {progress?.nextAttemptNumber ?? 1}
             </Text>
           </View>
         )}
@@ -1028,15 +1025,10 @@ export default function DuetRecordingScreen() {
           <View className="px-5">
             <View className="items-center">
               <View
-                className="items-center justify-center rounded-full bg-white"
+                className="items-center justify-center rounded-full"
                 style={{
                   width: 82,
                   height: 82,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 14,
-                  elevation: 3,
                 }}>
                 <Image
                   source={require('~/assets/icons/Gbam.png')}
@@ -1048,8 +1040,8 @@ export default function DuetRecordingScreen() {
                 />
               </View>
 
-              <Text className="mt-3 text-center font-heading text-2xl font-extrabold text-[#1A1A1A]">
-                Gbam. That&apos;s how it&apos;s done.
+              <Text className="mt-3 text-center font-heading text-2xl font-extrabold text-[#000]">
+                Gbam. You did that!
               </Text>
 
               <Text className="mt-1 text-center font-body text-sm text-[#686868]">
@@ -1061,11 +1053,7 @@ export default function DuetRecordingScreen() {
           {recordedVideoUri && challenge.instructionalVideoUrl && (
             <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-white">
               <CompositeVideoPlayer
-                leftVideoUrl={
-                  progress?.day1VideoUrl ||
-                  FIRST_ATTEMPT_VIDEO_URL ||
-                  challenge.instructionalVideoUrl
-                }
+                leftVideoUrl={progress?.day1VideoUrl || challenge.instructionalVideoUrl}
                 rightVideoUrl={recordedVideoUri}
                 mirrorRight={false}
               />
@@ -1079,7 +1067,6 @@ export default function DuetRecordingScreen() {
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 0.05,
               shadowRadius: 12,
-              elevation: 2,
             }}>
             <View className="mb-2 flex-row items-center justify-between">
               <Text className="font-body text-sm font-bold text-[#1F1F1F]">Caption *</Text>
@@ -1140,10 +1127,6 @@ export default function DuetRecordingScreen() {
                 Submit Round {progress?.nextAttemptNumber} for {totalPoints} pts
               </ButtonText>
             </LoadingButton>
-
-            <Text className="mt-2 text-center font-body text-sm text-[#838383]">
-              We&apos;ll finish uploading while you keep using the app.
-            </Text>
           </View>
 
           <TouchableOpacity

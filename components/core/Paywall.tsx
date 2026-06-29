@@ -24,6 +24,41 @@ import { CatchPromise } from '~/utils/catch-promise';
 
 const QUARTERLY_PACKAGE_ID = '$rc_three_month';
 const ANNUAL_PACKAGE_ID = '$rc_annual';
+const MONTHLY_PACKAGE_ID = '$rc_monthly';
+
+function PlanPrice({ value, featured = false }: { value?: string; featured?: boolean }) {
+  return (
+    <Text
+      className="mt-3 w-full text-center font-extrabold"
+      style={{
+        color: featured ? '#FFFFFF' : '#181818',
+        fontSize: featured ? 28 : 19,
+        includeFontPadding: false,
+      }}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.55}>
+      {value ?? 'Loading...'}
+    </Text>
+  );
+}
+
+function PerMonthText({ value, featured = false }: { value?: string | null; featured?: boolean }) {
+  return (
+    <Text
+      className="w-full text-center font-extrabold"
+      style={{
+        color: featured ? '#FFFFFF' : '#FF6A2A',
+        fontSize: 12,
+        includeFontPadding: false,
+      }}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.65}>
+      {value ? `${value}/mo` : 'Loading...'}
+    </Text>
+  );
+}
 
 function formatCurrency(value: number, currencyCode?: string) {
   const locale = Localization.getLocales()[0]?.languageTag ?? 'en-US';
@@ -62,6 +97,11 @@ export default function Paywall() {
     console.log('Available packages from RevenueCat:', packages);
   }
 
+  const monthlyPackage = useMemo(
+    () => packages.find((pkg) => pkg.identifier === MONTHLY_PACKAGE_ID),
+    [packages]
+  );
+
   const quarterlyPackage = useMemo(
     () => packages.find((pkg) => pkg.identifier === QUARTERLY_PACKAGE_ID),
     [packages]
@@ -82,43 +122,59 @@ export default function Paywall() {
       return;
     }
 
+    if (monthlyPackage) {
+      setSelectedPackage(monthlyPackage);
+      return;
+    }
+
     if (quarterlyPackage) {
       setSelectedPackage(quarterlyPackage);
     }
-  }, [annualPackage, quarterlyPackage, selectedPackage]);
+  }, [annualPackage, monthlyPackage, quarterlyPackage, selectedPackage]);
 
   const savingsPercentage = useMemo(() => {
-    if (!quarterlyPackage || !annualPackage) return 0;
+    if (!annualPackage) return 0;
 
-    const quarterlyPerYear = quarterlyPackage.product.price * 4;
+    const yearlyBaseline = monthlyPackage
+      ? monthlyPackage.product.price * 12
+      : quarterlyPackage
+        ? quarterlyPackage.product.price * 4
+        : 0;
     const annualPrice = annualPackage.product.price;
 
-    if (!quarterlyPerYear || !annualPrice) return 0;
-    if (annualPrice >= quarterlyPerYear) return 0;
+    if (!yearlyBaseline || !annualPrice) return 0;
+    if (annualPrice >= yearlyBaseline) return 0;
 
-    return Math.round(((quarterlyPerYear - annualPrice) / quarterlyPerYear) * 100);
-  }, [quarterlyPackage, annualPackage]);
+    return Math.round(((yearlyBaseline - annualPrice) / yearlyBaseline) * 100);
+  }, [annualPackage, monthlyPackage, quarterlyPackage]);
 
   const yearlySaving = useMemo(() => {
-    if (!quarterlyPackage || !annualPackage) return 0;
+    if (!annualPackage) return 0;
 
-    const saving = quarterlyPackage.product.price * 4 - annualPackage.product.price;
+    const yearlyBaseline = monthlyPackage
+      ? monthlyPackage.product.price * 12
+      : quarterlyPackage
+        ? quarterlyPackage.product.price * 4
+        : 0;
+    const saving = yearlyBaseline - annualPackage.product.price;
 
     return saving > 0 ? saving : 0;
-  }, [quarterlyPackage, annualPackage]);
+  }, [annualPackage, monthlyPackage, quarterlyPackage]);
 
   const yearlySavingText = useMemo(() => {
     const currencyCode =
-      annualPackage?.product.currencyCode ?? quarterlyPackage?.product.currencyCode;
+      annualPackage?.product.currencyCode ??
+      monthlyPackage?.product.currencyCode ??
+      quarterlyPackage?.product.currencyCode;
 
     return formatCurrency(yearlySaving, currencyCode);
-  }, [annualPackage, quarterlyPackage, yearlySaving]);
+  }, [annualPackage, monthlyPackage, quarterlyPackage, yearlySaving]);
 
   const isAnnualSelected = selectedPackage?.identifier === ANNUAL_PACKAGE_ID;
   const isQuarterlySelected = selectedPackage?.identifier === QUARTERLY_PACKAGE_ID;
+  const isMonthlySelected = selectedPackage?.identifier === MONTHLY_PACKAGE_ID;
 
   const hasTrial = Boolean(selectedPackage?.product?.introPrice);
-  const ctaText = hasTrial ? 'Try Free for 7 Days' : 'Continue';
 
   const isCtaDisabled =
     !selectedPackage || !purchasePackage || isLoading || isLoggingOut || isPackagesLoading;
@@ -238,7 +294,7 @@ export default function Paywall() {
         <Text className="mt-1 text-right text-[11px] text-[#4A4A4A]">~ Aeaqyeman</Text>
 
         <View className="mx-3 mt-5">
-          <Text className="mb-3 text-m text-[#000]" style={{ fontFamily: 'Inter_700Bold' }}>
+          <Text className="text-m mb-3 text-[#000]" style={{ fontFamily: 'Inter_700Bold' }}>
             This is for you if...
           </Text>
 
@@ -255,64 +311,145 @@ export default function Paywall() {
           </View>
         </View>
 
-        <View className="mt-8 gap-y-3">
+        <View
+          className="mt-10 flex-row items-end justify-between"
+          style={{
+            columnGap: 8,
+            marginHorizontal: -14,
+          }}>
           <TouchableOpacity
             activeOpacity={0.85}
+            disabled={!monthlyPackage || isLoading || isLoggingOut}
+            onPress={() => {
+              if (monthlyPackage) {
+                setSelectedPackage(monthlyPackage);
+              }
+            }}
+            className="flex-1 items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
+            style={{
+              minHeight: 170,
+              borderWidth: isMonthlySelected ? 1.8 : 1.2,
+              borderColor: isMonthlySelected ? '#FF6A2A' : '#E8E1DF',
+              backgroundColor: '#FFFFFF',
+              opacity: monthlyPackage ? 1 : 0.55,
+              overflow: 'visible',
+            }}>
+            {isMonthlySelected && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -10,
+                  right: 14,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  backgroundColor: '#FF5C1A',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }}>
+                <Icon.Check size={17} color="#FFFFFF" weight="bold" />
+              </View>
+            )}
+
+            <Text
+              className="w-full text-center text-[14px] font-extrabold text-[#9E9E9E]"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}>
+              MONTHLY
+            </Text>
+
+            <PlanPrice value={monthlyPackage?.product.priceString} />
+
+            <Text className="mt-3 text-center text-[12px] font-semibold text-[#A2A2A2]">
+              per month
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.9}
             disabled={!annualPackage || isLoading || isLoggingOut}
             onPress={() => {
               if (annualPackage) {
                 setSelectedPackage(annualPackage);
               }
             }}
-            className="rounded-2xl px-4 py-4"
+            className="items-center justify-center rounded-[20px] px-2 pb-5 pt-8"
             style={{
+              flex: 1.18,
+              minHeight: 176,
               position: 'relative',
-              borderWidth: 1.4,
-              borderColor: isAnnualSelected ? '#FF5C1A' : '#E6E6E6',
-              backgroundColor: isAnnualSelected ? '#FFF3EC' : '#FFFFFF',
+              backgroundColor: '#FF6A2A',
               opacity: annualPackage ? 1 : 0.55,
+              overflow: 'visible',
+              ...(Platform.OS === 'ios'
+                ? {
+                    shadowColor: '#FF6A2A',
+                    shadowOffset: {
+                      width: 0,
+                      height: 8,
+                    },
+                    shadowOpacity: 0.24,
+                    shadowRadius: 10,
+                  }
+                : {
+                    elevation: 5,
+                  }),
             }}>
-            {annualPackage && yearlySaving > 0 && (
+            <View
+              style={{
+                position: 'absolute',
+                top: -18,
+                alignSelf: 'center',
+                backgroundColor: '#151515',
+                borderRadius: 999,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+              }}>
+              <Text className="text-[10px] font-extrabold text-white" numberOfLines={1}>
+                BEST VALUE
+              </Text>
+            </View>
+
+            {isAnnualSelected && (
               <View
                 style={{
                   position: 'absolute',
-                  top: -13,
-                  alignSelf: 'center',
-                  backgroundColor: '#FF5C1A',
+                  top: 13,
+                  right: 12,
+                  width: 24,
+                  height: 24,
                   borderRadius: 999,
-                  paddingHorizontal: 14,
-                  paddingVertical: 4,
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                <Text className="text-[11px] font-bold text-white">
-                  Save {savingsPercentage}% · {yearlySavingText}/year
-                </Text>
+                <Icon.Check size={17} color="#FFFFFF" weight="bold" />
               </View>
             )}
 
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-sm font-bold text-[#1A1A1A]">Annual</Text>
+            <Text className="w-full text-center text-[18px] font-extrabold text-white">YEARLY</Text>
 
-                <Text className="mt-1 text-[13px] text-[#555555]">
-                  {annualPackage?.product.priceString ?? 'Loading...'}/year
+            <PlanPrice value={annualPackage?.product.priceString} featured />
+
+            <Text className="mt-1 text-center text-[15px] font-semibold text-white">per year</Text>
+
+            <View
+              className="mt-4 w-full items-center rounded-[5px] px-2 py-2"
+              style={{ backgroundColor: 'rgba(218,76,28,0.65)' }}>
+              <PerMonthText value={annualPackage?.product.pricePerMonthString} featured />
+
+              {yearlySaving > 0 && (
+                <Text
+                  className="mt-1 w-full text-center text-[12px] font-extrabold text-white"
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}>
+                  Save {savingsPercentage}% ({yearlySavingText})
                 </Text>
-
-                <Text className="mt-0.5 text-[12px] text-[#777777]">
-                  {annualPackage?.product.pricePerMonthString
-                    ? `${annualPackage.product.pricePerMonthString}/month`
-                    : 'Best yearly value'}
-                </Text>
-              </View>
-
-              <View
-                className="h-6 w-6 items-center justify-center rounded-full"
-                style={{
-                  borderWidth: 1,
-                  borderColor: isAnnualSelected ? '#FF5C1A' : '#BDBDBD',
-                  backgroundColor: isAnnualSelected ? '#FF5C1A' : '#FFFFFF',
-                }}>
-                {isAnnualSelected && <Icon.Check size={14} color="#FFFFFF" weight="bold" />}
-              </View>
+              )}
             </View>
           </TouchableOpacity>
 
@@ -324,37 +461,52 @@ export default function Paywall() {
                 setSelectedPackage(quarterlyPackage);
               }
             }}
-            className="rounded-2xl px-4 py-4"
+            className="flex-1 items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
             style={{
-              borderWidth: 1.4,
-              borderColor: isQuarterlySelected ? '#FF5C1A' : '#E6E6E6',
-              backgroundColor: isQuarterlySelected ? '#FFF3EC' : '#FFFFFF',
+              minHeight: 170,
+              borderWidth: isQuarterlySelected ? 1.8 : 1.2,
+              borderColor: isQuarterlySelected ? '#FF6A2A' : '#E8E1DF',
+              backgroundColor: '#FFFFFF',
               opacity: quarterlyPackage ? 1 : 0.55,
+              overflow: 'visible',
             }}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <Text className="text-sm font-bold text-[#1A1A1A]">Quarterly</Text>
-
-                <Text className="mt-1 text-[13px] text-[#555555]">
-                  {quarterlyPackage?.product.priceString ?? 'Loading...'}/quarter
-                </Text>
-
-                <Text className="mt-0.5 text-[12px] text-[#777777]">
-                  {quarterlyPackage?.product.pricePerMonthString
-                    ? `${quarterlyPackage.product.pricePerMonthString}/month`
-                    : 'Every 3 months'}
-                </Text>
-              </View>
-
+            {isQuarterlySelected && (
               <View
-                className="h-6 w-6 items-center justify-center rounded-full"
                 style={{
-                  borderWidth: 1,
-                  borderColor: isQuarterlySelected ? '#FF5C1A' : '#BDBDBD',
-                  backgroundColor: isQuarterlySelected ? '#FF5C1A' : '#FFFFFF',
+                  position: 'absolute',
+                  top: -10,
+                  right: 14,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  backgroundColor: '#FF5C1A',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
                 }}>
-                {isQuarterlySelected && <Icon.Check size={14} color="#FFFFFF" weight="bold" />}
+                <Icon.Check size={17} color="#FFFFFF" weight="bold" />
               </View>
+            )}
+
+            <Text
+              className="w-full text-center text-[14px] font-extrabold text-[#9E9E9E]"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.64}>
+              QUARTERLY
+            </Text>
+
+            <PlanPrice value={quarterlyPackage?.product.priceString} />
+
+            <Text
+              className="mt-3 text-center text-[12px] font-semibold leading-4 text-[#A2A2A2]"
+              numberOfLines={2}>
+              every 3 months
+            </Text>
+
+            <View className="mt-2 w-full px-1">
+              <PerMonthText value={quarterlyPackage?.product.pricePerMonthString} />
             </View>
           </TouchableOpacity>
         </View>
@@ -400,7 +552,11 @@ export default function Paywall() {
               </View>
             ) : (
               <Text className="text-lg font-bold text-white">
-                {isPackagesLoading ? 'Loading plans...' : ctaText}
+                {isPackagesLoading
+                  ? 'Loading plans...'
+                  : hasTrial
+                    ? 'Start Your 7-Day Free Trial'
+                    : 'Continue'}
               </Text>
             )}
           </View>
@@ -416,9 +572,7 @@ export default function Paywall() {
               <View className="flex-row items-center">
                 <ActivityIndicator size="small" color="#FF5C1A" />
 
-                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">
-                  Signing out...
-                </Text>
+                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">Signing out...</Text>
               </View>
             ) : (
               <Text className="text-sm font-semibold text-[#FF5C1A]">Back to login</Text>

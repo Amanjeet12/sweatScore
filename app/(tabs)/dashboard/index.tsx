@@ -218,7 +218,7 @@ export default function TabDashboard() {
             <View className=" pv-5 mt-5 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />
             </View>
-            <View className="mt-4 bg-[#F9F9F9]">
+            <View className="mt-4 mb-10 bg-[#F9F9F9]">
               <WeeklyStreakCard />
             </View>
             {/* <View className="mt-4 bg-[#F9F9F9] px-5">
@@ -254,9 +254,9 @@ export default function TabDashboard() {
                 </LinearGradient>
               </TouchableOpacity>
             </View> */}
-            <View className="mb-5 mt-4 bg-[#F9F9F9]">
+            {/* <View className="mb-5 mt-4 bg-[#F9F9F9]">
               <MoveWithUs />
-            </View>
+            </View> */}
 
             {showUpdateBanner ? <View style={{ height: 64 }} /> : null}
           </View>

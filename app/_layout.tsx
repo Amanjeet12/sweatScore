@@ -225,7 +225,8 @@ export default function Layout() {
                       <Stack.Screen
                         name="challenge/[challengeId]"
                         options={{
-                          presentation: 'modal',
+                          presentation: 'card',
+                          animation: 'slide_from_right',
                           gestureEnabled: false,
                           headerTitle: '',
                         }}
@@ -241,7 +242,8 @@ export default function Layout() {
                       <Stack.Screen
                         name="challenge-view/[challengeId]"
                         options={{
-                          presentation: 'modal',
+                          presentation: 'card',
+                          animation: 'slide_from_right',
                           gestureEnabled: true,
                           headerTitle: '',
                         }}
@@ -249,7 +251,8 @@ export default function Layout() {
                       <Stack.Screen
                         name="challenge-record/[challengeId]"
                         options={{
-                          presentation: 'fullScreenModal',
+                          presentation: 'card',
+                          animation: 'slide_from_right',
                           headerShown: false,
                           gestureEnabled: false,
                         }}
