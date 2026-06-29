@@ -1,18 +1,15 @@
 import { Platform } from 'react-native';
 import AppleHealthKit, { HealthInputOptions } from 'react-native-health';
-import {
-  SdkAvailabilityStatus,
-  aggregateGroupByDuration,
-  aggregateRecord,
-  getGrantedPermissions,
-  getSdkStatus,
-  initialize,
-} from 'react-native-health-connect';
-import { TimeRangeFilter } from 'react-native-health-connect/src/types/base.types';
+import type { TimeRangeFilter } from 'react-native-health-connect/src/types/base.types';
 
 import { getDayRangeISO } from '@/utils/timezone';
 import { healthPermissions } from '~/utils/constants';
 import { getData } from '~/utils/storage';
+
+function getHealthConnect() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('react-native-health-connect') as typeof import('react-native-health-connect');
+}
 
 // Promisify HealthKit methods for iOS
 function promisifyHealthKitMethod<T>(
@@ -174,6 +171,15 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
 
 // Android Health Connect data fetch
 async function fetchAndroidHealthData(date: Date, timeZone: string, userAge?: number) {
+  const {
+    SdkAvailabilityStatus,
+    aggregateGroupByDuration,
+    aggregateRecord,
+    getGrantedPermissions,
+    getSdkStatus,
+    initialize,
+  } = getHealthConnect();
+
   let steps = 0,
     zone2Minutes = 0,
     stepsTill11am = 0,

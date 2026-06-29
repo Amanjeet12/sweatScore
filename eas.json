@@ -15,6 +15,17 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "environment": "preview",
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "preview-store": {
+      "extends": "preview",
+      "distribution": "store",
+      "autoIncrement": true,
+      "channel": "preview",
+      "environment": "preview",
       "ios": {
         "image": "latest"
       }
@@ -28,6 +39,7 @@
     }
   },
   "submit": {
+    "preview-store": {},
     "production": {}
   }
 }

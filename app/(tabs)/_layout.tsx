@@ -113,7 +113,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Move
+                Progress
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (

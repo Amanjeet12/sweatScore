@@ -14,7 +14,6 @@ import {
   AppState,
   TouchableOpacity,
 } from 'react-native';
-import { getSdkStatus, SdkAvailabilityStatus } from 'react-native-health-connect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
@@ -38,6 +37,11 @@ import { storage } from '~/utils/storage';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight } from 'phosphor-react-native';
+
+function getHealthConnect() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('react-native-health-connect') as typeof import('react-native-health-connect');
+}
 
 function getCurrentWeekMondayStr(): string {
   const now = new Date();
@@ -111,6 +115,9 @@ export default function TabDashboard() {
   };
 
   const checkAvailability = async () => {
+    if (Platform.OS !== 'android') return;
+
+    const { getSdkStatus, SdkAvailabilityStatus } = getHealthConnect();
     const status = await getSdkStatus();
     if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
       return;

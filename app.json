@@ -5,6 +5,7 @@
     "owner": "sweatscore",
     "version": "1.1.0",
     "scheme": "sweatscore-app",
+    "newArchEnabled": true,
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -58,6 +59,7 @@
           }
         }
       ],
+      "./plugins/with-xcode26-fmt-fix",
       [
         "expo-image-picker",
         {

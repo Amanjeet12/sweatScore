@@ -10,7 +10,6 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, TouchableOpacity, View } from 'react-native';
 import AppleHealthKit from 'react-native-health';
-import { initialize, requestPermission } from 'react-native-health-connect';
 import { z } from 'zod';
 
 import { Switch } from '@/components/ui/switch';

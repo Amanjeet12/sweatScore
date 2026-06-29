@@ -379,14 +379,14 @@ function HowToEarnPointsModal({
     },
     {
       icon: require('~/assets/icons/Move With Us.png'),
-      title: 'Move With Us',
-      description: 'Post a duet',
-      points: '+5 pts',
+      title: 'Progress Video',
+      description: 'Record a progress video',
+      points: '+10 pts',
     },
     {
       icon: require('~/assets/icons/Flame.png'),
       title: 'Weekly Streak',
-      description: 'Post a duet 5 days a week',
+      description: 'Hit a target 5 days this week',
       points: '+10 pts',
     },
   ];

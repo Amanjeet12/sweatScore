@@ -23,13 +23,13 @@ export default function CompositeVideoPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
 
   const ownLeftPlayer = useVideoPlayer(existingLeftPlayer ? null : leftVideoUrl, (p) => {
-    p.loop = true;
+    p.loop = true; // old/instructor video can repeat
   });
 
   const leftPlayer = existingLeftPlayer ?? ownLeftPlayer;
 
   const rightPlayer = useVideoPlayer(rightVideoUrl, (p) => {
-    p.loop = true;
+    p.loop = false; // current recorded video should play its real 60 sec
     p.volume = 0;
   });
 
@@ -44,9 +44,13 @@ export default function CompositeVideoPlayer({
     } else {
       leftPlayer.currentTime = 0;
       rightPlayer.currentTime = 0;
+
       leftPlayer.loop = true;
+      rightPlayer.loop = false;
+
       leftPlayer.play();
       rightPlayer.play();
+
       setIsPlaying(true);
     }
   };

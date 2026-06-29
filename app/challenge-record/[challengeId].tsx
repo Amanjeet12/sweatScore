@@ -1,9 +1,10 @@
 import { useQuery } from 'convex/react';
+import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { CameraRotate, Record, X } from 'phosphor-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -28,13 +29,22 @@ import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
-import { Audio } from 'expo-av';
 
 const COUNTDOWN_SECONDS = 5;
-const MIN_STOP_RECORDING_SECONDS = 5;
+const MIN_STOP_RECORDING_SECONDS = 30;
 const MAX_RECORDING_SECONDS = 60;
+const RECORDING_VIDEO_QUALITY = '720p';
+const RECORDING_VIDEO_BITRATE = 2_500_000;
+const RECORDING_MAX_FILE_SIZE_BYTES = 80 * 1024 * 1024;
+const EARLY_NATIVE_STOP_GRACE_SECONDS = 1;
 
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
+
+function getDefaultCaption(round?: number, exerciseName?: string) {
+  return `Done and dusted! Keeping my streak alive. Round ${round ?? 1} of ${
+    exerciseName ?? 'this exercise'
+  } done 🔥`;
+}
 
 export default function DuetRecordingScreen() {
   useKeepAwake();
@@ -58,12 +68,17 @@ export default function DuetRecordingScreen() {
   const postRecordScrollRef = useRef<ScrollView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const maxRecordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const elapsedRef = useRef(0);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const isRecordingRef = useRef(false);
   const cancelledByBackgroundRef = useRef(false);
   const cancelledByUserRef = useRef(false);
+  const manualStopRequestedRef = useRef(false);
   const preserveRecordedVideoOnUnmountRef = useRef(false);
   const recordedVideoUriRef = useRef<string | null>(null);
   const countdownSoundRef = useRef<Audio.Sound | null>(null);
+
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
@@ -77,6 +92,107 @@ export default function DuetRecordingScreen() {
 
   const { enqueueChallengeUpload, getJobForChallenge } = useChallengeUploadQueue();
   const existingUploadJob = getJobForChallenge(challengeId ?? '');
+
+  const debugRecordingState = useCallback(
+    (label: string) => {
+      console.log(`[RecordingDebug] ${label}`, {
+        state,
+        elapsed,
+        elapsedRef: elapsedRef.current,
+        countdownValue,
+        recordedVideoUri,
+        caption,
+        allowRepost,
+        isSubmitting,
+        cameraFacing,
+        timerActive: !!timerRef.current,
+        countdownActive: !!countdownRef.current,
+        maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+        recordingStartedAtRef: recordingStartedAtRef.current,
+        isRecordingRef: isRecordingRef.current,
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+        cancelledByUserRef: cancelledByUserRef.current,
+        manualStopRequestedRef: manualStopRequestedRef.current,
+        preserveRecordedVideoOnUnmountRef: preserveRecordedVideoOnUnmountRef.current,
+        recordedVideoUriRef: recordedVideoUriRef.current,
+        countdownSoundLoaded: !!countdownSoundRef.current,
+      });
+    },
+    [
+      state,
+      elapsed,
+      countdownValue,
+      recordedVideoUri,
+      caption,
+      allowRepost,
+      isSubmitting,
+      cameraFacing,
+    ]
+  );
+
+  useEffect(() => {
+    elapsedRef.current = elapsed;
+  }, [elapsed]);
+
+  useEffect(() => {
+    recordedVideoUriRef.current = recordedVideoUri;
+  }, [recordedVideoUri]);
+
+  const cleanupRecordingRefs = useCallback((reason: string) => {
+    console.log(`[RecordingDebug] cleanupRecordingRefs: ${reason}`, {
+      elapsedRef: elapsedRef.current,
+      timerActive: !!timerRef.current,
+      countdownActive: !!countdownRef.current,
+      maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+      isRecordingRef: isRecordingRef.current,
+      cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+      cancelledByUserRef: cancelledByUserRef.current,
+      manualStopRequestedRef: manualStopRequestedRef.current,
+      recordedVideoUriRef: recordedVideoUriRef.current,
+    });
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+      maxRecordingTimeoutRef.current = null;
+    }
+
+    countdownSoundRef.current?.stopAsync().catch(() => {});
+
+    if (isRecordingRef.current) {
+      cancelledByUserRef.current = true;
+      isRecordingRef.current = false;
+
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        // Recording already stopped.
+      }
+    }
+
+    manualStopRequestedRef.current = false;
+    recordingStartedAtRef.current = null;
+    cancelledByBackgroundRef.current = false;
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[RecordingDebug] screen focused');
+
+      return () => {
+        cleanupRecordingRefs('screen blur/unfocus');
+      };
+    }, [cleanupRecordingRefs])
+  );
 
   useEffect(() => {
     if (!cameraPermission?.granted) {
@@ -95,25 +211,25 @@ export default function DuetRecordingScreen() {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      console.log('[RecordingDebug] screen unmount cleanup', {
+        timerActive: !!timerRef.current,
+        countdownActive: !!countdownRef.current,
+        isRecordingRef: isRecordingRef.current,
+        recordedVideoUriRef: recordedVideoUriRef.current,
+      });
 
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-        countdownRef.current = null;
-      }
+      cleanupRecordingRefs('screen unmount');
     };
-  }, []);
-
-  useEffect(() => {
-    recordedVideoUriRef.current = recordedVideoUri;
-  }, [recordedVideoUri]);
+  }, [cleanupRecordingRefs]);
 
   useEffect(() => {
     return () => {
       const uri = recordedVideoUriRef.current;
+
+      console.log('[RecordingDebug] temp video cleanup check', {
+        uri,
+        preserveRecordedVideoOnUnmountRef: preserveRecordedVideoOnUnmountRef.current,
+      });
 
       if (
         uri &&
@@ -129,6 +245,15 @@ export default function DuetRecordingScreen() {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
+      console.log('[RecordingDebug] AppState changed', {
+        nextState,
+        elapsedRef: elapsedRef.current,
+        isRecordingRef: isRecordingRef.current,
+        countdownActive: !!countdownRef.current,
+        timerActive: !!timerRef.current,
+        maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+      });
+
       if (nextState === 'active') return;
 
       if (countdownRef.current) {
@@ -143,6 +268,11 @@ export default function DuetRecordingScreen() {
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
+        }
+
+        if (maxRecordingTimeoutRef.current) {
+          clearTimeout(maxRecordingTimeoutRef.current);
+          maxRecordingTimeoutRef.current = null;
         }
 
         try {
@@ -180,31 +310,52 @@ export default function DuetRecordingScreen() {
 
         if (isMounted) {
           countdownSoundRef.current = sound;
+          console.log('[RecordingDebug] countdown sound loaded');
         } else {
           await sound.unloadAsync();
         }
-      } catch {
-        // Sound is optional. Recording should still work.
+      } catch (error) {
+        console.log('[RecordingDebug] countdown sound failed', error);
       }
     };
 
-    void loadCountdownSound();
+    loadCountdownSound().catch(() => {});
 
     return () => {
       isMounted = false;
       countdownSoundRef.current?.unloadAsync().catch(() => {});
       countdownSoundRef.current = null;
+      console.log('[RecordingDebug] countdown sound unloaded');
     };
   }, []);
 
   const stopRecording = useCallback(() => {
+    console.log('[RecordingDebug] stopRecording called', {
+      elapsedRef: elapsedRef.current,
+      isRecordingRef: isRecordingRef.current,
+    });
+
     if (!isRecordingRef.current) return;
 
+    if (elapsedRef.current < MIN_STOP_RECORDING_SECONDS) {
+      console.log('[RecordingDebug] stopRecording ignored before minimum seconds', {
+        elapsedRef: elapsedRef.current,
+        minimum: MIN_STOP_RECORDING_SECONDS,
+      });
+      return;
+    }
+
     isRecordingRef.current = false;
+    manualStopRequestedRef.current = true;
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+      maxRecordingTimeoutRef.current = null;
     }
 
     try {
@@ -215,6 +366,11 @@ export default function DuetRecordingScreen() {
   }, []);
 
   const startRecording = useCallback(async () => {
+    console.log('[RecordingDebug] startRecording called', {
+      hasCameraRef: !!cameraRef.current,
+      challengeId,
+    });
+
     if (!cameraRef.current) {
       setState('pre-record');
       return;
@@ -222,25 +378,101 @@ export default function DuetRecordingScreen() {
 
     setState('recording');
     setElapsed(0);
+    elapsedRef.current = 0;
 
     cancelledByUserRef.current = false;
     cancelledByBackgroundRef.current = false;
+    manualStopRequestedRef.current = false;
+    recordingStartedAtRef.current = Date.now();
     isRecordingRef.current = true;
 
+    console.log('[RecordingDebug] recording refs initialized', {
+      isRecordingRef: isRecordingRef.current,
+      cancelledByUserRef: cancelledByUserRef.current,
+      cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+      manualStopRequestedRef: manualStopRequestedRef.current,
+      recordingStartedAtRef: recordingStartedAtRef.current,
+      appMaxDuration: MAX_RECORDING_SECONDS,
+      nativeMaxDuration: null,
+      videoQuality: RECORDING_VIDEO_QUALITY,
+      videoBitrate: RECORDING_VIDEO_BITRATE,
+      maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
+    });
+
     timerRef.current = setInterval(() => {
-      setElapsed((previous) => previous + 1);
+      setElapsed((previous) => {
+        const next = previous + 1;
+        elapsedRef.current = next;
+        console.log('[RecordingDebug] tick', { elapsed: next });
+        return next;
+      });
     }, 1000);
 
-    try {
-      const video = await cameraRef.current.recordAsync({
-        maxDuration: MAX_RECORDING_SECONDS,
+    maxRecordingTimeoutRef.current = setTimeout(() => {
+      console.log('[RecordingDebug] max recording duration reached', {
+        elapsedRef: elapsedRef.current,
+        isRecordingRef: isRecordingRef.current,
       });
+
+      if (!isRecordingRef.current) return;
 
       isRecordingRef.current = false;
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        // Camera may already be stopped by the native maxDuration limit.
+      }
+    }, MAX_RECORDING_SECONDS * 1000);
+
+    try {
+      const video = await cameraRef.current.recordAsync({
+        maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
+      });
+
+      const recordedDurationSeconds = recordingStartedAtRef.current
+        ? (Date.now() - recordingStartedAtRef.current) / 1000
+        : elapsedRef.current;
+      const wasManualStop = manualStopRequestedRef.current;
+      let videoSizeBytes: number | null = null;
+
+      if (video?.uri) {
+        try {
+          const videoInfo = await FileSystem.getInfoAsync(video.uri, { size: true });
+          videoSizeBytes = videoInfo.exists ? videoInfo.size : null;
+        } catch (error) {
+          console.log('[RecordingDebug] video info failed', error);
+        }
+      }
+
+      console.log('[RecordingDebug] recordAsync finished', {
+        videoUri: video?.uri,
+        videoSizeBytes,
+        elapsedRef: elapsedRef.current,
+        recordedDurationSeconds,
+        isRecordingRef: isRecordingRef.current,
+        cancelledByUserRef: cancelledByUserRef.current,
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+        manualStopRequestedRef: manualStopRequestedRef.current,
+      });
+
+      isRecordingRef.current = false;
+      recordingStartedAtRef.current = null;
+      manualStopRequestedRef.current = false;
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+        maxRecordingTimeoutRef.current = null;
       }
 
       if (cancelledByUserRef.current) {
@@ -257,15 +489,40 @@ export default function DuetRecordingScreen() {
 
       const finishedNormally = !cancelledByBackgroundRef.current;
       cancelledByBackgroundRef.current = false;
+      const endedBeforeMaxDuration =
+        !wasManualStop &&
+        recordedDurationSeconds < MAX_RECORDING_SECONDS - EARLY_NATIVE_STOP_GRACE_SECONDS;
 
       if (!video?.uri || !finishedNormally) {
         setRecordedVideoUri(null);
         setElapsed(0);
+        elapsedRef.current = 0;
         setState('pre-record');
 
         Alert.alert(
           'Recording incomplete',
           'The recording was interrupted. Please try again without leaving the app.'
+        );
+
+        return;
+      }
+
+      if (endedBeforeMaxDuration) {
+        FileSystem.deleteAsync(video.uri, {
+          idempotent: true,
+        }).catch(() => {});
+
+        setRecordedVideoUri(null);
+        setElapsed(0);
+        elapsedRef.current = 0;
+        setState('pre-record');
+
+        Alert.alert(
+          'Recording stopped early',
+          `The camera stopped after ${Math.max(
+            1,
+            Math.round(recordedDurationSeconds)
+          )}s before the 60s limit. Please try again.`
         );
 
         return;
@@ -283,23 +540,45 @@ export default function DuetRecordingScreen() {
           idempotent: true,
         });
 
+        console.log('[RecordingDebug] video copied to persistent uri', {
+          persistentUri,
+          elapsedRef: elapsedRef.current,
+        });
+
         recordedVideoUriRef.current = persistentUri;
         setRecordedVideoUri(persistentUri);
+        setCaption(
+          getDefaultCaption(progress?.nextAttemptNumber, challenge?.name ?? 'this exercise')
+        );
         setState('post-record');
-      } catch {
+      } catch (error) {
+        console.log('[RecordingDebug] video save failed', error);
+
         setRecordedVideoUri(null);
         setElapsed(0);
+        elapsedRef.current = 0;
         setState('pre-record');
 
         Alert.alert('Recording failed', 'Could not save the recording. Please try again.');
       }
-    } catch {
+    } catch (error) {
+      console.log('[RecordingDebug] recordAsync error', {
+        error,
+        elapsedRef: elapsedRef.current,
+        cancelledByUserRef: cancelledByUserRef.current,
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+      });
+
       if (cancelledByUserRef.current) {
         cancelledByUserRef.current = false;
+        manualStopRequestedRef.current = false;
+        recordingStartedAtRef.current = null;
         return;
       }
 
       isRecordingRef.current = false;
+      manualStopRequestedRef.current = false;
+      recordingStartedAtRef.current = null;
       cancelledByBackgroundRef.current = false;
 
       if (timerRef.current) {
@@ -307,10 +586,16 @@ export default function DuetRecordingScreen() {
         timerRef.current = null;
       }
 
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+        maxRecordingTimeoutRef.current = null;
+      }
+
       setElapsed(0);
+      elapsedRef.current = 0;
       setState('pre-record');
     }
-  }, []);
+  }, [challenge?.name, challengeId, progress?.nextAttemptNumber]);
 
   const playCountdownSound = useCallback(async () => {
     try {
@@ -321,12 +606,14 @@ export default function DuetRecordingScreen() {
       await sound.stopAsync();
       await sound.setPositionAsync(0);
       await sound.playAsync();
-    } catch {
-      // Ignore sound errors.
+    } catch (error) {
+      console.log('[RecordingDebug] countdown sound play failed', error);
     }
   }, []);
 
   const startCountdown = useCallback(() => {
+    debugRecordingState('startCountdown pressed');
+
     if (existingUploadJob) {
       Alert.alert(
         existingUploadJob.status === 'failed' ? 'Upload paused' : 'Upload in progress',
@@ -342,14 +629,14 @@ export default function DuetRecordingScreen() {
     setState('countdown');
     setCountdownValue(COUNTDOWN_SECONDS);
 
-    // Plays 4 sec sound immediately after Start Recording click
-    void playCountdownSound();
+    playCountdownSound().catch(() => {});
 
     let count = COUNTDOWN_SECONDS;
 
     countdownRef.current = setInterval(() => {
       count -= 1;
       setCountdownValue(count);
+      console.log('[RecordingDebug] countdown tick', { count });
 
       if (count <= 0) {
         if (countdownRef.current) {
@@ -357,10 +644,10 @@ export default function DuetRecordingScreen() {
           countdownRef.current = null;
         }
 
-        void startRecording();
+        startRecording().catch(() => {});
       }
     }, 1000);
-  }, [existingUploadJob, playCountdownSound, startRecording]);
+  }, [debugRecordingState, existingUploadJob, playCountdownSound, startRecording]);
 
   const handleSwitchCamera = useCallback(() => {
     if (isRecordingRef.current) return;
@@ -369,22 +656,15 @@ export default function DuetRecordingScreen() {
   }, []);
 
   const handleCancel = useCallback(() => {
-    countdownSoundRef.current?.stopAsync().catch(() => {});
-
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-
-    if (isRecordingRef.current) {
-      cancelledByUserRef.current = true;
-    }
-
-    stopRecording();
+    debugRecordingState('handleCancel called');
+    cleanupRecordingRefs('handleCancel');
     router.back();
-  }, [stopRecording]);
+  }, [cleanupRecordingRefs, debugRecordingState]);
 
   const handleStartOver = useCallback(() => {
+    debugRecordingState('handleStartOver called');
+    cleanupRecordingRefs('handleStartOver');
+
     if (recordedVideoUri) {
       FileSystem.deleteAsync(recordedVideoUri, {
         idempotent: true,
@@ -393,16 +673,25 @@ export default function DuetRecordingScreen() {
 
     recordedVideoUriRef.current = null;
     preserveRecordedVideoOnUnmountRef.current = false;
+    cancelledByUserRef.current = false;
+    cancelledByBackgroundRef.current = false;
+    manualStopRequestedRef.current = false;
+    recordingStartedAtRef.current = null;
+    isRecordingRef.current = false;
+    elapsedRef.current = 0;
 
     setRecordedVideoUri(null);
     setCaption('');
     setAllowRepost(true);
     setElapsed(0);
     setCountdownValue(COUNTDOWN_SECONDS);
+    setIsSubmitting(false);
     setState('pre-record');
-  }, [recordedVideoUri]);
+  }, [cleanupRecordingRefs, debugRecordingState, recordedVideoUri]);
 
   const handleSubmit = useCallback(async () => {
+    debugRecordingState('handleSubmit called');
+
     if (!recordedVideoUri || !challenge || isSubmitting) {
       return;
     }
@@ -441,6 +730,7 @@ export default function DuetRecordingScreen() {
     challengeId,
     allowRepost,
     caption,
+    debugRecordingState,
   ]);
 
   const handleCaptionFocus = useCallback(() => {
@@ -507,7 +797,8 @@ export default function DuetRecordingScreen() {
           style={StyleSheet.absoluteFillObject}
           facing={cameraFacing}
           mode="video"
-          videoQuality="720p"
+          videoQuality={RECORDING_VIDEO_QUALITY}
+          videoBitrate={RECORDING_VIDEO_BITRATE}
         />
 
         <View
