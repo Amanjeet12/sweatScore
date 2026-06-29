@@ -5,12 +5,6 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, TouchableOpacity, View } from 'react-native';
 import AppleHealthKit from 'react-native-health';
-import {
-  getSdkStatus,
-  initialize,
-  requestPermission,
-  SdkAvailabilityStatus,
-} from 'react-native-health-connect';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/ui/text';
@@ -19,6 +13,11 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { healthPermissions, healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
 import { hasActiveSubscription } from '~/utils/subscription';
+
+function getHealthConnect() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('react-native-health-connect') as typeof import('react-native-health-connect');
+}
 
 export default function AskHealthPermission() {
   const appState = useRef(AppState.currentState);
@@ -50,6 +49,8 @@ export default function AskHealthPermission() {
         });
       });
     } else {
+      const { getSdkStatus, initialize, requestPermission, SdkAvailabilityStatus } =
+        getHealthConnect();
       const status = await getSdkStatus();
 
       if (status === SdkAvailabilityStatus.SDK_UNAVAILABLE) {
@@ -136,6 +137,8 @@ export default function AskHealthPermission() {
 
   useEffect(() => {
     if (Platform.OS === 'android') {
+      const { getSdkStatus } = getHealthConnect();
+
       getSdkStatus().then((status) => {
         setSdkStatus(status);
       });
@@ -146,6 +149,8 @@ export default function AskHealthPermission() {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         if (Platform.OS === 'android') {
+          const { getSdkStatus } = getHealthConnect();
+
           getSdkStatus().then((status) => {
             setSdkStatus(status);
           });

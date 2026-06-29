@@ -9,8 +9,6 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, TouchableOpacity, View } from 'react-native';
-import AppleHealthKit from 'react-native-health';
-import { initialize, requestPermission } from 'react-native-health-connect';
 import { z } from 'zod';
 
 import { Switch } from '@/components/ui/switch';
@@ -22,10 +20,8 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
-import { healthPermissions, healthPermissionsAndroid } from '~/utils/constants';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 import { formatDateToLocaleString } from '~/utils/formatter';
-import { storeData } from '~/utils/storage';
 import { PROFILE_FIELD } from '~/utils/types';
 
 export default function ProfileEdit() {

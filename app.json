@@ -29,18 +29,8 @@
       [
         "react-native-share",
         {
-          "ios": [
-            "fb",
-            "instagram",
-            "instagram-stories",
-            "facebook-stories",
-            "tiktoksharesdk"
-          ],
-          "android": [
-            "com.instagram.android",
-            "com.facebook.katana",
-            "com.zhiliaoapp.musically"
-          ]
+          "ios": ["fb", "instagram", "instagram-stories", "facebook-stories", "tiktoksharesdk"],
+          "android": ["com.instagram.android", "com.facebook.katana", "com.zhiliaoapp.musically"]
         }
       ],
       "expo-localization",
@@ -69,6 +59,7 @@
           }
         }
       ],
+      "./plugins/with-xcode26-fmt-fix",
       [
         "expo-image-picker",
         {
@@ -82,9 +73,7 @@
     },
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sweatscore.sweatscoreapp",
