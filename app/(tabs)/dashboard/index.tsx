@@ -52,6 +52,18 @@ function getCurrentWeekMondayStr(): string {
   return monday.toISOString().split('T')[0];
 }
 
+async function openHealthConnectListing() {
+  const marketUrl = 'market://details?id=com.google.android.apps.healthdata';
+  const webUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
+
+  try {
+    const canOpenMarket = await Linking.canOpenURL(marketUrl);
+    await Linking.openURL(canOpenMarket ? marketUrl : webUrl);
+  } catch (error) {
+    console.warn('Failed to open Health Connect listing:', error);
+  }
+}
+
 export default function TabDashboard() {
   const appState = useRef(AppState.currentState);
   const { showSuccess } = useLocalSearchParams();
@@ -310,7 +322,7 @@ export default function TabDashboard() {
         showAlertDialog={showInstallDialog}
         handleClose={() => setShowInstallDialog(false)}
         handlePrimaryButtonPress={() => {
-          Linking.openURL('market://details?id=com.google.android.apps.healthdata');
+          openHealthConnectListing();
         }}
         title="Install Health Connect"
         body="To track your movement and earn Sweat Points, you’ll need to install Health Connect."

@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
-import AppleHealthKit, { HealthInputOptions } from 'react-native-health';
+import type { HealthInputOptions } from 'react-native-health';
 import type { TimeRangeFilter } from 'react-native-health-connect/src/types/base.types';
 
 import { getDayRangeISO } from '@/utils/timezone';
+import { getAppleHealthKit } from '~/utils/apple-health-kit';
 import { healthPermissions } from '~/utils/constants';
 import { getData } from '~/utils/storage';
 
@@ -103,6 +104,9 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
     zone2Minutes = 0,
     stepsTill11am = 0,
     hasPermissions = false;
+
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) return { steps, zone2Minutes, stepsTill11am, hasPermissions };
 
   // Get timezone-adjusted date range
   const { startDate, endDate } = getDayRangeISO(date, timeZone);
