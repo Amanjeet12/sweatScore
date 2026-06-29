@@ -90,7 +90,7 @@ export default function ChallengeViewScreen() {
             ) : null,
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#F9F9F9' },
-          headerLeft: () => <BackButton onPress={() => router.back()} />,
+          headerLeft: () => <BackButton fallbackHref={`/(tabs)/${currentTab}` as any} />,
         }}
       />
 

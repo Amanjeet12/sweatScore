@@ -15,7 +15,9 @@ export default function NewChallenge() {
           headerStyle: { backgroundColor: '#FFFFFF' },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerLeft: () => <BackButton onPress={() => router.back()} text="Back" />,
+          headerLeft: () => (
+            <BackButton fallbackHref="/(tabs)/dashboard/settings/admin/challenges" text="Back" />
+          ),
         }}
       />
 

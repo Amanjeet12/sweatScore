@@ -1,5 +1,5 @@
 import { useMutation, usePaginatedQuery } from 'convex/react';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, TouchableOpacity, View } from 'react-native';
 
@@ -104,17 +104,7 @@ export default function AdminViewPendingApprovals() {
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard/settings');
-                }
-              }}
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}
       />
 

@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Linking, ScrollView, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -14,7 +14,7 @@ export default function Terms() {
           headerTitleAlign: 'center',
           title: 'Terms of Use',
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} />,
+          headerLeft: () => <BackButton fallbackHref="/" />,
         }}
       />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>

@@ -1,5 +1,5 @@
 import { useQuery } from 'convex/react';
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { Platform, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
@@ -55,18 +55,7 @@ export default function SinglePost() {
             },
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => (
-              <BackButton
-                onPress={() => {
-                  if (router.canGoBack()) {
-                    router.back();
-                  } else {
-                    router.replace('/(tabs)/share');
-                  }
-                }}
-                text="Back"
-              />
-            ),
+            headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="Back" />,
           }}
         />
         <View

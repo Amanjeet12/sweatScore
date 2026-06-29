@@ -259,14 +259,7 @@ export default function AddNewActivity() {
             },
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => (
-              <BackButton
-                onPress={() => {
-                  router.back();
-                }}
-                text="Back"
-              />
-            ),
+            headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings" text="Back" />,
           }}
         />
 

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { View, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -26,7 +26,9 @@ export default function ProfileEditField() {
               title: '',
               headerTitleAlign: 'center',
               headerShadowVisible: false,
-              headerLeft: () => <BackButton onPress={router.back} text="Back" />,
+              headerLeft: () => (
+                <BackButton fallbackHref="/(tabs)/dashboard/settings/profile/edit" text="Back" />
+              ),
             }}
           />
           <View className="mx-4 mt-4 flex-1 flex-col gap-y-12">

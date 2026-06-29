@@ -252,7 +252,7 @@ export default function NewPost() {
           headerStyle: { backgroundColor: '#F9F9F9' },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerLeft: () => <BackButton onPress={() => router.back()} text="" />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
           headerTitle: () => (
             <Text className="font-heading text-xl font-bold text-[#1A1A1A]">New Post</Text>
           ),
@@ -268,7 +268,8 @@ export default function NewPost() {
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <View className="mx-4 mt-4 rounded-3xl bg-white px-4 py-4">
+          <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
+            {' '}
             <View className="flex-row items-start gap-x-3">
               <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder />
 
@@ -297,14 +298,13 @@ export default function NewPost() {
                 </Input>
               </View>
             </View>
-
             {!media && (
               <View className="mt-4 flex-row gap-x-3">
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={selectImage}
                   disabled={isUploading}
-                  className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#FFF6F1] px-4 py-3"
+                  className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
                   style={{ opacity: isUploading ? 0.5 : 1 }}>
                   <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
                     <ImageSquare size={22} color="#FF5C1A" weight="duotone" />
@@ -321,7 +321,7 @@ export default function NewPost() {
                     activeOpacity={0.85}
                     onPress={selectVideo}
                     disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#FFF6F1] px-4 py-3"
+                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
                     style={{ opacity: isUploading ? 0.5 : 1 }}>
                     <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
                       <VideoCamera size={22} color="#FF5C1A" weight="duotone" />

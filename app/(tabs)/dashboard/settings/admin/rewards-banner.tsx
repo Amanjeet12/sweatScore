@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { X } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import {
@@ -171,17 +171,7 @@ export default function AdminViewRewardsBanner() {
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard/settings');
-                }
-              }}
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}
       />
 

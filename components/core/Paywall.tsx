@@ -555,7 +555,7 @@ export default function Paywall() {
                 {isPackagesLoading
                   ? 'Loading plans...'
                   : hasTrial
-                    ? 'Start Your 7-Day Free Trial'
+                    ? 'Try Free For 7 Days'
                     : 'Continue'}
               </Text>
             )}

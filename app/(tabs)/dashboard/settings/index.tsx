@@ -58,20 +58,7 @@ export default function TabSettings() {
               <Ionicons size={22} name="settings-outline" />
             </TouchableOpacity>
           ),
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace({
-                    pathname: '/(tabs)/dashboard',
-                  });
-                }
-              }}
-              text="Back"
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard" text="Back" />,
           headerShadowVisible: false,
         }}
       />

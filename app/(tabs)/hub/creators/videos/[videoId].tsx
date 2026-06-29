@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 
@@ -41,18 +41,7 @@ export default function TabHubCreatorVideo() {
             headerStyle: {
               backgroundColor: '#F9F9F9',
             },
-            headerLeft: () => (
-              <BackButton
-                onPress={() => {
-                  if (router.canGoBack()) {
-                    router.back();
-                  } else {
-                    router.replace('/(tabs)/hub');
-                  }
-                }}
-                text="Back"
-              />
-            ),
+            headerLeft: () => <BackButton fallbackHref="/(tabs)/hub" text="Back" />,
           }}
         />
 

@@ -86,7 +86,9 @@ export default function ProfileEditGoal() {
             title: '',
             headerTitleAlign: 'center',
             headerShadowVisible: false,
-            headerLeft: () => <BackButton onPress={router.back} text="Back" />,
+            headerLeft: () => (
+              <BackButton fallbackHref="/(tabs)/dashboard/settings/profile/edit" text="Back" />
+            ),
           }}
         />
         <View className="flex-1 flex-col">

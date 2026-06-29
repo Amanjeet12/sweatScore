@@ -32,18 +32,7 @@ export default function TabHubCreator() {
           headerStyle: {
             backgroundColor: '#F9F9F9',
           },
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/hub');
-                }
-              }}
-              text="Back"
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/hub" text="Back" />,
         }}
       />
 

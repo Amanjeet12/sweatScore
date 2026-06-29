@@ -268,12 +268,7 @@ export default function EditCreator() {
             headerShadowVisible: false,
             headerBackVisible: false,
             headerLeft: () => (
-              <BackButton
-                onPress={() => {
-                  router.back();
-                }}
-                text="Back"
-              />
+              <BackButton fallbackHref="/(tabs)/dashboard/settings/admin/creator-hub" text="Back" />
             ),
           }}
         />

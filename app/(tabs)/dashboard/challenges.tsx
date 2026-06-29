@@ -62,17 +62,7 @@ export default function ChallengesScreen() {
           ),
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#F9F9F9' },
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard');
-                }
-              }}
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard" />,
         }}
       />
 

@@ -30,17 +30,7 @@ export default function AdminViewCreatorHub() {
               <Text className="text-xl font-semibold text-primary-500">+ Add</Text>
             </TouchableOpacity>
           ),
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard/settings');
-                }
-              }}
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}
       />
 

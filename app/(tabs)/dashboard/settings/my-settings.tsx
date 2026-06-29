@@ -112,7 +112,7 @@ export default function TabMySettings() {
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings" />,
         }}
       />
       <View className="mx-8 mt-8 flex-col gap-y-8">

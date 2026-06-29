@@ -44,7 +44,7 @@ export default function TabDashboardWorkouts() {
             headerTitleAlign: 'center',
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => <BackButton text="Back" onPress={router.back} />,
+            headerLeft: () => <BackButton text="Back" fallbackHref="/(tabs)/dashboard" />,
           }}
         />
 

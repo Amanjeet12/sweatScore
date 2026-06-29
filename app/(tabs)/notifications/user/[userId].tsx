@@ -1,6 +1,6 @@
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { View, Text } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -30,7 +30,7 @@ export default function TabNotificationsUser() {
             backgroundColor: '#F9F9F9',
           },
           headerShadowVisible: false,
-          headerLeft: () => <BackButton text="Back" onPress={router.back} />,
+          headerLeft: () => <BackButton text="Back" fallbackHref="/(tabs)/notifications" />,
         }}
       />
       {isUserLoading || !user ? (

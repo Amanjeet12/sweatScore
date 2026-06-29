@@ -346,7 +346,7 @@ export default function ProfileEdit() {
           title: '',
           headerTitleAlign: 'center',
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} text="Back" />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings" text="Back" />,
         }}
       />
       <View className="mx-4 flex-1 flex-col gap-y-8">

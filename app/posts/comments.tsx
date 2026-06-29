@@ -112,14 +112,7 @@ export default function PostComments() {
             },
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => (
-              <BackButton
-                onPress={() => {
-                  router.back();
-                }}
-                text="Back"
-              />
-            ),
+            headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="Back" />,
           }}
         />
         <View

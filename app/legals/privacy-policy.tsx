@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { ScrollView, Linking, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
           headerTitleAlign: 'center',
           title: 'Privacy Policy',
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} />,
+          headerLeft: () => <BackButton fallbackHref="/" />,
         }}
       />
 

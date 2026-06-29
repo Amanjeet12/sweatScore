@@ -125,9 +125,14 @@ export default function AddNewCreatorVideo() {
             headerBackVisible: false,
             headerLeft: () => (
               <BackButton
-                onPress={() => {
-                  router.back();
-                }}
+                fallbackHref={
+                  creatorId
+                    ? ({
+                        pathname: '/(tabs)/dashboard/settings/admin/creator/[creatorId]',
+                        params: { creatorId },
+                      } as any)
+                    : '/(tabs)/dashboard/settings/admin/creator-hub'
+                }
                 text="Back"
               />
             ),

@@ -23,7 +23,7 @@ export default function AdminView() {
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/my-settings" />,
         }}
       />
       <View className="mx-8 mt-4 flex-col gap-y-8">

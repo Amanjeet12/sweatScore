@@ -46,15 +46,7 @@ export default function AdminViewCreator() {
             </TouchableOpacity>
           ),
           headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard/settings');
-                }
-              }}
-            />
+            <BackButton fallbackHref="/(tabs)/dashboard/settings/admin/creator-hub" />
           ),
         }}
       />

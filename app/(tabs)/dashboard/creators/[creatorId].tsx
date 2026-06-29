@@ -29,18 +29,7 @@ export default function TabDashboardCreator() {
           headerTitleAlign: 'center',
           title: '',
           headerShadowVisible: false,
-          headerLeft: () => (
-            <BackButton
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tabs)/dashboard');
-                }
-              }}
-              text="Back"
-            />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard" text="Back" />,
         }}
       />
 

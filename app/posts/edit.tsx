@@ -282,7 +282,7 @@ export default function EditPost() {
             headerStyle: { backgroundColor: '#F9F9F9' },
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => <BackButton onPress={() => router.back()} text="" />,
+            headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
             headerTitle: () => (
               <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Edit Post</Text>
             ),
@@ -302,7 +302,7 @@ export default function EditPost() {
           headerStyle: { backgroundColor: '#F9F9F9' },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerLeft: () => <BackButton onPress={() => router.back()} text="" />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
           headerTitle: () => (
             <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Edit Post</Text>
           ),

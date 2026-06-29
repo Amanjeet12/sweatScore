@@ -1,5 +1,5 @@
 import { usePaginatedQuery } from 'convex/react';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { FlatList, View, Text } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -34,7 +34,7 @@ export default function AdminViewUsers() {
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => <BackButton onPress={router.back} />,
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}
       />
 
