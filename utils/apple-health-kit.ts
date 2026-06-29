@@ -1,3 +1,4 @@
+import * as Device from 'expo-device';
 import type { AppleHealthKit as AppleHealthKitModule } from 'react-native-health';
 
 import { healthPermissions } from '~/utils/constants';
@@ -39,6 +40,10 @@ export async function isAppleHealthAvailable() {
   });
 }
 
+export function canBypassAppleHealthAvailabilityCheck() {
+  return !Device.isDevice;
+}
+
 export async function initializeAppleHealthKit() {
   const AppleHealthKit = getAppleHealthKit();
   if (!AppleHealthKit) return false;
@@ -46,6 +51,12 @@ export async function initializeAppleHealthKit() {
   return new Promise<boolean>((resolve) => {
     AppleHealthKit.initHealthKit(healthPermissions, (err) => {
       if (err) {
+        if (canBypassAppleHealthAvailabilityCheck()) {
+          console.warn('Apple Health initialization failed on simulator, continuing:', err);
+          resolve(true);
+          return;
+        }
+
         console.warn('Apple Health initialization failed:', err);
         resolve(false);
         return;

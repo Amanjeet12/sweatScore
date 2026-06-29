@@ -9,7 +9,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
-import { initializeAppleHealthKit, isAppleHealthAvailable } from '~/utils/apple-health-kit';
+import {
+  canBypassAppleHealthAvailabilityCheck,
+  initializeAppleHealthKit,
+  isAppleHealthAvailable,
+} from '~/utils/apple-health-kit';
 import { healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
 import { hasActiveSubscription } from '~/utils/subscription';
@@ -60,7 +64,7 @@ export default function AskHealthPermission() {
       if (Platform.OS === 'ios') {
         const isAvailable = await isAppleHealthAvailable();
 
-        if (!isAvailable) {
+        if (!isAvailable && !canBypassAppleHealthAvailabilityCheck()) {
           Alert.alert('Apple Health not available');
           await handleSkip();
           return;

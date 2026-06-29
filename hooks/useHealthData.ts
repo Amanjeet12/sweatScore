@@ -4,6 +4,7 @@ import type { TimeRangeFilter } from 'react-native-health-connect/src/types/base
 
 import { getDayRangeISO } from '@/utils/timezone';
 import {
+  canBypassAppleHealthAvailabilityCheck,
   getAppleHealthKit,
   initializeAppleHealthKit,
   isAppleHealthAvailable,
@@ -121,7 +122,9 @@ async function fetchIOSHealthData(date: Date, timeZone: string, userAge?: number
 
   // Check availability
   const isAvailable = await isAppleHealthAvailable();
-  if (!isAvailable) return { steps, zone2Minutes, stepsTill11am, hasPermissions };
+  if (!isAvailable && !canBypassAppleHealthAvailabilityCheck()) {
+    return { steps, zone2Minutes, stepsTill11am, hasPermissions };
+  }
 
   // Request permissions
   const permissionsGranted = await initializeAppleHealthKit();
