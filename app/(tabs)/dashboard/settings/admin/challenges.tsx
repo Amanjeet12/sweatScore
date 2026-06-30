@@ -3,6 +3,7 @@ import { router, Stack } from 'expo-router';
 import { FlatList, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
+import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import ChallengeRow from '~/components/core/admin/ChallengeRow';
@@ -30,9 +31,9 @@ export default function AdminViewChallenges() {
           ),
           headerShadowVisible: false,
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push('/challenge/new')}>
+            <HeaderButton minWidth={72} onPress={() => router.push('/challenge/new')}>
               <Text className="text-xl font-semibold text-primary-500">+ Add</Text>
-            </TouchableOpacity>
+            </HeaderButton>
           ),
           headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}

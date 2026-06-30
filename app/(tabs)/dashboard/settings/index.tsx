@@ -5,6 +5,7 @@ import { ScrollView, TouchableOpacity, View, Linking, Alert } from 'react-native
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
+import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import MyActivities from '~/components/core/settings/MyActivities';
 import { Button, ButtonText } from '~/components/ui/button';
@@ -49,14 +50,14 @@ export default function TabSettings() {
             </Text>
           ),
           headerRight: () => (
-            <TouchableOpacity
+            <HeaderButton
               onPress={() => {
                 router.push({
                   pathname: '/dashboard/settings/my-settings',
                 });
               }}>
               <Ionicons size={22} name="settings-outline" />
-            </TouchableOpacity>
+            </HeaderButton>
           ),
           headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard" text="Back" />,
           headerShadowVisible: false,

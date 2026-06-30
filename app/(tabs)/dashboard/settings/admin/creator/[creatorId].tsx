@@ -3,6 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
+import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CreatorRow from '~/components/core/creators/Row';
@@ -35,7 +36,8 @@ export default function AdminViewCreator() {
           ),
           headerShadowVisible: false,
           headerRight: () => (
-            <TouchableOpacity
+            <HeaderButton
+              minWidth={88}
               onPress={() =>
                 router.push({
                   pathname: '/creator-video/new',
@@ -43,7 +45,7 @@ export default function AdminViewCreator() {
                 })
               }>
               <Text className="text-xl font-semibold text-primary-500">+ Video</Text>
-            </TouchableOpacity>
+            </HeaderButton>
           ),
           headerLeft: () => (
             <BackButton fallbackHref="/(tabs)/dashboard/settings/admin/creator-hub" />

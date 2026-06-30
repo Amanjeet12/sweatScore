@@ -3,6 +3,7 @@ import { router, Stack } from 'expo-router';
 import { FlatList, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
+import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CreatorRow from '~/components/core/creators/Row';
@@ -26,9 +27,9 @@ export default function AdminViewCreatorHub() {
           ),
           headerShadowVisible: false,
           headerRight: () => (
-            <TouchableOpacity onPress={() => router.push('/creator/new')}>
+            <HeaderButton minWidth={72} onPress={() => router.push('/creator/new')}>
               <Text className="text-xl font-semibold text-primary-500">+ Add</Text>
-            </TouchableOpacity>
+            </HeaderButton>
           ),
           headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}

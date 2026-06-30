@@ -45,7 +45,7 @@ export default function TabLayout() {
   return (
     <View className="flex-1 bg-white">
       <Tabs
-        backBehavior="none"
+        backBehavior="history"
         screenOptions={{
           lazy: false,
           freezeOnBlur: true,

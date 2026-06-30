@@ -1,9 +1,11 @@
-import { Text, TouchableOpacity, View, TouchableOpacityProps } from 'react-native';
+import { PressableProps, Text, View } from 'react-native';
 
-export const CancelButton = ({ text, ...props }: TouchableOpacityProps & { text?: string }) => {
+import { HeaderButton } from '~/components/core/HeaderButton';
+
+export const CancelButton = ({ text, ...props }: PressableProps & { text?: string }) => {
   return (
-    <TouchableOpacity {...props}>
+    <HeaderButton minWidth={64} {...props}>
       <View className="flex-row">{text && <Text className="text-link ml-1">{text}</Text>}</View>
-    </TouchableOpacity>
+    </HeaderButton>
   );
 };
