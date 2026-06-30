@@ -309,7 +309,7 @@ function SweatProgressRow({
   const progress = Math.min(100, (value / safeTarget) * 100);
 
   return (
-    <View className={showDivider ? 'mb-4 pb-4' : ''}>
+    <View className={showDivider ? 'mb-3.5 pb-3.5' : ''}>
       <View className="flex-row items-center">
         <View
           className="mr-4 items-center justify-center rounded-full"
@@ -332,7 +332,7 @@ function SweatProgressRow({
 
         <View className="flex-1">
           <View className="flex-row items-center justify-between">
-            <Text className="font-body text-lg font-semibold text-[#1A1A1A]">{title}</Text>
+            <Text className="font-body text-sm font-bold text-[#1A1A1A]">{title}</Text>
 
             <View className="flex-row items-center">
               <Text
@@ -343,7 +343,7 @@ function SweatProgressRow({
                 {formatNumber(value)}
               </Text>
 
-              <Text className="font-heading text-lg font-extrabold text-[#B9BDC3]">
+              <Text className="font-heading text-sm font-extrabold text-[#B9BDC3]">
                 {' '}
                 / {formatNumber(target)}
               </Text>
