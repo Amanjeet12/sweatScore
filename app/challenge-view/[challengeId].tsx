@@ -17,6 +17,8 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useTabStore } from '~/store/useTabStore';
 
+
+
 export default function ChallengeViewScreen() {
   const { challengeId } = useLocalSearchParams<{ challengeId: string }>();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -271,7 +273,7 @@ export default function ChallengeViewScreen() {
                 </LoadingButton>
 
                 <Text className="mt-2 text-center font-body text-sm text-[#838383]">
-                  {dailyCompletionCount}/{dailyLimit} progress video recorded today.
+                  {dailyCompletionCount}/{dailyLimit} progress videos recorded today.
                 </Text>
               </>
             )}

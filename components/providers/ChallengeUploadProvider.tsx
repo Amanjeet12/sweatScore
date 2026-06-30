@@ -140,7 +140,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
   const processingJobIdRef = useRef<string | null>(null);
 
   const showToast = useCallback(
-    (message: string, action: 'error' | 'success') => {
+    (message: string, action: 'error' | 'success' | 'warning') => {
       toast.show({
         placement: 'top',
         duration: 7500,
@@ -291,7 +291,10 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
-            showToast(`+${result.pointsEarned} pts added successfully.`, 'success');
+            showToast(
+              `+${result.pointsEarned} pts added successfully. Your progress video will be shared after Round 2`,
+              'success'
+            );
           } else {
             showToast('Progress saved successfully.', 'success');
           }
@@ -399,7 +402,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
       saveJobs((current) => [...current, nextJob]);
 
-      showToast('Uploading your video. Please keep the app open until it finishes.', 'success');
+      showToast('Uploading your video. Please keep the app open until it finishes.', 'warning');
     },
     [isHydrated, saveJobs, showToast]
   );

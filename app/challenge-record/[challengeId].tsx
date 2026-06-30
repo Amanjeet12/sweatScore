@@ -38,6 +38,9 @@ const RECORDING_VIDEO_BITRATE = 2_500_000;
 const RECORDING_MAX_FILE_SIZE_BYTES = 80 * 1024 * 1024;
 const EARLY_NATIVE_STOP_GRACE_SECONDS = 1;
 
+const FIRST_ATTEMPT_VIDEO_URL =
+  'https://beloved-stoat-88.convex.cloud/api/storage/e2f45d18-715b-4342-83ca-aef8407ae8f3';
+
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 
 function getDefaultCaption(round?: number, exerciseName?: string) {
@@ -846,6 +849,7 @@ export default function DuetRecordingScreen() {
           mode="video"
           videoQuality={RECORDING_VIDEO_QUALITY}
           videoBitrate={RECORDING_VIDEO_BITRATE}
+          mute={true}
         />
 
         <View
@@ -1080,7 +1084,11 @@ export default function DuetRecordingScreen() {
           {recordedVideoUri && challenge.instructionalVideoUrl && (
             <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-white">
               <CompositeVideoPlayer
-                leftVideoUrl={progress?.day1VideoUrl || challenge.instructionalVideoUrl}
+                leftVideoUrl={
+                  progress?.day1VideoUrl ||
+                  FIRST_ATTEMPT_VIDEO_URL ||
+                  challenge.instructionalVideoUrl
+                }
                 rightVideoUrl={recordedVideoUri}
                 mirrorRight={false}
               />
@@ -1154,6 +1162,9 @@ export default function DuetRecordingScreen() {
                 Submit Round {progress?.nextAttemptNumber} for {totalPoints} pts
               </ButtonText>
             </LoadingButton>
+            <Text className="mt-1 text-center font-body text-sm font-semibold text-[#6F6F6F]">
+              Keep the app open while your video uploads
+            </Text>
           </View>
 
           <TouchableOpacity

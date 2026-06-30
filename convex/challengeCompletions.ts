@@ -10,6 +10,8 @@ import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
+const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2c6mtdj1x0rj97br01j2exhn89mqac' as Id<'_storage'>;
+
 
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
@@ -232,7 +234,9 @@ export const completeChallenge = mutation({
       // But adminVideoUrl can now be either:
       // 1. User's Day 1 video, if available
       // 2. Instructor video, if this is the first attempt
-      const firstAttemptVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+      const firstAttemptVideoUrl =
+        (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
+        (await ctx.storage.getUrl(challenge.instructionalVideo));
 
       const adminVideoUrl = day1VideoUrl ? day1VideoUrl : firstAttemptVideoUrl;
 
