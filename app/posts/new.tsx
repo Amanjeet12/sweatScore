@@ -2,7 +2,6 @@ import { useMutation } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import * as Progress from 'react-native-progress';
 import { ImagePickerAsset } from 'expo-image-picker';
 import { router, Stack } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -18,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Progress from 'react-native-progress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
@@ -269,7 +269,6 @@ export default function NewPost() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
-            {' '}
             <View className="flex-row items-start gap-x-3">
               <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder />
 
