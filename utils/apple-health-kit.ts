@@ -20,12 +20,22 @@ export function getAppleHealthKit(): AppleHealthKitModule | null {
       typeof candidate.initHealthKit === 'function'
   );
 
+  if (!healthKit) {
+    console.warn('Apple Health native module was not found:', {
+      exportKeys: Object.keys(healthKitModule),
+      isDevice: Device.isDevice,
+    });
+  }
+
   return healthKit ? (healthKit as AppleHealthKitModule) : null;
 }
 
 export async function isAppleHealthAvailable() {
   const AppleHealthKit = getAppleHealthKit();
-  if (!AppleHealthKit) return false;
+  if (!AppleHealthKit) {
+    console.warn('Apple Health availability check skipped because native module is unavailable');
+    return false;
+  }
 
   return new Promise<boolean>((resolve) => {
     AppleHealthKit.isAvailable((err, isAvailable) => {
