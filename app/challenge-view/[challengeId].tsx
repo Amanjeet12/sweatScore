@@ -271,7 +271,7 @@ export default function ChallengeViewScreen() {
                 </LoadingButton>
 
                 <Text className="mt-2 text-center font-body text-sm text-[#838383]">
-                  {dailyCompletionCount}/{dailyLimit} challenges completed today
+                  {dailyCompletionCount}/{dailyLimit} progress video recorded today.
                 </Text>
               </>
             )}

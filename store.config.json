@@ -1,0 +1,78 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "version": "1.1.2",
+    "copyright": "2025 SweatScore Ltd.",
+    "release": {
+      "automaticRelease": true
+    },
+    "info": {
+      "en-GB": {
+        "description": "SweatScore turns fitness into a game you actually want to play.\n\nIf you've tried fitness apps before and fallen off, it's not you. it's the routine. SweatScore is built around afrobeats music and movement that feels good, with a points system that keeps you coming back.\n\nHere's how it works:\n\n1) Join the Monthly Fitness Challenge\nEvery month there's a new challenge to jump into. Earn points, hit your goal, and see your name on the monthly leaderboard.\n\n2) Build your weekly streak\nShow up 5 days a week and watch your streak grow. \n\n3) Move With Us\nBrowse workouts led by creators who move like you with dance, jump rope, toning and more. Every routine earns you points.\n\n4) Sweat with your sisters\nRecord duets, share your workouts, and cheer each other on in the community feed. Fitness is better together.\n\n5) Watch your SweatScore climb\nThe more you show up, the higher your score. Compete monthly and see where you stand on the leaderboard.\n\n6) Track your progress\nSee how consistent you've been all year round and stay motivated.\n\nThis is for you if…\n\nYou want workouts set to afrobeats music you actually love\nYou've tried other apps and never felt fun\nYou want a community that moves like you\n\nDownload SweatScore and join this month's fitness challenge.\n\nTerms of Use - https://sweatscore.com/terms-of-use/",
+        "keywords": [
+          "afro dance workout",
+          "dance fitness",
+          "jump rope workout",
+          "steps tracker",
+          "fitness challenge",
+          "steps challenge"
+        ],
+        "releaseNotes": "Track your progress all year round. See how others are progressing each month on the leaderboard. ",
+        "marketingUrl": "https://sweatscore.com",
+        "supportUrl": "https://support.sweatscore.com",
+        "title": "SweatScore",
+        "privacyPolicyUrl": "https://sweatscore.com/privacy-policy",
+        "screenshots": {
+          "APP_IPHONE_65": [
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/1.png",
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/2.png",
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/3.png",
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/4.png",
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/5.png",
+            "store/apple/screenshot/en-GB/APP_IPHONE_65/6.png"
+          ]
+        }
+      }
+    },
+    "categories": ["HEALTH_AND_FITNESS"],
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "FREQUENT_OR_INTENSE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": false,
+      "messagingAndChat": false,
+      "parentalControls": false,
+      "userGeneratedContent": false
+    },
+    "review": {
+      "firstName": "Rachael",
+      "lastName": "Okesola",
+      "email": "rachael@sweatscore.com",
+      "phone": "+447947253034",
+      "demoUsername": "test@sweatscore.com",
+      "demoPassword": "0000",
+      "demoRequired": true,
+      "notes": "This app requires OTP authentication. So please use the email id provided and then enter 0000 as OTP to login as test user."
+    }
+  }
+}

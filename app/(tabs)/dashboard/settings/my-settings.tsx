@@ -42,13 +42,16 @@ export default function TabMySettings() {
 
   const logoutUser = async () => {
     setLoading(true);
-    await signOut();
-    setCurrentUser(null);
-    await delay(500);
-    await Purchases.logOut();
-    router.dismissAll();
-    router.replace({ pathname: '/' });
-    setLoading(false);
+    try {
+      setCurrentUser(null);
+      await signOut();
+      await delay(500);
+      await Purchases.logOut();
+      router.dismissAll();
+      router.replace({ pathname: '/' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -79,8 +82,8 @@ export default function TabMySettings() {
                     setDeleting(true);
                     try {
                       await deleteAccountMutation();
-                      await signOut();
                       setCurrentUser(null);
+                      await signOut();
                       await delay(500);
                       await Purchases.logOut();
                       router.dismissAll();

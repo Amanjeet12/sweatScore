@@ -19,6 +19,7 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useAuthStore } from '~/store/useAuthStore';
 import { useTabStore } from '~/store/useTabStore';
 import { storage } from '~/utils/storage';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
@@ -68,8 +69,8 @@ const getTodayWeekIndex = () => {
   return day === 0 ? 6 : day - 1;
 };
 
-function useTrackOverview() {
-  return useQuery(api.track.queries.getTrackOverview);
+function useTrackOverview(enabled: boolean) {
+  return useQuery(api.track.queries.getTrackOverview, enabled ? {} : 'skip');
 }
 
 const getWeekStats = (overview: any): SweatStats => {
@@ -93,8 +94,10 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
 
   const { isPro } = useRevenueCat();
   const currentTab = useTabStore((state) => state.currentTab);
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const canLoadUserData = !!currentUser?._id;
 
-  const overview = useTrackOverview();
+  const overview = useTrackOverview(canLoadUserData);
 
   const formattedDate = useMemo(
     () => formatDateYYYYMMDD(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone),
@@ -102,10 +105,13 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
   );
 
   const { data: pointsForDate } = useTanstackQuery(
-    convexQuery(api.activities.getPointsForDate, { date: formattedDate })
+    convexQuery(api.activities.getPointsForDate, canLoadUserData ? { date: formattedDate } : 'skip')
   );
 
-  const pointsToday = useQuery(api.challengeCompletions.getPointsEarnedToday);
+  const pointsToday = useQuery(
+    api.challengeCompletions.getPointsEarnedToday,
+    canLoadUserData ? {} : 'skip'
+  );
 
   useEffect(() => {
     if (!pointsToday) return;
@@ -168,7 +174,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
         shadowOpacity: 0.06,
         shadowRadius: 18,
       }}>
-      <Text className="font-heading text-xl font-bold text-[#1A1A1A] mb-4" numberOfLines={1}>
+      <Text className="mb-4 font-heading text-xl font-bold text-[#1A1A1A]" numberOfLines={1}>
         Your Activity
       </Text>
 
@@ -326,7 +332,7 @@ function SweatProgressRow({
 
         <View className="flex-1">
           <View className="flex-row items-center justify-between">
-            <Text className="font-heading text-lg font-extrabold text-[#1A1A1A]">{title}</Text>
+            <Text className="font-body text-lg font-semibold text-[#1A1A1A]">{title}</Text>
 
             <View className="flex-row items-center">
               <Text
