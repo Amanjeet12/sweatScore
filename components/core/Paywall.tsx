@@ -13,6 +13,7 @@ import {
   ScrollView,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
@@ -26,14 +27,25 @@ const QUARTERLY_PACKAGE_ID = '$rc_three_month';
 const ANNUAL_PACKAGE_ID = '$rc_annual';
 const MONTHLY_PACKAGE_ID = '$rc_monthly';
 
-function PlanPrice({ value, featured = false }: { value?: string; featured?: boolean }) {
+function PlanPrice({
+  value,
+  featured = false,
+  compact = false,
+}: {
+  value?: string;
+  featured?: boolean;
+  compact?: boolean;
+}) {
+  const fontSize = featured ? (compact ? 22 : 24) : compact ? 17 : 18;
+
   return (
     <Text
-      className="mt-3 w-full text-center font-extrabold"
+      className="mt-3 w-full px-1 text-center font-extrabold"
       style={{
         color: featured ? '#FFFFFF' : '#181818',
-        fontSize: featured ? 28 : 19,
-        includeFontPadding: false,
+        fontSize,
+        lineHeight: Math.round(fontSize * 1.22),
+        includeFontPadding: true,
       }}
       numberOfLines={1}
       adjustsFontSizeToFit
@@ -44,13 +56,16 @@ function PlanPrice({ value, featured = false }: { value?: string; featured?: boo
 }
 
 function PerMonthText({ value, featured = false }: { value?: string | null; featured?: boolean }) {
+  const fontSize = featured ? 13 : 12;
+
   return (
     <Text
-      className="w-full text-center font-extrabold"
+      className="w-full px-1 text-center font-extrabold"
       style={{
         color: featured ? '#FFFFFF' : '#FF6A2A',
-        fontSize: 12,
-        includeFontPadding: false,
+        fontSize,
+        lineHeight: Math.round(fontSize * 1.22),
+        includeFontPadding: true,
       }}
       numberOfLines={1}
       adjustsFontSizeToFit
@@ -78,6 +93,7 @@ function formatCurrency(value: number, currencyCode?: string) {
 }
 
 export default function Paywall() {
+  const { width: screenWidth } = useWindowDimensions();
   const { redirectTo, showBackToLogin } = useLocalSearchParams<{
     redirectTo?: string;
     showBackToLogin?: string;
@@ -185,6 +201,13 @@ export default function Paywall() {
     'You stick to things better when other women are doing it with you',
     "You're ready to start without overthinking it",
   ];
+
+  const isCompactPlanRow = screenWidth < 380;
+  const planRowGap = 8;
+  const planRowWidth = Math.max(0, screenWidth - 64 + 28);
+  const planAvailableWidth = Math.max(0, planRowWidth - planRowGap * 2);
+  const sidePlanWidth = Math.floor(planAvailableWidth * (isCompactPlanRow ? 0.27 : 0.29));
+  const annualPlanWidth = planAvailableWidth - sidePlanWidth * 2;
 
   const handlePurchase = async () => {
     if (!selectedPackage || !purchasePackage || isLoading || isLoggingOut) {
@@ -314,7 +337,7 @@ export default function Paywall() {
         <View
           className="mt-10 flex-row items-end justify-between"
           style={{
-            columnGap: 8,
+            columnGap: planRowGap,
             marginHorizontal: -14,
           }}>
           <TouchableOpacity
@@ -325,8 +348,9 @@ export default function Paywall() {
                 setSelectedPackage(monthlyPackage);
               }
             }}
-            className="flex-1 items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
+            className="items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
             style={{
+              width: sidePlanWidth,
               minHeight: 170,
               borderWidth: isMonthlySelected ? 1.8 : 1.2,
               borderColor: isMonthlySelected ? '#FF6A2A' : '#E8E1DF',
@@ -361,7 +385,7 @@ export default function Paywall() {
               MONTHLY
             </Text>
 
-            <PlanPrice value={monthlyPackage?.product.priceString} />
+            <PlanPrice value={monthlyPackage?.product.priceString} compact={isCompactPlanRow} />
 
             <Text className="mt-3 text-center text-[12px] font-semibold text-[#A2A2A2]">
               per month
@@ -378,7 +402,7 @@ export default function Paywall() {
             }}
             className="items-center justify-center rounded-[20px] px-2 pb-5 pt-8"
             style={{
-              flex: 1.18,
+              width: annualPlanWidth,
               minHeight: 176,
               position: 'relative',
               backgroundColor: '#FF6A2A',
@@ -432,7 +456,11 @@ export default function Paywall() {
 
             <Text className="w-full text-center text-[18px] font-extrabold text-white">YEARLY</Text>
 
-            <PlanPrice value={annualPackage?.product.priceString} featured />
+            <PlanPrice
+              value={annualPackage?.product.priceString}
+              featured
+              compact={isCompactPlanRow}
+            />
 
             <Text className="mt-1 text-center text-[15px] font-semibold text-white">per year</Text>
 
@@ -461,8 +489,9 @@ export default function Paywall() {
                 setSelectedPackage(quarterlyPackage);
               }
             }}
-            className="flex-1 items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
+            className="items-center justify-center rounded-[18px] px-2 pb-5 pt-6"
             style={{
+              width: sidePlanWidth,
               minHeight: 170,
               borderWidth: isQuarterlySelected ? 1.8 : 1.2,
               borderColor: isQuarterlySelected ? '#FF6A2A' : '#E8E1DF',
@@ -497,7 +526,7 @@ export default function Paywall() {
               QUARTERLY
             </Text>
 
-            <PlanPrice value={quarterlyPackage?.product.priceString} />
+            <PlanPrice value={quarterlyPackage?.product.priceString} compact={isCompactPlanRow} />
 
             <Text
               className="mt-3 text-center text-[12px] font-semibold leading-4 text-[#A2A2A2]"

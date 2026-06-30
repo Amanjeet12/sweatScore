@@ -14,7 +14,6 @@ import {
   AppState,
   TouchableOpacity,
 } from 'react-native';
-import { getSdkStatus, SdkAvailabilityStatus } from 'react-native-health-connect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
@@ -39,6 +38,11 @@ import { storage } from '~/utils/storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight } from 'phosphor-react-native';
 
+function getHealthConnect() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('react-native-health-connect') as typeof import('react-native-health-connect');
+}
+
 function getCurrentWeekMondayStr(): string {
   const now = new Date();
   const dow = now.getDay();
@@ -46,6 +50,18 @@ function getCurrentWeekMondayStr(): string {
   const monday = new Date(now);
   monday.setDate(now.getDate() + offset);
   return monday.toISOString().split('T')[0];
+}
+
+async function openHealthConnectListing() {
+  const marketUrl = 'market://details?id=com.google.android.apps.healthdata';
+  const webUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata';
+
+  try {
+    const canOpenMarket = await Linking.canOpenURL(marketUrl);
+    await Linking.openURL(canOpenMarket ? marketUrl : webUrl);
+  } catch (error) {
+    console.warn('Failed to open Health Connect listing:', error);
+  }
 }
 
 export default function TabDashboard() {
@@ -111,6 +127,9 @@ export default function TabDashboard() {
   };
 
   const checkAvailability = async () => {
+    if (Platform.OS !== 'android') return;
+
+    const { getSdkStatus, SdkAvailabilityStatus } = getHealthConnect();
     const status = await getSdkStatus();
     if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
       return;
@@ -218,7 +237,7 @@ export default function TabDashboard() {
             <View className=" pv-5 mt-5 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />
             </View>
-            <View className="mt-4 mb-10 bg-[#F9F9F9]">
+            <View className="mb-10 mt-4 bg-[#F9F9F9]">
               <WeeklyStreakCard />
             </View>
             {/* <View className="mt-4 bg-[#F9F9F9] px-5">
@@ -303,7 +322,7 @@ export default function TabDashboard() {
         showAlertDialog={showInstallDialog}
         handleClose={() => setShowInstallDialog(false)}
         handlePrimaryButtonPress={() => {
-          Linking.openURL('market://details?id=com.google.android.apps.healthdata');
+          openHealthConnectListing();
         }}
         title="Install Health Connect"
         body="To track your movement and earn Sweat Points, you’ll need to install Health Connect."

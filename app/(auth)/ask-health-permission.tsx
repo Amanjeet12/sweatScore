@@ -3,22 +3,54 @@ import { useConvex, useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Platform, TouchableOpacity, View } from 'react-native';
-import AppleHealthKit from 'react-native-health';
 import {
-  getSdkStatus,
-  initialize,
-  requestPermission,
-  SdkAvailabilityStatus,
-} from 'react-native-health-connect';
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Linking,
+  Platform,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
-import { healthPermissions, healthPermissionsAndroid } from '~/utils/constants';
+import {
+  canBypassAppleHealthAvailabilityCheck,
+  initializeAppleHealthKit,
+  isAppleHealthAvailable,
+} from '~/utils/apple-health-kit';
+import { healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
 import { hasActiveSubscription } from '~/utils/subscription';
+
+function getHealthConnect() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('react-native-health-connect') as typeof import('react-native-health-connect');
+}
+
+const HEALTH_CONNECT_CHECK_TIMEOUT_MS = 30000;
+const HEALTH_CONNECT_PERMISSION_TIMEOUT_MS = 120000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMessage: string,
+  timeoutMs = HEALTH_CONNECT_CHECK_TIMEOUT_MS
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
 
 export default function AskHealthPermission() {
   const appState = useRef(AppState.currentState);
@@ -26,34 +58,60 @@ export default function AskHealthPermission() {
   const insets = useSafeAreaInsets();
   const [, setHasPermission] = useState(false);
   const [, setSdkStatus] = useState<number | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const updateOnboarded = useMutation(api.users.updateOnboarded);
   const updateUserAutoSyncEnabled = useMutation(api.users.updateUserAutoSyncEnabled);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
 
   const handleAllow = async () => {
-    if (Platform.OS === 'ios') {
-      AppleHealthKit.isAvailable((err, isAvailable) => {
-        if (err) {
-          alert('Error checking availability');
-          return;
-        }
+    if (isConnecting) return;
+
+    setIsConnecting(true);
+
+    try {
+      if (Platform.OS === 'ios') {
+        const isAvailable = await isAppleHealthAvailable();
+        const canBypassAvailability = canBypassAppleHealthAvailabilityCheck();
+
         if (!isAvailable) {
-          alert('Apple Health not available');
-          return;
-        }
-        AppleHealthKit.initHealthKit(healthPermissions, async (err) => {
-          if (err) {
+          if (!canBypassAvailability) {
+            Alert.alert('Apple Health not available');
             return;
           }
+
           setHasPermission(true);
-          handleSuccess('yes');
-        });
-      });
-    } else {
-      const status = await getSdkStatus();
+          await handleSuccess('yes');
+          return;
+        }
+
+        const hasPermissions = await initializeAppleHealthKit();
+        if (!hasPermissions) {
+          Alert.alert(
+            'Permissions not enabled',
+            'Apple Health permissions were not enabled. Please allow Steps and Heart Rate for SweatScore in iOS Settings, then try again.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
+          );
+          return;
+        }
+
+        setHasPermission(true);
+        await handleSuccess('yes');
+        return;
+      }
+
+      const { getSdkStatus, initialize, requestPermission, SdkAvailabilityStatus } =
+        getHealthConnect();
+      const status = await withTimeout(
+        getSdkStatus(),
+        'Health Connect did not respond. Please try again.'
+      );
 
       if (status === SdkAvailabilityStatus.SDK_UNAVAILABLE) {
-        alert(
+        Alert.alert(
+          'Health Connect not available',
           'Health Connect is not available on this device. Upgrade your Android version to enable Health Connect.'
         );
         await handleSkip();
@@ -61,21 +119,46 @@ export default function AskHealthPermission() {
       }
 
       if (status === SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
-        handleSuccess('install');
+        await handleSuccess('install');
         return;
       }
 
-      const isInitialized = await initialize();
+      const isInitialized = await withTimeout(
+        initialize(),
+        'Health Connect did not finish opening. Please try again.'
+      );
+
       if (!isInitialized) {
-        alert('Error initializing Health Connect');
-        router.dismissAll();
+        Alert.alert('Error initializing Health Connect');
+        return;
+      }
+
+      const grantedPermissions = await withTimeout(
+        requestPermission(healthPermissionsAndroid),
+        'Health Connect permissions did not finish. Please try again.',
+        HEALTH_CONNECT_PERMISSION_TIMEOUT_MS
+      );
+      if (grantedPermissions.length === 0) {
+        Alert.alert(
+          'Permissions not enabled',
+          'Health Connect permissions were not enabled. You can connect again later from settings.'
+        );
         await handleSkip();
         return;
       }
 
-      await requestPermission(healthPermissionsAndroid);
       setHasPermission(true);
-      handleSuccess('yes');
+      await handleSuccess('yes');
+    } catch (error) {
+      console.warn('Health permission request failed:', error);
+      Alert.alert(
+        'Could not connect health data',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong while opening health permissions. Please try again.'
+      );
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -136,6 +219,8 @@ export default function AskHealthPermission() {
 
   useEffect(() => {
     if (Platform.OS === 'android') {
+      const { getSdkStatus } = getHealthConnect();
+
       getSdkStatus().then((status) => {
         setSdkStatus(status);
       });
@@ -146,6 +231,8 @@ export default function AskHealthPermission() {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         if (Platform.OS === 'android') {
+          const { getSdkStatus } = getHealthConnect();
+
           getSdkStatus().then((status) => {
             setSdkStatus(status);
           });
@@ -214,14 +301,23 @@ export default function AskHealthPermission() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleAllow}
+              disabled={isConnecting}
               className="mt-6"
               style={{
                 backgroundColor: '#F76B1C',
                 borderRadius: 9999,
                 paddingVertical: 14,
                 alignItems: 'center',
+                opacity: isConnecting ? 0.7 : 1,
               }}>
-              <Text className="text-2xl font-bold text-white">Connect</Text>
+              {isConnecting ? (
+                <View className="flex-row items-center gap-x-3">
+                  <ActivityIndicator color="#FFFFFF" />
+                  <Text className="text-2xl font-bold text-white">Connecting</Text>
+                </View>
+              ) : (
+                <Text className="text-2xl font-bold text-white">Connect</Text>
+              )}
             </TouchableOpacity>
           </View>
 

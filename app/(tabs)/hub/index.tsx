@@ -12,7 +12,7 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { CHALLENGE_TAGS } from '~/convex/challenges';
 
-const YOUR_PROGRESS_FILTER = 'Your’s Progress';
+const YOUR_PROGRESS_FILTER = 'Your Progress';
 
 const ALL_FILTERS = ['All', YOUR_PROGRESS_FILTER, ...CHALLENGE_TAGS] as const;
 

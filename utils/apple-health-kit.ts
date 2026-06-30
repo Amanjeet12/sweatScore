@@ -1,0 +1,78 @@
+import * as Device from 'expo-device';
+import type { AppleHealthKit as AppleHealthKitModule } from 'react-native-health';
+
+import { healthPermissions } from '~/utils/constants';
+
+type AppleHealthKitExport = {
+  default?: AppleHealthKitModule;
+  HealthKit?: AppleHealthKitModule;
+} & Partial<AppleHealthKitModule>;
+
+export function getAppleHealthKit(): AppleHealthKitModule | null {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const healthKitModule = require('react-native-health') as AppleHealthKitExport;
+  const candidates = [healthKitModule.HealthKit, healthKitModule.default, healthKitModule];
+
+  const healthKit = candidates.find(
+    (candidate) =>
+      candidate &&
+      typeof candidate.isAvailable === 'function' &&
+      typeof candidate.initHealthKit === 'function'
+  );
+
+  if (!healthKit) {
+    console.warn('Apple Health native module was not found:', {
+      exportKeys: Object.keys(healthKitModule),
+      isDevice: Device.isDevice,
+    });
+  }
+
+  return healthKit ? (healthKit as AppleHealthKitModule) : null;
+}
+
+export async function isAppleHealthAvailable() {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) {
+    console.warn('Apple Health availability check skipped because native module is unavailable');
+    return false;
+  }
+
+  return new Promise<boolean>((resolve) => {
+    AppleHealthKit.isAvailable((err, isAvailable) => {
+      if (err) {
+        console.warn('Apple Health availability check failed:', err);
+        resolve(false);
+        return;
+      }
+
+      resolve(Boolean(isAvailable));
+    });
+  });
+}
+
+export function canBypassAppleHealthAvailabilityCheck() {
+  return !Device.isDevice;
+}
+
+export async function initializeAppleHealthKit() {
+  const AppleHealthKit = getAppleHealthKit();
+  if (!AppleHealthKit) return false;
+
+  return new Promise<boolean>((resolve) => {
+    AppleHealthKit.initHealthKit(healthPermissions, (err) => {
+      if (err) {
+        if (canBypassAppleHealthAvailabilityCheck()) {
+          console.warn('Apple Health initialization failed on simulator, continuing:', err);
+          resolve(true);
+          return;
+        }
+
+        console.warn('Apple Health initialization failed:', err);
+        resolve(false);
+        return;
+      }
+
+      resolve(true);
+    });
+  });
+}

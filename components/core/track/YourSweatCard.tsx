@@ -12,6 +12,7 @@ import TrackPaywallOverlay from './TrackPaywallOverlay';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useAuthStore } from '~/store/useAuthStore';
 import { formatPoints } from '~/utils/formatter';
 
 const DAY_LABELS = ['Mon', 'Tues', 'Wed', 'Thr', 'Fri', 'Sat', 'Sun'];
@@ -169,13 +170,12 @@ function buildBars(
       const value = valueFor(m as any, category);
       const monthNum = parseInt(m.yearMonth.slice(5, 7), 10);
 
-      const short = new Date(
-        parseInt(m.yearMonth.slice(0, 4), 10),
-        monthNum - 1,
-        1
-      ).toLocaleString('en-US', {
-        month: 'short',
-      });
+      const short = new Date(parseInt(m.yearMonth.slice(0, 4), 10), monthNum - 1, 1).toLocaleString(
+        'en-US',
+        {
+          month: 'short',
+        }
+      );
 
       return {
         label: short,
@@ -186,12 +186,13 @@ function buildBars(
     });
 }
 
-function useTrackOverview() {
-  return useQuery(api.track.queries.getTrackOverview);
+function useTrackOverview(enabled: boolean) {
+  return useQuery(api.track.queries.getTrackOverview, enabled ? {} : 'skip');
 }
 
 export default function YourSweatCard() {
-  const overview = useTrackOverview();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const overview = useTrackOverview(!!currentUser?._id);
   const { isPro } = useRevenueCat();
 
   const [period, setPeriod] = useState<Period>('week');
@@ -233,9 +234,7 @@ export default function YourSweatCard() {
       className="mx-screen-x rounded-card bg-white p-5"
       style={{ marginHorizontal: 20, overflow: 'hidden' }}>
       <View className="flex-row items-center justify-between">
-        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">
-          Your Sweat
-        </Text>
+        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Sweat</Text>
 
         <PeriodDropdown value={period} onChange={setPeriod} />
       </View>
@@ -268,9 +267,7 @@ export default function YourSweatCard() {
           }
           activeOpacity={0.7}
           className="mt-4 flex-row items-center justify-center gap-x-1 border-t border-[#EFEAE4] pt-4">
-          <Text className="font-body text-base text-[#1A1A1A]">
-            10 pts daily cap.
-          </Text>
+          <Text className="font-body text-base text-[#1A1A1A]">10 pts daily cap.</Text>
 
           <Text className="font-body text-base font-semibold text-primary-500">
             Upgrade to keep earning

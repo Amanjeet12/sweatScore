@@ -75,6 +75,8 @@ export default function DuetRecordingScreen() {
   const preserveRecordedVideoOnUnmountRef = useRef(false);
   const recordedVideoUriRef = useRef<string | null>(null);
   const countdownSoundRef = useRef<Audio.Sound | null>(null);
+  const countdownSoundLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
+  const countdownSoundPlaybackTokenRef = useRef(0);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -91,7 +93,6 @@ export default function DuetRecordingScreen() {
   const existingUploadJob = getJobForChallenge(challengeId ?? '');
   const dailyLimitReached = progress?.dailyLimitReached === true;
   const dailyLimit = progress?.dailyLimit ?? 5;
-  const dailyCompletionCount = progress?.dailyCompletionCount ?? 0;
 
   const debugRecordingState = useCallback(
     (label: string) => {
@@ -138,6 +139,40 @@ export default function DuetRecordingScreen() {
     recordedVideoUriRef.current = recordedVideoUri;
   }, [recordedVideoUri]);
 
+  const ensureCountdownSound = useCallback(async () => {
+    if (countdownSoundRef.current) {
+      return countdownSoundRef.current;
+    }
+
+    if (countdownSoundLoadingPromiseRef.current) {
+      return countdownSoundLoadingPromiseRef.current;
+    }
+
+    countdownSoundLoadingPromiseRef.current = (async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
+          shouldPlay: false,
+          volume: 1,
+        });
+
+        countdownSoundRef.current = sound;
+        console.log('[RecordingDebug] countdown sound loaded');
+        return sound;
+      } catch (error) {
+        console.log('[RecordingDebug] countdown sound failed', error);
+        return null;
+      } finally {
+        countdownSoundLoadingPromiseRef.current = null;
+      }
+    })();
+
+    return countdownSoundLoadingPromiseRef.current;
+  }, []);
+
   const cleanupRecordingRefs = useCallback((reason: string) => {
     console.log(`[RecordingDebug] cleanupRecordingRefs: ${reason}`, {
       elapsedRef: elapsedRef.current,
@@ -166,6 +201,7 @@ export default function DuetRecordingScreen() {
       maxRecordingTimeoutRef.current = null;
     }
 
+    countdownSoundPlaybackTokenRef.current += 1;
     countdownSoundRef.current?.stopAsync().catch(() => {});
 
     if (isRecordingRef.current) {
@@ -298,24 +334,11 @@ export default function DuetRecordingScreen() {
     let isMounted = true;
 
     const loadCountdownSound = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-        });
+      const sound = await ensureCountdownSound();
 
-        const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
-          shouldPlay: false,
-          volume: 1,
-        });
-
-        if (isMounted) {
-          countdownSoundRef.current = sound;
-          console.log('[RecordingDebug] countdown sound loaded');
-        } else {
-          await sound.unloadAsync();
-        }
-      } catch (error) {
-        console.log('[RecordingDebug] countdown sound failed', error);
+      if (!isMounted && sound) {
+        await sound.unloadAsync();
+        countdownSoundRef.current = null;
       }
     };
 
@@ -327,7 +350,7 @@ export default function DuetRecordingScreen() {
       countdownSoundRef.current = null;
       console.log('[RecordingDebug] countdown sound unloaded');
     };
-  }, []);
+  }, [ensureCountdownSound]);
 
   const stopRecording = useCallback(() => {
     console.log('[RecordingDebug] stopRecording called', {
@@ -597,19 +620,25 @@ export default function DuetRecordingScreen() {
     }
   }, [challenge?.name, challengeId, progress?.nextAttemptNumber]);
 
-  const playCountdownSound = useCallback(async () => {
-    try {
-      const sound = countdownSoundRef.current;
+  const playCountdownSound = useCallback(
+    async (playbackToken: number) => {
+      try {
+        const sound = await ensureCountdownSound();
 
-      if (!sound) return;
+        if (!sound || playbackToken !== countdownSoundPlaybackTokenRef.current) return;
 
-      await sound.stopAsync();
-      await sound.setPositionAsync(0);
-      await sound.playAsync();
-    } catch (error) {
-      console.log('[RecordingDebug] countdown sound play failed', error);
-    }
-  }, []);
+        await sound.stopAsync();
+        await sound.setPositionAsync(0);
+
+        if (playbackToken !== countdownSoundPlaybackTokenRef.current) return;
+
+        await sound.playAsync();
+      } catch (error) {
+        console.log('[RecordingDebug] countdown sound play failed', error);
+      }
+    },
+    [ensureCountdownSound]
+  );
 
   const startCountdown = useCallback(() => {
     if (dailyLimitReached) {
@@ -636,7 +665,9 @@ export default function DuetRecordingScreen() {
     setState('countdown');
     setCountdownValue(COUNTDOWN_SECONDS);
 
-    playCountdownSound().catch(() => {});
+    const countdownPlaybackToken = countdownSoundPlaybackTokenRef.current + 1;
+    countdownSoundPlaybackTokenRef.current = countdownPlaybackToken;
+    playCountdownSound(countdownPlaybackToken).catch(() => {});
 
     let count = COUNTDOWN_SECONDS;
 
@@ -651,6 +682,8 @@ export default function DuetRecordingScreen() {
           countdownRef.current = null;
         }
 
+        countdownSoundPlaybackTokenRef.current += 1;
+        countdownSoundRef.current?.stopAsync().catch(() => {});
         startRecording().catch(() => {});
       }
     }, 1000);
@@ -980,12 +1013,6 @@ export default function DuetRecordingScreen() {
                 You reached your limit for today. Come back tomorrow.
               </Text>
             )}
-
-            {/* {!dailyLimitReached && (
-              <Text className="mb-3 text-center font-body text-xs font-semibold text-white">
-                {dailyCompletionCount}/{dailyLimit} challenges completed today
-              </Text>
-            )} */}
 
             <LoadingButton
               variant="solid"
