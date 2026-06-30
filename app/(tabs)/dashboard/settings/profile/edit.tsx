@@ -8,7 +8,7 @@ import { ImagePickerAsset } from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, Platform, TouchableOpacity, View } from 'react-native';
 import { z } from 'zod';
 
 import { Switch } from '@/components/ui/switch';
@@ -19,9 +19,15 @@ import { Spinner } from '~/components/ui/spinner';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
+import {
+  canBypassAppleHealthAvailabilityCheck,
+  initializeAppleHealthKit,
+  isAppleHealthAvailable,
+} from '~/utils/apple-health-kit';
 import { CatchPromise } from '~/utils/catch-promise';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 import { formatDateToLocaleString } from '~/utils/formatter';
+import { storeData } from '~/utils/storage';
 import { PROFILE_FIELD } from '~/utils/types';
 
 export default function ProfileEdit() {
@@ -32,7 +38,7 @@ export default function ProfileEdit() {
     useState(false);
   const [isUserAutoSyncEnabledLoading, setIsUserAutoSyncEnabledLoading] = useState(false);
   const [photo, setPhoto] = useState<ImagePickerAsset | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [userNotificationEnabled, setUserNotificationEnabled] = useState(false);
   const [userCommentNotificationEnabled, setUserCommentNotificationEnabled] = useState(false);
   const [userAutoSyncEnabled, setUserAutoSyncEnabled] = useState(true);
@@ -160,44 +166,28 @@ export default function ProfileEdit() {
     }
   };
 
-  // const registerForHealthAsync = async (): Promise<boolean> => {
-  //   if (Platform.OS === 'ios') {
-  //     return new Promise((resolve) => {
-  //       AppleHealthKit.isAvailable((err, isAvailable) => {
-  //         if (err) {
-  //           alert('Error checking availability');
-  //           resolve(false);
-  //           return;
-  //         }
-  //         if (!isAvailable) {
-  //           alert('Apple Health not available');
-  //           resolve(false);
-  //           return;
-  //         }
-  //         AppleHealthKit.initHealthKit(healthPermissions, async (err) => {
-  //           if (err) {
-  //             resolve(false);
-  //             return;
-  //           }
-  //           resolve(true);
-  //         });
-  //       });
-  //     });
-  //   } else {
-  //     const isInitialized = await initialize();
-  //     if (!isInitialized) {
-  //       alert('Error initializing Health Connect');
-  //       return false;
-  //     }
+  const registerForAppleHealthAsync = async (): Promise<boolean> => {
+    const isAvailable = await isAppleHealthAvailable();
+    if (!isAvailable && !canBypassAppleHealthAvailabilityCheck()) {
+      Alert.alert('Apple Health not available');
+      return false;
+    }
 
-  //     try {
-  //       await requestPermission(healthPermissionsAndroid);
-  //       return true;
-  //     } catch (error) {
-  //       return false;
-  //     }
-  //   }
-  // };
+    const hasPermissions = await initializeAppleHealthKit();
+    if (!hasPermissions) {
+      Alert.alert(
+        'Permissions not enabled',
+        'Apple Health permissions were not enabled. Please allow Steps and Heart Rate for SweatScore in iOS Settings, then try again.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return false;
+    }
+
+    return true;
+  };
 
   const registerForPushNotificationsAsync = async () => {
     let token;
@@ -281,33 +271,34 @@ export default function ProfileEdit() {
     setIsUserCommentNotificationEnabledLoading(false);
   };
 
-  // const handleUserAutoSyncEnabled = async (enabled: boolean) => {
-  //   setIsUserAutoSyncEnabledLoading(true);
+  const handleUserAutoSyncEnabled = async (enabled: boolean) => {
+    setIsUserAutoSyncEnabledLoading(true);
 
-  //   if (enabled) {
-  //     const success = await registerForHealthAsync();
-  //     if (!success) {
-  //       setUserAutoSyncEnabled(false);
-  //       setIsUserAutoSyncEnabledLoading(false);
-  //       return;
-  //     }
-  //   }
+    if (enabled) {
+      const success = await registerForAppleHealthAsync();
+      if (!success) {
+        setUserAutoSyncEnabled(false);
+        setIsUserAutoSyncEnabledLoading(false);
+        return;
+      }
+    }
 
-  //   const [error, response] = await CatchPromise(updateUserAutoSyncEnabled({ enabled }));
-  //   if (response) {
-  //     const user = await convex.query(api.users.current);
-  //     setCurrentUser(user);
-  //     storeData('autoSync', {
-  //       enabled,
-  //     });
-  //   }
+    const [error, response] = await CatchPromise(updateUserAutoSyncEnabled({ enabled }));
+    if (response) {
+      const user = await convex.query(api.users.current);
+      setCurrentUser(user);
+      setUserAutoSyncEnabled(enabled);
+      storeData('autoSync', {
+        enabled,
+      });
+    }
 
-  //   if (error) {
-  //     setError(getErrorMessage(error));
-  //   }
+    if (error) {
+      setError(getErrorMessage(error));
+    }
 
-  //   setIsUserAutoSyncEnabledLoading(false);
-  // };
+    setIsUserAutoSyncEnabledLoading(false);
+  };
 
   useEffect(() => {
     if (isUserNotificationEnabled !== undefined) {
@@ -394,19 +385,22 @@ export default function ProfileEdit() {
             ) : (
               <TouchableOpacity
                 onPress={() => {
-                  Platform.OS === 'ios'
-                    ? router.push({
-                        pathname: '/dashboard/settings/profile/edit-field',
-                        params: { field: PROFILE_FIELD.BIRTHDATE },
-                      })
-                    : DateTimePickerAndroid.open({
-                        value: date,
-                        mode: 'date',
-                        onChange,
-                        display: 'spinner',
-                        maximumDate: tenYearsAgo,
-                        minimumDate: new Date(1900, 0, 1),
-                      });
+                  if (Platform.OS === 'ios') {
+                    router.push({
+                      pathname: '/dashboard/settings/profile/edit-field',
+                      params: { field: PROFILE_FIELD.BIRTHDATE },
+                    });
+                    return;
+                  }
+
+                  DateTimePickerAndroid.open({
+                    value: date,
+                    mode: 'date',
+                    onChange,
+                    display: 'spinner',
+                    maximumDate: tenYearsAgo,
+                    minimumDate: new Date(1900, 0, 1),
+                  });
                 }}>
                 <View className="flex-row items-start gap-x-2">
                   <View className="flex-1">
@@ -507,29 +501,31 @@ export default function ProfileEdit() {
           </View>
         ) : null}
 
-        {/* <View className="flex-row items-center justify-between">
-          <View className="flex-1">
-            <Text className="text-[16px] font-semibold">Health Data Sync</Text>
+        {Platform.OS === 'ios' ? (
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-[16px] font-semibold">Health Data Sync</Text>
+            </View>
+            <View>
+              {isUserAutoSyncEnabledLoading ? (
+                <View className="flex-row items-center">
+                  <Spinner className="text-primary-500" size="small" />
+                </View>
+              ) : (
+                <View className="flex-row items-start gap-x-2">
+                  <Switch
+                    size="sm"
+                    isDisabled={isUserAutoSyncEnabledLoading}
+                    value={userAutoSyncEnabled}
+                    onValueChange={(v) => {
+                      handleUserAutoSyncEnabled(v);
+                    }}
+                  />
+                </View>
+              )}
+            </View>
           </View>
-          <View>
-            {isLoading ? (
-              <View className="flex-row items-center">
-                <Spinner className="text-primary-500" size="small" />
-              </View>
-            ) : (
-              <View className="flex-row items-start gap-x-2">
-                <Switch
-                  size="sm"
-                  isDisabled={isUserAutoSyncEnabledLoading}
-                  value={userAutoSyncEnabled}
-                  onValueChange={(v) => {
-                    handleUserAutoSyncEnabled(v);
-                  }}
-                />
-              </View>
-            )}
-          </View>
-        </View> */}
+        ) : null}
       </View>
     </SafeAreaView>
   );

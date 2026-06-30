@@ -3,7 +3,15 @@ import { useConvex, useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Platform, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Linking,
+  Platform,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/ui/text';
@@ -63,10 +71,16 @@ export default function AskHealthPermission() {
     try {
       if (Platform.OS === 'ios') {
         const isAvailable = await isAppleHealthAvailable();
+        const canBypassAvailability = canBypassAppleHealthAvailabilityCheck();
 
-        if (!isAvailable && !canBypassAppleHealthAvailabilityCheck()) {
-          Alert.alert('Apple Health not available');
-          await handleSkip();
+        if (!isAvailable) {
+          if (!canBypassAvailability) {
+            Alert.alert('Apple Health not available');
+            return;
+          }
+
+          setHasPermission(true);
+          await handleSuccess('yes');
           return;
         }
 
@@ -74,9 +88,12 @@ export default function AskHealthPermission() {
         if (!hasPermissions) {
           Alert.alert(
             'Permissions not enabled',
-            'Apple Health permissions were not enabled. You can connect again later from settings.'
+            'Apple Health permissions were not enabled. Please allow Steps and Heart Rate for SweatScore in iOS Settings, then try again.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
           );
-          await handleSkip();
           return;
         }
 
@@ -135,10 +152,10 @@ export default function AskHealthPermission() {
     } catch (error) {
       console.warn('Health permission request failed:', error);
       Alert.alert(
-        'Could not connect Health Connect',
+        'Could not connect health data',
         error instanceof Error
           ? error.message
-          : 'Something went wrong while opening Health Connect. Please try again.'
+          : 'Something went wrong while opening health permissions. Please try again.'
       );
     } finally {
       setIsConnecting(false);
