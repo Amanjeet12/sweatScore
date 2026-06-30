@@ -179,11 +179,11 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
       </Text>
 
       <View className="flex-row items-center justify-between">
-        <View className="flex-row rounded-2xl bg-[#EEEEEE] p-0.5">
+        <View className="flex-row rounded-2xl bg-[#EEEEEE] p-1">
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPeriod('today')}
-            className="rounded-xl px-6 py-2.5"
+            className="rounded-xl px-8 py-2.5"
             style={{
               backgroundColor: period === 'today' ? '#FFFFFF' : 'transparent',
               shadowColor: period === 'today' ? '#000' : 'transparent',
@@ -202,7 +202,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPeriod('week')}
-            className="rounded-xl px-6 py-2.5"
+            className="rounded-xl px-8 py-2.5"
             style={{
               backgroundColor: period === 'week' ? '#FFFFFF' : 'transparent',
               shadowColor: period === 'week' ? '#000' : 'transparent',

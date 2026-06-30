@@ -29,8 +29,7 @@ export const FirstTimeOnboardingModal = ({
   currentPoints?: number;
   missionTarget?: number;
 }) => {
-  const progressPct =
-    missionTarget > 0 ? Math.min(100, (currentPoints / missionTarget) * 100) : 0;
+  const progressPct = missionTarget > 0 ? Math.min(100, (currentPoints / missionTarget) * 100) : 0;
 
   return (
     <AlertDialog isOpen={showAlertDialog} onClose={handleClose} size="md" useRNModal>
@@ -51,7 +50,7 @@ export const FirstTimeOnboardingModal = ({
             </Text>
           </View>
         </AlertDialogHeader>
-        <AlertDialogBody className="mt-3">
+        <AlertDialogBody className="mt-3 p-2">
           <Text className="text-center font-body text-base text-[#313131]">
             Welcome to the{' '}
             <Text className="text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
@@ -61,11 +60,11 @@ export const FirstTimeOnboardingModal = ({
             <Text className="text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
               {targetPoints} points
             </Text>{' '}
-            to complete it. Any activity you&apos;ve already tracked this month will be added to
-            your score and streak.
+            to complete it. Any activity you've already tracked this month will be added to your
+            score.
           </Text>
 
-          <View className="mt-6">
+          {/* <View className="mt-6">
             <Text
               className="text-center text-[#1A1A1A]"
               size="lg"
@@ -84,7 +83,7 @@ export const FirstTimeOnboardingModal = ({
                 style={{ width: `${progressPct}%` }}
               />
             </View>
-          </View>
+          </View> */}
         </AlertDialogBody>
         <AlertDialogFooter className="mt-6">
           <Button
@@ -93,7 +92,7 @@ export const FirstTimeOnboardingModal = ({
             action="primary"
             className="h-16 w-full rounded-2xl"
             onPress={handleClose}>
-            <ButtonText className="text-xl font-bold text-white">Let&apos;s Go!</ButtonText>
+            <ButtonText className="text-xl font-bold text-white">say hello to the group</ButtonText>
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
