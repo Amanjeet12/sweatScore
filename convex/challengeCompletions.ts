@@ -10,8 +10,10 @@ import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
-const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2c6mtdj1x0rj97br01j2exhn89mqac' as Id<'_storage'>;
+const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg25g2j1k7vcx2h2qq58gw9h5n89p5fp' as Id<'_storage'>;
 
+// production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp 
+// testing: kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
 
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
