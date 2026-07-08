@@ -34,9 +34,7 @@ import { useRefreshStore } from '~/store/useRefreshStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { storage } from '~/utils/storage';
-
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight } from 'phosphor-react-native';
+import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 
 function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -224,16 +222,9 @@ export default function TabDashboard() {
                 <Avatar uri={currentUser?.image ?? undefined} size={56} goToSettings />
               </View>
             </View>
-            {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (
-              <View className="bg-[#F9F9F9]">
-                <MonthlyProgressCard
-                  coverImageUrl={rewardsBanner.imageUrl}
-                  title={rewardsBanner.title}
-                  targetPoints={rewardsBanner.targetPoints}
-                  earnedPoints={leaderboard?.displayTotalPoints ?? 0}
-                />
-              </View>
-            )}
+            <View className="bg-[#F9F9F9]">
+              <DailyChallengeCard />
+            </View>
             <View className=" pv-5 mt-5 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />
             </View>

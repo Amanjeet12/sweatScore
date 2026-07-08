@@ -676,7 +676,7 @@ export const updateChallenge = mutation({
       endDate: args.removeEndDate ? undefined : (args.endDate ?? challenge.endDate),
     });
 
-    return { success: true };
+    return { success: true, challengeId: args.challengeId };
   },
 });
 
@@ -1064,6 +1064,111 @@ export const deleteUser = internalMutation({
       success: true,
       deletedUserId: userId,
       deletedEmail: args.email,
+    };
+  },
+});
+
+export const setTodayDailyChallenge = mutation({
+  args: {
+    challengeId: v.id('challenges'),
+    shortDescription: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      throw new ConvexError('Unauthorized');
+    }
+
+    const user = await ctx.db.get(userId);
+
+    if (!user?.isAdmin) {
+      throw new ConvexError('Unauthorized');
+    }
+
+    const challenge = await ctx.db.get(args.challengeId);
+
+    if (!challenge) {
+      throw new ConvexError('Challenge not found');
+    }
+
+    if (!challenge.isPublished) {
+      throw new ConvexError('Only published challenges can be set as daily challenge');
+    }
+
+    if (!args.shortDescription.trim()) {
+      throw new ConvexError('Short description is required');
+    }
+
+    const now = Date.now();
+    const endAt = now + 24 * 60 * 60 * 1000;
+
+    // Turn off every old daily challenge first
+    const existingDailyChallenges = await ctx.db
+      .query('challenges')
+      .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
+      .collect();
+
+    for (const item of existingDailyChallenges) {
+      await ctx.db.patch(item._id, {
+        isDailyChallenge: false,
+        dailyStartAt: undefined,
+        dailyEndAt: undefined,
+        shortDescription: undefined,
+      });
+    }
+
+    // Turn on only this selected challenge
+    await ctx.db.patch(args.challengeId, {
+      isDailyChallenge: true,
+      dailyStartAt: now,
+      dailyEndAt: endAt,
+      shortDescription: args.shortDescription.trim(),
+    });
+
+    return {
+      success: true,
+      challengeId: args.challengeId,
+      startsAt: now,
+      endsAt: endAt,
+    };
+  },
+});
+
+
+export const closeTodayDailyChallenge = mutation({
+  args: {
+    challengeId: v.id('challenges'),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      throw new ConvexError('Unauthorized');
+    }
+
+    const user = await ctx.db.get(userId);
+
+    if (!user?.isAdmin) {
+      throw new ConvexError('Unauthorized');
+    }
+
+    const challenge = await ctx.db.get(args.challengeId);
+
+    if (!challenge) {
+      throw new ConvexError('Challenge not found');
+    }
+
+    await ctx.db.patch(args.challengeId, {
+      isDailyChallenge: false,
+      dailyStartAt: undefined,
+      dailyEndAt: undefined,
+      shortDescription: undefined,
+    });
+
+    return {
+      success: true,
+      challengeId: args.challengeId,
     };
   },
 });

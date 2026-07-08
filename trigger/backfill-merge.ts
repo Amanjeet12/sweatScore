@@ -105,7 +105,7 @@ export const backfillMergeTask = task({
           .input(userVideoPath)
           .complexFilter([
             '[0:v]fps=24,scale=540:960:force_original_aspect_ratio=increase,crop=540:960[left]',
-            '[1:v]fps=24,hflip,scale=540:960:force_original_aspect_ratio=increase,crop=540:960[right]',
+            '[1:v]fps=24,scale=540:960:force_original_aspect_ratio=increase,crop=540:960[right]',
             '[left][right]hstack=inputs=2[v]',
           ])
           .outputOptions([

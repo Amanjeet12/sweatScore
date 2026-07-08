@@ -55,6 +55,14 @@ export default function NewPost() {
   const isUploading = mediaLoading || uploadingMedia;
   const userName = currentUser?.name?.split(' ')[0] ?? '';
 
+  const isAdmin = currentUser?.isAdmin === true;
+  const videoMaxDurationSeconds = isAdmin ? 300 : 60;
+  const videoMaxDurationMs = videoMaxDurationSeconds * 1000;
+  const videoLimitText = isAdmin ? 'Max 5 min' : 'Max 60 sec';
+  const videoLimitError = isAdmin
+    ? 'Video must be 5 minutes or less'
+    : 'Video must be 1 minute or less';
+
   const resetMedia = () => {
     setMedia(null);
     setMediaUri(undefined);
@@ -160,7 +168,7 @@ export default function NewPost() {
       allowsEditing: true,
       quality: 0.5,
       selectionLimit: 1,
-      videoMaxDuration: 160,
+      videoMaxDuration: videoMaxDurationSeconds,
       preferredAssetRepresentationMode:
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
     });
@@ -172,8 +180,8 @@ export default function NewPost() {
 
     const localmedia = result.assets[0];
 
-    if (localmedia.duration && localmedia.duration > 160000) {
-      setError('Video must be 1 minute or less');
+    if (localmedia.duration && localmedia.duration > videoMaxDurationMs) {
+      setError(videoLimitError);
       setMediaLoading(false);
       return;
     }
@@ -282,7 +290,9 @@ export default function NewPost() {
                     multiline
                     autoFocus
                     className="border-0 bg-transparent px-0 text-base"
-                    placeholder={`What's on your mind, ${userName || 'there'}? Share your progress or just check in with the group`}
+                    placeholder={`What's on your mind, ${
+                      userName || 'there'
+                    }? Share your progress or just check in with the group`}
                     value={body}
                     onChangeText={(text) => {
                       setError(null);
@@ -297,6 +307,7 @@ export default function NewPost() {
                 </Input>
               </View>
             </View>
+
             {!media && (
               <View className="mt-4 flex-row gap-x-3">
                 <TouchableOpacity
@@ -315,23 +326,21 @@ export default function NewPost() {
                   </View>
                 </TouchableOpacity>
 
-                {currentUser?.isAdmin && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={selectVideo}
-                    disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
-                    style={{ opacity: isUploading ? 0.5 : 1 }}>
-                    <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
-                      <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
-                    </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={selectVideo}
+                  disabled={isUploading}
+                  className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
+                  style={{ opacity: isUploading ? 0.5 : 1 }}>
+                  <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
+                    <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
+                  </View>
 
-                    <View>
-                      <Text className="font-body text-sm font-bold text-[#1A1A1A]">Video</Text>
-                      <Text className="font-body text-xs text-[#838383]">Max 60 sec</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
+                  <View>
+                    <Text className="font-body text-sm font-bold text-[#1A1A1A]">Video</Text>
+                    <Text className="font-body text-xs text-[#838383]">{videoLimitText}</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -405,6 +414,7 @@ export default function NewPost() {
                   <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
                     {media.type === 'video' ? 'Video attached' : 'Photo attached'}
                   </Text>
+
                   <Text className="mt-0.5 font-body text-xs text-[#838383]">
                     {uploadingMedia ? 'Uploading media...' : 'Ready to post'}
                   </Text>

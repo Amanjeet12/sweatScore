@@ -76,6 +76,10 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
   const [endDate, setEndDate] = useState<Date | null>(
     initialData?.endDate ? new Date(initialData.endDate + 'T00:00:00') : null
   );
+
+  // Mutation for setting today's daily challenge
+  const setTodayDailyChallenge = useMutation(api.admin.setTodayDailyChallenge);
+  const closeTodayDailyChallenge = useMutation(api.admin.closeTodayDailyChallenge);
   // Cover image state
   const [coverMediaUri, setCoverMediaUri] = useState<string | undefined>(
     initialData?.coverImageUrl ?? undefined
@@ -108,6 +112,12 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const createChallenge = useMutation(api.admin.createChallenge);
   const updateChallenge = useMutation(api.admin.updateChallenge);
+
+  const [setAsTodayChallenge, setSetAsTodayChallenge] = useState(
+    initialData?.isDailyChallenge ?? false
+  );
+
+  const [shortDescription, setShortDescription] = useState(initialData?.shortDescription ?? '');
 
   useEffect(() => {
     const showListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -318,6 +328,12 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
       return;
     }
 
+    if (setAsTodayChallenge && !shortDescription.trim()) {
+      setError('Please add a short description for today’s daily challenge');
+      setIsLoading(false);
+      return;
+    }
+
     const parsedPoints = parseInt(points, 10);
     const parsedDuration = parseInt(durationMinutes, 10) * 60;
 
@@ -363,12 +379,29 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         })
       );
 
+
       if (err) {
         setError(getErrorMessage(err));
         setIsLoading(false);
         return;
       }
+
       if (response) {
+        if (setAsTodayChallenge) {
+          const [dailyErr] = await CatchPromise(
+            setTodayDailyChallenge({
+              challengeId: response.challengeId,
+              shortDescription: shortDescription.trim(),
+            })
+          );
+
+          if (dailyErr) {
+            setError(getErrorMessage(dailyErr));
+            setIsLoading(false);
+            return;
+          }
+        }
+
         onSuccess();
       }
     } else if (mode === 'edit' && initialData) {
@@ -386,27 +419,25 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
       if (!isNaN(parsedPts) && parsedPts !== initialData.points) updates.points = parsedPts;
 
       const parsedDur = parseInt(durationMinutes, 10) * 60;
-      if (!isNaN(parsedDur) && parsedDur !== initialData.durationLimit)
+      if (!isNaN(parsedDur) && parsedDur !== initialData.durationLimit) {
         updates.durationLimit = parsedDur;
+      }
 
       if ((youtubeUrl.trim() || undefined) !== initialData.youtubeUrl) {
         updates.youtubeUrl = youtubeUrl.trim() || undefined;
       }
 
-      // Handle cover image replacement
       if (coverMediaKey !== String(initialData.coverImage)) {
         updates.coverImage = coverMediaKey as Id<'_storage'>;
         updates.oldCoverImage = initialData.coverImage;
       }
 
-      // Handle video replacement
       if (videoMediaKey !== String(initialData.instructionalVideo)) {
         updates.instructionalVideo = videoMediaKey as Id<'_storage'>;
         updates.oldInstructionalVideo = initialData.instructionalVideo;
         updates.videoDuration = videoDuration;
       }
 
-      // Handle end date
       if (!hasEndDate && initialData.endDate) {
         updates.removeEndDate = true;
       } else if (endDateStr !== initialData.endDate) {
@@ -420,7 +451,41 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         setIsLoading(false);
         return;
       }
+
       if (response) {
+        const updatedChallengeId = response.challengeId ?? initialData._id;
+
+        // Switch ON: make this the only active daily challenge
+        if (setAsTodayChallenge) {
+          const [dailyErr] = await CatchPromise(
+            setTodayDailyChallenge({
+              challengeId: updatedChallengeId,
+              shortDescription: shortDescription.trim(),
+            })
+          );
+
+          if (dailyErr) {
+            setError(getErrorMessage(dailyErr));
+            setIsLoading(false);
+            return;
+          }
+        }
+
+        // Switch OFF: close this daily challenge
+        if (initialData.isDailyChallenge && !setAsTodayChallenge) {
+          const [closeErr] = await CatchPromise(
+            closeTodayDailyChallenge({
+              challengeId: updatedChallengeId,
+            })
+          );
+
+          if (closeErr) {
+            setError(getErrorMessage(closeErr));
+            setIsLoading(false);
+            return;
+          }
+        }
+
         onSuccess();
       }
     }
@@ -433,12 +498,12 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 50}
       className="flex-1">
       <ScrollView
         ref={scrollViewRef}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 80 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 250 }}
         className="flex-1">
         <View className="flex-1 justify-start px-6">
           {/* Name */}
@@ -721,6 +786,35 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
               </View>
             )}
           </View>
+
+          <View className="mb-4 flex-row items-center justify-between">
+            <Text className="text-xl font-bold text-primary-500">
+              Set as Today&apos;s Daily Challenge
+            </Text>
+
+            <Switch value={setAsTodayChallenge} onValueChange={setSetAsTodayChallenge} />
+          </View>
+
+          {setAsTodayChallenge && (
+            <View className="mb-4">
+              <Text className="mb-2 text-xl font-bold text-primary-500">Short Description</Text>
+
+              <Input size="xl" variant="rounded">
+                <InputField
+                  placeholder="e.g. Complete 20 reps"
+                  value={shortDescription}
+                  onChangeText={(text) => {
+                    setError(null);
+                    setShortDescription(text);
+                  }}
+                />
+              </Input>
+
+              <Text className="mt-1 text-sm text-gray-500">
+                This will show on the Daily Challenge card.
+              </Text>
+            </View>
+          )}
 
           <ErrorMessage error={error} className="mb-4" />
 

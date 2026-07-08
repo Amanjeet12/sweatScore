@@ -214,7 +214,12 @@ const schema = defineSchema({
     isPublished: v.boolean(),
     createdByUserId: v.id('users'),
     totalCompletions: v.optional(v.number()),
+    isDailyChallenge: v.optional(v.boolean()),
+    dailyStartAt: v.optional(v.number()),
+    dailyEndAt: v.optional(v.number()),
+    shortDescription: v.optional(v.string()),
   })
+    .index('by_daily_challenge', ['isDailyChallenge'])
     .index('by_published', ['isPublished'])
     .index('by_tag', ['tag'])
     .index('by_endDate', ['endDate']),

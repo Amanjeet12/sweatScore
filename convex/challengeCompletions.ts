@@ -10,10 +10,10 @@ import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
-const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg25g2j1k7vcx2h2qq58gw9h5n89p5fp' as Id<'_storage'>;
+const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2bw8mc19yyc4ststyr6751wd8a4skj' as Id<'_storage'>;
 
-// production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp 
-// testing: kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
+// production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
+// testing: kg2bw8mc19yyc4ststyr6751wd8a4skj
 
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
@@ -665,6 +665,72 @@ export const getChallengeProgress = query({
       dailyCompletionCount,
       dailyLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
       dailyLimitReached: dailyCompletionCount >= MAX_DAILY_CHALLENGE_COMPLETIONS,
+    };
+  },
+});
+
+export const getTodayDailyChallenge = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const now = Date.now();
+
+    const activeChallenges = await ctx.db
+      .query('challenges')
+      .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field('isPublished'), true),
+          q.lte(q.field('dailyStartAt'), now),
+          q.gt(q.field('dailyEndAt'), now)
+        )
+      )
+      .collect();
+
+    const challenge = activeChallenges.sort(
+      (a, b) => (b.dailyStartAt ?? 0) - (a.dailyStartAt ?? 0)
+    )[0];
+
+    if (!challenge) {
+      return null;
+    }
+
+    const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
+    const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+
+    const dailyDateKey = new Date(challenge.dailyStartAt ?? now).toISOString().slice(0, 10);
+
+    const communityDoneToday = await challengeCounter.count(
+      ctx,
+      `challenge:${challenge._id}:${dailyDateKey}`
+    );
+
+    let userCompletedToday = false;
+
+    if (userId) {
+      const completion = await ctx.db
+        .query('challengeCompletions')
+        .withIndex('by_user_challenge_date', (q) =>
+          q.eq('userId', userId).eq('challengeId', challenge._id).eq('date', dailyDateKey)
+        )
+        .filter((q) => q.neq(q.field('removed'), true))
+        .first();
+
+      userCompletedToday = Boolean(completion);
+    }
+
+    return {
+      ...challenge,
+      coverImageUrl,
+      instructionalVideoUrl,
+
+      // This is what card/demo page will show
+      shortDescription: challenge.shortDescription ?? challenge.description,
+
+      secondsRemaining: Math.max(0, Math.floor(((challenge.dailyEndAt ?? now) - now) / 1000)),
+
+      communityDoneToday,
+      userCompletedToday,
     };
   },
 });
