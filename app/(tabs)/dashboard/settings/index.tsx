@@ -1,7 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack } from 'expo-router';
 import { ArrowRight } from 'phosphor-react-native';
-import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
@@ -11,11 +19,12 @@ import MyActivities from '~/components/core/settings/MyActivities';
 import { Button, ButtonText } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { useAuthStore } from '~/store/useAuthStore';
-import { externalLinks } from '~/utils/constants';
+import { colors, externalLinks } from '~/utils/constants';
 import { formatDateToLocaleString } from '~/utils/formatter';
 
 export default function TabSettings() {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const isIOS = Platform.OS === 'ios';
 
   const openWhatsApp = async () => {
     const url = externalLinks.whatsappSupport;
@@ -29,9 +38,15 @@ export default function TabSettings() {
         const webUrl = url.replace('api.whatsapp.com', 'wa.me');
         await Linking.openURL(webUrl);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Unable to open WhatsApp. Please make sure WhatsApp is installed.');
     }
+  };
+
+  const openSettings = () => {
+    router.push({
+      pathname: '/dashboard/settings/my-settings',
+    });
   };
 
   const handleBack = () => {
@@ -46,7 +61,7 @@ export default function TabSettings() {
     <>
       <Stack.Screen
         options={{
-          headerShown: true,
+          headerShown: !isIOS,
           headerTitleAlign: 'center',
           title: '',
           headerStyle: {
@@ -58,12 +73,7 @@ export default function TabSettings() {
             </Text>
           ),
           headerRight: () => (
-            <HeaderButton
-              onPress={() => {
-                router.push({
-                  pathname: '/dashboard/settings/my-settings',
-                });
-              }}>
+            <HeaderButton onPress={openSettings}>
               <Ionicons size={22} name="settings-outline" />
             </HeaderButton>
           ),
@@ -73,7 +83,30 @@ export default function TabSettings() {
       />
 
       <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-       
+        {isIOS && (
+          <View style={styles.iosHeader}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleBack}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.iosBackButton}>
+              <Ionicons name="chevron-back" size={30} color={colors.primary} />
+              <Text style={styles.iosBackText}>Back</Text>
+            </TouchableOpacity>
+
+            <Text className="text-center font-heading text-xl font-bold text-[#1A1A1A]">
+              My Profile
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={openSettings}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.iosSettingsButton}>
+              <Ionicons size={28} color={colors.nearBlack} name="settings-outline" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -143,3 +176,35 @@ export default function TabSettings() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  iosHeader: {
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  iosBackButton: {
+    position: 'absolute',
+    left: 16,
+    height: 44,
+    minWidth: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  iosBackText: {
+    color: colors.primary,
+    fontFamily: 'Inter_700Bold',
+    fontSize: 20,
+    marginLeft: 1,
+  },
+  iosSettingsButton: {
+    position: 'absolute',
+    right: 18,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
