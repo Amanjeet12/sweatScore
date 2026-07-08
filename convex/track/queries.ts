@@ -42,21 +42,38 @@ type MonthBucket = {
   points: number;
 };
 
+function addDays(date: string, amount: number) {
+  const [year, month, day] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  dt.setUTCDate(dt.getUTCDate() + amount);
+  return dt.toISOString().slice(0, 10);
+}
+
+function lastDayOfMonth(yearMonth: string) {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const dt = new Date(Date.UTC(year, month, 0));
+  return dt.toISOString().slice(0, 10);
+}
+
 async function loadWeekDays(
   ctx: QueryCtx,
   userId: Id<'users'>,
   weekStart: string
 ): Promise<DayBucket[]> {
   const yearWeek = yearWeekOf(weekStart);
+
   const rows = await ctx.db
     .query('trackDaily')
     .withIndex('by_user_yearWeek', (q) => q.eq('userId', userId).eq('yearWeek', yearWeek))
     .collect();
+
   const byDate = new Map(rows.map((r) => [r.date, r]));
-  return weekDateRange(weekStart).map((d) => {
-    const r = byDate.get(d);
+
+  return weekDateRange(weekStart).map((date) => {
+    const r = byDate.get(date);
+
     return {
-      date: d,
+      date,
       steps: r?.steps ?? 0,
       activeMinutes: r?.activeMinutes ?? 0,
       moves: r?.moves ?? 0,
@@ -71,23 +88,36 @@ async function loadMonthWeeks(
   userId: Id<'users'>,
   yearMonth: string
 ): Promise<WeekBucket[]> {
-  const rows = await ctx.db
-    .query('trackWeekly')
-    .withIndex('by_user_yearMonthOfStart', (q) =>
-      q.eq('userId', userId).eq('yearMonthOfStart', yearMonth)
-    )
-    .collect();
-  rows.sort((a, b) => a.weekStart.localeCompare(b.weekStart));
-  return rows.map((r) => ({
-    yearWeek: r.yearWeek,
-    weekStart: r.weekStart,
-    steps: r.steps,
-    activeMinutes: r.activeMinutes,
-    moves: r.moves,
-    points: r.points,
-    daysMet: r.daysMet,
-    streakWeek: r.streakWeek,
-  }));
+  const monthStart = `${yearMonth}-01`;
+  const monthEnd = lastDayOfMonth(yearMonth);
+
+  let weekStart = mondayOf(monthStart);
+  const weekStarts: string[] = [];
+
+  while (weekStart <= monthEnd) {
+    weekStarts.push(weekStart);
+    weekStart = addDays(weekStart, 7);
+  }
+
+  const weeks = await Promise.all(
+    weekStarts.map(async (start) => {
+      const days = await loadWeekDays(ctx, userId, start);
+      const monthDays = days.filter((day) => day.date.startsWith(yearMonth));
+
+      return {
+        yearWeek: yearWeekOf(start),
+        weekStart: start,
+        steps: monthDays.reduce((sum, day) => sum + day.steps, 0),
+        activeMinutes: monthDays.reduce((sum, day) => sum + day.activeMinutes, 0),
+        moves: monthDays.reduce((sum, day) => sum + day.moves, 0),
+        points: monthDays.reduce((sum, day) => sum + day.points, 0),
+        daysMet: monthDays.filter((day) => day.targetMet).length,
+        streakWeek: monthDays.some((day) => day.targetMet),
+      };
+    })
+  );
+
+  return weeks;
 }
 
 async function loadYearMonths(
@@ -99,11 +129,14 @@ async function loadYearMonths(
     .query('trackMonthly')
     .withIndex('by_user_year', (q) => q.eq('userId', userId).eq('year', year))
     .collect();
+
   const byMonth = new Map(rows.map((r) => [r.yearMonth, r]));
-  return yearMonths(year).map((ym) => {
-    const r = byMonth.get(ym);
+
+  return yearMonths(year).map((yearMonth) => {
+    const r = byMonth.get(yearMonth);
+
     return {
-      yearMonth: ym,
+      yearMonth,
       steps: r?.steps ?? 0,
       activeMinutes: r?.activeMinutes ?? 0,
       moves: r?.moves ?? 0,
@@ -166,6 +199,7 @@ export const getTrackWeekDays = query({
   handler: async (ctx, { weekStart }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Unauthorized');
+
     return loadWeekDays(ctx, userId, weekStart);
   },
 });
@@ -175,6 +209,7 @@ export const getTrackMonthWeeks = query({
   handler: async (ctx, { yearMonth }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Unauthorized');
+
     return loadMonthWeeks(ctx, userId, yearMonth);
   },
 });
@@ -184,6 +219,7 @@ export const getTrackYearMonths = query({
   handler: async (ctx, { year }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Unauthorized');
+
     return loadYearMonths(ctx, userId, year);
   },
 });
