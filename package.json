@@ -40,7 +40,7 @@
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-picker/picker": "2.9.0",
     "@react-navigation/native": "^7.0.3",
-    "@trigger.dev/sdk": "4.5.1",
+    "@trigger.dev/sdk": "4.5.2",
     "@types/nodemailer": "^6.4.17",
     "babel-plugin-module-resolver": "^5.0.2",
     "compare-versions": "^6.1.1",
@@ -112,7 +112,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@trigger.dev/build": "4.5.1",
+    "@trigger.dev/build": "4.5.2",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/react": "~18.3.12",
     "@typescript-eslint/eslint-plugin": "^7.7.0",

@@ -18,6 +18,7 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
 import { getData, storeData } from '~/utils/storage';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 
 const CHALLENGE_UPLOAD_QUEUE_KEY = 'challenge-upload-queue:v1';
 const MAX_AUTO_RETRIES = 3;
@@ -38,6 +39,8 @@ export interface ChallengeUploadJob {
   nextAttemptAt: number;
   lastError?: string;
   uploadedStorageId?: Id<'_storage'>;
+  uploadedThumbnailStorageId?: Id<'_storage'>;
+  thumbnailUri?: string;
 }
 
 interface EnqueueChallengeUploadInput {
@@ -110,6 +113,13 @@ function normalizeStoredJobs(raw: unknown): ChallengeUploadJob[] {
           typeof candidate.uploadedStorageId === 'string'
             ? (candidate.uploadedStorageId as Id<'_storage'>)
             : undefined,
+        thumbnailUri:
+          typeof candidate.thumbnailUri === 'string' ? candidate.thumbnailUri : undefined,
+
+        uploadedThumbnailStorageId:
+          typeof candidate.uploadedThumbnailStorageId === 'string'
+            ? (candidate.uploadedThumbnailStorageId as Id<'_storage'>)
+            : undefined,
       },
     ];
   });
@@ -123,6 +133,15 @@ async function deleteLocalVideo(uri: string) {
   } catch {
     // Best effort cleanup.
   }
+}
+
+async function generateVideoThumbnail(videoUri: string): Promise<string> {
+  const result = await VideoThumbnails.getThumbnailAsync(videoUri, {
+    time: 300,
+    quality: 0.8,
+  });
+
+  return result.uri;
 }
 
 export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
@@ -212,19 +231,50 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
   const processJob = useCallback(
     async (jobId: string) => {
       const job = jobsRef.current.find((candidate) => candidate.id === jobId);
+
       if (!job) return;
 
       processingJobIdRef.current = jobId;
 
+      // Keep this outside try so it is available during error cleanup.
+      let thumbnailUri = job.thumbnailUri;
+
       try {
+        // ---------------------------------------------------------
+        // 1. Check that the recorded video still exists
+        // ---------------------------------------------------------
         const fileInfo = await FileSystem.getInfoAsync(job.videoUri);
 
         if (!fileInfo.exists) {
           removeJob(jobId);
+
           showToast('Saved recording could not be found. Please record again.', 'error');
+
           return;
         }
 
+        // ---------------------------------------------------------
+        // 2. Check or generate the local video thumbnail
+        // ---------------------------------------------------------
+        if (thumbnailUri) {
+          const thumbnailInfo = await FileSystem.getInfoAsync(thumbnailUri);
+
+          if (!thumbnailInfo.exists) {
+            thumbnailUri = undefined;
+          }
+        }
+
+        if (!thumbnailUri) {
+          thumbnailUri = await generateVideoThumbnail(job.videoUri);
+
+          patchJob(jobId, {
+            thumbnailUri,
+          });
+        }
+
+        // ---------------------------------------------------------
+        // 3. Upload the recorded video
+        // ---------------------------------------------------------
         let uploadedStorageId = job.uploadedStorageId;
 
         if (!uploadedStorageId) {
@@ -279,16 +329,84 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
           });
         }
 
+        // ---------------------------------------------------------
+        // 4. Upload the generated thumbnail
+        // ---------------------------------------------------------
+        let uploadedThumbnailStorageId = job.uploadedThumbnailStorageId;
+
+        if (!uploadedThumbnailStorageId && thumbnailUri) {
+          const thumbnailUploadUrl = await generateUploadUrl();
+
+          if (!thumbnailUploadUrl) {
+            throw new Error('Could not create thumbnail upload URL.');
+          }
+
+          const thumbnailUploadTask = FileSystem.createUploadTask(
+            thumbnailUploadUrl,
+            thumbnailUri,
+            {
+              fieldName: 'file',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: {
+                'Content-Type': 'image/jpeg',
+              },
+            }
+          );
+
+          const thumbnailUploadResult = await thumbnailUploadTask.uploadAsync();
+
+          if (!thumbnailUploadResult?.body) {
+            throw new Error('Could not upload video thumbnail.');
+          }
+
+          if (thumbnailUploadResult.status < 200 || thumbnailUploadResult.status >= 300) {
+            throw new Error('Video thumbnail upload failed.');
+          }
+
+          const thumbnailUploadBody = JSON.parse(thumbnailUploadResult.body) as {
+            storageId?: string;
+          };
+
+          if (!thumbnailUploadBody.storageId) {
+            throw new Error('Thumbnail upload response missing storage id.');
+          }
+
+          uploadedThumbnailStorageId = thumbnailUploadBody.storageId as Id<'_storage'>;
+
+          patchJob(jobId, {
+            uploadedThumbnailStorageId,
+          });
+        }
+
+        // ---------------------------------------------------------
+        // 5. Complete the challenge/check-in in Convex
+        // ---------------------------------------------------------
         const result = await completeChallenge({
           challengeId: job.challengeId as Id<'challenges'>,
+
           videoStorageId: uploadedStorageId,
+
+          thumbnailStorageId: uploadedThumbnailStorageId,
+
           allowRepost: job.allowRepost,
           caption: job.caption || undefined,
         });
 
+        // ---------------------------------------------------------
+        // 6. Remove queue item and local temporary files
+        // ---------------------------------------------------------
         removeJob(jobId);
-        await deleteLocalVideo(job.videoUri);
 
+        await Promise.all([
+          deleteLocalVideo(job.videoUri),
+
+          thumbnailUri ? deleteLocalVideo(thumbnailUri) : Promise.resolve(),
+        ]);
+
+        // ---------------------------------------------------------
+        // 7. Show success message
+        // ---------------------------------------------------------
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
             showToast(
@@ -305,20 +423,25 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         const latestJob = jobsRef.current.find((candidate) => candidate.id === jobId);
+
         const nextRetryCount = (latestJob?.retryCount ?? job.retryCount) + 1;
+
         const message = getErrorMessage(error);
 
-        const shouldRetry =
-          isRetryableChallengeUploadError(message) && nextRetryCount <= MAX_AUTO_RETRIES;
+        const isRetryable = isRetryableChallengeUploadError(message);
+
+        const shouldRetry = isRetryable && nextRetryCount <= MAX_AUTO_RETRIES;
 
         if (shouldRetry) {
+          // Keep video and thumbnail locally for retry.
           patchJob(jobId, {
             status: 'queued',
             retryCount: nextRetryCount,
             nextAttemptAt: Date.now() + getRetryDelayMs(nextRetryCount),
             lastError: message,
           });
-        } else if (isRetryableChallengeUploadError(message)) {
+        } else if (isRetryable) {
+          // Keep local files because the user can manually retry.
           patchJob(jobId, {
             status: 'failed',
             retryCount: nextRetryCount,
@@ -328,18 +451,26 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
           showToast('Upload paused. Open the challenge to retry.', 'error');
         } else {
+          // Permanent error: remove the job and local files.
           removeJob(jobId);
-          await deleteLocalVideo(job.videoUri);
+
+          await Promise.all([
+            deleteLocalVideo(job.videoUri),
+
+            thumbnailUri ? deleteLocalVideo(thumbnailUri) : Promise.resolve(),
+          ]);
+
           showToast(message, 'error');
         }
       } finally {
         processingJobIdRef.current = null;
+
         setRetryWakeTick((current) => current + 1);
       }
     },
     [completeChallenge, generateUploadUrl, patchJob, removeJob, showToast]
   );
-
+  
   useEffect(() => {
     if (!isHydrated || appState !== 'active' || processingJobIdRef.current) {
       return;

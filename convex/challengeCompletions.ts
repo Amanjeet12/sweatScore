@@ -104,6 +104,7 @@ export const completeChallenge = mutation({
     // here as a back-compat shim to prevent ArgumentValidationError. Safe to
     // drop once the minimum supported app version no longer sends it.
     recordedDurationSec: v.optional(v.number()),
+    thumbnailStorageId: v.optional(v.id('_storage')),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -182,30 +183,46 @@ export const completeChallenge = mutation({
       (completion) => completion.videoStorageId
     );
 
-    const completionId = await ctx.db.insert('challengeCompletions', {
+    const isCheckIn =
+      challenge.isDailyChallenge === true && challenge.dailyChallengeType === 'check_in';
+
+    const completionData = {
       userId,
       challengeId: args.challengeId,
       date: todayStr,
       pointsEarned: totalPoints,
+
       videoStorageId: args.videoStorageId,
-      allowRepost: args.allowRepost,
+      thumbnailStorageId: args.thumbnailStorageId,
+
+      allowRepost: isCheckIn ? false : args.allowRepost,
+
       caption: args.caption,
       removed: false,
-
       attemptNumber,
-      comparisonMode: day1Completion?.videoStorageId ? 'day1_vs_current' : 'day1_baseline',
 
-      ...(day1Completion?._id ? { day1CompletionId: day1Completion._id } : {}),
+      ...(!isCheckIn
+        ? {
+            comparisonMode: day1Completion?.videoStorageId
+              ? ('day1_vs_current' as const)
+              : ('day1_baseline' as const),
 
-      ...(day1Completion?.videoStorageId
-        ? { comparisonBaseVideoStorageId: day1Completion.videoStorageId }
+            ...(day1Completion?._id
+              ? {
+                  day1CompletionId: day1Completion._id,
+                }
+              : {}),
+
+            ...(day1Completion?.videoStorageId
+              ? {
+                  comparisonBaseVideoStorageId: day1Completion.videoStorageId,
+                }
+              : {}),
+          }
         : {}),
-    });
+    };
 
-    // Increment total completion count on the challenge
-    await ctx.db.patch(args.challengeId, {
-      totalCompletions: (challenge.totalCompletions ?? 0) + 1,
-    });
+    const completionId = await ctx.db.insert('challengeCompletions', completionData);
 
     // Increment sharded counter for today's completions
     await challengeCounter.add(ctx, `challenge:${args.challengeId}:${todayStr}`, 1);
@@ -225,59 +242,83 @@ export const completeChallenge = mutation({
 
     // Schedule video merge via Trigger.dev — post will be created after merge completes
     if (args.videoStorageId) {
-      const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
+      // CHECK-IN:
+      // Post today's original video directly to the community.
+      // Do not run Trigger.dev and do not create a left/right video.
+      if (isCheckIn) {
+        const postId = await ctx.db.insert('posts', {
+          userId,
+          createdAt: Date.now(),
 
-      const day1VideoUrl = day1Completion?.videoStorageId
-        ? await ctx.storage.getUrl(day1Completion.videoStorageId)
-        : null;
+          body: args.caption?.trim() || `${challenge.name} check-in completed`,
 
-      // Important:
-      // We keep old Trigger payload names: adminVideoUrl + userVideoUrl.
-      // But adminVideoUrl can now be either:
-      // 1. User's Day 1 video, if available
-      // 2. Instructor video, if this is the first attempt
-      const firstAttemptVideoUrl =
-        (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
-        (await ctx.storage.getUrl(challenge.instructionalVideo));
+          media: args.videoStorageId,
+          mediaThumbnail: args.thumbnailStorageId,
 
-      const adminVideoUrl = day1VideoUrl ? day1VideoUrl : firstAttemptVideoUrl;
+          mediaWidth: 1080,
+          mediaHeight: 1350,
+          mediaType: 'video',
 
-      console.log('Transformation merge check:', {
-        userId,
-        challengeId: args.challengeId,
-        completionId,
-        attemptNumber,
-        day1CompletionId: day1Completion?._id,
-        day1VideoStorageId: day1Completion?.videoStorageId,
-        hasDay1VideoUrl: Boolean(day1VideoUrl),
-        hasAdminVideoUrl: Boolean(adminVideoUrl),
-        hasUserVideoUrl: Boolean(userVideoUrl),
-        leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
-      });
+          challengeId: args.challengeId,
+          challengeCompletionId: completionId,
+        });
 
-      if (!adminVideoUrl || !userVideoUrl) {
-        console.log('Video merge skipped. Missing video URL.', {
+        console.log('Single check-in video posted:', {
+          postId,
           completionId,
-          hasAdminVideoUrl: Boolean(adminVideoUrl),
-          hasUserVideoUrl: Boolean(userVideoUrl),
+          challengeId: args.challengeId,
+          userId,
         });
       } else {
-        console.log('Scheduling video merge...', {
+        // NORMAL CHALLENGE:
+        // Keep the existing left/right transformation video flow.
+        const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
+
+        const day1VideoUrl = day1Completion?.videoStorageId
+          ? await ctx.storage.getUrl(day1Completion.videoStorageId)
+          : null;
+
+        const firstAttemptVideoUrl =
+          (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
+          (await ctx.storage.getUrl(challenge.instructionalVideo));
+
+        const adminVideoUrl = day1VideoUrl || firstAttemptVideoUrl;
+
+        console.log('Transformation merge check:', {
+          userId,
+          challengeId: args.challengeId,
           completionId,
           attemptNumber,
+          day1CompletionId: day1Completion?._id,
+          day1VideoStorageId: day1Completion?.videoStorageId,
+          hasDay1VideoUrl: Boolean(day1VideoUrl),
+          hasAdminVideoUrl: Boolean(adminVideoUrl),
+          hasUserVideoUrl: Boolean(userVideoUrl),
           leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
         });
 
-        await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
-          // Keep old production payload names
-          adminVideoUrl,
-          userVideoUrl,
+        if (!adminVideoUrl || !userVideoUrl) {
+          console.log('Video merge skipped. Missing video URL.', {
+            completionId,
+            hasAdminVideoUrl: Boolean(adminVideoUrl),
+            hasUserVideoUrl: Boolean(userVideoUrl),
+          });
+        } else {
+          console.log('Scheduling video merge...', {
+            completionId,
+            attemptNumber,
+            leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
+          });
 
-          challengeCompletionId: completionId,
-          userId,
-          caption: args.caption?.trim() || '',
-          challengeId: args.challengeId,
-        });
+          await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
+            adminVideoUrl,
+            userVideoUrl,
+            challengeCompletionId: completionId,
+            userId,
+            caption: args.caption?.trim() || '',
+            challengeId: args.challengeId,
+          });
+        }
       }
     }
 

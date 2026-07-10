@@ -140,7 +140,7 @@ export default function DailyChallengeCard() {
                 className={`text-[14px] font-extrabold ${
                   isCompleted ? 'ml-1 text-gray-600' : 'text-[#161616]'
                 }`}>
-                {isCompleted ? 'Challenge complete' : 'Accept Challenge'}
+                {isCompleted ? 'Challenge completed' : 'Accept Challenge'}
               </Text>
             </View>
           </TouchableOpacity>

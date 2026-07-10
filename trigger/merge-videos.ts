@@ -9,6 +9,10 @@ if (process.env.FFMPEG_PATH) {
   ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH);
 }
 
+if (process.env.FFPROBE_PATH) {
+  ffmpeg.setFfprobePath(process.env.FFPROBE_PATH);
+}
+
 export const mergeVideosTask = task({
   id: 'merge-videos',
   maxDuration: 600, // 10 minutes max (free plan limit)

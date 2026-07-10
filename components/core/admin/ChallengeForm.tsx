@@ -60,6 +60,8 @@ interface ChallengeFormProps {
   onSuccess: () => void;
 }
 
+type DailyChallengeType = 'challenge' | 'check_in';
+
 export default function ChallengeForm({ mode, initialData, onSuccess }: ChallengeFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name ?? '');
@@ -118,6 +120,9 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
   );
 
   const [shortDescription, setShortDescription] = useState(initialData?.shortDescription ?? '');
+  const [dailyChallengeType, setDailyChallengeType] = useState<DailyChallengeType>(
+    initialData?.dailyChallengeType ?? 'challenge'
+  );
 
   useEffect(() => {
     const showListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -379,7 +384,6 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         })
       );
 
-
       if (err) {
         setError(getErrorMessage(err));
         setIsLoading(false);
@@ -392,6 +396,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             setTodayDailyChallenge({
               challengeId: response.challengeId,
               shortDescription: shortDescription.trim(),
+              dailyChallengeType,
             })
           );
 
@@ -461,6 +466,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             setTodayDailyChallenge({
               challengeId: updatedChallengeId,
               shortDescription: shortDescription.trim(),
+              dailyChallengeType: dailyChallengeType,
             })
           );
 
@@ -813,6 +819,60 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
               <Text className="mt-1 text-sm text-gray-500">
                 This will show on the Daily Challenge card.
               </Text>
+
+              <View className="mb-4 mt-4">
+                <Text className="mb-2 text-xl font-bold text-primary-500">
+                  Daily Challenge Type
+                </Text>
+
+                <View className="flex-row gap-x-3">
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setDailyChallengeType('challenge')}
+                    className={`flex-1 rounded-2xl border px-4 py-4 ${
+                      dailyChallengeType === 'challenge'
+                        ? 'border-primary-500 bg-primary-500'
+                        : 'border-gray-300 bg-white'
+                    }`}>
+                    <Text
+                      className={`text-center font-bold ${
+                        dailyChallengeType === 'challenge' ? 'text-white' : 'text-gray-700'
+                      }`}>
+                      Challenge
+                    </Text>
+
+                    <Text
+                      className={`mt-1 text-center text-xs ${
+                        dailyChallengeType === 'challenge' ? 'text-white' : 'text-gray-500'
+                      }`}>
+                      Previous and current video
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setDailyChallengeType('check_in')}
+                    className={`flex-1 rounded-2xl border px-4 py-4 ${
+                      dailyChallengeType === 'check_in'
+                        ? 'border-primary-500 bg-primary-500'
+                        : 'border-gray-300 bg-white'
+                    }`}>
+                    <Text
+                      className={`text-center font-bold ${
+                        dailyChallengeType === 'check_in' ? 'text-white' : 'text-gray-700'
+                      }`}>
+                      Check In
+                    </Text>
+
+                    <Text
+                      className={`mt-1 text-center text-xs ${
+                        dailyChallengeType === 'check_in' ? 'text-white' : 'text-gray-500'
+                      }`}>
+                      Today&apos;s video only
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           )}
 

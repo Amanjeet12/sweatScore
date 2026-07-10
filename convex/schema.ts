@@ -218,6 +218,7 @@ const schema = defineSchema({
     dailyStartAt: v.optional(v.number()),
     dailyEndAt: v.optional(v.number()),
     shortDescription: v.optional(v.string()),
+    dailyChallengeType: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
   })
     .index('by_daily_challenge', ['isDailyChallenge'])
     .index('by_published', ['isPublished'])

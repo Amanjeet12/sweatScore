@@ -1072,6 +1072,7 @@ export const setTodayDailyChallenge = mutation({
   args: {
     challengeId: v.id('challenges'),
     shortDescription: v.string(),
+    dailyChallengeType: v.union(v.literal('challenge'), v.literal('check_in')),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -1124,6 +1125,7 @@ export const setTodayDailyChallenge = mutation({
       dailyStartAt: now,
       dailyEndAt: endAt,
       shortDescription: args.shortDescription.trim(),
+      dailyChallengeType: args.dailyChallengeType,
     });
 
     return {
@@ -1134,7 +1136,6 @@ export const setTodayDailyChallenge = mutation({
     };
   },
 });
-
 
 export const closeTodayDailyChallenge = mutation({
   args: {
@@ -1164,6 +1165,7 @@ export const closeTodayDailyChallenge = mutation({
       dailyStartAt: undefined,
       dailyEndAt: undefined,
       shortDescription: undefined,
+      dailyChallengeType: undefined,
     });
 
     return {

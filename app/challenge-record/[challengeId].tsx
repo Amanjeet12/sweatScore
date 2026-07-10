@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { useVideoPlayer, VideoView } from 'expo-video';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CompositeVideoPlayer from '~/components/core/dashboard/CompositeVideoPlayer';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
@@ -46,6 +46,33 @@ type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 function getDefaultCaption(round?: number, exerciseName?: string) {
   return `Round ${round ?? 1} of ${exerciseName ?? 'this exercise'} done 🔥`;
 }
+
+function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
+  const player = useVideoPlayer(videoUrl, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.volume = 0;
+  });
+
+  return (
+    <View
+      style={{
+        width: '100%',
+        aspectRatio: 4 / 5, // Smaller height than 9 / 16
+        backgroundColor: '#000',
+      }}>
+      <VideoView
+        player={player}
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+        contentFit="cover"
+        nativeControls
+      />
+    </View>
+  );
+}
+
 
 export default function DuetRecordingScreen() {
   useKeepAwake();
@@ -791,6 +818,8 @@ export default function DuetRecordingScreen() {
     }, 250);
   }, []);
 
+  const isCheckIn = challenge?.dailyChallengeType === 'check_in';
+
   if (challenge === undefined || progress === undefined) {
     return <ScreenLoading />;
   }
@@ -1081,17 +1110,21 @@ export default function DuetRecordingScreen() {
             </View>
           </View>
 
-          {recordedVideoUri && challenge.instructionalVideoUrl && (
-            <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-white">
-              <CompositeVideoPlayer
-                leftVideoUrl={
-                  progress?.day1VideoUrl ||
-                  FIRST_ATTEMPT_VIDEO_URL ||
-                  challenge.instructionalVideoUrl
-                }
-                rightVideoUrl={recordedVideoUri}
-                mirrorRight={false}
-              />
+          {recordedVideoUri && (
+            <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-black">
+              {isCheckIn ? (
+                <SingleVideoPreview videoUrl={recordedVideoUri} />
+              ) : challenge.instructionalVideoUrl ? (
+                <CompositeVideoPlayer
+                  leftVideoUrl={
+                    progress?.day1VideoUrl ||
+                    FIRST_ATTEMPT_VIDEO_URL ||
+                    challenge.instructionalVideoUrl
+                  }
+                  rightVideoUrl={recordedVideoUri}
+                  mirrorRight={false}
+                />
+              ) : null}
             </View>
           )}
 
