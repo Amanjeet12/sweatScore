@@ -38,13 +38,45 @@ const RECORDING_VIDEO_BITRATE = 2_500_000;
 const RECORDING_MAX_FILE_SIZE_BYTES = 80 * 1024 * 1024;
 const EARLY_NATIVE_STOP_GRACE_SECONDS = 1;
 
+const DEFAULT_CAPTION_TEMPLATES = [
+  'Round {round} of {exercise} done 🔥',
+  'Round {round} in the bag 💪',
+  'Round {round} of {exercise} complete ✅',
+  'Round {round} done and dusted 🙌',
+  'Round {round} locked in 🔒',
+  'Round {round} of {exercise} finished 💥',
+  'Round {round} complete, no excuses 🔥',
+  "Round {round} done, who's next? 👀",
+  'Round {round} of {exercise} smashed 💪',
+  'Keeping the streak alive with Round {round} 🔥',
+  'Round {round} in the bag 🎯',
+  'Round {round} done, still showing up 👊',
+  "That's Round {round} in the bag ✅",
+  'Smashed Round {round} 🙌',
+  'Boom, Round {round} done 💥',
+  'Still here, Round {round} finished 👊',
+  'Round {round} and counting 📈',
+  'Knocked out Round {round} today 🥊',
+  'Consistency check: Round {round} complete 🔥',
+  'Feeling strong after Round {round} 💪',
+  'Round {round} in the books 📖',
+  'Showed up for Round {round} today ✅',
+];
+
 const FIRST_ATTEMPT_VIDEO_URL =
   'https://beloved-stoat-88.convex.cloud/api/storage/e2f45d18-715b-4342-83ca-aef8407ae8f3';
 
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 
 function getDefaultCaption(round?: number, exerciseName?: string) {
-  return `Round ${round ?? 1} of ${exerciseName ?? 'this exercise'} done 🔥`;
+  const currentRound = round ?? 1;
+  const exercise = exerciseName?.trim() || 'this exercise';
+
+  const randomIndex = Math.floor(Math.random() * DEFAULT_CAPTION_TEMPLATES.length);
+
+  return DEFAULT_CAPTION_TEMPLATES[randomIndex]
+    .replace(/\{round\}/g, String(currentRound))
+    .replace(/\{exercise\}/g, exercise);
 }
 
 function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
@@ -72,7 +104,6 @@ function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
     </View>
   );
 }
-
 
 export default function DuetRecordingScreen() {
   useKeepAwake();

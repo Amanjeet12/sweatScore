@@ -10,7 +10,32 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '~/components/ui/text';
-import { formatPoints } from '~/utils/formatter';
+
+const formatPoints = (points: number): string => {
+  if (!Number.isFinite(points)) return '0';
+
+  const absolutePoints = Math.abs(points);
+
+  const compact = (divisor: number, suffix: string) => {
+    const value = points / divisor;
+
+    return `${value.toFixed(Math.abs(value) < 10 ? 1 : 0).replace(/\.0$/, '')}${suffix}`;
+  };
+
+  if (absolutePoints >= 1_000_000_000) {
+    return compact(1_000_000_000, 'B');
+  }
+
+  if (absolutePoints >= 1_000_000) {
+    return compact(1_000_000, 'M');
+  }
+
+  if (absolutePoints >= 1_000) {
+    return compact(1_000, 'K');
+  }
+
+  return Math.round(points).toLocaleString();
+};
 
 const CHART_HEIGHT = 220;
 const BAR_WIDTH = 28;
@@ -27,15 +52,7 @@ export type BarChartProps = {
   bars: Bar[];
 };
 
-function BarColumn({
-  bar,
-  index,
-  maxValue,
-}: {
-  bar: Bar;
-  index: number;
-  maxValue: number;
-}) {
+function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue: number }) {
   const targetHeight = bar.value > 0 ? (bar.value / maxValue) * CHART_HEIGHT : 0;
 
   const h = useSharedValue(0);
@@ -70,8 +87,7 @@ function BarColumn({
           height: CHART_HEIGHT + 40,
           justifyContent: 'flex-end',
           alignItems: 'center',
-        }}
-      >
+        }}>
         <Animated.View style={[labelStyle, { alignItems: 'center', marginBottom: 2 }]}>
           {bar.showMedal && (
             <Image

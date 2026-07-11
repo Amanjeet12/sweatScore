@@ -9,7 +9,7 @@ import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timez
 import { getStreakEarnedDatesInRange } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
-const MAX_DAILY_CHALLENGE_COMPLETIONS = 5;
+const MAX_DAILY_CHALLENGE_COMPLETIONS = 3;
 const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2bw8mc19yyc4ststyr6751wd8a4skj' as Id<'_storage'>;
 
 // production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp

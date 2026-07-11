@@ -77,11 +77,11 @@ export default function TabSweat() {
 
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
         <View className="items-center px-6 py-4">
-          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Progress Videos</Text>
+          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">30 Days Challenge</Text>
         </View>
       </View>
 
-      <View className="px-screen mt-2">
+      {/* <View className="px-screen mt-2">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row gap-x-2">
             {ALL_FILTERS.map((tag) => (
@@ -103,7 +103,7 @@ export default function TabSweat() {
             ))}
           </View>
         </ScrollView>
-      </View>
+      </View> */}
 
       {challenges === undefined ? (
         <ScreenLoading />

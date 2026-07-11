@@ -17,8 +17,6 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useTabStore } from '~/store/useTabStore';
 
-
-
 export default function ChallengeViewScreen() {
   const { challengeId } = useLocalSearchParams<{ challengeId: string }>();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -163,6 +161,15 @@ export default function ChallengeViewScreen() {
             </Text>
           </View>
 
+          {challenge.youtubeUrl && (
+            <TouchableOpacity
+              className="mt-4 flex-row items-center justify-center gap-x-1"
+              onPress={() => Linking.openURL(challenge.youtubeUrl!)}>
+              <Play size={16} color="#FF5C1A" weight="fill" />
+              <Text className="font-body text-sm font-bold text-primary-500">Know More</Text>
+            </TouchableOpacity>
+          )}
+
           <View className="mt-6 px-8">
             {hasFailedUpload ? (
               <>
@@ -273,20 +280,11 @@ export default function ChallengeViewScreen() {
                 </LoadingButton>
 
                 <Text className="mt-2 text-center font-body text-sm text-[#838383]">
-                  {dailyCompletionCount}/{dailyLimit} progress videos recorded today.
+                  {dailyCompletionCount}/{dailyLimit} Challenge videos recorded today.
                 </Text>
               </>
             )}
           </View>
-
-          {challenge.youtubeUrl && (
-            <TouchableOpacity
-              className="mt-4 flex-row items-center justify-center gap-x-1"
-              onPress={() => Linking.openURL(challenge.youtubeUrl!)}>
-              <Play size={16} color="#FF5C1A" weight="fill" />
-              <Text className="font-body text-sm font-bold text-primary-500">Watch on YouTube</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
       )}
     </SafeAreaView>

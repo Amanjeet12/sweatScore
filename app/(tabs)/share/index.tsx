@@ -2,7 +2,7 @@ import { LegendList } from '@legendapp/list';
 import { usePaginatedQuery, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,32 @@ import { Id } from '~/convex/_generated/dataModel';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
+const COMMUNITY_TAGLINES = [
+  "Share what's on your plate today, [name]!",
+  'Show us your pre- or post-workout snack, [name]!',
+  'What are we cooking for dinner tonight, [name]?',
+  'Drop your lunch photo below.',
+  'Hydration check! Show us your water bottle right now.',
+  'Show us your workout space today.',
+  'Drop a pic of your view right now.',
+  'Show us your workout outfit today.',
+  'What song or playlist is keeping you moving right now?',
+  'Drop a quick video clip of your workout today!',
+  'How many points did you lock in today?',
+  'Drop a selfie after your workout today.',
+  'Drop an emoji that sums up your energy level right now.',
+  'How many steps did you clock today?',
+  'Show us your breakfast today!',
+  "Coffee, tea, or a smoothie? What's in your cup right now?",
+  'Show us your gym bag essentials, [name].',
+  "How did today's session go, [name]?",
+  'Drop your favourite healthy meal right now, [name].',
+  'What time did you train today, [name]?',
+  "What's your fitness goal this month, [name]?",
+  'Rest day or active day today, [name]?',
+  'Post your water intake so far, [name].',
+  "What's motivating you this week, [name]?",
+];
 const TabShare = () => {
   const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams();
@@ -89,6 +115,12 @@ const TabShare = () => {
   const userInitial = userName.charAt(0).toUpperCase();
   const userImage = currentUser?.image?.trim();
 
+  const communityTagline = useMemo(() => {
+    const randomIndex = Math.floor(Math.random() * COMMUNITY_TAGLINES.length);
+
+    return COMMUNITY_TAGLINES[randomIndex].replace(/\[name\]/g, userName);
+  }, [userName]);
+
   return (
     <MenuProvider>
       <SafeAreaView className="flex-1 bg-white">
@@ -124,11 +156,8 @@ const TabShare = () => {
                 )}
               </View>
 
-              <Text className="flex-1 font-body text-sm text-[#8B8B8B]">
-                What&apos;s on your mind{' '}
-                <Text className="font-body text-sm font-bold text-[#8B8B8B]">
-                  {userName ?? 'User'}?
-                </Text>
+              <Text className="flex-1 pr-2 font-body text-sm text-[#8B8B8B]" numberOfLines={2}>
+                {communityTagline}
               </Text>
             </TouchableOpacity>
           </View>

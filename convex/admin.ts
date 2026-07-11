@@ -1116,6 +1116,7 @@ export const setTodayDailyChallenge = mutation({
         dailyStartAt: undefined,
         dailyEndAt: undefined,
         shortDescription: undefined,
+        dailyChallengeType: undefined,
       });
     }
 

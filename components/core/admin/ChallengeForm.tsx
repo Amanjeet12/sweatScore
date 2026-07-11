@@ -845,7 +845,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                       className={`mt-1 text-center text-xs ${
                         dailyChallengeType === 'challenge' ? 'text-white' : 'text-gray-500'
                       }`}>
-                      Previous and current video
+                     Side by Side video
                     </Text>
                   </TouchableOpacity>
 
@@ -868,7 +868,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                       className={`mt-1 text-center text-xs ${
                         dailyChallengeType === 'check_in' ? 'text-white' : 'text-gray-500'
                       }`}>
-                      Today&apos;s video only
+                     Single video only
                     </Text>
                   </TouchableOpacity>
                 </View>
