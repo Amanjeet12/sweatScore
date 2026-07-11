@@ -117,7 +117,7 @@ export default function ChallengeCard({
 
       <View className="absolute right-3 top-3 rounded-full bg-primary-500 px-3 py-1">
         <Text className="font-body text-xs font-semibold text-white">
-          {challenge.points} pts
+          +{challenge.points} pts
         </Text>
       </View>
 
@@ -146,7 +146,7 @@ export default function ChallengeCard({
             backgroundColor: 'rgba(0,0,0,0.4)',
           }}>
           <Text className="font-body text-base font-medium text-white">
-            Available in {cooldownHours}h
+            Unlocks in  {cooldownHours}h
           </Text>
         </View>
       )}

@@ -165,8 +165,8 @@ export default function ChallengeViewScreen() {
             <TouchableOpacity
               className="mt-4 flex-row items-center justify-center gap-x-1"
               onPress={() => Linking.openURL(challenge.youtubeUrl!)}>
-              <Play size={16} color="#FF5C1A" weight="fill" />
-              <Text className="font-body text-sm font-bold text-primary-500">Know More</Text>
+              {/* <Play size={16} color="#FF5C1A" weight="fill" /> */}
+              <Text className="font-body text-sm font-bold text-primary-500">Check It Out</Text>
             </TouchableOpacity>
           )}
 
@@ -276,12 +276,12 @@ export default function ChallengeViewScreen() {
                       params: { challengeId },
                     });
                   }}>
-                  <ButtonText className="text-lg font-bold text-white">Record progress</ButtonText>
+                  <ButtonText className="text-lg font-bold text-white">Let’s Go</ButtonText>
                 </LoadingButton>
 
-                <Text className="mt-2 text-center font-body text-sm text-[#838383]">
+                {/* <Text className="mt-2 text-center font-body text-sm text-[#838383]">
                   {dailyCompletionCount}/{dailyLimit} Challenge videos recorded today.
-                </Text>
+                </Text> */}
               </>
             )}
           </View>

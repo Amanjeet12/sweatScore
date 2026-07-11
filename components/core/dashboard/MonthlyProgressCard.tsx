@@ -67,7 +67,7 @@ export default function MonthlyProgressCard({
           {/* Title + Points row */}
           <View className="mb-3 flex-row items-end justify-between">
             <Text
-              className="font-heading text-2xl font-bold text-white"
+              className="font-heading text-xl font-bold text-white"
               style={{ flex: 1, marginRight: 12 }}>
               {title}
             </Text>

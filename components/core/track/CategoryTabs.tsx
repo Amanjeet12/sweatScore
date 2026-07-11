@@ -8,7 +8,7 @@ const TABS: { id: Category; label: string }[] = [
   { id: 'points', label: 'Points' },
   { id: 'steps', label: 'Steps' },
   { id: 'activeMinutes', label: 'Active Min' },
-  { id: 'moves', label: 'Progress' },
+  { id: 'moves', label: 'Challenges' },
 ];
 
 export type CategoryTabsProps = {

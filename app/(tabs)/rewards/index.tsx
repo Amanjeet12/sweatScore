@@ -12,6 +12,9 @@ import YourSweatCard from '~/components/core/track/YourSweatCard';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
+import MonthlyProgressCard from '~/components/core/dashboard/MonthlyProgressCard';
+import { useMemo } from 'react';
+import { useRefreshStore } from '~/store/useRefreshStore';
 
 const WEEKLY_TARGET_DAYS = 5;
 
@@ -24,6 +27,15 @@ export default function TabTrack() {
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
   const overview = useQuery(api.track.queries.getTrackOverview, currentUser?._id ? {} : 'skip');
+  const rewardsBanner = useQuery(api.admin.getRewardsBanner);
+  const refreshKey = useRefreshStore((state) => state.refreshKey);
+
+  const yearMonth = useMemo(() => {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    return `${today.getFullYear()}-${month}`;
+  }, [refreshKey]);
+  const leaderboard = useQuery(api.activities.getUserLeaderboardPosition, { yearMonth });
 
   const goToProfile = () => {
     if (!currentUser?._id) return;
@@ -55,12 +67,24 @@ export default function TabTrack() {
             <View className="flex-row items-center justify-between px-12 py-6">
               <View>
                 <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Track</Text>
-                <Text className="font-body text-base text-[#838383]">Your Progress</Text>
+                <Text className="font-body text-base text-[#838383]">Your Consistency</Text>
               </View>
               {/* <TouchableOpacity onPress={goToProfile} activeOpacity={0.7}>
               <Avatar uri={currentUser?.image ?? undefined} size={56} />
             </TouchableOpacity> */}
             </View>
+            <View className="px-12 pb-4">
+              <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Your Progress</Text>
+            </View>
+
+            {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (
+              <MonthlyProgressCard
+                coverImageUrl={rewardsBanner.imageUrl}
+                title={rewardsBanner.title}
+                targetPoints={rewardsBanner.targetPoints}
+                earnedPoints={leaderboard?.displayTotalPoints ?? 0}
+              />
+            )}
 
             <YourStreakCard
               currentWeeklyStreak={overview?.lifetime.currentWeeklyStreak ?? 0}

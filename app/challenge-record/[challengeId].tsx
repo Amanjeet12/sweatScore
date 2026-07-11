@@ -31,7 +31,7 @@ import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
 
 const COUNTDOWN_SECONDS = 5;
-const MIN_STOP_RECORDING_SECONDS = 30;
+const MIN_STOP_RECORDING_SECONDS = 1;
 const MAX_RECORDING_SECONDS = 60;
 const RECORDING_VIDEO_QUALITY = '720p';
 const RECORDING_VIDEO_BITRATE = 2_500_000;
@@ -977,7 +977,7 @@ export default function DuetRecordingScreen() {
               alignItems: 'center',
             }}>
             <Text className="font-heading text-xl font-bold text-white">
-              Round {progress?.nextAttemptNumber ?? 1}
+              Day {progress?.nextAttemptNumber ?? 1}
             </Text>
           </View>
         )}
@@ -1223,7 +1223,7 @@ export default function DuetRecordingScreen() {
               disabled={isSubmitting || isCaptionMissing}
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
-                Submit Round {progress?.nextAttemptNumber} for {totalPoints} pts
+                Submit Day {progress?.nextAttemptNumber} for {totalPoints} pts
               </ButtonText>
             </LoadingButton>
             <Text className="mt-1 text-center font-body text-sm font-semibold text-[#6F6F6F]">
@@ -1235,7 +1235,7 @@ export default function DuetRecordingScreen() {
             className="mt-5 items-center"
             disabled={isSubmitting}
             onPress={handleStartOver}>
-            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">Record again</Text>
+            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">Start over</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

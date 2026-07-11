@@ -21,7 +21,7 @@ const CATEGORY_LABEL: Record<Category, string> = {
   points: 'points',
   steps: 'steps',
   activeMinutes: 'active min',
-  moves: 'progress',
+  moves: 'challenges',
 };
 
 const ORANGE = '#F76B1C';
