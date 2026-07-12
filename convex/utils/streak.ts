@@ -1,17 +1,25 @@
 import { Id } from '../_generated/dataModel';
-import { QueryCtx, MutationCtx } from '../_generated/server';
+import {
+  MutationCtx,
+  QueryCtx,
+} from '../_generated/server';
 
-export const STREAK_POINTS_THRESHOLD = 10;
+const DAILY_STEP_TARGET = 5000;
+const DAILY_ACTIVE_MINUTES_TARGET = 50;
 
 /**
- * Returns the set of YYYY-MM-DD date strings within [startStr, endStr) where
- * the user "earned" a streak — i.e. completed at least one (non-removed)
- * challenge that day OR accumulated >= STREAK_POINTS_THRESHOLD daily display
- * points (challenge points + synced/approved activity displayTotalPoints +
- * check-in points).
+ * Returns dates where the user completed at least one
+ * physical daily streak target:
  *
- * Inclusive of startStr, exclusive of endStr (matches range query semantics
- * already used elsewhere in this codebase).
+ * 1. Reached 5,000 steps.
+ * 2. Reached 50 active minutes.
+ * 3. Completed a physical Daily Check-in video.
+ *
+ * Normal challenge completions do not count.
+ * Opening the app does not count.
+ *
+ * startStr is inclusive.
+ * endStr is exclusive.
  */
 export async function getStreakEarnedDatesInRange(
   ctx: QueryCtx | MutationCtx,
@@ -19,52 +27,135 @@ export async function getStreakEarnedDatesInRange(
   startStr: string,
   endStr: string
 ): Promise<Set<string>> {
-  const completions = await ctx.db
-    .query('challengeCompletions')
-    .withIndex('by_user_date', (q) =>
-      q.eq('userId', userId).gte('date', startStr).lt('date', endStr)
-    )
-    .filter((q) => q.neq(q.field('removed'), true))
-    .collect();
-
   const activities = await ctx.db
     .query('dailyActivities')
     .withIndex('by_user_date', (q) =>
-      q.eq('userId', userId).gte('date', startStr).lt('date', endStr)
+      q
+        .eq('userId', userId)
+        .gte('date', startStr)
+        .lt('date', endStr)
     )
     .filter((q) =>
-      q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved'))
+      q.or(
+        q.eq(q.field('synced'), true),
+        q.eq(
+          q.field('reviewStatus'),
+          'approved'
+        )
+      )
     )
     .collect();
 
-  const checkIns = await ctx.db
-    .query('userCheckIns')
+  const completions = await ctx.db
+    .query('challengeCompletions')
     .withIndex('by_user_date', (q) =>
-      q.eq('userId', userId).gte('date', startStr).lt('date', endStr)
+      q
+        .eq('userId', userId)
+        .gte('date', startStr)
+        .lt('date', endStr)
+    )
+    .filter((q) =>
+      q.neq(
+        q.field('removed'),
+        true
+      )
     )
     .collect();
 
-  const challengeDates = new Set<string>();
-  const pointsByDate = new Map<string, number>();
+  const earnedDates =
+    new Set<string>();
 
-  const add = (date: string, pts: number) => {
-    pointsByDate.set(date, (pointsByDate.get(date) ?? 0) + pts);
-  };
+  /*
+   * A user may have multiple activity rows
+   * for the same date, so combine them first.
+   */
+  const activityTotalsByDate =
+    new Map<
+      string,
+      {
+        steps: number;
+        activeMinutes: number;
+      }
+    >();
 
-  for (const c of completions) {
-    challengeDates.add(c.date);
-    add(c.date, c.pointsEarned);
-  }
-  for (const a of activities) {
-    add(a.date, a.displayTotalPoints ?? 0);
-  }
-  for (const ci of checkIns) {
-    add(ci.date, ci.points);
+  for (const activity of activities) {
+    const current =
+      activityTotalsByDate.get(
+        activity.date
+      ) ?? {
+        steps: 0,
+        activeMinutes: 0,
+      };
+
+    current.steps +=
+      activity.steps ?? 0;
+
+    current.activeMinutes +=
+      activity.zone2Minutes ?? 0;
+
+    activityTotalsByDate.set(
+      activity.date,
+      current
+    );
   }
 
-  const earned = new Set<string>(challengeDates);
-  for (const [date, pts] of pointsByDate) {
-    if (pts >= STREAK_POINTS_THRESHOLD) earned.add(date);
+  /*
+   * Mark a date when the steps target or
+   * active-minutes target is reached.
+   */
+  for (const [
+    date,
+    totals,
+  ] of activityTotalsByDate) {
+    const stepTargetReached =
+      totals.steps >=
+      DAILY_STEP_TARGET;
+
+    const activeMinutesTargetReached =
+      totals.activeMinutes >=
+      DAILY_ACTIVE_MINUTES_TARGET;
+
+    if (
+      stepTargetReached ||
+      activeMinutesTargetReached
+    ) {
+      earnedDates.add(date);
+    }
   }
-  return earned;
+
+  /*
+   * Load each completed challenge so that
+   * normal challenges can be separated from
+   * physical Daily Check-in videos.
+   */
+  const completedChallenges =
+    await Promise.all(
+      completions.map(
+        (completion) =>
+          ctx.db.get(
+            completion.challengeId
+          )
+      )
+    );
+
+  completions.forEach(
+    (completion, index) => {
+      const challenge =
+        completedChallenges[index];
+
+      const isPhysicalDailyCheckIn =
+        challenge?.isDailyChallenge ===
+          true &&
+        challenge.dailyChallengeType ===
+          'check_in';
+
+      if (isPhysicalDailyCheckIn) {
+        earnedDates.add(
+          completion.date
+        );
+      }
+    }
+  );
+
+  return earnedDates;
 }

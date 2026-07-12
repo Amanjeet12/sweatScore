@@ -271,6 +271,7 @@ const schema = defineSchema({
     points: v.number(),
     targetMet: v.boolean(),
     updatedAt: v.number(),
+    dailyCheckIns: v.optional(v.number()),
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user_yearWeek', ['userId', 'yearWeek'])

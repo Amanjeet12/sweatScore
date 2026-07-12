@@ -21,6 +21,7 @@ type DayBucket = {
   moves: number;
   points: number;
   targetMet: boolean;
+  dailyCheckIns: number;
 };
 
 type WeekBucket = {
@@ -79,6 +80,7 @@ async function loadWeekDays(
       moves: r?.moves ?? 0,
       points: r?.points ?? 0,
       targetMet: r?.targetMet ?? false,
+      dailyCheckIns: r?.dailyCheckIns ?? 0,
     };
   });
 }

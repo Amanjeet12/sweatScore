@@ -264,8 +264,16 @@ export const updateLastActiveAt = mutation({
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', args.date))
       .unique();
 
+    const DAILY_CHECK_IN_POINTS = 5;
+
     if (!userCheckIn) {
-      const cappedPoints = await applyFreeDailyCap(ctx, userId, args.date, 1, 'checkin');
+      const cappedPoints = await applyFreeDailyCap(
+        ctx,
+        userId,
+        args.date,
+        DAILY_CHECK_IN_POINTS,
+        'checkin'
+      );
       await ctx.db.insert('userCheckIns', {
         userId,
         date: args.date,

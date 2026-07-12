@@ -22,7 +22,7 @@ export default function YourMovesCard() {
 
   return (
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
-      <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Challenges</Text>
+      <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Progress</Text>
       <Text className=" font-body text-sm text-[#838383] pt-1">
         Your videos will be saved for 30 days
       </Text>
