@@ -11,8 +11,7 @@ import {
   CHALLENGE_DURATION_MIN,
   CHALLENGE_DURATION_MAX,
 } from './challenges';
-
-const DAILY_CHALLENGE_DURATION_MS = 24 * 60 * 60 * 1000;
+import { getNextMidnightTimestamp } from './utils/timezone';
 
 export const users = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -1172,6 +1171,12 @@ export const setCurrentDailyChallenge = mutation({
 
     const now = Date.now();
 
+    /*
+     * Today's challenge always expires at the next
+     * 12:00 AM in the admin user's timezone.
+     */
+    const todayEndsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
+
     const scheduledChallenges = await ctx.db
       .query('challenges')
       .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
@@ -1186,27 +1191,68 @@ export const setCurrentDailyChallenge = mutation({
     });
 
     /*
-     * If the selected challenge is already current,
-     * only update its display data.
-     * Do not restart its 24-hour timer.
+     * If the selected challenge is already today's
+     * challenge, update its description and make sure
+     * that it expires at the upcoming midnight.
      */
     if (currentChallenge?._id === args.challengeId) {
       await ctx.db.patch(args.challengeId, {
         shortDescription,
+        dailyEndAt: todayEndsAt,
       });
+
+      /*
+       * Find the existing next-day challenge, if one
+       * has already been scheduled.
+       */
+      const futureChallenges = scheduledChallenges
+        .filter(
+          (challenge) =>
+            challenge._id !== currentChallenge._id && (challenge.dailyStartAt ?? 0) > now
+        )
+        .sort((a, b) => (a.dailyStartAt ?? 0) - (b.dailyStartAt ?? 0));
+
+      const nextChallenge = futureChallenges[0];
+
+      /*
+       * Keep only one future challenge.
+       */
+      for (let index = 1; index < futureChallenges.length; index++) {
+        const extraFutureChallenge = futureChallenges[index];
+
+        await ctx.db.patch(extraFutureChallenge._id, {
+          isDailyChallenge: false,
+          dailyStartAt: undefined,
+          dailyEndAt: undefined,
+          shortDescription: undefined,
+        });
+      }
+
+      /*
+       * Realign the next challenge so that it starts
+       * at midnight and ends at the following midnight.
+       */
+      if (nextChallenge) {
+        const nextEndsAt = getNextMidnightTimestamp(new Date(todayEndsAt), user.timezone);
+
+        await ctx.db.patch(nextChallenge._id, {
+          dailyStartAt: todayEndsAt,
+          dailyEndAt: nextEndsAt,
+        });
+      }
 
       return {
         success: true,
         challengeId: args.challengeId,
         startsAt: currentChallenge.dailyStartAt!,
-        endsAt: currentChallenge.dailyEndAt!,
+        endsAt: todayEndsAt,
         alreadyCurrent: true,
       };
     }
 
     /*
-     * Selecting a new current challenge clears
-     * the previous current and next-day schedule.
+     * Selecting a different current challenge removes
+     * all existing current and future daily schedules.
      */
     for (const challenge of scheduledChallenges) {
       await ctx.db.patch(challenge._id, {
@@ -1217,8 +1263,12 @@ export const setCurrentDailyChallenge = mutation({
       });
     }
 
+    /*
+     * The challenge becomes active immediately but
+     * expires at the upcoming local midnight.
+     */
     const startsAt = now;
-    const endsAt = startsAt + DAILY_CHALLENGE_DURATION_MS;
+    const endsAt = todayEndsAt;
 
     await ctx.db.patch(args.challengeId, {
       isDailyChallenge: true,
@@ -1296,8 +1346,31 @@ export const setNextDailyChallenge = mutation({
     }
 
     /*
-     * Remove only previously scheduled future
-     * challenges. Keep the current challenge active.
+     * Today's challenge must end at the upcoming
+     * local midnight.
+     */
+    const startsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
+
+    /*
+     * The next challenge ends at the following
+     * local midnight.
+     */
+    const endsAt = getNextMidnightTimestamp(new Date(startsAt), user.timezone);
+
+    /*
+     * Make sure the current challenge expires exactly
+     * at midnight.
+     */
+    if (currentChallenge.dailyEndAt !== startsAt) {
+      await ctx.db.patch(currentChallenge._id, {
+        dailyEndAt: startsAt,
+      });
+    }
+
+    /*
+     * Remove every other future scheduled challenge.
+     * Keep the current challenge and the selected
+     * next-day challenge.
      */
     for (const challenge of scheduledChallenges) {
       if (challenge._id === currentChallenge._id || challenge._id === args.challengeId) {
@@ -1316,10 +1389,10 @@ export const setNextDailyChallenge = mutation({
       }
     }
 
-    const startsAt = currentChallenge.dailyEndAt!;
-
-    const endsAt = startsAt + DAILY_CHALLENGE_DURATION_MS;
-
+    /*
+     * The next video becomes active at 12:00 AM
+     * and expires at the next 12:00 AM.
+     */
     await ctx.db.patch(args.challengeId, {
       isDailyChallenge: true,
       dailyStartAt: startsAt,

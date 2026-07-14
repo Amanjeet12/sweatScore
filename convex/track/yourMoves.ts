@@ -16,6 +16,8 @@ type CompletionRow = {
   timesCompleted: number; // This is now the row's own round number
 };
 
+type ChallengeType = 'challenge' | 'check_in';
+
 export const getYourMoves = query({
   args: {},
   handler: async (ctx) => {
@@ -73,8 +75,14 @@ export const getYourMoves = query({
       });
     }
 
-    const challengeCache = new Map<string, { name: string; coverImage: Id<'_storage'> | null }>();
-
+    const challengeCache = new Map<
+      string,
+      {
+        name: string;
+        coverImage: Id<'_storage'> | null;
+        type: ChallengeType;
+      }
+    >();
     for (const r of rows) {
       const key = String(r.challengeId);
       if (challengeCache.has(key)) continue;
@@ -84,6 +92,7 @@ export const getYourMoves = query({
       challengeCache.set(key, {
         name: challenge?.name ?? 'Challenge',
         coverImage: challenge?.coverImage ?? null,
+        type: challenge?.type === 'check_in' ? 'check_in' : 'challenge',
       });
     }
 
@@ -108,7 +117,10 @@ export const getYourMoves = query({
       const chal = challengeCache.get(challengeKey)!;
 
       const coverImageUrl = await resolveUrl(chal.coverImage);
-      const compositeVideoUrl = await resolveUrl(r.compositeVideoStorageId ?? null);
+      const downloadableVideoStorageId =
+        chal.type === 'check_in' ? r.videoStorageId : r.compositeVideoStorageId;
+
+      const compositeVideoUrl = await resolveUrl(downloadableVideoStorageId ?? null);
 
       hydrated.push({
         _id: r._id,

@@ -86,9 +86,11 @@ async function computeDailyTotals(
    *
    * are counted as physical daily check-ins.
    */
-  const dailyCheckIns = completedChallenges.filter(
-    (challenge) => challenge?.type === 'check_in'
-  ).length;
+  const dailyCheckIns = completions.filter((completion, index) => {
+    const challenge = completedChallenges[index];
+
+    return completion.dailyWindowStartAt !== undefined || challenge?.isDailyChallenge === true;
+  }).length;
 
   /*
    * Point calculation remains unchanged:

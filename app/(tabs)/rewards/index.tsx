@@ -66,7 +66,7 @@ export default function TabTrack() {
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
             <View className="flex-row items-center justify-between px-12 py-6">
               <View>
-                <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Track</Text>
+                <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Progress</Text>
                 <Text className="font-body text-base text-[#838383]">Your Consistency</Text>
               </View>
               {/* <TouchableOpacity onPress={goToProfile} activeOpacity={0.7}>
@@ -76,7 +76,7 @@ export default function TabTrack() {
 
             <View className="mx-screen-x rounded-card bg-white px-4 pb-4 pt-4">
               <Text className="mb-4 font-heading text-xl font-bold text-[#1A1A1A]">
-                Your Progress
+                Your Challenge
               </Text>
 
               {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (

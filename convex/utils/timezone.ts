@@ -36,3 +36,85 @@ export function ymdUTC(date: Date): string {
   const d = String(date.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
+
+function getDateTimePartsInTZ(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+  return {
+    year: getPart('year'),
+    month: getPart('month'),
+    day: getPart('day'),
+    hour: getPart('hour'),
+    minute: getPart('minute'),
+    second: getPart('second'),
+  };
+}
+
+function getTimezoneOffsetMs(date: Date, timezone: string): number {
+  const parts = getDateTimePartsInTZ(date, timezone);
+
+  const representedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+
+  const timestampWithoutMilliseconds = Math.floor(date.getTime() / 1000) * 1000;
+
+  return representedAsUtc - timestampWithoutMilliseconds;
+}
+
+function localMidnightToUtcTimestamp(
+  year: number,
+  month: number,
+  day: number,
+  timezone: string
+): number {
+  const utcGuess = Date.UTC(year, month - 1, day, 0, 0, 0);
+
+  const firstOffset = getTimezoneOffsetMs(new Date(utcGuess), timezone);
+
+  let timestamp = utcGuess - firstOffset;
+
+  // Recalculate once to handle daylight-saving timezone changes.
+  const correctedOffset = getTimezoneOffsetMs(new Date(timestamp), timezone);
+
+  timestamp = utcGuess - correctedOffset;
+
+  return timestamp;
+}
+
+export function getNextMidnightTimestamp(
+  date: Date = new Date(),
+  timezone?: string | null
+): number {
+  const tz = timezone || DEFAULT_TZ;
+
+  const currentLocalDate = getDateTimePartsInTZ(date, tz);
+
+  const nextDate = new Date(
+    Date.UTC(currentLocalDate.year, currentLocalDate.month - 1, currentLocalDate.day + 1)
+  );
+
+  return localMidnightToUtcTimestamp(
+    nextDate.getUTCFullYear(),
+    nextDate.getUTCMonth() + 1,
+    nextDate.getUTCDate(),
+    tz
+  );
+}

@@ -127,7 +127,7 @@ export default function MoveRow({
 
           <View className="rounded-full border border-primary-100 bg-primary-50 px-2.5 py-0.5">
             <Text className="font-body text-[11px] font-bold text-primary-500">
-              Round {timesCompleted}
+              Day {timesCompleted}
             </Text>
           </View>
         </View>

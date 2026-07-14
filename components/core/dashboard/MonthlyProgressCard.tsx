@@ -26,7 +26,7 @@ export default function MonthlyProgressCard({
 
   return (
     <View className="">
-      <View className="overflow-hidden rounded-[11px]">
+      <View className="overflow-hidden rounded-[22px]">
         {/* Cover Image */}
         <Image
           source={{ uri: coverImageUrl }}
