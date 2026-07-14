@@ -146,7 +146,7 @@ export default function ChallengeCard({
             backgroundColor: 'rgba(0,0,0,0.4)',
           }}>
           <Text className="font-body text-base font-medium text-white">
-            Unlocks in  {cooldownHours}h
+            Unlocks in {cooldownHours}h
           </Text>
         </View>
       )}

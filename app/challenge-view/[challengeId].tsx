@@ -53,6 +53,14 @@ export default function ChallengeViewScreen() {
   const dailyLimit = progress?.dailyLimit ?? 5;
   const dailyCompletionCount = progress?.dailyCompletionCount ?? 0;
 
+  const challengeType = challenge?.type ?? 'challenge';
+  const isCheckIn = challengeType === 'check_in';
+  const selectedDescription = challenge
+    ? isCheckIn
+      ? challenge.checkInDescription?.trim() || challenge.description
+      : challenge.description
+    : '';
+
   const handlePlay = useCallback(() => {
     if (player) {
       player.play();
@@ -157,7 +165,7 @@ export default function ChallengeViewScreen() {
 
           <View className="mt-6 px-8">
             <Text className="text-center font-body text-base text-[#313131]">
-              {challenge.description}
+              {selectedDescription}
             </Text>
           </View>
 

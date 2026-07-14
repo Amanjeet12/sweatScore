@@ -218,6 +218,8 @@ const schema = defineSchema({
     dailyStartAt: v.optional(v.number()),
     dailyEndAt: v.optional(v.number()),
     shortDescription: v.optional(v.string()),
+    type: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
+    checkInDescription: v.optional(v.string()),
     dailyChallengeType: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
   })
     .index('by_daily_challenge', ['isDailyChallenge'])
@@ -246,11 +248,14 @@ const schema = defineSchema({
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
     removed: v.optional(v.boolean()),
+    dailyWindowStartAt: v.optional(v.number()),
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user_challenge_date', ['userId', 'challengeId', 'date'])
     .index('by_challenge_date', ['challengeId', 'date'])
+    .index('by_user_challenge_window', ['userId', 'challengeId', 'dailyWindowStartAt'])
     .index('by_user', ['userId']),
+
   appConfig: defineTable({
     key: v.string(),
     value: v.string(),

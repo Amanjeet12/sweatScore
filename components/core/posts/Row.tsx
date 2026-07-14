@@ -40,6 +40,7 @@ import { colors } from '~/utils/constants';
 import { formatDistanceToNow, intToString } from '~/utils/formatter';
 import { buildCaption } from '~/utils/share';
 
+
 type PostWithUser = {
   _id: Id<'posts'>;
   userId: Id<'users'>;
@@ -102,53 +103,83 @@ export function setStopCurrentVideo(fn: (() => void) | null) {
 // Mounts only when active — single player instance at a time
 function ActiveVideoPlayer({
   videoUrl,
-  aspectRatio = 1,
+  aspectRatio,
 }: {
   videoUrl: string;
-  aspectRatio?: number;
+  aspectRatio: number;
 }) {
-  const [isBuffering, setIsBuffering] = useState(true);
-  const player = useVideoPlayer(videoUrl, (p) => {
-    p.loop = false;
-    p.play();
-  });
+  const [isBuffering, setIsBuffering] =
+    useState(true);
+
+  const player = useVideoPlayer(
+    videoUrl,
+    (videoPlayer) => {
+      videoPlayer.loop = false;
+      videoPlayer.play();
+    }
+  );
 
   useEffect(() => {
-    const statusSub = player.addListener('statusChange', ({ status }) => {
-      setIsBuffering(status !== 'readyToPlay');
-    });
-    const endSub = player.addListener('playToEnd', () => {
-      // Rewind so the native play button works for replay
-      player.currentTime = 0;
-      player.pause();
-    });
+    const statusSubscription =
+      player.addListener(
+        'statusChange',
+        ({ status }) => {
+          setIsBuffering(
+            status !== 'readyToPlay'
+          );
+        }
+      );
+
+    const endSubscription =
+      player.addListener(
+        'playToEnd',
+        () => {
+          player.currentTime = 0;
+          player.pause();
+        }
+      );
+
     return () => {
-      statusSub.remove();
-      endSub.remove();
+      statusSubscription.remove();
+      endSubscription.remove();
     };
   }, [player]);
 
   return (
-    <View style={{ width: '100%', aspectRatio }}>
+    <View
+      style={{
+        width: '100%',
+        aspectRatio,
+        backgroundColor: '#000',
+        overflow: 'hidden',
+      }}>
       <VideoView
         player={player}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+        contentFit="contain"
         nativeControls
       />
+
       {isBuffering && (
         <View
           style={{
             position: 'absolute',
             top: 0,
-            left: 0,
             right: 0,
             bottom: 0,
+            left: 0,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(0,0,0,0.3)',
+            backgroundColor:
+              'rgba(0,0,0,0.2)',
           }}>
-          <ActivityIndicator size="large" color="#fff" />
+          <ActivityIndicator
+            size="large"
+            color="#FFFFFF"
+          />
         </View>
       )}
     </View>
@@ -158,61 +189,141 @@ function ActiveVideoPlayer({
 function ChallengeVideoPlayer({
   videoUrl,
   thumbnailUrl,
-  aspectRatio = 1,
+  aspectRatio = 9 / 16,
 }: {
   videoUrl: string;
   thumbnailUrl?: string;
   aspectRatio?: number;
 }) {
-  const [isActive, setIsActive] = useState(false);
+  const [isActive, setIsActive] =
+    useState(false);
 
+  const fallbackRatio =
+    Number.isFinite(aspectRatio) &&
+    aspectRatio > 0
+      ? aspectRatio
+      : 9 / 16;
+
+  const [
+    resolvedAspectRatio,
+    setResolvedAspectRatio,
+  ] = useState(fallbackRatio);
+
+  /*
+   * Use the thumbnail's exact visible ratio.
+   *
+   * Do not clamp it to 9:16 because many
+   * phones record taller videos such as
+   * 9:19.5 or 9:20.
+   */
   useEffect(() => {
-    return () => {
-      if (stopCurrentVideo === (() => setIsActive(false))) {
-        setStopCurrentVideo(null);
+    if (!thumbnailUrl) {
+      setResolvedAspectRatio(
+        fallbackRatio
+      );
+
+      return;
+    }
+
+    Image.getSize(
+      thumbnailUrl,
+
+      (width, height) => {
+        if (width > 0 && height > 0) {
+          setResolvedAspectRatio(
+            width / height
+          );
+        }
+      },
+
+      () => {
+        setResolvedAspectRatio(
+          fallbackRatio
+        );
       }
-    };
-  }, []);
+    );
+  }, [
+    thumbnailUrl,
+    fallbackRatio,
+  ]);
 
   const handlePlay = () => {
     stopCurrentVideo?.();
-    setStopCurrentVideo(() => setIsActive(false));
+
+    const stopThisVideo = () => {
+      setIsActive(false);
+    };
+
+    setStopCurrentVideo(
+      stopThisVideo
+    );
+
     setIsActive(true);
   };
 
   return (
-    <View>
+    <View
+      style={{
+        width: '100%',
+        backgroundColor: '#000',
+        overflow: 'hidden',
+      }}>
       {isActive ? (
-        <ActiveVideoPlayer videoUrl={videoUrl} aspectRatio={aspectRatio} />
+        <ActiveVideoPlayer
+          videoUrl={videoUrl}
+          aspectRatio={
+            resolvedAspectRatio
+          }
+        />
       ) : (
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={handlePlay}
-          style={{ width: '100%', aspectRatio, backgroundColor: '#1A1A1A' }}>
+          style={{
+            width: '100%',
+
+            /*
+             * Exact ratio from the generated
+             * thumbnail.
+             */
+            aspectRatio:
+              resolvedAspectRatio,
+
+            backgroundColor: '#000',
+            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
           {thumbnailUrl && (
             <ExpoImage
-              source={{ uri: thumbnailUrl }}
-              style={{ width: '100%', height: '100%', position: 'absolute' }}
-              contentFit="cover"
+              source={{
+                uri: thumbnailUrl,
+              }}
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+              }}
+              contentFit="contain"
+              contentPosition="center"
             />
           )}
+
           <View
             style={{
-              flex: 1,
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor:
+                'rgba(26,26,26,0.6)',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: 'rgba(26, 26, 26, 0.5)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Icon.Play size={24} color="#FFFFFF" weight="fill" />
-            </View>
+            <Icon.Play
+              size={24}
+              color="#FFFFFF"
+              weight="fill"
+            />
           </View>
         </TouchableOpacity>
       )}

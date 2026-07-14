@@ -25,8 +25,8 @@ export default function MonthlyProgressCard({
   const daysLeft = daysRemainingInMonth();
 
   return (
-    <View className="px-screen">
-      <View className="overflow-hidden rounded-card">
+    <View className="">
+      <View className="overflow-hidden rounded-[11px]">
         {/* Cover Image */}
         <Image
           source={{ uri: coverImageUrl }}
@@ -37,7 +37,6 @@ export default function MonthlyProgressCard({
           }}
           contentFit="cover"
         />
-
         {/* Gradient Overlay */}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.65)']}
@@ -49,7 +48,6 @@ export default function MonthlyProgressCard({
             height: '70%',
           }}
         />
-
         {/* Badge — top left */}
         <View className="absolute left-8 top-6 flex-row items-center gap-x-2">
           <Image
@@ -61,7 +59,6 @@ export default function MonthlyProgressCard({
             {exceeded ? 'You did that!' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}
           </Text>
         </View>
-
         {/* Bottom content overlay */}
         <View className="absolute bottom-0 left-0 right-0 px-8 pb-8">
           {/* Title + Points row */}

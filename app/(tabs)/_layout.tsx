@@ -74,7 +74,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Earn
+                Today
               </Text>
             ),
             // tabBarStyle: {
@@ -113,7 +113,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Challenges
+                Challenge
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
@@ -142,7 +142,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Connect
+                Feed
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
@@ -171,7 +171,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Rank
+                League
               </Text>
             ),
             // tabBarStyle: {
@@ -204,7 +204,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Track
+                Progress
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (

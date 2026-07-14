@@ -73,18 +73,21 @@ export default function TabTrack() {
               <Avatar uri={currentUser?.image ?? undefined} size={56} />
             </TouchableOpacity> */}
             </View>
-            <View className="px-12 pb-4">
-              <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Your Progress</Text>
-            </View>
 
-            {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (
-              <MonthlyProgressCard
-                coverImageUrl={rewardsBanner.imageUrl}
-                title={rewardsBanner.title}
-                targetPoints={rewardsBanner.targetPoints}
-                earnedPoints={leaderboard?.displayTotalPoints ?? 0}
-              />
-            )}
+            <View className="mx-screen-x rounded-card bg-white px-4 pb-4 pt-4">
+              <Text className="mb-4 font-heading text-xl font-bold text-[#1A1A1A]">
+                Your Progress
+              </Text>
+
+              {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (
+                  <MonthlyProgressCard
+                    coverImageUrl={rewardsBanner.imageUrl}
+                    title={rewardsBanner.title}
+                    targetPoints={rewardsBanner.targetPoints}
+                    earnedPoints={leaderboard?.displayTotalPoints ?? 0}
+                  />
+              )}
+            </View>
 
             <YourStreakCard
               currentWeeklyStreak={overview?.lifetime.currentWeeklyStreak ?? 0}

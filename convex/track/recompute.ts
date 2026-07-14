@@ -87,8 +87,7 @@ async function computeDailyTotals(
    * are counted as physical daily check-ins.
    */
   const dailyCheckIns = completedChallenges.filter(
-    (challenge) =>
-      challenge?.isDailyChallenge === true && challenge.dailyChallengeType === 'check_in'
+    (challenge) => challenge?.type === 'check_in'
   ).length;
 
   /*

@@ -15,6 +15,18 @@ const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2bw8mc19yyc4ststyr6751wd8a4skj' as Id<
 // production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
 // testing: kg2bw8mc19yyc4ststyr6751wd8a4skj
 
+function getChallengeCounterKey(
+  challengeId: Id<'challenges'>,
+  dailyWindowStartAt: number | undefined,
+  date: string
+) {
+  if (dailyWindowStartAt !== undefined) {
+    return `challenge:${challengeId}:window:${dailyWindowStartAt}`;
+  }
+
+  return `challenge:${challengeId}:${date}`;
+}
+
 async function getDailyPointsEarned(
   ctx: QueryCtx | MutationCtx,
   userId: Id<'users'>,
@@ -100,56 +112,117 @@ export const completeChallenge = mutation({
     videoStorageId: v.optional(v.id('_storage')),
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
-    // Accepted but ignored — older app builds still send this field. Kept
-    // here as a back-compat shim to prevent ArgumentValidationError. Safe to
-    // drop once the minimum supported app version no longer sends it.
+
+    // Backward compatibility for older app versions.
     recordedDurationSec: v.optional(v.number()),
+
     thumbnailStorageId: v.optional(v.id('_storage')),
   },
+
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
+
     if (!userId) {
       throw new ConvexError('Unauthorized');
     }
 
     const challenge = await ctx.db.get(args.challengeId);
+
     if (!challenge) {
       throw new ConvexError('Challenge not found');
     }
+
     if (!challenge.isPublished) {
       throw new ConvexError('Challenge is not available');
     }
 
+    const now = Date.now();
+
+    const isDailyChallenge = challenge.isDailyChallenge === true;
+
+    let dailyWindowStartAt: number | undefined;
+
+    /*
+     * Validate that a scheduled daily challenge
+     * is inside its active time window.
+     *
+     * This prevents users from completing the
+     * next-day challenge before its start time.
+     */
+    if (isDailyChallenge) {
+      const dailyStartAt = challenge.dailyStartAt;
+
+      const dailyEndAt = challenge.dailyEndAt;
+
+      if (dailyStartAt === undefined || dailyEndAt === undefined) {
+        throw new ConvexError('Daily challenge schedule is invalid');
+      }
+
+      if (now < dailyStartAt || now >= dailyEndAt) {
+        throw new ConvexError('This daily challenge is not currently active');
+      }
+
+      dailyWindowStartAt = dailyStartAt;
+    }
+
     const user = await ctx.db.get(userId);
+
     if (!user) {
       throw new ConvexError('User not found');
     }
 
-    // Check end date (in user's local timezone)
+    /*
+     * Keep the local date for leaderboard,
+     * points and activity tracking.
+     */
     const todayStr = formatDateInTZ(new Date(), user.timezone);
+
     if (challenge.endDate && todayStr >= challenge.endDate) {
       throw new ConvexError('Challenge has ended');
     }
 
-    // Check lock for non-premium, non-admin users
-    if (challenge.isLocked) {
-      if (!user.isPremium && !user.isAdmin) {
-        throw new ConvexError('Premium required');
-      }
+    if (challenge.isLocked && !user.isPremium && !user.isAdmin) {
+      throw new ConvexError('Premium required');
     }
 
-    // Check cooldown — already completed today?
-    const existingCompletion = await ctx.db
-      .query('challengeCompletions')
-      .withIndex('by_user_challenge_date', (q) =>
-        q.eq('userId', userId).eq('challengeId', args.challengeId).eq('date', todayStr)
-      )
-      .unique();
+    const isCheckIn = challenge.type === 'check_in';
+    /*
+     * Daily challenges are checked using their
+     * exact scheduled window.
+     *
+     * Normal challenges continue using the
+     * user's local date.
+     */
+    const existingCompletion =
+      dailyWindowStartAt !== undefined
+        ? await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_challenge_window', (q) =>
+              q
+                .eq('userId', userId)
+                .eq('challengeId', args.challengeId)
+                .eq('dailyWindowStartAt', dailyWindowStartAt)
+            )
+            .filter((q) => q.neq(q.field('removed'), true))
+            .first()
+        : await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_challenge_date', (q) =>
+              q.eq('userId', userId).eq('challengeId', args.challengeId).eq('date', todayStr)
+            )
+            .filter((q) => q.neq(q.field('removed'), true))
+            .first();
 
     if (existingCompletion) {
-      throw new ConvexError('Already completed today');
+      throw new ConvexError(
+        isDailyChallenge ? 'Already completed this daily challenge' : 'Already completed today'
+      );
     }
 
+    /*
+     * Keep the global daily completion limit
+     * based on the user's local calendar date.
+     */
     const todayCompletions = await ctx.db
       .query('challengeCompletions')
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
@@ -160,11 +233,21 @@ export const completeChallenge = mutation({
       throw new ConvexError('Daily challenge limit reached');
     }
 
-    // Record completion
-    const repostBonus = args.allowRepost ? 3 : 0;
+    /*
+     * Check-ins must never receive the repost
+     * bonus even if an older client sends
+     * allowRepost=true.
+     */
+    const repostBonus = !isCheckIn && args.allowRepost ? 3 : 0;
+
     const rawPoints = challenge.points + repostBonus;
+
     const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
 
+    /*
+     * Fetch all previous attempts for progress
+     * and Day-1 comparison logic.
+     */
     const previousCompletions = await ctx.db
       .query('challengeCompletions')
       .withIndex('by_user_challenge_date', (q) =>
@@ -183,17 +266,34 @@ export const completeChallenge = mutation({
       (completion) => completion.videoStorageId
     );
 
-    const isCheckIn =
-      challenge.isDailyChallenge === true && challenge.dailyChallengeType === 'check_in';
-
+    /*
+     * Do not insert undefined for optional
+     * fields. Include dailyWindowStartAt only
+     * for scheduled daily challenges.
+     */
     const completionData = {
       userId,
       challengeId: args.challengeId,
       date: todayStr,
       pointsEarned: totalPoints,
 
-      videoStorageId: args.videoStorageId,
-      thumbnailStorageId: args.thumbnailStorageId,
+      ...(dailyWindowStartAt !== undefined
+        ? {
+            dailyWindowStartAt,
+          }
+        : {}),
+
+      ...(args.videoStorageId
+        ? {
+            videoStorageId: args.videoStorageId,
+          }
+        : {}),
+
+      ...(args.thumbnailStorageId
+        ? {
+            thumbnailStorageId: args.thumbnailStorageId,
+          }
+        : {}),
 
       allowRepost: isCheckIn ? false : args.allowRepost,
 
@@ -201,6 +301,11 @@ export const completeChallenge = mutation({
       removed: false,
       attemptNumber,
 
+      /*
+       * Check-in videos are posted directly.
+       * Normal challenges keep Day-1 and
+       * transformation comparison data.
+       */
       ...(!isCheckIn
         ? {
             comparisonMode: day1Completion?.videoStorageId
@@ -224,27 +329,41 @@ export const completeChallenge = mutation({
 
     const completionId = await ctx.db.insert('challengeCompletions', completionData);
 
-    // Increment sharded counter for today's completions
-    await challengeCounter.add(ctx, `challenge:${args.challengeId}:${todayStr}`, 1);
+    /*
+     * Daily challenge counters use the exact
+     * challenge window.
+     *
+     * Normal challenge counters continue using
+     * the user's local date.
+     */
+    const completionCounterKey = getChallengeCounterKey(
+      args.challengeId,
+      dailyWindowStartAt,
+      todayStr
+    );
 
-    // Schedule leaderboard update
-    const yearMonth = todayStr.substring(0, 7); // YYYY-MM
+    await challengeCounter.add(ctx, completionCounterKey, 1);
+
+    const yearMonth = todayStr.substring(0, 7);
+
     await ctx.scheduler.runAfter(0, internal.leaderboard.updateMonthlyLeaderboard, {
       userId,
       yearMonth,
     });
 
-    // Recompute track rollups after challenge completion
     await ctx.runMutation(internal.track.recompute.recomputeTrackForDate, {
       userId,
       date: todayStr,
     });
 
-    // Schedule video merge via Trigger.dev — post will be created after merge completes
+    /*
+     * Process the user's uploaded video.
+     */
     if (args.videoStorageId) {
-      // CHECK-IN:
-      // Post today's original video directly to the community.
-      // Do not run Trigger.dev and do not create a left/right video.
+      /*
+       * CHECK-IN:
+       * Post the original user video directly.
+       */
       if (isCheckIn) {
         const postId = await ctx.db.insert('posts', {
           userId,
@@ -253,13 +372,19 @@ export const completeChallenge = mutation({
           body: args.caption?.trim() || `${challenge.name} check-in completed`,
 
           media: args.videoStorageId,
-          mediaThumbnail: args.thumbnailStorageId,
+
+          ...(args.thumbnailStorageId
+            ? {
+                mediaThumbnail: args.thumbnailStorageId,
+              }
+            : {}),
 
           mediaWidth: 1080,
           mediaHeight: 1350,
           mediaType: 'video',
 
           challengeId: args.challengeId,
+
           challengeCompletionId: completionId,
         });
 
@@ -268,10 +393,13 @@ export const completeChallenge = mutation({
           completionId,
           challengeId: args.challengeId,
           userId,
+          dailyWindowStartAt,
         });
       } else {
-        // NORMAL CHALLENGE:
-        // Keep the existing left/right transformation video flow.
+        /*
+         * NORMAL CHALLENGE:
+         * Keep the transformation video flow.
+         */
         const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
 
         const day1VideoUrl = day1Completion?.videoStorageId
@@ -289,33 +417,46 @@ export const completeChallenge = mutation({
           challengeId: args.challengeId,
           completionId,
           attemptNumber,
+
           day1CompletionId: day1Completion?._id,
+
           day1VideoStorageId: day1Completion?.videoStorageId,
+
           hasDay1VideoUrl: Boolean(day1VideoUrl),
+
           hasAdminVideoUrl: Boolean(adminVideoUrl),
+
           hasUserVideoUrl: Boolean(userVideoUrl),
+
           leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
         });
 
         if (!adminVideoUrl || !userVideoUrl) {
           console.log('Video merge skipped. Missing video URL.', {
             completionId,
+
             hasAdminVideoUrl: Boolean(adminVideoUrl),
+
             hasUserVideoUrl: Boolean(userVideoUrl),
           });
         } else {
           console.log('Scheduling video merge...', {
             completionId,
             attemptNumber,
+
             leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
           });
 
           await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
             adminVideoUrl,
             userVideoUrl,
+
             challengeCompletionId: completionId,
+
             userId,
+
             caption: args.caption?.trim() || '',
+
             challengeId: args.challengeId,
           });
         }
@@ -328,6 +469,7 @@ export const completeChallenge = mutation({
       completionId,
       attemptNumber,
       isDay1Baseline: attemptNumber === 1,
+      dailyWindowStartAt: dailyWindowStartAt ?? null,
     };
   },
 });
@@ -711,11 +853,24 @@ export const getChallengeProgress = query({
 });
 
 export const getTodayDailyChallenge = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    // Used by the mobile app to force the query to rerun
+    // when the current daily challenge expires.
+    refreshToken: v.optional(v.number()),
+  },
+
+  handler: async (ctx, args) => {
+    // The value is intentionally not used in the query logic.
+    // Changing it causes Convex to rerun this query.
+    void args.refreshToken;
+
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
+    /*
+     * Find the daily challenge whose schedule
+     * is currently active.
+     */
     const activeChallenges = await ctx.db
       .query('challenges')
       .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
@@ -728,6 +883,13 @@ export const getTodayDailyChallenge = query({
       )
       .collect();
 
+    /*
+     * There should normally be only one active
+     * daily challenge.
+     *
+     * If multiple records overlap, use the one
+     * with the most recent start time.
+     */
     const challenge = activeChallenges.sort(
       (a, b) => (b.dailyStartAt ?? 0) - (a.dailyStartAt ?? 0)
     )[0];
@@ -736,23 +898,36 @@ export const getTodayDailyChallenge = query({
       return null;
     }
 
+    /*
+     * Scheduled daily challenges must always
+     * have valid start and end timestamps.
+     */
+    if (challenge.dailyStartAt === undefined || challenge.dailyEndAt === undefined) {
+      return null;
+    }
+
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
+
     const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
 
-    const dailyDateKey = new Date(challenge.dailyStartAt ?? now).toISOString().slice(0, 10);
+    /*
+     * Community completion count is connected
+     * to this exact daily challenge window.
+     */
+    const counterKey = getChallengeCounterKey(challenge._id, challenge.dailyStartAt, '');
 
-    const communityDoneToday = await challengeCounter.count(
-      ctx,
-      `challenge:${challenge._id}:${dailyDateKey}`
-    );
+    const communityDoneToday = await challengeCounter.count(ctx, counterKey);
 
     let userCompletedToday = false;
 
     if (userId) {
       const completion = await ctx.db
         .query('challengeCompletions')
-        .withIndex('by_user_challenge_date', (q) =>
-          q.eq('userId', userId).eq('challengeId', challenge._id).eq('date', dailyDateKey)
+        .withIndex('by_user_challenge_window', (q) =>
+          q
+            .eq('userId', userId)
+            .eq('challengeId', challenge._id)
+            .eq('dailyWindowStartAt', challenge.dailyStartAt)
         )
         .filter((q) => q.neq(q.field('removed'), true))
         .first();
@@ -760,16 +935,50 @@ export const getTodayDailyChallenge = query({
       userCompletedToday = Boolean(completion);
     }
 
+    /*
+     * Recording type is permanent and does not
+     * depend on isDailyChallenge.
+     *
+     * challenge:
+     *   uses the normal challenge description.
+     *
+     * check_in:
+     *   uses the check-in description.
+     */
+    const typeDescription =
+      challenge.type === 'check_in' ? challenge.checkInDescription : challenge.description;
+
+    /*
+     * shortDescription is only for the daily
+     * dashboard card.
+     *
+     * When it is missing, use the description
+     * that belongs to the challenge type.
+     */
+    const dashboardDescription =
+      challenge.shortDescription?.trim() || typeDescription?.trim() || challenge.description;
+
+    const secondsRemaining = Math.max(0, Math.floor((challenge.dailyEndAt - now) / 1000));
+
     return {
       ...challenge,
+
       coverImageUrl,
       instructionalVideoUrl,
 
-      // This is what card/demo page will show
-      shortDescription: challenge.shortDescription ?? challenge.description,
+      /*
+       * This is displayed by the daily challenge
+       * dashboard card.
+       */
+      shortDescription: dashboardDescription,
 
-      secondsRemaining: Math.max(0, Math.floor(((challenge.dailyEndAt ?? now) - now) / 1000)),
+      /*
+       * This can be used by challenge details
+       * screens without repeating type logic.
+       */
+      typeDescription,
 
+      secondsRemaining,
       communityDoneToday,
       userCompletedToday,
     };

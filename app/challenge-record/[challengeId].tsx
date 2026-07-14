@@ -155,6 +155,9 @@ export default function DuetRecordingScreen() {
   const dailyLimitReached = progress?.dailyLimitReached === true;
   const dailyLimit = progress?.dailyLimit ?? 5;
 
+  const selectedDescription =
+    challenge?.type === 'check_in' ? challenge.checkInDescription : challenge?.description;
+
   const debugRecordingState = useCallback(
     (label: string) => {
       console.log(`[RecordingDebug] ${label}`, {
@@ -849,7 +852,7 @@ export default function DuetRecordingScreen() {
     }, 250);
   }, []);
 
-  const isCheckIn = challenge?.dailyChallengeType === 'check_in';
+  const isCheckIn = challenge?.type === 'check_in';
 
   if (challenge === undefined || progress === undefined) {
     return <ScreenLoading />;
@@ -1136,7 +1139,7 @@ export default function DuetRecordingScreen() {
               </Text>
 
               <Text className="mt-1 text-center font-body text-sm text-[#686868]">
-                Review your video then submit your progress
+                Review your video then submit
               </Text>
             </View>
           </View>

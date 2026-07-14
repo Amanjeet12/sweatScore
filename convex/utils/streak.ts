@@ -1,8 +1,5 @@
 import { Id } from '../_generated/dataModel';
-import {
-  MutationCtx,
-  QueryCtx,
-} from '../_generated/server';
+import { MutationCtx, QueryCtx } from '../_generated/server';
 
 const DAILY_STEP_TARGET = 5000;
 const DAILY_ACTIVE_MINUTES_TARGET = 50;
@@ -30,95 +27,56 @@ export async function getStreakEarnedDatesInRange(
   const activities = await ctx.db
     .query('dailyActivities')
     .withIndex('by_user_date', (q) =>
-      q
-        .eq('userId', userId)
-        .gte('date', startStr)
-        .lt('date', endStr)
+      q.eq('userId', userId).gte('date', startStr).lt('date', endStr)
     )
-    .filter((q) =>
-      q.or(
-        q.eq(q.field('synced'), true),
-        q.eq(
-          q.field('reviewStatus'),
-          'approved'
-        )
-      )
-    )
+    .filter((q) => q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved')))
     .collect();
 
   const completions = await ctx.db
     .query('challengeCompletions')
     .withIndex('by_user_date', (q) =>
-      q
-        .eq('userId', userId)
-        .gte('date', startStr)
-        .lt('date', endStr)
+      q.eq('userId', userId).gte('date', startStr).lt('date', endStr)
     )
-    .filter((q) =>
-      q.neq(
-        q.field('removed'),
-        true
-      )
-    )
+    .filter((q) => q.neq(q.field('removed'), true))
     .collect();
 
-  const earnedDates =
-    new Set<string>();
+  const earnedDates = new Set<string>();
 
   /*
    * A user may have multiple activity rows
    * for the same date, so combine them first.
    */
-  const activityTotalsByDate =
-    new Map<
-      string,
-      {
-        steps: number;
-        activeMinutes: number;
-      }
-    >();
+  const activityTotalsByDate = new Map<
+    string,
+    {
+      steps: number;
+      activeMinutes: number;
+    }
+  >();
 
   for (const activity of activities) {
-    const current =
-      activityTotalsByDate.get(
-        activity.date
-      ) ?? {
-        steps: 0,
-        activeMinutes: 0,
-      };
+    const current = activityTotalsByDate.get(activity.date) ?? {
+      steps: 0,
+      activeMinutes: 0,
+    };
 
-    current.steps +=
-      activity.steps ?? 0;
+    current.steps += activity.steps ?? 0;
 
-    current.activeMinutes +=
-      activity.zone2Minutes ?? 0;
+    current.activeMinutes += activity.zone2Minutes ?? 0;
 
-    activityTotalsByDate.set(
-      activity.date,
-      current
-    );
+    activityTotalsByDate.set(activity.date, current);
   }
 
   /*
    * Mark a date when the steps target or
    * active-minutes target is reached.
    */
-  for (const [
-    date,
-    totals,
-  ] of activityTotalsByDate) {
-    const stepTargetReached =
-      totals.steps >=
-      DAILY_STEP_TARGET;
+  for (const [date, totals] of activityTotalsByDate) {
+    const stepTargetReached = totals.steps >= DAILY_STEP_TARGET;
 
-    const activeMinutesTargetReached =
-      totals.activeMinutes >=
-      DAILY_ACTIVE_MINUTES_TARGET;
+    const activeMinutesTargetReached = totals.activeMinutes >= DAILY_ACTIVE_MINUTES_TARGET;
 
-    if (
-      stepTargetReached ||
-      activeMinutesTargetReached
-    ) {
+    if (stepTargetReached || activeMinutesTargetReached) {
       earnedDates.add(date);
     }
   }
@@ -128,34 +86,19 @@ export async function getStreakEarnedDatesInRange(
    * normal challenges can be separated from
    * physical Daily Check-in videos.
    */
-  const completedChallenges =
-    await Promise.all(
-      completions.map(
-        (completion) =>
-          ctx.db.get(
-            completion.challengeId
-          )
-      )
-    );
-
-  completions.forEach(
-    (completion, index) => {
-      const challenge =
-        completedChallenges[index];
-
-      const isPhysicalDailyCheckIn =
-        challenge?.isDailyChallenge ===
-          true &&
-        challenge.dailyChallengeType ===
-          'check_in';
-
-      if (isPhysicalDailyCheckIn) {
-        earnedDates.add(
-          completion.date
-        );
-      }
-    }
+  const completedChallenges = await Promise.all(
+    completions.map((completion) => ctx.db.get(completion.challengeId))
   );
+
+  completions.forEach((completion, index) => {
+    const challenge = completedChallenges[index];
+
+    const isPhysicalCheckIn = challenge?.type === 'check_in';
+
+    if (isPhysicalCheckIn) {
+      earnedDates.add(completion.date);
+    }
+  });
 
   return earnedDates;
 }

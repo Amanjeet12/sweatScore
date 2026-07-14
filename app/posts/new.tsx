@@ -165,8 +165,8 @@ export default function NewPost() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['videos'],
-      allowsEditing: true,
-      quality: 0.5,
+      allowsEditing: false,
+      quality: 1,
       selectionLimit: 1,
       videoMaxDuration: videoMaxDurationSeconds,
       preferredAssetRepresentationMode:
@@ -250,6 +250,8 @@ export default function NewPost() {
 
     setIsLoading(false);
   };
+
+  const mediaAspectRatio = media?.width && media?.height ? media.width / media.height : 16 / 9;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
@@ -356,16 +358,25 @@ export default function NewPost() {
                 <View className="relative">
                   {media.type === 'video' ? (
                     <View>
-                      <RNImage
-                        source={{ uri: mediaUri }}
+                      <View
                         style={{
                           width: '100%',
-                          height: 220,
-                          backgroundColor: '#EFEFEF',
-                        }}
-                        resizeMode="cover"
-                        blurRadius={uploadingMedia ? 5 : 0}
-                      />
+                          backgroundColor: '#000',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                        <RNImage
+                          source={{ uri: mediaUri }}
+                          style={{
+                            width: '100%',
+                            aspectRatio: mediaAspectRatio,
+                            maxHeight: 440,
+                            backgroundColor: '#000',
+                          }}
+                          resizeMode="contain"
+                          blurRadius={uploadingMedia ? 5 : 0}
+                        />
+                      </View>
 
                       <View className="absolute inset-0 items-center justify-center">
                         <View className="h-14 w-14 items-center justify-center rounded-full bg-[rgba(0,0,0,0.55)]">
