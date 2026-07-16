@@ -726,7 +726,7 @@ function HowToEarnPointsModal({
       icon: require('~/assets/icons/Phone.png'),
       title: 'App Open',
       description: 'Open the app daily',
-      points: '1 pts',
+      points: '1 pt',
     },
     {
       icon: require(
