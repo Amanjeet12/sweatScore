@@ -1,30 +1,13 @@
 import { useQuery } from 'convex/react';
 import { Audio } from 'expo-av';
-import {
-  CameraView,
-  useCameraPermissions,
-  useMicrophonePermissions,
-} from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
-import {
-  router,
-  useFocusEffect,
-  useLocalSearchParams,
-} from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import {
-  CameraRotate,
-  Record,
-  X,
-} from 'phosphor-react-native';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { CameraRotate, Record, X } from 'phosphor-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -40,16 +23,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CompositeVideoPlayer from '~/components/core/dashboard/CompositeVideoPlayer';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
-import {
-  ButtonText,
-  LoadingButton,
-} from '~/components/ui/button';
+import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Switch } from '~/components/ui/switch';
 import { Text } from '~/components/ui/text';
-import {
-  Textarea,
-  TextareaInput,
-} from '~/components/ui/textarea';
+import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
@@ -60,8 +37,7 @@ const MAX_RECORDING_SECONDS = 60;
 
 const RECORDING_VIDEO_QUALITY = '720p';
 const RECORDING_VIDEO_BITRATE = 2_500_000;
-const RECORDING_MAX_FILE_SIZE_BYTES =
-  80 * 1024 * 1024;
+const RECORDING_MAX_FILE_SIZE_BYTES = 80 * 1024 * 1024;
 
 const EARLY_NATIVE_STOP_GRACE_SECONDS = 1;
 
@@ -115,59 +91,31 @@ const CHECK_IN_CAPTION_TEMPLATES = [
 const FIRST_ATTEMPT_VIDEO_URL =
   'https://beloved-stoat-88.convex.cloud/api/storage/31a427be-72ed-4d4b-9974-ceb32e41ed02';
 
-type RecordingState =
-  | 'pre-record'
-  | 'countdown'
-  | 'recording'
-  | 'post-record';
+type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 
-function getDefaultCaption(
-  round?: number,
-  exerciseName?: string
-) {
+function getDefaultCaption(round?: number, exerciseName?: string) {
   const currentRound = round ?? 1;
 
-  const exercise =
-    exerciseName?.trim() || 'this exercise';
+  const exercise = exerciseName?.trim() || 'this exercise';
 
-  const randomIndex = Math.floor(
-    Math.random() *
-      DEFAULT_CAPTION_TEMPLATES.length
-  );
+  const randomIndex = Math.floor(Math.random() * DEFAULT_CAPTION_TEMPLATES.length);
 
-  return DEFAULT_CAPTION_TEMPLATES[
-    randomIndex
-  ]
-    .replace(
-      /\{round\}/g,
-      String(currentRound)
-    )
+  return DEFAULT_CAPTION_TEMPLATES[randomIndex]
+    .replace(/\{round\}/g, String(currentRound))
     .replace(/\{exercise\}/g, exercise);
 }
 
 function getCheckInCaption() {
-  const randomIndex = Math.floor(
-    Math.random() *
-      CHECK_IN_CAPTION_TEMPLATES.length
-  );
+  const randomIndex = Math.floor(Math.random() * CHECK_IN_CAPTION_TEMPLATES.length);
 
-  return CHECK_IN_CAPTION_TEMPLATES[
-    randomIndex
-  ];
+  return CHECK_IN_CAPTION_TEMPLATES[randomIndex];
 }
 
-function SingleVideoPreview({
-  videoUrl,
-}: {
-  videoUrl: string;
-}) {
-  const player = useVideoPlayer(
-    videoUrl,
-    (videoPlayer) => {
-      videoPlayer.loop = false;
-      videoPlayer.volume = 0;
-    }
-  );
+function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
+  const player = useVideoPlayer(videoUrl, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.volume = 0;
+  });
 
   return (
     <View
@@ -192,377 +140,250 @@ function SingleVideoPreview({
 export default function DuetRecordingScreen() {
   useKeepAwake();
 
-  const { challengeId } =
-    useLocalSearchParams<{
-      challengeId: string;
-    }>();
+  const { challengeId } = useLocalSearchParams<{
+    challengeId: string;
+  }>();
 
   const insets = useSafeAreaInsets();
 
-  const [state, setState] =
-    useState<RecordingState>('pre-record');
+  const [state, setState] = useState<RecordingState>('pre-record');
 
-  const [
-    countdownValue,
-    setCountdownValue,
-  ] = useState(COUNTDOWN_SECONDS);
+  const [countdownValue, setCountdownValue] = useState(COUNTDOWN_SECONDS);
 
   const [elapsed, setElapsed] = useState(0);
 
-  const [
-    recordedVideoUri,
-    setRecordedVideoUri,
-  ] = useState<string | null>(null);
+  const [recordedVideoUri, setRecordedVideoUri] = useState<string | null>(null);
 
   const [caption, setCaption] = useState('');
 
-  const [
-    allowRepost,
-    setAllowRepost,
-  ] = useState(true);
+  const [allowRepost, setAllowRepost] = useState(true);
 
-  const [
-    isSubmitting,
-    setIsSubmitting,
-  ] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [
-    cameraFacing,
-    setCameraFacing,
-  ] = useState<'front' | 'back'>('front');
+  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
 
-  const cameraRef =
-    useRef<CameraView>(null);
+  const cameraRef = useRef<CameraView>(null);
 
-  const postRecordScrollRef =
-    useRef<ScrollView>(null);
+  const postRecordScrollRef = useRef<ScrollView>(null);
 
-  const timerRef =
-    useRef<ReturnType<
-      typeof setInterval
-    > | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const countdownRef =
-    useRef<ReturnType<
-      typeof setInterval
-    > | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const maxRecordingTimeoutRef =
-    useRef<ReturnType<
-      typeof setTimeout
-    > | null>(null);
+  const maxRecordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const elapsedRef = useRef(0);
 
-  const recordingStartedAtRef =
-    useRef<number | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
 
   const isRecordingRef = useRef(false);
 
-  const cancelledByBackgroundRef =
-    useRef(false);
+  const cancelledByBackgroundRef = useRef(false);
 
-  const cancelledByUserRef =
-    useRef(false);
+  const cancelledByUserRef = useRef(false);
 
-  const manualStopRequestedRef =
-    useRef(false);
+  const manualStopRequestedRef = useRef(false);
 
-  const preserveRecordedVideoOnUnmountRef =
-    useRef(false);
+  const preserveRecordedVideoOnUnmountRef = useRef(false);
 
-  const recordedVideoUriRef =
-    useRef<string | null>(null);
+  const recordedVideoUriRef = useRef<string | null>(null);
 
-  const countdownSoundRef =
-    useRef<Audio.Sound | null>(null);
+  const countdownSoundRef = useRef<Audio.Sound | null>(null);
 
-  const countdownSoundLoadingPromiseRef =
-    useRef<
-      Promise<Audio.Sound | null> | null
-    >(null);
+  const countdownSoundLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
 
-  const countdownSoundPlaybackTokenRef =
-    useRef(0);
+  const countdownSoundPlaybackTokenRef = useRef(0);
 
-  const [
-    cameraPermission,
-    requestCameraPermission,
-  ] = useCameraPermissions();
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
-  const [
-    micPermission,
-    requestMicPermission,
-  ] = useMicrophonePermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
-  const challenge = useQuery(
-    api.challengeCompletions
-      .getPublishedChallenge,
-    {
-      challengeId:
-        challengeId as Id<'challenges'>,
-    }
-  );
+  const challenge = useQuery(api.challengeCompletions.getPublishedChallenge, {
+    challengeId: challengeId as Id<'challenges'>,
+  });
 
-  const progress = useQuery(
-    api.challengeCompletions
-      .getChallengeProgress,
-    {
-      challengeId:
-        challengeId as Id<'challenges'>,
-    }
-  );
+  const progress = useQuery(api.challengeCompletions.getChallengeProgress, {
+    challengeId: challengeId as Id<'challenges'>,
+  });
 
-  const isCheckIn =
-    challenge?.type === 'check_in';
+  const isCheckIn = challenge?.type === 'check_in';
 
-  const {
-    enqueueChallengeUpload,
-    getJobForChallenge,
-  } = useChallengeUploadQueue();
+  const { enqueueChallengeUpload, getJobForChallenge } = useChallengeUploadQueue();
 
-  const existingUploadJob =
-    getJobForChallenge(challengeId ?? '');
+  const existingUploadJob = getJobForChallenge(challengeId ?? '');
 
-  const dailyLimitReached =
-    progress?.dailyLimitReached === true;
+  const dailyLimitReached = progress?.dailyLimitReached === true;
 
-  const dailyLimit =
-    progress?.dailyLimit ?? 3;
+  const dailyLimit = progress?.dailyLimit ?? 3;
 
   useEffect(() => {
     if (!challenge) {
       return;
     }
 
-    setAllowRepost(
-      challenge.type !== 'check_in'
-    );
+    setAllowRepost(challenge.type !== 'check_in');
   }, [challengeId, challenge?.type]);
 
-  const debugRecordingState =
-    useCallback(
-      (label: string) => {
-        console.log(
-          `[RecordingDebug] ${label}`,
-          {
-            state,
-            elapsed,
-            elapsedRef:
-              elapsedRef.current,
-            countdownValue,
-            recordedVideoUri,
-            caption,
-            allowRepost,
-            isSubmitting,
-            cameraFacing,
-
-            timerActive:
-              !!timerRef.current,
-
-            countdownActive:
-              !!countdownRef.current,
-
-            maxRecordingTimeoutActive:
-              !!maxRecordingTimeoutRef.current,
-
-            recordingStartedAtRef:
-              recordingStartedAtRef.current,
-
-            isRecordingRef:
-              isRecordingRef.current,
-
-            cancelledByBackgroundRef:
-              cancelledByBackgroundRef.current,
-
-            cancelledByUserRef:
-              cancelledByUserRef.current,
-
-            manualStopRequestedRef:
-              manualStopRequestedRef.current,
-
-            preserveRecordedVideoOnUnmountRef:
-              preserveRecordedVideoOnUnmountRef.current,
-
-            recordedVideoUriRef:
-              recordedVideoUriRef.current,
-
-            countdownSoundLoaded:
-              !!countdownSoundRef.current,
-          }
-        );
-      },
-      [
+  const debugRecordingState = useCallback(
+    (label: string) => {
+      console.log(`[RecordingDebug] ${label}`, {
         state,
         elapsed,
+        elapsedRef: elapsedRef.current,
         countdownValue,
         recordedVideoUri,
         caption,
         allowRepost,
         isSubmitting,
         cameraFacing,
-      ]
-    );
+
+        timerActive: !!timerRef.current,
+
+        countdownActive: !!countdownRef.current,
+
+        maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+
+        recordingStartedAtRef: recordingStartedAtRef.current,
+
+        isRecordingRef: isRecordingRef.current,
+
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+
+        cancelledByUserRef: cancelledByUserRef.current,
+
+        manualStopRequestedRef: manualStopRequestedRef.current,
+
+        preserveRecordedVideoOnUnmountRef: preserveRecordedVideoOnUnmountRef.current,
+
+        recordedVideoUriRef: recordedVideoUriRef.current,
+
+        countdownSoundLoaded: !!countdownSoundRef.current,
+      });
+    },
+    [
+      state,
+      elapsed,
+      countdownValue,
+      recordedVideoUri,
+      caption,
+      allowRepost,
+      isSubmitting,
+      cameraFacing,
+    ]
+  );
 
   useEffect(() => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
   useEffect(() => {
-    recordedVideoUriRef.current =
-      recordedVideoUri;
+    recordedVideoUriRef.current = recordedVideoUri;
   }, [recordedVideoUri]);
 
-  const ensureCountdownSound =
-    useCallback(async () => {
-      if (countdownSoundRef.current) {
-        return countdownSoundRef.current;
-      }
+  const ensureCountdownSound = useCallback(async () => {
+    if (countdownSoundRef.current) {
+      return countdownSoundRef.current;
+    }
 
-      if (
-        countdownSoundLoadingPromiseRef.current
-      ) {
-        return countdownSoundLoadingPromiseRef.current;
-      }
-
-      countdownSoundLoadingPromiseRef.current =
-        (async () => {
-          try {
-            await Audio.setAudioModeAsync({
-              playsInSilentModeIOS: true,
-            });
-
-            const { sound } =
-              await Audio.Sound.createAsync(
-                require('../../assets/beep.mp3'),
-                {
-                  shouldPlay: false,
-                  volume: 1,
-                }
-              );
-
-            countdownSoundRef.current =
-              sound;
-
-            console.log(
-              '[RecordingDebug] countdown sound loaded'
-            );
-
-            return sound;
-          } catch (error) {
-            console.log(
-              '[RecordingDebug] countdown sound failed',
-              error
-            );
-
-            return null;
-          } finally {
-            countdownSoundLoadingPromiseRef.current =
-              null;
-          }
-        })();
-
+    if (countdownSoundLoadingPromiseRef.current) {
       return countdownSoundLoadingPromiseRef.current;
-    }, []);
+    }
 
-  const cleanupRecordingRefs =
-    useCallback((reason: string) => {
-      console.log(
-        `[RecordingDebug] cleanupRecordingRefs: ${reason}`,
-        {
-          elapsedRef:
-            elapsedRef.current,
+    countdownSoundLoadingPromiseRef.current = (async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+        });
 
-          timerActive:
-            !!timerRef.current,
+        const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
+          shouldPlay: false,
+          volume: 1,
+        });
 
-          countdownActive:
-            !!countdownRef.current,
+        countdownSoundRef.current = sound;
 
-          maxRecordingTimeoutActive:
-            !!maxRecordingTimeoutRef.current,
+        console.log('[RecordingDebug] countdown sound loaded');
 
-          isRecordingRef:
-            isRecordingRef.current,
+        return sound;
+      } catch (error) {
+        console.log('[RecordingDebug] countdown sound failed', error);
 
-          cancelledByBackgroundRef:
-            cancelledByBackgroundRef.current,
-
-          cancelledByUserRef:
-            cancelledByUserRef.current,
-
-          manualStopRequestedRef:
-            manualStopRequestedRef.current,
-
-          recordedVideoUriRef:
-            recordedVideoUriRef.current,
-        }
-      );
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+        return null;
+      } finally {
+        countdownSoundLoadingPromiseRef.current = null;
       }
+    })();
 
-      if (countdownRef.current) {
-        clearInterval(
-          countdownRef.current
-        );
+    return countdownSoundLoadingPromiseRef.current;
+  }, []);
 
-        countdownRef.current = null;
+  const cleanupRecordingRefs = useCallback((reason: string) => {
+    console.log(`[RecordingDebug] cleanupRecordingRefs: ${reason}`, {
+      elapsedRef: elapsedRef.current,
+
+      timerActive: !!timerRef.current,
+
+      countdownActive: !!countdownRef.current,
+
+      maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+
+      isRecordingRef: isRecordingRef.current,
+
+      cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+
+      cancelledByUserRef: cancelledByUserRef.current,
+
+      manualStopRequestedRef: manualStopRequestedRef.current,
+
+      recordedVideoUriRef: recordedVideoUriRef.current,
+    });
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+
+      countdownRef.current = null;
+    }
+
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+
+      maxRecordingTimeoutRef.current = null;
+    }
+
+    countdownSoundPlaybackTokenRef.current += 1;
+
+    countdownSoundRef.current?.stopAsync().catch(() => {});
+
+    if (isRecordingRef.current) {
+      cancelledByUserRef.current = true;
+
+      isRecordingRef.current = false;
+
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        // Recording already stopped.
       }
+    }
 
-      if (
-        maxRecordingTimeoutRef.current
-      ) {
-        clearTimeout(
-          maxRecordingTimeoutRef.current
-        );
+    manualStopRequestedRef.current = false;
 
-        maxRecordingTimeoutRef.current =
-          null;
-      }
+    recordingStartedAtRef.current = null;
 
-      countdownSoundPlaybackTokenRef.current +=
-        1;
-
-      countdownSoundRef.current
-        ?.stopAsync()
-        .catch(() => {});
-
-      if (isRecordingRef.current) {
-        cancelledByUserRef.current =
-          true;
-
-        isRecordingRef.current = false;
-
-        try {
-          cameraRef.current?.stopRecording();
-        } catch {
-          // Recording already stopped.
-        }
-      }
-
-      manualStopRequestedRef.current =
-        false;
-
-      recordingStartedAtRef.current =
-        null;
-
-      cancelledByBackgroundRef.current =
-        false;
-    }, []);
+    cancelledByBackgroundRef.current = false;
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      console.log(
-        '[RecordingDebug] screen focused'
-      );
+      console.log('[RecordingDebug] screen focused');
 
       return () => {
-        cleanupRecordingRefs(
-          'screen blur/unfocus'
-        );
+        cleanupRecordingRefs('screen blur/unfocus');
       };
     }, [cleanupRecordingRefs])
   );
@@ -584,50 +405,34 @@ export default function DuetRecordingScreen() {
 
   useEffect(() => {
     return () => {
-      console.log(
-        '[RecordingDebug] screen unmount cleanup',
-        {
-          timerActive:
-            !!timerRef.current,
+      console.log('[RecordingDebug] screen unmount cleanup', {
+        timerActive: !!timerRef.current,
 
-          countdownActive:
-            !!countdownRef.current,
+        countdownActive: !!countdownRef.current,
 
-          isRecordingRef:
-            isRecordingRef.current,
+        isRecordingRef: isRecordingRef.current,
 
-          recordedVideoUriRef:
-            recordedVideoUriRef.current,
-        }
-      );
+        recordedVideoUriRef: recordedVideoUriRef.current,
+      });
 
-      cleanupRecordingRefs(
-        'screen unmount'
-      );
+      cleanupRecordingRefs('screen unmount');
     };
   }, [cleanupRecordingRefs]);
 
   useEffect(() => {
     return () => {
-      const uri =
-        recordedVideoUriRef.current;
+      const uri = recordedVideoUriRef.current;
 
-      console.log(
-        '[RecordingDebug] temp video cleanup check',
-        {
-          uri,
+      console.log('[RecordingDebug] temp video cleanup check', {
+        uri,
 
-          preserveRecordedVideoOnUnmountRef:
-            preserveRecordedVideoOnUnmountRef.current,
-        }
-      );
+        preserveRecordedVideoOnUnmountRef: preserveRecordedVideoOnUnmountRef.current,
+      });
 
       if (
         uri &&
         !preserveRecordedVideoOnUnmountRef.current &&
-        uri.startsWith(
-          FileSystem.documentDirectory ?? ''
-        )
+        uri.startsWith(FileSystem.documentDirectory ?? '')
       ) {
         FileSystem.deleteAsync(uri, {
           idempotent: true,
@@ -637,89 +442,64 @@ export default function DuetRecordingScreen() {
   }, []);
 
   useEffect(() => {
-    const subscription =
-      AppState.addEventListener(
-        'change',
-        (nextState) => {
-          console.log(
-            '[RecordingDebug] AppState changed',
-            {
-              nextState,
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      console.log('[RecordingDebug] AppState changed', {
+        nextState,
 
-              elapsedRef:
-                elapsedRef.current,
+        elapsedRef: elapsedRef.current,
 
-              isRecordingRef:
-                isRecordingRef.current,
+        isRecordingRef: isRecordingRef.current,
 
-              countdownActive:
-                !!countdownRef.current,
+        countdownActive: !!countdownRef.current,
 
-              timerActive:
-                !!timerRef.current,
+        timerActive: !!timerRef.current,
 
-              maxRecordingTimeoutActive:
-                !!maxRecordingTimeoutRef.current,
-            }
-          );
+        maxRecordingTimeoutActive: !!maxRecordingTimeoutRef.current,
+      });
 
-          if (nextState === 'active') {
-            return;
-          }
+      if (nextState === 'active') {
+        return;
+      }
 
-          if (countdownRef.current) {
-            clearInterval(
-              countdownRef.current
-            );
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
 
-            countdownRef.current = null;
-          }
+        countdownRef.current = null;
+      }
 
-          if (isRecordingRef.current) {
-            cancelledByBackgroundRef.current =
-              true;
+      if (isRecordingRef.current) {
+        cancelledByBackgroundRef.current = true;
 
-            isRecordingRef.current =
-              false;
+        isRecordingRef.current = false;
 
-            if (timerRef.current) {
-              clearInterval(
-                timerRef.current
-              );
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
 
-              timerRef.current = null;
-            }
-
-            if (
-              maxRecordingTimeoutRef.current
-            ) {
-              clearTimeout(
-                maxRecordingTimeoutRef.current
-              );
-
-              maxRecordingTimeoutRef.current =
-                null;
-            }
-
-            try {
-              cameraRef.current?.stopRecording();
-            } catch {
-              // Recording already stopped.
-            }
-
-            return;
-          }
-
-          if (state === 'countdown') {
-            setState('pre-record');
-            setElapsed(0);
-
-            setCountdownValue(
-              COUNTDOWN_SECONDS
-            );
-          }
+          timerRef.current = null;
         }
-      );
+
+        if (maxRecordingTimeoutRef.current) {
+          clearTimeout(maxRecordingTimeoutRef.current);
+
+          maxRecordingTimeoutRef.current = null;
+        }
+
+        try {
+          cameraRef.current?.stopRecording();
+        } catch {
+          // Recording already stopped.
+        }
+
+        return;
+      }
+
+      if (state === 'countdown') {
+        setState('pre-record');
+        setElapsed(0);
+
+        setCountdownValue(COUNTDOWN_SECONDS);
+      }
+    });
 
     return () => subscription.remove();
   }, [state]);
@@ -727,93 +507,152 @@ export default function DuetRecordingScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadCountdownSound =
-      async () => {
-        const sound =
-          await ensureCountdownSound();
+    const loadCountdownSound = async () => {
+      const sound = await ensureCountdownSound();
 
-        if (!isMounted && sound) {
-          await sound.unloadAsync();
+      if (!isMounted && sound) {
+        await sound.unloadAsync();
 
-          countdownSoundRef.current =
-            null;
-        }
-      };
+        countdownSoundRef.current = null;
+      }
+    };
 
-    loadCountdownSound().catch(
-      () => {}
-    );
+    loadCountdownSound().catch(() => {});
 
     return () => {
       isMounted = false;
 
-      countdownSoundRef.current
-        ?.unloadAsync()
-        .catch(() => {});
+      countdownSoundRef.current?.unloadAsync().catch(() => {});
 
-      countdownSoundRef.current =
-        null;
+      countdownSoundRef.current = null;
 
-      console.log(
-        '[RecordingDebug] countdown sound unloaded'
-      );
+      console.log('[RecordingDebug] countdown sound unloaded');
     };
   }, [ensureCountdownSound]);
 
-  const stopRecording =
-    useCallback(() => {
-      console.log(
-        '[RecordingDebug] stopRecording called',
-        {
-          elapsedRef:
-            elapsedRef.current,
+  const stopRecording = useCallback(() => {
+    console.log('[RecordingDebug] stopRecording called', {
+      elapsedRef: elapsedRef.current,
 
-          isRecordingRef:
-            isRecordingRef.current,
-        }
-      );
+      isRecordingRef: isRecordingRef.current,
+    });
+
+    if (!isRecordingRef.current) {
+      return;
+    }
+
+    if (elapsedRef.current < MIN_STOP_RECORDING_SECONDS) {
+      console.log('[RecordingDebug] stopRecording ignored before minimum seconds', {
+        elapsedRef: elapsedRef.current,
+
+        minimum: MIN_STOP_RECORDING_SECONDS,
+      });
+
+      return;
+    }
+
+    isRecordingRef.current = false;
+
+    manualStopRequestedRef.current = true;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (maxRecordingTimeoutRef.current) {
+      clearTimeout(maxRecordingTimeoutRef.current);
+
+      maxRecordingTimeoutRef.current = null;
+    }
+
+    try {
+      cameraRef.current?.stopRecording();
+    } catch {
+      // Camera may already be stopped.
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    console.log('[RecordingDebug] startRecording called', {
+      hasCameraRef: !!cameraRef.current,
+
+      challengeId,
+    });
+
+    if (!cameraRef.current) {
+      setState('pre-record');
+      return;
+    }
+
+    setState('recording');
+    setElapsed(0);
+
+    elapsedRef.current = 0;
+
+    cancelledByUserRef.current = false;
+
+    cancelledByBackgroundRef.current = false;
+
+    manualStopRequestedRef.current = false;
+
+    recordingStartedAtRef.current = Date.now();
+
+    isRecordingRef.current = true;
+
+    console.log('[RecordingDebug] recording refs initialized', {
+      isRecordingRef: isRecordingRef.current,
+
+      cancelledByUserRef: cancelledByUserRef.current,
+
+      cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+
+      manualStopRequestedRef: manualStopRequestedRef.current,
+
+      recordingStartedAtRef: recordingStartedAtRef.current,
+
+      appMaxDuration: MAX_RECORDING_SECONDS,
+
+      nativeMaxDuration: null,
+
+      videoQuality: RECORDING_VIDEO_QUALITY,
+
+      videoBitrate: RECORDING_VIDEO_BITRATE,
+
+      maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
+    });
+
+    timerRef.current = setInterval(() => {
+      setElapsed((previous) => {
+        const next = previous + 1;
+
+        elapsedRef.current = next;
+
+        console.log('[RecordingDebug] tick', {
+          elapsed: next,
+        });
+
+        return next;
+      });
+    }, 1000);
+
+    maxRecordingTimeoutRef.current = setTimeout(() => {
+      console.log('[RecordingDebug] max recording duration reached', {
+        elapsedRef: elapsedRef.current,
+
+        isRecordingRef: isRecordingRef.current,
+      });
 
       if (!isRecordingRef.current) {
         return;
       }
 
-      if (
-        elapsedRef.current <
-        MIN_STOP_RECORDING_SECONDS
-      ) {
-        console.log(
-          '[RecordingDebug] stopRecording ignored before minimum seconds',
-          {
-            elapsedRef:
-              elapsedRef.current,
-
-            minimum:
-              MIN_STOP_RECORDING_SECONDS,
-          }
-        );
-
-        return;
-      }
-
       isRecordingRef.current = false;
-
-      manualStopRequestedRef.current =
-        true;
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
+
         timerRef.current = null;
-      }
-
-      if (
-        maxRecordingTimeoutRef.current
-      ) {
-        clearTimeout(
-          maxRecordingTimeoutRef.current
-        );
-
-        maxRecordingTimeoutRef.current =
-          null;
       }
 
       try {
@@ -821,784 +660,444 @@ export default function DuetRecordingScreen() {
       } catch {
         // Camera may already be stopped.
       }
-    }, []);
+    }, MAX_RECORDING_SECONDS * 1000);
 
-  const startRecording =
-    useCallback(async () => {
-      console.log(
-        '[RecordingDebug] startRecording called',
-        {
-          hasCameraRef:
-            !!cameraRef.current,
+    try {
+      const video = await cameraRef.current.recordAsync({
+        maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
+      });
 
-          challengeId,
+      const recordedDurationSeconds = recordingStartedAtRef.current
+        ? (Date.now() - recordingStartedAtRef.current) / 1000
+        : elapsedRef.current;
+
+      const wasManualStop = manualStopRequestedRef.current;
+
+      let videoSizeBytes: number | null = null;
+
+      if (video?.uri) {
+        try {
+          const videoInfo = await FileSystem.getInfoAsync(video.uri, {
+            size: true,
+          });
+
+          videoSizeBytes = videoInfo.exists ? videoInfo.size : null;
+        } catch (error) {
+          console.log('[RecordingDebug] video info failed', error);
         }
-      );
+      }
 
-      if (!cameraRef.current) {
-        setState('pre-record');
+      console.log('[RecordingDebug] recordAsync finished', {
+        videoUri: video?.uri,
+        videoSizeBytes,
+
+        elapsedRef: elapsedRef.current,
+
+        recordedDurationSeconds,
+
+        isRecordingRef: isRecordingRef.current,
+
+        cancelledByUserRef: cancelledByUserRef.current,
+
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+
+        manualStopRequestedRef: manualStopRequestedRef.current,
+      });
+
+      isRecordingRef.current = false;
+
+      recordingStartedAtRef.current = null;
+
+      manualStopRequestedRef.current = false;
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+
+        timerRef.current = null;
+      }
+
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+
+        maxRecordingTimeoutRef.current = null;
+      }
+
+      if (cancelledByUserRef.current) {
+        cancelledByUserRef.current = false;
+
+        if (video?.uri) {
+          FileSystem.deleteAsync(video.uri, {
+            idempotent: true,
+          }).catch(() => {});
+        }
+
         return;
       }
 
-      setState('recording');
-      setElapsed(0);
+      const finishedNormally = !cancelledByBackgroundRef.current;
 
-      elapsedRef.current = 0;
+      cancelledByBackgroundRef.current = false;
 
-      cancelledByUserRef.current =
-        false;
+      const endedBeforeMaxDuration =
+        !wasManualStop &&
+        recordedDurationSeconds < MAX_RECORDING_SECONDS - EARLY_NATIVE_STOP_GRACE_SECONDS;
 
-      cancelledByBackgroundRef.current =
-        false;
-
-      manualStopRequestedRef.current =
-        false;
-
-      recordingStartedAtRef.current =
-        Date.now();
-
-      isRecordingRef.current = true;
-
-      console.log(
-        '[RecordingDebug] recording refs initialized',
-        {
-          isRecordingRef:
-            isRecordingRef.current,
-
-          cancelledByUserRef:
-            cancelledByUserRef.current,
-
-          cancelledByBackgroundRef:
-            cancelledByBackgroundRef.current,
-
-          manualStopRequestedRef:
-            manualStopRequestedRef.current,
-
-          recordingStartedAtRef:
-            recordingStartedAtRef.current,
-
-          appMaxDuration:
-            MAX_RECORDING_SECONDS,
-
-          nativeMaxDuration: null,
-
-          videoQuality:
-            RECORDING_VIDEO_QUALITY,
-
-          videoBitrate:
-            RECORDING_VIDEO_BITRATE,
-
-          maxFileSize:
-            RECORDING_MAX_FILE_SIZE_BYTES,
-        }
-      );
-
-      timerRef.current = setInterval(
-        () => {
-          setElapsed((previous) => {
-            const next = previous + 1;
-
-            elapsedRef.current = next;
-
-            console.log(
-              '[RecordingDebug] tick',
-              {
-                elapsed: next,
-              }
-            );
-
-            return next;
-          });
-        },
-        1000
-      );
-
-      maxRecordingTimeoutRef.current =
-        setTimeout(() => {
-          console.log(
-            '[RecordingDebug] max recording duration reached',
-            {
-              elapsedRef:
-                elapsedRef.current,
-
-              isRecordingRef:
-                isRecordingRef.current,
-            }
-          );
-
-          if (
-            !isRecordingRef.current
-          ) {
-            return;
-          }
-
-          isRecordingRef.current =
-            false;
-
-          if (timerRef.current) {
-            clearInterval(
-              timerRef.current
-            );
-
-            timerRef.current = null;
-          }
-
-          try {
-            cameraRef.current?.stopRecording();
-          } catch {
-            // Camera may already be stopped.
-          }
-        }, MAX_RECORDING_SECONDS * 1000);
-
-      try {
-        const video =
-          await cameraRef.current.recordAsync(
-            {
-              maxFileSize:
-                RECORDING_MAX_FILE_SIZE_BYTES,
-            }
-          );
-
-        const recordedDurationSeconds =
-          recordingStartedAtRef.current
-            ? (Date.now() -
-                recordingStartedAtRef.current) /
-              1000
-            : elapsedRef.current;
-
-        const wasManualStop =
-          manualStopRequestedRef.current;
-
-        let videoSizeBytes:
-          | number
-          | null = null;
-
-        if (video?.uri) {
-          try {
-            const videoInfo =
-              await FileSystem.getInfoAsync(
-                video.uri,
-                {
-                  size: true,
-                }
-              );
-
-            videoSizeBytes =
-              videoInfo.exists
-                ? videoInfo.size
-                : null;
-          } catch (error) {
-            console.log(
-              '[RecordingDebug] video info failed',
-              error
-            );
-          }
-        }
-
-        console.log(
-          '[RecordingDebug] recordAsync finished',
-          {
-            videoUri: video?.uri,
-            videoSizeBytes,
-
-            elapsedRef:
-              elapsedRef.current,
-
-            recordedDurationSeconds,
-
-            isRecordingRef:
-              isRecordingRef.current,
-
-            cancelledByUserRef:
-              cancelledByUserRef.current,
-
-            cancelledByBackgroundRef:
-              cancelledByBackgroundRef.current,
-
-            manualStopRequestedRef:
-              manualStopRequestedRef.current,
-          }
-        );
-
-        isRecordingRef.current = false;
-
-        recordingStartedAtRef.current =
-          null;
-
-        manualStopRequestedRef.current =
-          false;
-
-        if (timerRef.current) {
-          clearInterval(
-            timerRef.current
-          );
-
-          timerRef.current = null;
-        }
-
-        if (
-          maxRecordingTimeoutRef.current
-        ) {
-          clearTimeout(
-            maxRecordingTimeoutRef.current
-          );
-
-          maxRecordingTimeoutRef.current =
-            null;
-        }
-
-        if (
-          cancelledByUserRef.current
-        ) {
-          cancelledByUserRef.current =
-            false;
-
-          if (video?.uri) {
-            FileSystem.deleteAsync(
-              video.uri,
-              {
-                idempotent: true,
-              }
-            ).catch(() => {});
-          }
-
-          return;
-        }
-
-        const finishedNormally =
-          !cancelledByBackgroundRef.current;
-
-        cancelledByBackgroundRef.current =
-          false;
-
-        const endedBeforeMaxDuration =
-          !wasManualStop &&
-          recordedDurationSeconds <
-            MAX_RECORDING_SECONDS -
-              EARLY_NATIVE_STOP_GRACE_SECONDS;
-
-        if (
-          !video?.uri ||
-          !finishedNormally
-        ) {
-          setRecordedVideoUri(null);
-          setElapsed(0);
-
-          elapsedRef.current = 0;
-
-          setState('pre-record');
-
-          Alert.alert(
-            'Recording incomplete',
-            'The recording was interrupted. Please try again without leaving the app.'
-          );
-
-          return;
-        }
-
-        if (endedBeforeMaxDuration) {
-          FileSystem.deleteAsync(
-            video.uri,
-            {
-              idempotent: true,
-            }
-          ).catch(() => {});
-
-          setRecordedVideoUri(null);
-          setElapsed(0);
-
-          elapsedRef.current = 0;
-
-          setState('pre-record');
-
-          Alert.alert(
-            'Recording stopped early',
-            `The camera stopped after ${Math.max(
-              1,
-              Math.round(
-                recordedDurationSeconds
-              )
-            )}s before the 60s limit. Please try again.`
-          );
-
-          return;
-        }
-
-        try {
-          const persistentUri =
-            `${FileSystem.documentDirectory}` +
-            `challenge-${Date.now()}.mp4`;
-
-          await FileSystem.copyAsync({
-            from: video.uri,
-            to: persistentUri,
-          });
-
-          await FileSystem.deleteAsync(
-            video.uri,
-            {
-              idempotent: true,
-            }
-          );
-
-          console.log(
-            '[RecordingDebug] video copied to persistent uri',
-            {
-              persistentUri,
-
-              elapsedRef:
-                elapsedRef.current,
-            }
-          );
-
-          recordedVideoUriRef.current =
-            persistentUri;
-
-          setRecordedVideoUri(
-            persistentUri
-          );
-
-          setCaption(
-            isCheckIn
-              ? getCheckInCaption()
-              : getDefaultCaption(
-                  progress?.nextAttemptNumber,
-                  challenge?.name ??
-                    'this exercise'
-                )
-          );
-
-          setState('post-record');
-        } catch (error) {
-          console.log(
-            '[RecordingDebug] video save failed',
-            error
-          );
-
-          setRecordedVideoUri(null);
-          setElapsed(0);
-
-          elapsedRef.current = 0;
-
-          setState('pre-record');
-
-          Alert.alert(
-            'Recording failed',
-            'Could not save the recording. Please try again.'
-          );
-        }
-      } catch (error) {
-        console.log(
-          '[RecordingDebug] recordAsync error',
-          {
-            error,
-
-            elapsedRef:
-              elapsedRef.current,
-
-            cancelledByUserRef:
-              cancelledByUserRef.current,
-
-            cancelledByBackgroundRef:
-              cancelledByBackgroundRef.current,
-          }
-        );
-
-        if (
-          cancelledByUserRef.current
-        ) {
-          cancelledByUserRef.current =
-            false;
-
-          manualStopRequestedRef.current =
-            false;
-
-          recordingStartedAtRef.current =
-            null;
-
-          return;
-        }
-
-        isRecordingRef.current = false;
-
-        manualStopRequestedRef.current =
-          false;
-
-        recordingStartedAtRef.current =
-          null;
-
-        cancelledByBackgroundRef.current =
-          false;
-
-        if (timerRef.current) {
-          clearInterval(
-            timerRef.current
-          );
-
-          timerRef.current = null;
-        }
-
-        if (
-          maxRecordingTimeoutRef.current
-        ) {
-          clearTimeout(
-            maxRecordingTimeoutRef.current
-          );
-
-          maxRecordingTimeoutRef.current =
-            null;
-        }
-
+      if (!video?.uri || !finishedNormally) {
+        setRecordedVideoUri(null);
         setElapsed(0);
 
         elapsedRef.current = 0;
 
         setState('pre-record');
-      }
-    }, [
-      challenge?.name,
-      challengeId,
-      isCheckIn,
-      progress?.nextAttemptNumber,
-    ]);
 
-  const playCountdownSound =
-    useCallback(
-      async (
-        playbackToken: number
-      ) => {
-        try {
-          const sound =
-            await ensureCountdownSound();
-
-          if (
-            !sound ||
-            playbackToken !==
-              countdownSoundPlaybackTokenRef.current
-          ) {
-            return;
-          }
-
-          await sound.stopAsync();
-
-          await sound.setPositionAsync(
-            0
-          );
-
-          if (
-            playbackToken !==
-            countdownSoundPlaybackTokenRef.current
-          ) {
-            return;
-          }
-
-          await sound.playAsync();
-        } catch (error) {
-          console.log(
-            '[RecordingDebug] countdown sound play failed',
-            error
-          );
-        }
-      },
-      [ensureCountdownSound]
-    );
-
-  const startCountdown =
-    useCallback(() => {
-      if (dailyLimitReached) {
         Alert.alert(
-          'Daily limit reached',
-          `You have reached your limit for today. You can complete up to ${dailyLimit} challenges per day.`
+          'Recording incomplete',
+          'The recording was interrupted. Please try again without leaving the app.'
         );
 
         return;
       }
 
-      debugRecordingState(
-        'startCountdown pressed'
-      );
+      if (endedBeforeMaxDuration) {
+        FileSystem.deleteAsync(video.uri, {
+          idempotent: true,
+        }).catch(() => {});
 
-      if (existingUploadJob) {
+        setRecordedVideoUri(null);
+        setElapsed(0);
+
+        elapsedRef.current = 0;
+
+        setState('pre-record');
+
         Alert.alert(
-          existingUploadJob.status ===
-            'failed'
-            ? 'Upload paused'
-            : 'Upload in progress',
-
-          existingUploadJob.status ===
-            'failed'
-            ? 'This challenge already has a paused upload. Please retry it first.'
-            : 'This challenge is already uploading in the background.'
+          'Recording stopped early',
+          `The camera stopped after ${Math.max(
+            1,
+            Math.round(recordedDurationSeconds)
+          )}s before the 60s limit. Please try again.`
         );
 
         return;
       }
 
-      if (countdownRef.current) {
+      try {
+        const persistentUri = `${FileSystem.documentDirectory}` + `challenge-${Date.now()}.mp4`;
+
+        await FileSystem.copyAsync({
+          from: video.uri,
+          to: persistentUri,
+        });
+
+        await FileSystem.deleteAsync(video.uri, {
+          idempotent: true,
+        });
+
+        console.log('[RecordingDebug] video copied to persistent uri', {
+          persistentUri,
+
+          elapsedRef: elapsedRef.current,
+        });
+
+        recordedVideoUriRef.current = persistentUri;
+
+        setRecordedVideoUri(persistentUri);
+
+        setCaption(
+          isCheckIn
+            ? getCheckInCaption()
+            : getDefaultCaption(progress?.nextAttemptNumber, challenge?.name ?? 'this exercise')
+        );
+
+        setState('post-record');
+      } catch (error) {
+        console.log('[RecordingDebug] video save failed', error);
+
+        setRecordedVideoUri(null);
+        setElapsed(0);
+
+        elapsedRef.current = 0;
+
+        setState('pre-record');
+
+        Alert.alert('Recording failed', 'Could not save the recording. Please try again.');
+      }
+    } catch (error) {
+      console.log('[RecordingDebug] recordAsync error', {
+        error,
+
+        elapsedRef: elapsedRef.current,
+
+        cancelledByUserRef: cancelledByUserRef.current,
+
+        cancelledByBackgroundRef: cancelledByBackgroundRef.current,
+      });
+
+      if (cancelledByUserRef.current) {
+        cancelledByUserRef.current = false;
+
+        manualStopRequestedRef.current = false;
+
+        recordingStartedAtRef.current = null;
+
         return;
       }
-
-      setState('countdown');
-
-      setCountdownValue(
-        COUNTDOWN_SECONDS
-      );
-
-      const countdownPlaybackToken =
-        countdownSoundPlaybackTokenRef.current +
-        1;
-
-      countdownSoundPlaybackTokenRef.current =
-        countdownPlaybackToken;
-
-      playCountdownSound(
-        countdownPlaybackToken
-      ).catch(() => {});
-
-      let count = COUNTDOWN_SECONDS;
-
-      countdownRef.current =
-        setInterval(() => {
-          count -= 1;
-
-          setCountdownValue(count);
-
-          console.log(
-            '[RecordingDebug] countdown tick',
-            {
-              count,
-            }
-          );
-
-          if (count <= 0) {
-            if (
-              countdownRef.current
-            ) {
-              clearInterval(
-                countdownRef.current
-              );
-
-              countdownRef.current =
-                null;
-            }
-
-            countdownSoundPlaybackTokenRef.current +=
-              1;
-
-            countdownSoundRef.current
-              ?.stopAsync()
-              .catch(() => {});
-
-            startRecording().catch(
-              () => {}
-            );
-          }
-        }, 1000);
-    }, [
-      debugRecordingState,
-      dailyLimit,
-      dailyLimitReached,
-      existingUploadJob,
-      playCountdownSound,
-      startRecording,
-    ]);
-
-  const handleSwitchCamera =
-    useCallback(() => {
-      if (isRecordingRef.current) {
-        return;
-      }
-
-      setCameraFacing((current) =>
-        current === 'front'
-          ? 'back'
-          : 'front'
-      );
-    }, []);
-
-  const handleCancel =
-    useCallback(() => {
-      debugRecordingState(
-        'handleCancel called'
-      );
-
-      cleanupRecordingRefs(
-        'handleCancel'
-      );
-
-      router.back();
-    }, [
-      cleanupRecordingRefs,
-      debugRecordingState,
-    ]);
-
-  const handleStartOver =
-    useCallback(() => {
-      debugRecordingState(
-        'handleStartOver called'
-      );
-
-      cleanupRecordingRefs(
-        'handleStartOver'
-      );
-
-      if (recordedVideoUri) {
-        FileSystem.deleteAsync(
-          recordedVideoUri,
-          {
-            idempotent: true,
-          }
-        ).catch(() => {});
-      }
-
-      recordedVideoUriRef.current =
-        null;
-
-      preserveRecordedVideoOnUnmountRef.current =
-        false;
-
-      cancelledByUserRef.current =
-        false;
-
-      cancelledByBackgroundRef.current =
-        false;
-
-      manualStopRequestedRef.current =
-        false;
-
-      recordingStartedAtRef.current =
-        null;
 
       isRecordingRef.current = false;
 
-      elapsedRef.current = 0;
+      manualStopRequestedRef.current = false;
 
-      setRecordedVideoUri(null);
-      setCaption('');
+      recordingStartedAtRef.current = null;
 
-      setAllowRepost(!isCheckIn);
+      cancelledByBackgroundRef.current = false;
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+
+        timerRef.current = null;
+      }
+
+      if (maxRecordingTimeoutRef.current) {
+        clearTimeout(maxRecordingTimeoutRef.current);
+
+        maxRecordingTimeoutRef.current = null;
+      }
 
       setElapsed(0);
 
-      setCountdownValue(
-        COUNTDOWN_SECONDS
-      );
-
-      setIsSubmitting(false);
+      elapsedRef.current = 0;
 
       setState('pre-record');
-    }, [
-      cleanupRecordingRefs,
-      debugRecordingState,
-      isCheckIn,
-      recordedVideoUri,
-    ]);
+    }
+  }, [challenge?.name, challengeId, isCheckIn, progress?.nextAttemptNumber]);
 
-  const handleSubmit =
-    useCallback(async () => {
-      debugRecordingState(
-        'handleSubmit called'
+  const playCountdownSound = useCallback(
+    async (playbackToken: number) => {
+      try {
+        const sound = await ensureCountdownSound();
+
+        if (!sound || playbackToken !== countdownSoundPlaybackTokenRef.current) {
+          return;
+        }
+
+        await sound.stopAsync();
+
+        await sound.setPositionAsync(0);
+
+        if (playbackToken !== countdownSoundPlaybackTokenRef.current) {
+          return;
+        }
+
+        await sound.playAsync();
+      } catch (error) {
+        console.log('[RecordingDebug] countdown sound play failed', error);
+      }
+    },
+    [ensureCountdownSound]
+  );
+
+  const startCountdown = useCallback(() => {
+    if (dailyLimitReached) {
+      Alert.alert(
+        'Daily limit reached',
+        `You have reached your limit for today. You can complete up to ${dailyLimit} challenges per day.`
       );
 
-      if (
-        !recordedVideoUri ||
-        !challenge ||
-        isSubmitting
-      ) {
-        return;
+      return;
+    }
+
+    debugRecordingState('startCountdown pressed');
+
+    if (existingUploadJob) {
+      Alert.alert(
+        existingUploadJob.status === 'failed' ? 'Upload paused' : 'Upload in progress',
+
+        existingUploadJob.status === 'failed'
+          ? 'This challenge already has a paused upload. Please retry it first.'
+          : 'This challenge is already uploading in the background.'
+      );
+
+      return;
+    }
+
+    if (countdownRef.current) {
+      return;
+    }
+
+    setState('countdown');
+
+    setCountdownValue(COUNTDOWN_SECONDS);
+
+    const countdownPlaybackToken = countdownSoundPlaybackTokenRef.current + 1;
+
+    countdownSoundPlaybackTokenRef.current = countdownPlaybackToken;
+
+    playCountdownSound(countdownPlaybackToken).catch(() => {});
+
+    let count = COUNTDOWN_SECONDS;
+
+    countdownRef.current = setInterval(() => {
+      count -= 1;
+
+      setCountdownValue(count);
+
+      console.log('[RecordingDebug] countdown tick', {
+        count,
+      });
+
+      if (count <= 0) {
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+
+          countdownRef.current = null;
+        }
+
+        countdownSoundPlaybackTokenRef.current += 1;
+
+        countdownSoundRef.current?.stopAsync().catch(() => {});
+
+        startRecording().catch(() => {});
       }
+    }, 1000);
+  }, [
+    debugRecordingState,
+    dailyLimit,
+    dailyLimitReached,
+    existingUploadJob,
+    playCountdownSound,
+    startRecording,
+  ]);
 
-      const trimmedCaption =
-        caption.trim();
+  const handleSwitchCamera = useCallback(() => {
+    if (isRecordingRef.current) {
+      return;
+    }
 
-      if (!trimmedCaption) {
-        Alert.alert(
-          'Caption required',
-          'Please add a caption before submitting your video.'
-        );
+    setCameraFacing((current) => (current === 'front' ? 'back' : 'front'));
+  }, []);
 
-        return;
-      }
+  const handleCancel = useCallback(() => {
+    debugRecordingState('handleCancel called');
 
-      setIsSubmitting(true);
+    cleanupRecordingRefs('handleCancel');
 
-      try {
-        await enqueueChallengeUpload({
-          challengeId,
+    router.back();
+  }, [cleanupRecordingRefs, debugRecordingState]);
 
-          videoUri:
-            recordedVideoUri,
+  const handleStartOver = useCallback(() => {
+    debugRecordingState('handleStartOver called');
 
-          allowRepost: isCheckIn
-            ? false
-            : allowRepost,
+    cleanupRecordingRefs('handleStartOver');
 
-          caption: trimmedCaption,
-        });
+    if (recordedVideoUri) {
+      FileSystem.deleteAsync(recordedVideoUri, {
+        idempotent: true,
+      }).catch(() => {});
+    }
 
-        preserveRecordedVideoOnUnmountRef.current =
-          true;
+    recordedVideoUriRef.current = null;
 
-        recordedVideoUriRef.current =
-          null;
+    preserveRecordedVideoOnUnmountRef.current = false;
 
-        router.dismissAll();
+    cancelledByUserRef.current = false;
 
-        router.replace(
-          '/(tabs)/dashboard'
-        );
-      } catch (error) {
-        Alert.alert(
-          'Unable to submit',
-          getErrorMessage(error)
-        );
+    cancelledByBackgroundRef.current = false;
 
-        setIsSubmitting(false);
-      }
-    }, [
-      recordedVideoUri,
-      challenge,
-      isSubmitting,
-      enqueueChallengeUpload,
-      challengeId,
-      allowRepost,
-      caption,
-      debugRecordingState,
-      isCheckIn,
-    ]);
+    manualStopRequestedRef.current = false;
 
-  const handleCaptionFocus =
-    useCallback(() => {
-      setTimeout(() => {
-        postRecordScrollRef.current?.scrollToEnd(
-          {
-            animated: true,
-          }
-        );
-      }, 250);
-    }, []);
+    recordingStartedAtRef.current = null;
 
-  if (
-    challenge === undefined ||
-    progress === undefined
-  ) {
+    isRecordingRef.current = false;
+
+    elapsedRef.current = 0;
+
+    setRecordedVideoUri(null);
+    setCaption('');
+
+    setAllowRepost(!isCheckIn);
+
+    setElapsed(0);
+
+    setCountdownValue(COUNTDOWN_SECONDS);
+
+    setIsSubmitting(false);
+
+    setState('pre-record');
+  }, [cleanupRecordingRefs, debugRecordingState, isCheckIn, recordedVideoUri]);
+
+  const handleSubmit = useCallback(async () => {
+    debugRecordingState('handleSubmit called');
+
+    if (!recordedVideoUri || !challenge || isSubmitting) {
+      return;
+    }
+
+    const trimmedCaption = caption.trim();
+
+    if (!trimmedCaption) {
+      Alert.alert('Caption required', 'Please add a caption before submitting your video.');
+
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await enqueueChallengeUpload({
+        challengeId,
+
+        videoUri: recordedVideoUri,
+
+        allowRepost: isCheckIn ? false : allowRepost,
+
+        caption: trimmedCaption,
+      });
+
+      preserveRecordedVideoOnUnmountRef.current = true;
+
+      recordedVideoUriRef.current = null;
+
+      router.dismissAll();
+
+      router.replace('/(tabs)/dashboard');
+    } catch (error) {
+      Alert.alert('Unable to submit', getErrorMessage(error));
+
+      setIsSubmitting(false);
+    }
+  }, [
+    recordedVideoUri,
+    challenge,
+    isSubmitting,
+    enqueueChallengeUpload,
+    challengeId,
+    allowRepost,
+    caption,
+    debugRecordingState,
+    isCheckIn,
+  ]);
+
+  const handleCaptionFocus = useCallback(() => {
+    setTimeout(() => {
+      postRecordScrollRef.current?.scrollToEnd({
+        animated: true,
+      });
+    }, 250);
+  }, []);
+
+  if (challenge === undefined || progress === undefined) {
     return <ScreenLoading />;
   }
 
   if (challenge === null) {
     return (
       <View className="flex-1 items-center justify-center bg-[#F9F9F9]">
-        <Text className="text-base text-gray-500">
-          Challenge not available
-        </Text>
+        <Text className="text-base text-gray-500">Challenge not available</Text>
       </View>
     );
   }
 
-  if (
-    !cameraPermission?.granted ||
-    !micPermission?.granted
-  ) {
+  if (!cameraPermission?.granted || !micPermission?.granted) {
     return (
       <View
         className="flex-1 items-center justify-center bg-[#F9F9F9] px-8"
@@ -1606,9 +1105,7 @@ export default function DuetRecordingScreen() {
           paddingTop: insets.top,
         }}>
         <Text className="mb-4 text-center text-base text-[#313131]">
-          Camera and microphone
-          permissions are required to record
-          your challenge.
+          Camera and microphone permissions are required to record your challenge.
         </Text>
 
         <LoadingButton
@@ -1619,67 +1116,39 @@ export default function DuetRecordingScreen() {
             await requestCameraPermission();
             await requestMicPermission();
           }}>
-          <ButtonText>
-            Grant Permissions
-          </ButtonText>
+          <ButtonText>Grant Permissions</ButtonText>
         </LoadingButton>
 
-        <TouchableOpacity
-          className="mt-4"
-          onPress={() => router.back()}>
-          <Text className="font-body text-sm font-medium text-[#838383]">
-            Cancel
-          </Text>
+        <TouchableOpacity className="mt-4" onPress={() => router.back()}>
+          <Text className="font-body text-sm font-medium text-[#838383]">Cancel</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const totalPoints =
-    challenge.points +
-    (!isCheckIn && allowRepost
-      ? 3
-      : 0);
+  const totalPoints = challenge.points + (!isCheckIn && allowRepost ? 3 : 0);
 
-  const isLiveState =
-    state === 'pre-record' ||
-    state === 'countdown' ||
-    state === 'recording';
+  const isLiveState = state === 'pre-record' || state === 'countdown' || state === 'recording';
 
-  const isCaptionMissing =
-    !caption.trim();
+  const isCaptionMissing = !caption.trim();
 
   const progressPercent =
-    state === 'recording'
-      ? Math.min(
-          100,
-          (elapsed /
-            MAX_RECORDING_SECONDS) *
-            100
-        )
-      : 0;
+    state === 'recording' ? Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100) : 0;
 
-  const canStopRecording =
-    state === 'recording' &&
-    elapsed >=
-      MIN_STOP_RECORDING_SECONDS;
+  const canStopRecording = state === 'recording' && elapsed >= MIN_STOP_RECORDING_SECONDS;
 
+  const currentChallengeDay = progress?.nextAttemptNumber ?? 1;
+  
   if (isLiveState) {
     return (
       <View className="flex-1 bg-black">
         <CameraView
           ref={cameraRef}
-          style={
-            StyleSheet.absoluteFillObject
-          }
+          style={StyleSheet.absoluteFillObject}
           facing={cameraFacing}
           mode="video"
-          videoQuality={
-            RECORDING_VIDEO_QUALITY
-          }
-          videoBitrate={
-            RECORDING_VIDEO_BITRATE
-          }
+          videoQuality={RECORDING_VIDEO_QUALITY}
+          videoBitrate={RECORDING_VIDEO_BITRATE}
           mute
         />
 
@@ -1688,10 +1157,7 @@ export default function DuetRecordingScreen() {
           style={[
             StyleSheet.absoluteFillObject,
             {
-              backgroundColor:
-                state === 'pre-record'
-                  ? 'rgba(0,0,0,0.18)'
-                  : 'rgba(0,0,0,0.08)',
+              backgroundColor: state === 'pre-record' ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.08)',
             },
           ]}
         />
@@ -1714,16 +1180,10 @@ export default function DuetRecordingScreen() {
               height: 46,
               borderRadius: 23,
               alignItems: 'center',
-              justifyContent:
-                'center',
-              backgroundColor:
-                'rgba(0,0,0,0.45)',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.45)',
             }}>
-            <CameraRotate
-              size={26}
-              color="#FFFFFF"
-              weight="bold"
-            />
+            <CameraRotate size={26} color="#FFFFFF" weight="bold" />
           </TouchableOpacity>
         )}
 
@@ -1735,41 +1195,34 @@ export default function DuetRecordingScreen() {
               left: 0,
               right: 0,
               height: 4,
-              backgroundColor:
-                'rgba(255,255,255,0.3)',
+              backgroundColor: 'rgba(255,255,255,0.3)',
             }}>
             <View
               style={{
                 height: '100%',
                 width: `${progressPercent}%`,
-                backgroundColor:
-                  '#FF5C1A',
+                backgroundColor: '#FF5C1A',
               }}
             />
           </View>
         )}
 
-        {state === 'pre-record' &&
-          !isCheckIn && (
-            <View
-              style={{
-                position: 'absolute',
-                top: insets.top + 20,
-                left: 0,
-                right: 0,
-                alignItems: 'center',
-              }}>
-              <Text className="font-heading text-xl font-bold text-white">
-                Day{' '}
-                {progress?.nextAttemptNumber ??
-                  1}
-              </Text>
-            </View>
-          )}
+        {state === 'pre-record' && !isCheckIn && (
+          <View
+            style={{
+              position: 'absolute',
+              top: insets.top + 20,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+            }}>
+            <Text className="font-heading text-xl font-bold text-white">
+              Day {progress?.nextAttemptNumber ?? 1}
+            </Text>
+          </View>
+        )}
 
-        {(state === 'countdown' ||
-          state === 'recording' ||
-          state === 'pre-record') && (
+        {(state === 'countdown' || state === 'recording' || state === 'pre-record') && (
           <TouchableOpacity
             onPress={handleCancel}
             hitSlop={{
@@ -1785,14 +1238,9 @@ export default function DuetRecordingScreen() {
               zIndex: 20,
               padding: 8,
               borderRadius: 999,
-              backgroundColor:
-                'rgba(0,0,0,0.35)',
+              backgroundColor: 'rgba(0,0,0,0.35)',
             }}>
-            <X
-              size={28}
-              color="#FFFFFF"
-              weight="bold"
-            />
+            <X size={28} color="#FFFFFF" weight="bold" />
           </TouchableOpacity>
         )}
 
@@ -1803,8 +1251,7 @@ export default function DuetRecordingScreen() {
               StyleSheet.absoluteFillObject,
               {
                 alignItems: 'center',
-                justifyContent:
-                  'center',
+                justifyContent: 'center',
               },
             ]}>
             <View
@@ -1812,8 +1259,7 @@ export default function DuetRecordingScreen() {
               style={{
                 width: 90,
                 height: 90,
-                backgroundColor:
-                  'rgba(0,0,0,0.55)',
+                backgroundColor: 'rgba(0,0,0,0.55)',
               }}>
               <Text className="font-heading text-4xl font-extrabold text-white">
                 {countdownValue}
@@ -1829,14 +1275,11 @@ export default function DuetRecordingScreen() {
               top: insets.top + 16,
               alignSelf: 'center',
               borderRadius: 999,
-              backgroundColor:
-                'rgba(0,0,0,0.45)',
+              backgroundColor: 'rgba(0,0,0,0.45)',
               paddingHorizontal: 14,
               paddingVertical: 7,
             }}>
-            <Text className="font-body text-sm font-bold text-white">
-              Recording {elapsed}s
-            </Text>
+            <Text className="font-body text-sm font-bold text-white">Recording {elapsed}s</Text>
           </View>
         )}
 
@@ -1846,8 +1289,7 @@ export default function DuetRecordingScreen() {
               position: 'absolute',
               left: 0,
               right: 0,
-              bottom:
-                insets.bottom + 20,
+              bottom: insets.bottom + 20,
               paddingHorizontal: 24,
             }}>
             <LoadingButton
@@ -1856,9 +1298,7 @@ export default function DuetRecordingScreen() {
               action="primary"
               className="h-14 w-full"
               onPress={stopRecording}>
-              <ButtonText className="text-lg font-bold text-white">
-                Stop Recording
-              </ButtonText>
+              <ButtonText className="text-lg font-bold text-white">Stop Recording</ButtonText>
             </LoadingButton>
           </View>
         )}
@@ -1869,14 +1309,12 @@ export default function DuetRecordingScreen() {
               position: 'absolute',
               left: 0,
               right: 0,
-              bottom:
-                insets.bottom + 20,
+              bottom: insets.bottom + 20,
               paddingHorizontal: 24,
             }}>
             {dailyLimitReached && (
               <Text className="mb-3 text-center font-body text-sm font-semibold text-white">
-                You reached your limit for
-                today. Come back tomorrow.
+                You reached your limit for today. Come back tomorrow.
               </Text>
             )}
 
@@ -1885,21 +1323,13 @@ export default function DuetRecordingScreen() {
               size="xl"
               action="primary"
               className="mt-5 h-14 w-full"
-              disabled={
-                dailyLimitReached
-              }
+              disabled={dailyLimitReached}
               onPress={startCountdown}>
               <View className="flex-row items-center gap-x-2">
-                <Record
-                  size={20}
-                  color="#FFFFFF"
-                  weight="fill"
-                />
+                <Record size={20} color="#FFFFFF" weight="fill" />
 
                 <ButtonText className="text-lg font-bold text-white">
-                  {dailyLimitReached
-                    ? 'Daily Limit Reached'
-                    : 'Start Recording'}
+                  {dailyLimitReached ? 'Daily Limit Reached' : 'Start Recording'}
                 </ButtonText>
               </View>
             </LoadingButton>
@@ -1913,33 +1343,17 @@ export default function DuetRecordingScreen() {
     return (
       <KeyboardAvoidingView
         className="flex-1 bg-[#F6F6F6]"
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : 'height'
-        }
-        keyboardVerticalOffset={
-          Platform.OS === 'ios'
-            ? 0
-            : 24
-        }>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
         <ScrollView
           ref={postRecordScrollRef}
           contentContainerStyle={{
-            paddingTop:
-              insets.top + 14,
+            paddingTop: insets.top + 14,
 
-            paddingBottom:
-              insets.bottom + 120,
+            paddingBottom: insets.bottom + 120,
           }}
-          showsVerticalScrollIndicator={
-            false
-          }
-          keyboardDismissMode={
-            Platform.OS === 'ios'
-              ? 'interactive'
-              : 'on-drag'
-          }
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           keyboardShouldPersistTaps="handled">
           <View className="px-5">
             <View className="items-center">
@@ -1964,8 +1378,7 @@ export default function DuetRecordingScreen() {
               </Text>
 
               <Text className="mt-1 text-center font-body text-sm text-[#686868]">
-                Review your video then
-                submit
+                Review your video then submit
               </Text>
             </View>
           </View>
@@ -1973,24 +1386,32 @@ export default function DuetRecordingScreen() {
           {recordedVideoUri && (
             <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-black">
               {isCheckIn ? (
-                <SingleVideoPreview
-                  videoUrl={
-                    recordedVideoUri
-                  }
-                />
-              ) : challenge.instructionalVideoUrl ? (
+                <SingleVideoPreview videoUrl={recordedVideoUri} />
+              ) : currentChallengeDay === 1 ? (
                 <CompositeVideoPlayer
-                  leftVideoUrl={
-                    progress?.day1VideoUrl ||
-                    FIRST_ATTEMPT_VIDEO_URL ||
-                    challenge.instructionalVideoUrl
-                  }
-                  rightVideoUrl={
-                    recordedVideoUri
-                  }
+                  leftVideoUrl={FIRST_ATTEMPT_VIDEO_URL}
+                  rightVideoUrl={recordedVideoUri}
+                  leftLabel=""
+                  rightLabel="Day 1"
                   mirrorRight={false}
                 />
-              ) : null}
+              ) : progress?.day1VideoUrl ? (
+                <CompositeVideoPlayer
+                  leftVideoUrl={progress.day1VideoUrl}
+                  rightVideoUrl={recordedVideoUri}
+                  leftLabel="Day 1"
+                  rightLabel={`Day ${currentChallengeDay}`}
+                  mirrorRight={false}
+                />
+              ) : (
+                <CompositeVideoPlayer
+                  leftVideoUrl={challenge.instructionalVideoUrl || FIRST_ATTEMPT_VIDEO_URL}
+                  rightVideoUrl={recordedVideoUri}
+                  leftLabel="Challenge"
+                  rightLabel={`Day ${currentChallengeDay}`}
+                  mirrorRight={false}
+                />
+              )}
             </View>
           )}
 
@@ -2008,9 +1429,7 @@ export default function DuetRecordingScreen() {
               shadowRadius: 12,
             }}>
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-body text-sm font-bold text-[#1F1F1F]">
-                Caption *
-              </Text>
+              <Text className="font-body text-sm font-bold text-[#1F1F1F]">Caption *</Text>
 
               <Text className="font-body text-xs text-[#838383]">
                 {caption.trim().length}
@@ -2018,27 +1437,16 @@ export default function DuetRecordingScreen() {
               </Text>
             </View>
 
-            <Textarea
-              size="xl"
-              className="rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA]">
+            <Textarea size="xl" className="rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA]">
               <TextareaInput
-                placeholder={
-                  isCheckIn
-                    ? 'Share your check-in...'
-                    : 'Share a progress update...'
-                }
+                placeholder={isCheckIn ? 'Share your check-in...' : 'Share a progress update...'}
                 value={caption}
                 maxLength={150}
-                onFocus={
-                  handleCaptionFocus
-                }
-                onChangeText={
-                  setCaption
-                }
+                onFocus={handleCaptionFocus}
+                onChangeText={setCaption}
                 style={{
                   minHeight: 104,
-                  textAlignVertical:
-                    'top',
+                  textAlignVertical: 'top',
                   paddingTop: 12,
                 }}
               />
@@ -2046,8 +1454,7 @@ export default function DuetRecordingScreen() {
 
             {isCaptionMissing && (
               <Text className="mt-2 font-body text-xs font-medium text-[#E5484D]">
-                Caption is required
-                before submitting.
+                Caption is required before submitting.
               </Text>
             )}
           </View>
@@ -2056,28 +1463,19 @@ export default function DuetRecordingScreen() {
             <View className="mx-5 mt-4 flex-row items-center justify-between rounded-3xl bg-white px-4 py-4">
               <View className="flex-1 pr-3">
                 <Text className="font-body text-sm font-bold text-[#1F1F1F]">
-                  Allow SweatScore to
-                  repost this
+                  Allow SweatScore to repost this
                 </Text>
 
                 <Text className="mt-1 font-body text-xs text-[#838383]">
-                  Keep this on to earn
-                  3 extra points.
+                  Keep this on to earn 3 extra points.
                 </Text>
               </View>
 
               <View className="mr-3 rounded-full bg-[#FFF1EA] px-3 py-1">
-                <Text className="font-body text-xs font-bold text-[#FF5C1A]">
-                  +3 pt
-                </Text>
+                <Text className="font-body text-xs font-bold text-[#FF5C1A]">+3 pt</Text>
               </View>
 
-              <Switch
-                value={allowRepost}
-                onValueChange={
-                  setAllowRepost
-                }
-              />
+              <Switch value={allowRepost} onValueChange={setAllowRepost} />
             </View>
           )}
 
@@ -2088,24 +1486,17 @@ export default function DuetRecordingScreen() {
               action="primary"
               className="h-14 w-full"
               loading={isSubmitting}
-              disabled={
-                isSubmitting ||
-                isCaptionMissing
-              }
+              disabled={isSubmitting || isCaptionMissing}
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
                 {isCheckIn
                   ? `Submit Check-in for ${totalPoints} pts`
-                  : `Submit Day ${
-                      progress?.nextAttemptNumber ??
-                      1
-                    } for ${totalPoints} pts`}
+                  : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
               </ButtonText>
             </LoadingButton>
 
             <Text className="mt-1 text-center font-body text-sm font-semibold text-[#6F6F6F]">
-              Keep the app open while
-              your video uploads
+              Keep the app open while your video uploads
             </Text>
           </View>
 
@@ -2113,9 +1504,7 @@ export default function DuetRecordingScreen() {
             className="mt-5 items-center"
             disabled={isSubmitting}
             onPress={handleStartOver}>
-            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">
-              Start over
-            </Text>
+            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">Start over</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

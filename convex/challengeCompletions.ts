@@ -434,30 +434,39 @@ export const completeChallenge = mutation({
         if (!adminVideoUrl || !userVideoUrl) {
           console.log('Video merge skipped. Missing video URL.', {
             completionId,
-
             hasAdminVideoUrl: Boolean(adminVideoUrl),
-
             hasUserVideoUrl: Boolean(userVideoUrl),
           });
         } else {
           console.log('Scheduling video merge...', {
             completionId,
             attemptNumber,
-
             leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
           });
+
+          const leftLabel = day1VideoUrl ? 'Day 1' : undefined;
+
+          const rightLabel = `Day ${attemptNumber}`;
 
           await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
             adminVideoUrl,
             userVideoUrl,
 
             challengeCompletionId: completionId,
-
             userId,
 
             caption: args.caption?.trim() || '',
-
             challengeId: args.challengeId,
+
+            // Day 1 has a predefined video on the left,
+            // so the left side should not display a day.
+            ...(leftLabel
+              ? {
+                  leftLabel,
+                }
+              : {}),
+
+            rightLabel,
           });
         }
       }
