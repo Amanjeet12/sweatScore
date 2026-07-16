@@ -264,7 +264,7 @@ export const updateLastActiveAt = mutation({
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', args.date))
       .unique();
 
-    const DAILY_CHECK_IN_POINTS = 5;
+    const DAILY_CHECK_IN_POINTS = 1;
 
     if (!userCheckIn) {
       const cappedPoints = await applyFreeDailyCap(

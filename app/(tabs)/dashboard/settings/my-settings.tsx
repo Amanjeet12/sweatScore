@@ -169,7 +169,7 @@ export default function TabMySettings() {
             </View>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           onPress={() => {
             Linking.openURL('https://support.sweatscore.com/');
           }}
@@ -180,7 +180,7 @@ export default function TabMySettings() {
               <Text className="font-lsBold text-2xl">Help & Support</Text>
             </View>
           </View>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <TouchableOpacity onPress={openWhatsApp} disabled={loading}>
           <View className="flex-row items-center gap-x-4">
             <Ionicons size={25} name="logo-whatsapp" />

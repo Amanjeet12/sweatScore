@@ -83,7 +83,7 @@ export default function AdminView() {
           <View className="flex-row items-center gap-x-4">
             <Ionicons size={25} name="gift-outline" />
             <View>
-              <Text className="font-lsBold text-2xl">Rewards Banner</Text>
+              <Text className="font-lsBold text-2xl">Challenge Banner</Text>
             </View>
           </View>
         </TouchableOpacity>

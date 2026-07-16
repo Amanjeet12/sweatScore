@@ -143,7 +143,7 @@ const TabShare = () => {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleCreatePost}
-              className="mt-4 flex-row items-center rounded-full border border-[#EEE3DA] bg-white px-3 py-2.5">
+              className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">
               <View style={styles.avatar}>
                 {userImage ? (
                   <Image
@@ -156,7 +156,9 @@ const TabShare = () => {
                 )}
               </View>
 
-              <Text className="flex-1 pr-2 font-body text-sm text-[#8B8B8B]" numberOfLines={2}>
+              <Text
+                className="text-[#555658 ] flex-1 pr-2 font-body text-sm"
+                numberOfLines={2}>
                 {communityTagline}
               </Text>
             </TouchableOpacity>

@@ -798,7 +798,7 @@ export default function PostRow({
               style={{ width: 14, height: 14 }}
               resizeMode="contain"
             />
-            <Text className="font-body text-sm font-bold text-primary-500">Try this</Text>
+            <Text className="font-body text-sm font-bold text-primary-500">Do This</Text>
           </TouchableOpacity>
         ) : null}
       </View>

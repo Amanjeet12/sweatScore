@@ -410,7 +410,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
             showToast(
-              `+${result.pointsEarned} pts added successfully. Your progress video will be shared after Round 2`,
+              `+${result.pointsEarned} pts added successfully. Your video will be live soon.`,
               'success'
             );
           } else {

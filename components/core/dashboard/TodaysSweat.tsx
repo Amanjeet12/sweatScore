@@ -723,6 +723,12 @@ function HowToEarnPointsModal({
 }) {
   const rows = [
     {
+      icon: require('~/assets/icons/Phone.png'),
+      title: 'App Open',
+      description: 'Open the app daily',
+      points: '1 pts',
+    },
+    {
       icon: require(
         '~/assets/icons/Steps.png'
       ),

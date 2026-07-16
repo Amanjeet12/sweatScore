@@ -16,13 +16,7 @@ const YOUR_PROGRESS_FILTER = 'Your Progress';
 
 const ALL_FILTERS = ['All', YOUR_PROGRESS_FILTER, ...CHALLENGE_TAGS] as const;
 
-function ChallengeCardWithData({
-  challenge,
-  isPremium,
-}: {
-  challenge: any;
-  isPremium: boolean;
-}) {
+function ChallengeCardWithData({ challenge, isPremium }: { challenge: any; isPremium: boolean }) {
   const cooldown = useQuery(api.challengeCompletions.getChallengeCooldown, {
     challengeId: challenge._id,
   });
@@ -58,18 +52,20 @@ export default function TabSweat() {
     selectedTag === 'All' || selectedTag === YOUR_PROGRESS_FILTER ? undefined : selectedTag;
 
   const challenges = useQuery(api.challengeCompletions.getPublishedChallenges, {
-    tag: queryTag,
+    tag: selectedTag === 'All' ? undefined : selectedTag,
   });
 
-  const visibleChallenges = useMemo(() => {
-    if (!challenges) return [];
+  const visibleChallenges = challenges?.filter((challenge) => challenge.type !== 'check_in');
 
-    if (selectedTag === YOUR_PROGRESS_FILTER) {
-      return challenges.filter((challenge) => (challenge.userCompletedCount ?? 0) > 0);
-    }
+  // const visibleChallenges = useMemo(() => {
+  //   if (!challenges) return [];
 
-    return challenges;
-  }, [challenges, selectedTag]);
+  //   if (selectedTag === YOUR_PROGRESS_FILTER) {
+  //     return challenges.filter((challenge) => (challenge.userCompletedCount ?? 0) > 0);
+  //   }
+
+  //   return challenges;
+  // }, [challenges, selectedTag]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
@@ -77,7 +73,7 @@ export default function TabSweat() {
 
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
         <View className="items-center px-6 py-4">
-          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">30 Day Challenges</Text>
+          <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">30 Days Challenges</Text>
         </View>
       </View>
 

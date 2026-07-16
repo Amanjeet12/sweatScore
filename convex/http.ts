@@ -29,33 +29,49 @@ export const createChallengePost = internalMutation({
     compositeVideoStorageId: v.id('_storage'),
     caption: v.string(),
   },
+
   handler: async (ctx, args) => {
     const completion = await ctx.db.get(args.challengeCompletionId);
 
     if (!completion) {
-      return null;
-    }
-
-    // Do everything for Day 1, but do not post it to community/feed.
-    if (completion.attemptNumber === 1 || completion.comparisonMode === 'day1_baseline') {
-      console.log('Skipping Day 1 challenge post', {
+      console.error('Challenge completion not found', {
         challengeCompletionId: args.challengeCompletionId,
-        challengeId: args.challengeId,
-        userId: args.userId,
-        attemptNumber: completion.attemptNumber,
-        comparisonMode: completion.comparisonMode,
       });
 
       return null;
     }
 
+    // Prevent duplicate posts if Trigger.dev retries
+    const existingPost = await ctx.db
+      .query('posts')
+      .filter((q) => q.eq(q.field('challengeCompletionId'), args.challengeCompletionId))
+      .first();
+
+    if (existingPost) {
+      return existingPost._id;
+    }
+
     const postId = await ctx.db.insert('posts', {
       userId: args.userId,
       createdAt: Date.now(),
-      body: args.caption,
+
+      body: args.caption.trim() || 'Challenge completed 🔥',
+
       media: args.compositeVideoStorageId,
+
+      mediaType: 'video',
+      mediaWidth: 1080,
+      mediaHeight: 960,
+
       challengeId: args.challengeId,
       challengeCompletionId: args.challengeCompletionId,
+    });
+
+    console.log('Challenge post created', {
+      postId,
+      challengeCompletionId: args.challengeCompletionId,
+      attemptNumber: completion.attemptNumber,
+      comparisonMode: completion.comparisonMode,
     });
 
     return postId;
