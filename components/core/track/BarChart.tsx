@@ -21,7 +21,9 @@ const formatChartValue = (value: number): string => {
   const compact = (divisor: number, suffix: string) => {
     const result = value / divisor;
 
-    return `${result.toFixed(Math.abs(result) < 10 ? 1 : 0).replace(/\.0$/, '')}${suffix}`;
+    return `${result
+      .toFixed(Math.abs(result) < 10 ? 1 : 0)
+      .replace(/\.0$/, '')}${suffix}`;
   };
 
   if (absoluteValue >= 1_000_000_000) {
@@ -39,13 +41,14 @@ const formatChartValue = (value: number): string => {
   return Math.round(value).toLocaleString();
 };
 
-const CHART_HEIGHT = 220;
-const VALUE_LABEL_HEIGHT = 40;
+const CHART_HEIGHT = 210;
+const VALUE_LABEL_HEIGHT = 34;
 const BAR_WIDTH = 28;
 
 const DEFAULT_GREY = '#D9D9D9';
-const AXIS_COLOR = '#838383';
-const GOAL_LINE_COLOR = '#1A1A1A';
+const AXIS_COLOR = '#A5A5A5';
+const GOAL_LINE_COLOR = '#999999';
+const ORANGE = '#F76B1C';
 
 export type Bar = {
   label: string;
@@ -66,18 +69,26 @@ type BarColumnProps = {
   maxValue: number;
 };
 
-function BarColumn({ bar, index, maxValue }: BarColumnProps) {
+function BarColumn({
+  bar,
+  index,
+  maxValue,
+}: BarColumnProps) {
   const targetHeight =
-    bar.value > 0 ? Math.min(CHART_HEIGHT, (bar.value / maxValue) * CHART_HEIGHT) : 0;
+    bar.value > 0
+      ? Math.min(
+          CHART_HEIGHT,
+          (bar.value / maxValue) * CHART_HEIGHT
+        )
+      : 0;
 
-  const height = useSharedValue(0);
-
-  const opacity = useSharedValue(0);
+  const animatedHeight = useSharedValue(0);
+  const animatedOpacity = useSharedValue(0);
 
   useEffect(() => {
-    height.value = 0;
+    animatedHeight.value = 0;
 
-    height.value = withDelay(
+    animatedHeight.value = withDelay(
       index * 50,
       withTiming(targetHeight, {
         duration: 500,
@@ -85,22 +96,27 @@ function BarColumn({ bar, index, maxValue }: BarColumnProps) {
       })
     );
 
-    opacity.value = 0;
+    animatedOpacity.value = 0;
 
-    opacity.value = withDelay(
+    animatedOpacity.value = withDelay(
       index * 50 + 300,
       withTiming(1, {
         duration: 250,
       })
     );
-  }, [height, opacity, index, targetHeight, bar.value]);
+  }, [
+    animatedHeight,
+    animatedOpacity,
+    index,
+    targetHeight,
+  ]);
 
   const barStyle = useAnimatedStyle(() => ({
-    height: height.value,
+    height: animatedHeight.value,
   }));
 
-  const valueLabelStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: animatedOpacity.value,
   }));
 
   return (
@@ -114,11 +130,12 @@ function BarColumn({ bar, index, maxValue }: BarColumnProps) {
       }}>
       <Animated.View
         style={[
-          valueLabelStyle,
+          labelStyle,
           {
+            minHeight: VALUE_LABEL_HEIGHT,
+            justifyContent: 'flex-end',
             alignItems: 'center',
-            marginBottom: 2,
-            minHeight: 20,
+            marginBottom: 3,
           },
         ]}>
         {bar.showMedal && (
@@ -134,7 +151,9 @@ function BarColumn({ bar, index, maxValue }: BarColumnProps) {
         )}
 
         {bar.value > 0 && (
-          <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
+          <Text
+            numberOfLines={1}
+            className="font-body text-xs font-semibold text-[#555555]">
             {formatChartValue(bar.value)}
           </Text>
         )}
@@ -155,39 +174,104 @@ function BarColumn({ bar, index, maxValue }: BarColumnProps) {
   );
 }
 
-export default function BarChart({ bars, target = 0, targetLabel = 'Goal'  }: BarChartProps) {
-  const largestBarValue = Math.max(0, ...bars.map((bar) => bar.value));
+export default function BarChart({
+  bars,
+  target = 0,
+  targetLabel = 'Goal',
+}: BarChartProps) {
+  const largestBarValue = Math.max(
+    0,
+    ...bars.map((bar) => bar.value)
+  );
 
-  /*
-   * Include the target in the chart scale so
-   * the goal line always remains visible.
-   */
-  const largestValue = Math.max(1, largestBarValue, target);
+  const largestValue = Math.max(
+    1,
+    largestBarValue,
+    target
+  );
 
-  /*
-   * Adds some spacing above the tallest value.
-   */
-  const maxValue = largestValue * 1.15;
+  const maxValue = largestValue * 1.18;
 
-  const targetHeight = target > 0 ? Math.min(CHART_HEIGHT, (target / maxValue) * CHART_HEIGHT) : 0;
+  const targetHeight =
+    target > 0
+      ? Math.min(
+          CHART_HEIGHT,
+          (target / maxValue) * CHART_HEIGHT
+        )
+      : 0;
 
-  /*
-   * Position is calculated from the top of
-   * the complete chart area.
-   */
-  const targetTop = VALUE_LABEL_HEIGHT + CHART_HEIGHT - targetHeight;
+  const targetTop =
+    VALUE_LABEL_HEIGHT +
+    CHART_HEIGHT -
+    targetHeight;
+
+  const achievedValue = Math.max(
+    0,
+    ...bars.map((bar) => bar.value)
+  );
+
+  const progressPercent =
+    target > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (achievedValue / target) * 100
+          )
+        )
+      : 0;
 
   return (
-    <View
-      style={{
-        minHeight: CHART_HEIGHT + 80,
-      }}>
+    <View>
+      {/* Goal information above chart */}
+      {target > 0 && (
+        <View className="mb-3 flex-row items-center justify-between">
+          <View>
+            <Text className="font-body text-xs text-[#838383]">
+              Current best
+            </Text>
+
+            <Text className="font-heading text-base font-bold text-[#1A1A1A]">
+              {formatChartValue(achievedValue)}
+            </Text>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              borderRadius: 20,
+              backgroundColor: '#FFF3EC',
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+            }}>
+            <View
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                backgroundColor: ORANGE,
+              }}
+            />
+
+            <Text className="font-body text-xs font-semibold text-[#F76B1C]">
+              {targetLabel} {formatChartValue(target)}
+            </Text>
+
+            {/* <Text className="font-body text-xs text-[#838383]">
+              · {progressPercent}%
+            </Text> */}
+          </View>
+        </View>
+      )}
+
+      {/* Chart */}
       <View
         style={{
           position: 'relative',
           height: CHART_HEIGHT + VALUE_LABEL_HEIGHT,
         }}>
-        {/* Goal line */}
+        {/* Goal line only */}
         {target > 0 && (
           <View
             pointerEvents="none"
@@ -196,42 +280,29 @@ export default function BarChart({ bars, target = 0, targetLabel = 'Goal'  }: Ba
               top: targetTop,
               left: 0,
               right: 0,
-              zIndex: 5,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}>
-            <View
-              style={{
-                flex: 1,
-                borderTopWidth: 1,
-                borderStyle: 'dashed',
-                borderTopColor: GOAL_LINE_COLOR,
-              }}
-            />
-
-            <View
-              style={{
-                marginLeft: 6,
-                backgroundColor: '#FFFFFF',
-                paddingHorizontal: 2,
-              }}>
-              <Text className="font-body text-[11px] font-semibold text-[#1A1A1A]">
-                {targetLabel} {formatChartValue(target)}
-              </Text>
-            </View>
-          </View>
+              zIndex: 1,
+              borderTopWidth: 1,
+              borderStyle: 'dashed',
+              borderTopColor: GOAL_LINE_COLOR,
+            }}
+          />
         )}
 
-        {/* Bars */}
         <View
           className="flex-row items-end"
           style={{
             height: CHART_HEIGHT + VALUE_LABEL_HEIGHT,
             borderBottomWidth: 1,
             borderBottomColor: AXIS_COLOR,
+            zIndex: 2,
           }}>
           {bars.map((bar, index) => (
-            <BarColumn key={`${bar.label}-${index}`} bar={bar} index={index} maxValue={maxValue} />
+            <BarColumn
+              key={`${bar.label}-${index}`}
+              bar={bar}
+              index={index}
+              maxValue={maxValue}
+            />
           ))}
         </View>
       </View>
@@ -249,7 +320,11 @@ export default function BarChart({ bars, target = 0, targetLabel = 'Goal'  }: Ba
               flex: 1,
               alignItems: 'center',
             }}>
-            <Text numberOfLines={1} className="font-body text-sm text-[#838383]">
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              className="font-body text-xs text-[#838383]">
               {bar.label}
             </Text>
           </View>
