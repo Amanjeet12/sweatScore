@@ -85,7 +85,7 @@ export default function CommentRow({ comment, onEdit }: CommentRowProps) {
   return (
     <View className="mb-4 border-b border-background-100 px-4 pb-4">
       <View className="flex-row items-start gap-x-3">
-        <Avatar uri={comment.user.imageUrl} size={36} showGoldBorder />
+        <Avatar uri={comment.user.imageUrl} size={36} showGoldBorder name={comment.user.name} />
         <View className="flex-1">
           <View className="flex-row items-start justify-between">
             <View className="flex-1">

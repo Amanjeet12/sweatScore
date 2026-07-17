@@ -1490,7 +1490,7 @@ export default function DuetRecordingScreen() {
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
                 {isCheckIn
-                  ? `Submit Check-in for ${totalPoints} pts`
+                  ? `Submit Check-In for ${totalPoints} pts`
                   : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
               </ButtonText>
             </LoadingButton>

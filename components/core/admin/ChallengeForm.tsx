@@ -1090,7 +1090,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           </View>
 
           <View className="mb-4">
-            <Text className="mb-2 text-xl font-bold text-primary-500">YouTube Link (Optional)</Text>
+            <Text className="mb-2 text-xl font-bold text-primary-500">Resource Link (Optional)</Text>
 
             <Input size="xl" variant="rounded">
               <InputField
@@ -1229,11 +1229,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
           {mode === 'edit' && initialData && (
             <View className="mb-6 rounded-3xl border border-gray-200 bg-gray-50 p-4">
-              <Text className="text-xl font-bold text-primary-500">Daily Challenge Schedule</Text>
-
-              <Text className="mt-1 text-sm text-gray-500">
-                Scheduling only controls when this challenge appears on the dashboard.
-              </Text>
+              <Text className="text-xl font-bold text-primary-500">Daily Check In Schedule</Text>
 
               <View className="mt-4 rounded-2xl bg-white px-4 py-3">
                 <Text className="text-xs font-semibold uppercase text-gray-400">
@@ -1302,7 +1298,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     loading={scheduleAction === 'current'}
                     disabled={isScheduling || isCurrentChallenge || !initialData.isPublished}>
                     <ButtonText>
-                      {isCurrentChallenge ? 'Current Day' : 'Set Current Day'}
+                      {isCurrentChallenge ? 'Current Day' : 'Set Today'}
                     </ButtonText>
                   </LoadingButton>
                 </View>

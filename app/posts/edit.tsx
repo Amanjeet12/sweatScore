@@ -319,7 +319,7 @@ export default function EditPost() {
           showsVerticalScrollIndicator={false}>
           {/* Avatar + input */}
           <View className="flex-row items-start gap-x-3 px-4 pt-4">
-            <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder />
+            <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder name={currentUser?.name} />
             <View className="flex-1">
               <Input className="h-auto border-0 bg-transparent">
                 <InputField

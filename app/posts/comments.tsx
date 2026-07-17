@@ -152,7 +152,7 @@ export default function PostComments() {
           style={{ backgroundColor: 'white' }}>
           <View className="border-t border-background-100 bg-white px-4 py-3">
             <View className="flex-row items-center gap-x-3">
-              <Avatar uri={currentUser?.image ?? undefined} size={40} showGoldBorder />
+              <Avatar uri={currentUser?.image ?? undefined} size={40} showGoldBorder name={currentUser?.name} />
               <View className="flex-1 flex-row items-center rounded-full bg-background-50 px-4 py-2">
                 <TextInput
                   ref={inputRef}

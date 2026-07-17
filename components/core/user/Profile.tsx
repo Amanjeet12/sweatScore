@@ -17,7 +17,7 @@ export default function Profile({ user }: { user: UserWithImageUrl }) {
         <View className="flex-col">
           <View className="flex-col items-center gap-y-4">
             <View>
-              <Avatar uri={user?.image ?? undefined} />
+              <Avatar uri={user?.image ?? undefined} name={user?.name}/>
             </View>
             <View className="flex-col items-center">
               <Text className="text-[20px] font-bold">{user?.name}</Text>

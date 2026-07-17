@@ -19,7 +19,7 @@ export default function UserRow({ user }: { user: UserWithImageUrl }) {
       }}>
       <View className="mb-4 flex-row items-center">
         <View className="mr-2">
-          <Avatar uri={user.image ?? undefined} size={52} />
+          <Avatar uri={user.image ?? undefined} size={52} name={user?.name}/>
         </View>
         <View className="flex-1">
           <View className="z-50 ml-2 flex-col gap-y-2">

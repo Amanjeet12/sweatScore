@@ -14,12 +14,14 @@ type CompletionRow = {
   coverImageUrl: string | null;
   compositeVideoUrl: string | null;
   timesCompleted: number; // This is now the row's own round number
+  challengeType: ChallengeType;
 };
 
 type ChallengeType = 'challenge' | 'check_in';
 
 export const getYourMoves = query({
   args: {},
+
   handler: async (ctx) => {
     const empty = {
       today: [] as CompletionRow[],
@@ -28,7 +30,10 @@ export const getYourMoves = query({
     };
 
     const userId = await getAuthUserId(ctx);
-    if (!userId) return empty;
+
+    if (!userId) {
+      return empty;
+    }
 
     const user = await ctx.db.get(userId);
     const tz = user?.timezone ?? null;
@@ -36,7 +41,7 @@ export const getYourMoves = query({
     const now = new Date();
     const todayStr = formatDateInTZ(now, tz);
     const mondayStr = ymdUTC(getMondayInTZ(now, tz));
-    const monthStartStr = todayStr.slice(0, 7) + '-01';
+    const monthStartStr = `${todayStr.slice(0, 7)}-01`;
 
     const rows = await ctx.db
       .query('challengeCompletions')
@@ -56,9 +61,11 @@ export const getYourMoves = query({
 
     for (const completion of allUserCompletions) {
       const challengeKey = String(completion.challengeId);
+
       const existing = completionsByChallenge.get(challengeKey) ?? [];
 
       existing.push(completion);
+
       completionsByChallenge.set(challengeKey, existing);
     }
 
@@ -83,15 +90,21 @@ export const getYourMoves = query({
         type: ChallengeType;
       }
     >();
-    for (const r of rows) {
-      const key = String(r.challengeId);
-      if (challengeCache.has(key)) continue;
 
-      const challenge = await ctx.db.get(r.challengeId);
+    for (const row of rows) {
+      const challengeKey = String(row.challengeId);
 
-      challengeCache.set(key, {
+      if (challengeCache.has(challengeKey)) {
+        continue;
+      }
+
+      const challenge = await ctx.db.get(row.challengeId);
+
+      challengeCache.set(challengeKey, {
         name: challenge?.name ?? 'Challenge',
+
         coverImage: challenge?.coverImage ?? null,
+
         type: challenge?.type === 'check_in' ? 'check_in' : 'challenge',
       });
     }
@@ -99,12 +112,18 @@ export const getYourMoves = query({
     const urlCache = new Map<string, string | null>();
 
     const resolveUrl = async (id: Id<'_storage'> | null | undefined): Promise<string | null> => {
-      if (!id) return null;
+      if (!id) {
+        return null;
+      }
 
       const key = String(id);
-      if (urlCache.has(key)) return urlCache.get(key)!;
+
+      if (urlCache.has(key)) {
+        return urlCache.get(key)!;
+      }
 
       const url = await ctx.storage.getUrl(id);
+
       urlCache.set(key, url);
 
       return url;
@@ -112,26 +131,36 @@ export const getYourMoves = query({
 
     const hydrated: CompletionRow[] = [];
 
-    for (const r of rows) {
-      const challengeKey = String(r.challengeId);
-      const chal = challengeCache.get(challengeKey)!;
+    for (const row of rows) {
+      const challengeKey = String(row.challengeId);
 
-      const coverImageUrl = await resolveUrl(chal.coverImage);
+      const challenge = challengeCache.get(challengeKey);
+
+      if (!challenge) {
+        continue;
+      }
+
+      const coverImageUrl = await resolveUrl(challenge.coverImage);
+
       const downloadableVideoStorageId =
-        chal.type === 'check_in' ? r.videoStorageId : r.compositeVideoStorageId;
+        challenge.type === 'check_in' ? row.videoStorageId : row.compositeVideoStorageId;
 
       const compositeVideoUrl = await resolveUrl(downloadableVideoStorageId ?? null);
 
       hydrated.push({
-        _id: r._id,
-        challengeId: r.challengeId,
-        date: r.date,
-        createdAt: r._creationTime,
-        pointsEarned: r.pointsEarned,
-        challengeName: chal.name,
+        _id: row._id,
+        challengeId: row.challengeId,
+        date: row.date,
+        createdAt: row._creationTime,
+        pointsEarned: row.pointsEarned,
+        challengeName: challenge.name,
         coverImageUrl,
         compositeVideoUrl,
-        timesCompleted: roundNumberByCompletionId.get(String(r._id)) ?? 1,
+
+        timesCompleted: roundNumberByCompletionId.get(String(row._id)) ?? 1,
+
+        // Added challenge type
+        challengeType: challenge.type,
       });
     }
 
@@ -139,13 +168,13 @@ export const getYourMoves = query({
     const earlierThisWeek: CompletionRow[] = [];
     const earlierThisMonth: CompletionRow[] = [];
 
-    for (const r of hydrated) {
-      if (r.date === todayStr) {
-        today.push(r);
-      } else if (r.date >= mondayStr && r.date < todayStr) {
-        earlierThisWeek.push(r);
-      } else if (r.date >= monthStartStr && r.date < mondayStr) {
-        earlierThisMonth.push(r);
+    for (const row of hydrated) {
+      if (row.date === todayStr) {
+        today.push(row);
+      } else if (row.date >= mondayStr && row.date < todayStr) {
+        earlierThisWeek.push(row);
+      } else if (row.date >= monthStartStr && row.date < mondayStr) {
+        earlierThisMonth.push(row);
       }
     }
 

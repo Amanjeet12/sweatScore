@@ -72,7 +72,7 @@ const UserCard = ({
           </View>
         )}
       </View>
-      <Avatar uri={user.image ?? undefined} size={44} showGoldBorder />
+      <Avatar uri={user.image ?? undefined} size={44} showGoldBorder name={user?.name}/>
       <View className="ml-1 flex-1 flex-row items-center justify-between gap-x-2">
         <View className="flex-1 flex-row items-center">
           {isCurrentUser ? (

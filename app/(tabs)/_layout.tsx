@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CrownSimple, Fire, VideoCamera, ChatCircleDots, ChartBar } from 'phosphor-react-native';
+import { CrownSimple, Fire, VideoCamera, ChatCircleDots, ChartBar, Trophy } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 
@@ -117,7 +117,7 @@ export default function TabLayout() {
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
-              <VideoCamera
+              <Trophy
                 color={focused ? colors.primary : color}
                 weight={focused ? 'fill' : 'duotone'}
                 size={28}

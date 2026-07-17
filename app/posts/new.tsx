@@ -280,7 +280,12 @@ export default function NewPost() {
           showsVerticalScrollIndicator={false}>
           <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
             <View className="flex-row items-start gap-x-3">
-              <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder />
+              <Avatar
+                uri={currentUser?.image ?? undefined}
+                size={46}
+                showGoldBorder
+                name={currentUser?.name}
+              />
 
               <View className="flex-1">
                 <Text className="font-body text-sm font-bold text-[#1A1A1A]">
@@ -292,9 +297,7 @@ export default function NewPost() {
                     multiline
                     autoFocus
                     className="border-0 bg-transparent px-0 text-base"
-                    placeholder={`What's on your mind, ${
-                      userName || 'there'
-                    }? Share your progress or just check in with the group`}
+                    placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
                     value={body}
                     onChangeText={(text) => {
                       setError(null);

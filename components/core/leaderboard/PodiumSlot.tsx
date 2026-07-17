@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useEffect, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
 import { Avatar } from '~/components/core/Avatar';
@@ -24,24 +25,47 @@ const MEDAL_SRC = {
 } as const;
 
 export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [entry?.image]);
+
+  const firstLetter = entry?.name ? entry.name.trim().substring(0, 1).toUpperCase() : '?';
+
   const avatarSize = isHero ? 96 : 80;
   const medalSize = isHero ? 36 : 28;
   const ringColor = isHero ? '#F76B1C' : '#E8DCD0';
 
   const Wrapper: any = entry && onPress ? TouchableOpacity : View;
+
   const wrapperProps =
-    entry && onPress ? { onPress: () => onPress(entry.userId), activeOpacity: 0.7 } : {};
+    entry && onPress
+      ? {
+          onPress: () => onPress(entry.userId),
+          activeOpacity: 0.7,
+        }
+      : {};
+
+  const hasValidImage = Boolean(entry?.image) && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [entry?.image]);
 
   return (
-    <Wrapper
-      {...wrapperProps}
-      className="items-center"
-      style={{ width: isHero ? 130 : 100 }}>
+    <Wrapper {...wrapperProps} className="items-center" style={{ width: isHero ? 130 : 100 }}>
       <Image
         source={MEDAL_SRC[rank]}
-        style={{ width: medalSize, height: medalSize, marginBottom: 4, zIndex: 2 }}
+        style={{
+          width: medalSize,
+          height: medalSize,
+          marginBottom: 4,
+          zIndex: 2,
+        }}
         contentFit="contain"
       />
+
       {entry ? (
         <View
           className="rounded-full bg-[#F9F9F9] px-3 py-1"
@@ -59,6 +83,7 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
           </Text>
         </View>
       ) : null}
+
       <View
         style={{
           width: avatarSize,
@@ -66,10 +91,36 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
           borderRadius: avatarSize / 2,
           borderWidth: 3,
           borderColor: ringColor,
-          backgroundColor: '#EEE',
+          backgroundColor: '#F76B1C',
           overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
-        {entry ? <Avatar uri={entry.image ?? undefined} size={avatarSize - 6} /> : null}
+        {entry ? (
+          entry.image && !imageFailed ? (
+            <Image
+              source={{ uri: entry.image }}
+              style={{
+                width: avatarSize - 6,
+                height: avatarSize - 6,
+                borderRadius: (avatarSize - 6) / 2,
+              }}
+              contentFit="cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <Text
+              style={{
+                fontSize: isHero ? 34 : 28,
+                lineHeight: isHero ? 40 : 34,
+                color: '#fff',
+                fontFamily: 'Inter_700Bold',
+                textAlign: 'center',
+              }}>
+              {firstLetter}
+            </Text>
+          )
+        ) : null}
       </View>
       <Text className="mt-3 font-body text-base font-medium text-[#1A1A1A]" numberOfLines={1}>
         {entry?.name ? formatName(entry.name) : '-'}

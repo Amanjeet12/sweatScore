@@ -17,6 +17,7 @@ export type MoveRowProps = {
   createdAt: number;
   compositeVideoUrl: string | null;
   timesCompleted: number;
+  challengeType: string;
 };
 
 export default function MoveRow({
@@ -26,6 +27,7 @@ export default function MoveRow({
   createdAt,
   compositeVideoUrl,
   timesCompleted,
+  challengeType,
 }: MoveRowProps) {
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -124,12 +126,13 @@ export default function MoveRow({
           <Text className="font-body text-sm text-[#838383]">
             {formatDistanceToNow(new Date(createdAt))}
           </Text>
-
-          <View className="rounded-full border border-primary-100 bg-primary-50 px-2.5 py-0.5">
-            <Text className="font-body text-[11px] font-bold text-primary-500">
-              Day {timesCompleted}
-            </Text>
-          </View>
+          {challengeType === 'challenge' && (
+            <View className="rounded-full border border-primary-100 bg-primary-50 px-2.5 py-0.5">
+              <Text className="font-body text-[11px] font-bold text-primary-500">
+                Day {timesCompleted}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 

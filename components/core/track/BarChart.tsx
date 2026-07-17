@@ -11,35 +11,41 @@ import Animated, {
 
 import { Text } from '~/components/ui/text';
 
-const formatPoints = (points: number): string => {
-  if (!Number.isFinite(points)) return '0';
+const formatChartValue = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return '0';
+  }
 
-  const absolutePoints = Math.abs(points);
+  const absoluteValue = Math.abs(value);
 
   const compact = (divisor: number, suffix: string) => {
-    const value = points / divisor;
+    const result = value / divisor;
 
-    return `${value.toFixed(Math.abs(value) < 10 ? 1 : 0).replace(/\.0$/, '')}${suffix}`;
+    return `${result.toFixed(Math.abs(result) < 10 ? 1 : 0).replace(/\.0$/, '')}${suffix}`;
   };
 
-  if (absolutePoints >= 1_000_000_000) {
+  if (absoluteValue >= 1_000_000_000) {
     return compact(1_000_000_000, 'B');
   }
 
-  if (absolutePoints >= 1_000_000) {
+  if (absoluteValue >= 1_000_000) {
     return compact(1_000_000, 'M');
   }
 
-  if (absolutePoints >= 1_000) {
+  if (absoluteValue >= 1_000) {
     return compact(1_000, 'K');
   }
 
-  return Math.round(points).toLocaleString();
+  return Math.round(value).toLocaleString();
 };
 
 const CHART_HEIGHT = 220;
+const VALUE_LABEL_HEIGHT = 40;
 const BAR_WIDTH = 28;
+
 const DEFAULT_GREY = '#D9D9D9';
+const AXIS_COLOR = '#838383';
+const GOAL_LINE_COLOR = '#1A1A1A';
 
 export type Bar = {
   label: string;
@@ -50,17 +56,28 @@ export type Bar = {
 
 export type BarChartProps = {
   bars: Bar[];
+  target?: number;
+  targetLabel?: string;
 };
 
-function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue: number }) {
-  const targetHeight = bar.value > 0 ? (bar.value / maxValue) * CHART_HEIGHT : 0;
+type BarColumnProps = {
+  bar: Bar;
+  index: number;
+  maxValue: number;
+};
 
-  const h = useSharedValue(0);
+function BarColumn({ bar, index, maxValue }: BarColumnProps) {
+  const targetHeight =
+    bar.value > 0 ? Math.min(CHART_HEIGHT, (bar.value / maxValue) * CHART_HEIGHT) : 0;
+
+  const height = useSharedValue(0);
+
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    h.value = 0;
-    h.value = withDelay(
+    height.value = 0;
+
+    height.value = withDelay(
       index * 50,
       withTiming(targetHeight, {
         duration: 500,
@@ -69,72 +86,172 @@ function BarColumn({ bar, index, maxValue }: { bar: Bar; index: number; maxValue
     );
 
     opacity.value = 0;
-    opacity.value = withDelay(index * 50 + 300, withTiming(1, { duration: 250 }));
-  }, [targetHeight, bar.value, index]);
+
+    opacity.value = withDelay(
+      index * 50 + 300,
+      withTiming(1, {
+        duration: 250,
+      })
+    );
+  }, [height, opacity, index, targetHeight, bar.value]);
 
   const barStyle = useAnimatedStyle(() => ({
-    height: h.value,
+    height: height.value,
   }));
 
-  const labelStyle = useAnimatedStyle(() => ({
+  const valueLabelStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
   }));
 
   return (
-    <View className="items-center" style={{ flex: 1 }}>
-      <View
-        style={{
-          height: CHART_HEIGHT + 40,
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-        }}>
-        <Animated.View style={[labelStyle, { alignItems: 'center', marginBottom: 2 }]}>
-          {bar.showMedal && (
-            <Image
-              source={require('~/assets/icons/500points.png')}
-              style={{ width: 18, height: 18, marginBottom: 2 }}
-              contentFit="contain"
-            />
-          )}
+    <View
+      style={{
+        flex: 1,
+        height: CHART_HEIGHT + VALUE_LABEL_HEIGHT,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        zIndex: 2,
+      }}>
+      <Animated.View
+        style={[
+          valueLabelStyle,
+          {
+            alignItems: 'center',
+            marginBottom: 2,
+            minHeight: 20,
+          },
+        ]}>
+        {bar.showMedal && (
+          <Image
+            source={require('~/assets/icons/500points.png')}
+            style={{
+              width: 18,
+              height: 18,
+              marginBottom: 2,
+            }}
+            contentFit="contain"
+          />
+        )}
 
-          {bar.value > 0 && (
-            <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
-              {formatPoints(bar.value)}
-            </Text>
-          )}
-        </Animated.View>
+        {bar.value > 0 && (
+          <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
+            {formatChartValue(bar.value)}
+          </Text>
+        )}
+      </Animated.View>
 
-        <Animated.View
-          style={[
-            barStyle,
-            {
-              width: BAR_WIDTH,
-              backgroundColor: bar.color ?? DEFAULT_GREY,
-              borderTopLeftRadius: 4,
-              borderTopRightRadius: 4,
-            },
-          ]}
-        />
-      </View>
+      <Animated.View
+        style={[
+          barStyle,
+          {
+            width: BAR_WIDTH,
+            backgroundColor: bar.color ?? DEFAULT_GREY,
+            borderTopLeftRadius: 4,
+            borderTopRightRadius: 4,
+          },
+        ]}
+      />
     </View>
   );
 }
 
-export default function BarChart({ bars }: BarChartProps) {
-  const maxValue = Math.max(1, ...bars.map((b) => b.value));
+export default function BarChart({ bars, target = 0, targetLabel = 'Goal'  }: BarChartProps) {
+  const largestBarValue = Math.max(0, ...bars.map((bar) => bar.value));
+
+  /*
+   * Include the target in the chart scale so
+   * the goal line always remains visible.
+   */
+  const largestValue = Math.max(1, largestBarValue, target);
+
+  /*
+   * Adds some spacing above the tallest value.
+   */
+  const maxValue = largestValue * 1.15;
+
+  const targetHeight = target > 0 ? Math.min(CHART_HEIGHT, (target / maxValue) * CHART_HEIGHT) : 0;
+
+  /*
+   * Position is calculated from the top of
+   * the complete chart area.
+   */
+  const targetTop = VALUE_LABEL_HEIGHT + CHART_HEIGHT - targetHeight;
 
   return (
-    <View style={{ minHeight: CHART_HEIGHT + 80 }}>
-      <View className="flex-row items-end" style={{ height: CHART_HEIGHT + 40 }}>
-        {bars.map((bar, i) => (
-          <BarColumn key={`${bar.label}-${i}`} bar={bar} index={i} maxValue={maxValue} />
-        ))}
+    <View
+      style={{
+        minHeight: CHART_HEIGHT + 80,
+      }}>
+      <View
+        style={{
+          position: 'relative',
+          height: CHART_HEIGHT + VALUE_LABEL_HEIGHT,
+        }}>
+        {/* Goal line */}
+        {target > 0 && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: targetTop,
+              left: 0,
+              right: 0,
+              zIndex: 5,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            <View
+              style={{
+                flex: 1,
+                borderTopWidth: 1,
+                borderStyle: 'dashed',
+                borderTopColor: GOAL_LINE_COLOR,
+              }}
+            />
+
+            <View
+              style={{
+                marginLeft: 6,
+                backgroundColor: '#FFFFFF',
+                paddingHorizontal: 2,
+              }}>
+              <Text className="font-body text-[11px] font-semibold text-[#1A1A1A]">
+                {targetLabel} {formatChartValue(target)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Bars */}
+        <View
+          className="flex-row items-end"
+          style={{
+            height: CHART_HEIGHT + VALUE_LABEL_HEIGHT,
+            borderBottomWidth: 1,
+            borderBottomColor: AXIS_COLOR,
+          }}>
+          {bars.map((bar, index) => (
+            <BarColumn key={`${bar.label}-${index}`} bar={bar} index={index} maxValue={maxValue} />
+          ))}
+        </View>
       </View>
 
-      <View className="flex-row" style={{ marginTop: 8 }}>
-        {bars.map((bar, i) => (
-          <View key={`label-${bar.label}-${i}`} style={{ flex: 1, alignItems: 'center' }}>
-            <Text className="font-body text-sm text-[#838383]">{bar.label}</Text>
+      {/* Bottom labels */}
+      <View
+        className="flex-row"
+        style={{
+          marginTop: 8,
+        }}>
+        {bars.map((bar, index) => (
+          <View
+            key={`label-${bar.label}-${index}`}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+            }}>
+            <Text numberOfLines={1} className="font-body text-sm text-[#838383]">
+              {bar.label}
+            </Text>
           </View>
         ))}
       </View>

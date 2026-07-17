@@ -339,7 +339,7 @@ export default function ProfileEdit() {
       <View className="mx-4 flex-1 flex-col gap-y-8">
         <View className="flex flex-col items-center gap-y-4">
           <View>
-            <Avatar uri={photo?.uri ?? currentUser?.image ?? undefined} />
+            <Avatar uri={photo?.uri ?? currentUser?.image ?? undefined} name={currentUser?.name}/>
           </View>
           <TouchableOpacity onPress={selectImage}>
             <Text className="text-link  text-[14px]">

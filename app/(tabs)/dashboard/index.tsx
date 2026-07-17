@@ -219,7 +219,12 @@ export default function TabDashboard() {
                 </Text>
               </View>
               <View>
-                <Avatar uri={currentUser?.image ?? undefined} size={56} goToSettings />
+                <Avatar
+                  uri={currentUser?.image ?? undefined}
+                  size={56}
+                  goToSettings
+                  name={currentUser?.name}
+                />
               </View>
             </View>
             <View className="bg-[#F9F9F9]">

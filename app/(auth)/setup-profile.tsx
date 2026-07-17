@@ -196,7 +196,7 @@ export default function SetupProfile() {
               <View className="items-center">
                 <TouchableOpacity onPress={selectImage} activeOpacity={0.7}>
                   {hasAvatar ? (
-                    <Avatar uri={avatarUri} size={88} />
+                    <Avatar uri={avatarUri} size={88} name={name} />
                   ) : (
                     <View
                       style={{

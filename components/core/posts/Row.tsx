@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { Menu, MenuOptions, MenuOption, MenuTrigger } from 'react-native-popup-menu';
 import Share from 'react-native-share';
-
+import { CaretRight } from 'phosphor-react-native';
 import { Avatar } from '~/components/core/Avatar';
 import {
   AlertDialog,
@@ -39,7 +39,6 @@ import { cn } from '~/utils/cn';
 import { colors } from '~/utils/constants';
 import { formatDistanceToNow, intToString } from '~/utils/formatter';
 import { buildCaption } from '~/utils/share';
-
 
 type PostWithUser = {
   _id: Id<'posts'>;
@@ -101,43 +100,23 @@ export function setStopCurrentVideo(fn: (() => void) | null) {
 }
 
 // Mounts only when active — single player instance at a time
-function ActiveVideoPlayer({
-  videoUrl,
-  aspectRatio,
-}: {
-  videoUrl: string;
-  aspectRatio: number;
-}) {
-  const [isBuffering, setIsBuffering] =
-    useState(true);
+function ActiveVideoPlayer({ videoUrl, aspectRatio }: { videoUrl: string; aspectRatio: number }) {
+  const [isBuffering, setIsBuffering] = useState(true);
 
-  const player = useVideoPlayer(
-    videoUrl,
-    (videoPlayer) => {
-      videoPlayer.loop = false;
-      videoPlayer.play();
-    }
-  );
+  const player = useVideoPlayer(videoUrl, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.play();
+  });
 
   useEffect(() => {
-    const statusSubscription =
-      player.addListener(
-        'statusChange',
-        ({ status }) => {
-          setIsBuffering(
-            status !== 'readyToPlay'
-          );
-        }
-      );
+    const statusSubscription = player.addListener('statusChange', ({ status }) => {
+      setIsBuffering(status !== 'readyToPlay');
+    });
 
-    const endSubscription =
-      player.addListener(
-        'playToEnd',
-        () => {
-          player.currentTime = 0;
-          player.pause();
-        }
-      );
+    const endSubscription = player.addListener('playToEnd', () => {
+      player.currentTime = 0;
+      player.pause();
+    });
 
     return () => {
       statusSubscription.remove();
@@ -173,13 +152,9 @@ function ActiveVideoPlayer({
             left: 0,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor:
-              'rgba(0,0,0,0.2)',
+            backgroundColor: 'rgba(0,0,0,0.2)',
           }}>
-          <ActivityIndicator
-            size="large"
-            color="#FFFFFF"
-          />
+          <ActivityIndicator size="large" color="#FFFFFF" />
         </View>
       )}
     </View>
@@ -195,19 +170,11 @@ function ChallengeVideoPlayer({
   thumbnailUrl?: string;
   aspectRatio?: number;
 }) {
-  const [isActive, setIsActive] =
-    useState(false);
+  const [isActive, setIsActive] = useState(false);
 
-  const fallbackRatio =
-    Number.isFinite(aspectRatio) &&
-    aspectRatio > 0
-      ? aspectRatio
-      : 9 / 16;
+  const fallbackRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 9 / 16;
 
-  const [
-    resolvedAspectRatio,
-    setResolvedAspectRatio,
-  ] = useState(fallbackRatio);
+  const [resolvedAspectRatio, setResolvedAspectRatio] = useState(fallbackRatio);
 
   /*
    * Use the thumbnail's exact visible ratio.
@@ -218,9 +185,7 @@ function ChallengeVideoPlayer({
    */
   useEffect(() => {
     if (!thumbnailUrl) {
-      setResolvedAspectRatio(
-        fallbackRatio
-      );
+      setResolvedAspectRatio(fallbackRatio);
 
       return;
     }
@@ -230,22 +195,15 @@ function ChallengeVideoPlayer({
 
       (width, height) => {
         if (width > 0 && height > 0) {
-          setResolvedAspectRatio(
-            width / height
-          );
+          setResolvedAspectRatio(width / height);
         }
       },
 
       () => {
-        setResolvedAspectRatio(
-          fallbackRatio
-        );
+        setResolvedAspectRatio(fallbackRatio);
       }
     );
-  }, [
-    thumbnailUrl,
-    fallbackRatio,
-  ]);
+  }, [thumbnailUrl, fallbackRatio]);
 
   const handlePlay = () => {
     stopCurrentVideo?.();
@@ -254,9 +212,7 @@ function ChallengeVideoPlayer({
       setIsActive(false);
     };
 
-    setStopCurrentVideo(
-      stopThisVideo
-    );
+    setStopCurrentVideo(stopThisVideo);
 
     setIsActive(true);
   };
@@ -269,12 +225,7 @@ function ChallengeVideoPlayer({
         overflow: 'hidden',
       }}>
       {isActive ? (
-        <ActiveVideoPlayer
-          videoUrl={videoUrl}
-          aspectRatio={
-            resolvedAspectRatio
-          }
-        />
+        <ActiveVideoPlayer videoUrl={videoUrl} aspectRatio={resolvedAspectRatio} />
       ) : (
         <TouchableOpacity
           activeOpacity={0.9}
@@ -286,8 +237,7 @@ function ChallengeVideoPlayer({
              * Exact ratio from the generated
              * thumbnail.
              */
-            aspectRatio:
-              resolvedAspectRatio,
+            aspectRatio: resolvedAspectRatio,
 
             backgroundColor: '#000',
             overflow: 'hidden',
@@ -314,16 +264,11 @@ function ChallengeVideoPlayer({
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor:
-                'rgba(26,26,26,0.6)',
+              backgroundColor: 'rgba(26,26,26,0.6)',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Icon.Play
-              size={24}
-              color="#FFFFFF"
-              weight="fill"
-            />
+            <Icon.Play size={24} color="#FFFFFF" weight="fill" />
           </View>
         </TouchableOpacity>
       )}
@@ -575,7 +520,7 @@ export default function PostRow({
     <View className="border-b border-b-[#EEEAE5] bg-white px-4 py-4">
       <View className="flex-row items-start gap-x-2">
         <View>
-          <Avatar uri={post.user.imageUrl} size={46} showGoldBorder />
+          <Avatar uri={post.user.imageUrl} size={46} showGoldBorder name={post?.user?.name} />
         </View>
         <View className="flex-1 flex-col">
           <View className="flex-row justify-between gap-x-2">
@@ -599,20 +544,7 @@ export default function PostRow({
                 <Text className="text-[#838383]"> {formatDistanceToNow(post.createdAt)}</Text>
               </Text>
             </View>
-            {post.challenge?.compositeVideoUrl &&
-              (post.user.isAuthor || (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
-                <TouchableOpacity
-                  className="flex-shrink-0"
-                  onPress={handleDownloadVideo}
-                  disabled={mediaBusy}
-                  style={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-                  {downloading ? (
-                    <ActivityIndicator size="small" color="black" />
-                  ) : (
-                    <Ionicons size={20} name="download-outline" color="black" />
-                  )}
-                </TouchableOpacity>
-              )}
+
             {(post.user.isAuthor || currentUser?.isAdmin || !post.user.isAdmin) && (
               <Menu>
                 <MenuTrigger>
@@ -642,12 +574,23 @@ export default function PostRow({
                           </View>
                         </MenuOption>
                       )}
+                       {post.challenge?.compositeVideoUrl &&
+                        (post.user.isAuthor ||
+                          (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
+                          <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                            <View className="flex-row items-center gap-x-3 px-2 py-2">
+                              <Ionicons size={20} name="download-outline" color="black" />
+                              <Text className="text-base text-black">Download</Text>
+                            </View>
+                          </MenuOption>
+                        )}
                       <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
                         <View className="flex-row items-center gap-x-3 px-2 py-2">
                           <Ionicons name="trash-outline" size={18} color="red" />
                           <Text className="text-base text-red-500">Delete</Text>
                         </View>
                       </MenuOption>
+                     
                     </>
                   ) : currentUser?.isAdmin ? (
                     <>
@@ -793,12 +736,15 @@ export default function PostRow({
                 params: { challengeId: post.challengeId },
               });
             }}>
-            <Image
+            {/* <Image
               source={require('~/assets/icons/Flame.png')}
               style={{ width: 14, height: 14 }}
               resizeMode="contain"
-            />
+            /> */}
+
             <Text className="font-body text-sm font-bold text-primary-500">Do This</Text>
+
+            <CaretRight size={16} weight="bold" color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>

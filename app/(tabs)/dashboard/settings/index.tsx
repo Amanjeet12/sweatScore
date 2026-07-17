@@ -117,15 +117,15 @@ export default function TabSettings() {
           <View className="flex-col">
             <View className="mx-4 flex-col items-center gap-y-4">
               <View>
-                <Avatar uri={currentUser?.image ?? undefined} />
+                <Avatar uri={currentUser?.image ?? undefined} name={currentUser?.name} />
               </View>
 
               <View className="flex-col items-center">
                 <Text className="text-[20px] font-bold">{currentUser?.name}</Text>
 
-                <Text className="text-[14px]">
+                {/* <Text className="text-[14px]">
                   {formatDateToLocaleString(currentUser?.birthdate)}
-                </Text>
+                </Text> */}
 
                 {/* <TouchableOpacity onPress={shareProfile}>
                   <View className="flex-row items-center gap-x-1">
@@ -150,7 +150,7 @@ export default function TabSettings() {
               </Button>
             </View>
 
-            <View className="mx-4 mt-4">
+            {/* <View className="mx-4 mt-4">
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={openWhatsApp}
@@ -165,7 +165,7 @@ export default function TabSettings() {
                   Fast help with setup and app issues.
                 </Text>
               </View>
-            </View>
+            </View> */}
 
             <View className="mt-4">
               <MyActivities />

@@ -17,13 +17,12 @@ export default function YourMovesCard() {
   const todayEmpty = data.today.length === 0;
   const weekEmpty = data.earlierThisWeek.length === 0;
   const monthEmpty = data.earlierThisMonth.length === 0;
-
   const cardEmpty = todayEmpty && weekEmpty && (isPro ? monthEmpty : true);
 
   return (
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Journey</Text>
-      <Text className=" font-body text-sm text-[#838383] pt-1">
+      <Text className=" pt-1 font-body text-sm text-[#838383]">
         Your videos will be saved for 30 days
       </Text>
       {cardEmpty ? (
@@ -47,6 +46,7 @@ export default function YourMovesCard() {
                   createdAt={row.createdAt}
                   compositeVideoUrl={row.compositeVideoUrl}
                   timesCompleted={row.timesCompleted}
+                  challengeType={row.challengeType}
                 />
               ))}
             </>
@@ -65,6 +65,7 @@ export default function YourMovesCard() {
                   createdAt={row.createdAt}
                   compositeVideoUrl={row.compositeVideoUrl}
                   timesCompleted={row.timesCompleted}
+                  challengeType={row.challengeType}
                 />
               ))}
             </>
@@ -84,6 +85,7 @@ export default function YourMovesCard() {
                     createdAt={row.createdAt}
                     compositeVideoUrl={row.compositeVideoUrl}
                     timesCompleted={row.timesCompleted}
+                    challengeType={row.challengeType}
                   />
                 ))}
               </>
