@@ -10,6 +10,7 @@ import {
   Easing,
   Image,
   ImageBackground,
+  Platform,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -233,7 +234,8 @@ export default function DailyChallengeCard() {
         <ImageBackground
           source={require('~/assets/backgrounds/swbg.png')}
           resizeMode="cover"
-          className="h-full w-full">
+          className={Platform.OS === 'ios' ? undefined : 'h-full w-full'}
+          style={Platform.OS === 'ios' ? { flex: 1, width: '100%' } : undefined}>
           <LinearGradient
             colors={[
               'rgba(0,0,0,0.08)',
@@ -242,7 +244,18 @@ export default function DailyChallengeCard() {
               'rgba(0,0,0,0.82)',
             ]}
             locations={[0, 0.35, 0.7, 1]}
-            className="h-full w-full px-3.5 pb-4 pt-3">
+            className={Platform.OS === 'ios' ? undefined : 'h-full w-full px-3.5 pb-4 pt-3'}
+            style={
+              Platform.OS === 'ios'
+                ? {
+                    flex: 1,
+                    width: '100%',
+                    paddingHorizontal: 14,
+                    paddingTop: 12,
+                    paddingBottom: 16,
+                  }
+                : undefined
+            }>
             <View className="flex-row items-center">
               <Image
                 source={require('../../../assets/time.png')}
@@ -253,15 +266,25 @@ export default function DailyChallengeCard() {
                 }}
               />
 
-              <Text className="ml-1.5 text-[11px] font-semibold text-white">Hang tight</Text>
+              <Text
+                className="ml-1.5 text-[11px] font-semibold text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_600SemiBold' } : undefined}>
+                Hang tight
+              </Text>
             </View>
 
             <View className="flex-1" />
 
             <View className="mb-3">
-              <Text className="text-[15px] font-extrabold text-white">Preparing Next Check-In</Text>
+              <Text
+                className="text-[15px] font-extrabold text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
+                Preparing Next Check-In
+              </Text>
 
-              <Text className="mt-0.5 text-[12px] font-medium text-white/90">
+              <Text
+                className="mt-0.5 text-[12px] font-medium text-white/90"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_500Medium' } : undefined}>
                 You&apos;ll be notified when it&apos;s live
               </Text>
             </View>
@@ -273,7 +296,11 @@ export default function DailyChallengeCard() {
                 opacity: 0.45,
               }}
               className="h-[39px] w-full items-center justify-center rounded-[22px] bg-[#A9A9A9]">
-              <Text className="text-[13px] font-bold text-[#262626]">Stay Tuned...</Text>
+              <Text
+                className="text-[13px] font-bold text-[#262626]"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
+                Stay Tuned...
+              </Text>
             </TouchableOpacity>
           </LinearGradient>
         </ImageBackground>
@@ -325,11 +352,23 @@ export default function DailyChallengeCard() {
           uri: dailyChallenge.coverImageUrl ?? undefined,
         }}
         resizeMode="cover"
-        className="h-full w-full">
+        className={Platform.OS === 'ios' ? undefined : 'h-full w-full'}
+        style={Platform.OS === 'ios' ? { flex: 1, width: '100%' } : undefined}>
         <LinearGradient
           colors={['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.84)']}
           locations={[0, 0.34, 0.68, 1]}
-          className="h-full w-full px-3.5 pb-3 pt-3">
+          className={Platform.OS === 'ios' ? undefined : 'h-full w-full px-3.5 pb-3 pt-3'}
+          style={
+            Platform.OS === 'ios'
+              ? {
+                  flex: 1,
+                  width: '100%',
+                  paddingHorizontal: 14,
+                  paddingTop: 12,
+                  paddingBottom: 12,
+                }
+              : undefined
+          }>
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center">
               <Image
@@ -341,11 +380,19 @@ export default function DailyChallengeCard() {
                 }}
               />
 
-              <Text className="ml-1.5 text-[11px] font-semibold text-white">{timerText}</Text>
+              <Text
+                className="ml-1.5 text-[11px] font-semibold text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_600SemiBold' } : undefined}>
+                {timerText}
+              </Text>
             </View>
 
             <View className="rounded-full bg-[#FF5A1F] px-2.5 py-1">
-              <Text className="text-[11px] font-bold text-white">+{dailyChallenge.points} pts</Text>
+              <Text
+                className="text-[11px] font-bold text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
+                +{dailyChallenge.points} pts
+              </Text>
             </View>
           </View>
 
@@ -353,18 +400,26 @@ export default function DailyChallengeCard() {
 
           <View className="mb-2 flex-row items-end justify-between">
             <View className="flex-1 pr-2">
-              <Text numberOfLines={1} className="text-[15px] font-extrabold text-white">
+              <Text
+                numberOfLines={1}
+                className="text-[15px] font-extrabold text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
                 {dailyChallenge.name}
               </Text>
 
-              <Text numberOfLines={1} className="mt-0.5 text-[12px] font-medium text-white/90">
+              <Text
+                numberOfLines={1}
+                className="mt-0.5 text-[12px] font-medium text-white/90"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_500Medium' } : undefined}>
                 {selectedDescription}
               </Text>
             </View>
+
             {dailyChallenge.communityDoneToday > 0 && (
-              <Text className="text-right text-[12px] font-semibold leading-4 text-white">
-                {dailyChallenge.communityDoneToday}{' '}
-                {dailyChallenge.communityDoneToday > 1 ? 'Sweat Sisters' : 'Sweat Sister'}
+              <Text
+                className="text-right text-[12px] font-semibold leading-4 text-white"
+                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_600SemiBold' } : undefined}>
+                {dailyChallenge.communityDoneToday} Sweat Sisters
                 {'\n'}
                 checked in
               </Text>
@@ -469,7 +524,8 @@ export default function DailyChallengeCard() {
                         : secondsRemaining <= 0
                           ? 'text-gray-500'
                           : 'text-[#161616]'
-                    }`}>
+                    }`}
+                    style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
                     {isCompleted
                       ? 'Check-In Completed'
                       : secondsRemaining <= 0
