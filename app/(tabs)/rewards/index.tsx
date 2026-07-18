@@ -80,28 +80,29 @@ export default function TabTrack() {
               </Text>
 
               {rewardsBanner?.title && rewardsBanner?.targetPoints && rewardsBanner?.imageUrl && (
-                  <MonthlyProgressCard
-                    coverImageUrl={rewardsBanner.imageUrl}
-                    title={rewardsBanner.title}
-                    targetPoints={rewardsBanner.targetPoints}
-                    earnedPoints={leaderboard?.displayTotalPoints ?? 0}
-                  />
+                <MonthlyProgressCard
+                  coverImageUrl={rewardsBanner.imageUrl}
+                  title={rewardsBanner.title}
+                  targetPoints={rewardsBanner.targetPoints}
+                  earnedPoints={leaderboard?.displayTotalPoints ?? 0}
+                />
               )}
             </View>
-
-            <YourStreakCard
-              currentWeeklyStreak={overview?.lifetime.currentWeeklyStreak ?? 0}
-              longestWeeklyStreak={overview?.lifetime.longestWeeklyStreak ?? 0}
-              days={days}
-              daysMet={daysMet}
-              targetDaysGoal={WEEKLY_TARGET_DAYS}
-              todayIndex={todayIndexMondayFirst()}
-            />
 
             <View className="mt-4">
               <YourSweatCard />
             </View>
 
+            <View className="mt-4">
+              <YourStreakCard
+                currentWeeklyStreak={overview?.lifetime.currentWeeklyStreak ?? 0}
+                longestWeeklyStreak={overview?.lifetime.longestWeeklyStreak ?? 0}
+                days={days}
+                daysMet={daysMet}
+                targetDaysGoal={WEEKLY_TARGET_DAYS}
+                todayIndex={todayIndexMondayFirst()}
+              />
+            </View>
             <View className="mt-4">
               <YourMovesCard />
             </View>

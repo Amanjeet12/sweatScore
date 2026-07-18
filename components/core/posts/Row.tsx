@@ -463,13 +463,21 @@ export default function PostRow({
     setSharing(false);
   };
 
+  const downloadableVideoUrl =
+    post.challenge?.compositeVideoUrl?.trim() ||
+    (post.mediaType === 'video' ? post.mediaUrl?.trim() : undefined);
+
   const handleDownloadVideo = async () => {
-    if (!post.challenge?.compositeVideoUrl || mediaBusy) return;
+    if (!downloadableVideoUrl || mediaBusy) {
+      return;
+    }
 
     let permission = mediaPermission;
+
     if (!permission?.granted) {
       permission = await requestMediaPermission();
     }
+
     if (!permission?.granted) {
       Alert.alert(
         'Permission required',
@@ -479,18 +487,24 @@ export default function PostRow({
     }
 
     setDownloading(true);
-    const localUri = FileSystem.cacheDirectory + 'download_video_' + Date.now() + '.mp4';
+
+    const localUri = FileSystem.cacheDirectory + `download_video_${Date.now()}.mp4`;
+
     const [err] = await CatchPromise(
-      FileSystem.downloadAsync(post.challenge.compositeVideoUrl, localUri).then(() =>
-        MediaLibrary.saveToLibraryAsync(localUri)
-      )
+      FileSystem.downloadAsync(downloadableVideoUrl, localUri).then(async ({ uri }) => {
+        await MediaLibrary.saveToLibraryAsync(uri);
+      })
     );
+
     setDownloading(false);
 
     if (err) {
+      console.error('Video download failed:', err);
+
       Alert.alert('Download failed', 'Could not save the video. Please try again.');
       return;
     }
+
     Alert.alert('Saved', 'Video saved to your gallery.');
   };
 
@@ -574,7 +588,7 @@ export default function PostRow({
                           </View>
                         </MenuOption>
                       )}
-                       {post.challenge?.compositeVideoUrl &&
+                      {downloadableVideoUrl &&
                         (post.user.isAuthor ||
                           (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
                           <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
@@ -590,7 +604,6 @@ export default function PostRow({
                           <Text className="text-base text-red-500">Delete</Text>
                         </View>
                       </MenuOption>
-                     
                     </>
                   ) : currentUser?.isAdmin ? (
                     <>
@@ -604,6 +617,12 @@ export default function PostRow({
                         <View className="flex-row items-center gap-x-3 px-2 py-2">
                           <Ionicons name="flag-outline" size={18} color="black" />
                           <Text className="text-base text-black">Report Post</Text>
+                        </View>
+                      </MenuOption>
+                      <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                        <View className="flex-row items-center gap-x-3 px-2 py-2">
+                          <Ionicons size={20} name="download-outline" color="black" />
+                          <Text className="text-base text-black">Download</Text>
                         </View>
                       </MenuOption>
                       <MenuOption onSelect={handleBlockUser} disabled={isLoading}>

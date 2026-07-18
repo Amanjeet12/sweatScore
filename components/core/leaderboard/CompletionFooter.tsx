@@ -18,7 +18,7 @@ export default function CompletionFooter({ completedCount }: CompletionFooterPro
         contentFit="contain"
       />
       <Text className="font-body text-sm text-[#1A1A1A]">
-        <Text className="text-[#F76B1C]" style={{ fontFamily: 'Inter_700Bold' }}>
+        <Text className="text-[#F76B1C]" >
           {completedCount} Sweat {completedCount === 1 ? 'Sister' : 'Sisters'}
         </Text>{' '}
         {completedCount === 1 ? 'has' : 'have'} completed the challenge!

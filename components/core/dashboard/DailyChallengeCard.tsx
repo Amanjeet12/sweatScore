@@ -361,10 +361,10 @@ export default function DailyChallengeCard() {
                 {selectedDescription}
               </Text>
             </View>
-
             {dailyChallenge.communityDoneToday > 0 && (
               <Text className="text-right text-[12px] font-semibold leading-4 text-white">
-                {dailyChallenge.communityDoneToday} Sweat Sisters
+                {dailyChallenge.communityDoneToday}{' '}
+                {dailyChallenge.communityDoneToday > 1 ? 'Sweat Sisters' : 'Sweat Sister'}
                 {'\n'}
                 checked in
               </Text>

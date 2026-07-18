@@ -501,7 +501,6 @@ export default function ProfileEdit() {
           </View>
         ) : null}
 
-        {Platform.OS === 'ios' ? (
           <View className="flex-row items-center justify-between">
             <View className="flex-1">
               <Text className="text-[16px] font-semibold">Health Data Sync</Text>
@@ -525,7 +524,6 @@ export default function ProfileEdit() {
               )}
             </View>
           </View>
-        ) : null}
       </View>
     </SafeAreaView>
   );
