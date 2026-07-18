@@ -6,6 +6,7 @@ import { components, internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import { appVersions } from './appVersions';
 import { MailerLiteGroup } from './mailerlite';
+import { Id } from './_generated/dataModel';
 
 function getDaysBetweenDates(date1: Date, date2: Date): number {
   // Clone dates to avoid mutating originals
@@ -357,5 +358,120 @@ export const processDailyMissionNotifications = internalMutation({
         });
       }
     }
+  },
+});
+
+
+export const processNewDailyChallengeNotification = internalMutation({
+  args: {
+    challengeId: v.id('challenges'),
+    expectedStartAt: v.number(),
+  },
+
+  handler: async (ctx, args) => {
+    const challenge = await ctx.db.get(args.challengeId);
+
+    if (!challenge) {
+      return {
+        success: false,
+        sent: 0,
+        reason: 'Challenge not found',
+      };
+    }
+
+    const now = Date.now();
+    const startsAt = challenge.dailyStartAt ?? 0;
+    const endsAt = challenge.dailyEndAt ?? 0;
+
+    /*
+     * Prevent an old scheduled function from sending a
+     * notification after the admin replaces or removes
+     * the daily challenge.
+     */
+    const challengeIsCurrentlyActive =
+      challenge.isPublished &&
+      challenge.isDailyChallenge === true &&
+      startsAt === args.expectedStartAt &&
+      startsAt <= now &&
+      endsAt > now;
+
+    if (!challengeIsCurrentlyActive) {
+      return {
+        success: false,
+        sent: 0,
+        reason: 'Challenge is no longer active',
+      };
+    }
+
+    /*
+     * Prevent duplicate broadcasts.
+     *
+     * setNextDailyChallenge can be called more than once,
+     * which could otherwise create multiple scheduled jobs.
+     */
+    const dispatchKey = `dailyChallengeNotification:${challenge._id}:${args.expectedStartAt}`;
+
+    const existingDispatch = await ctx.db
+      .query('appConfig')
+      .withIndex('by_key', (q) => q.eq('key', dispatchKey))
+      .unique();
+
+    if (existingDispatch) {
+      return {
+        success: true,
+        sent: 0,
+        reason: 'Notification already dispatched',
+      };
+    }
+
+    /*
+     * Only notify onboarded users who enabled notifications
+     * and have an Expo push token.
+     */
+    const users = await ctx.db
+      .query('users')
+      .withIndex('notificationEnabled', (q) => q.eq('notificationEnabled', true))
+      .collect();
+
+    const recipientIds: Id<'users'>[] = users
+      .filter((user) => user.onboarded === true && Boolean(user.expoPushToken))
+      .map((user) => user._id);
+
+    /*
+     * Store the dispatch marker in the same transaction.
+     * Convex also atomically schedules the following actions
+     * when this mutation commits.
+     */
+    await ctx.db.insert('appConfig', {
+      key: dispatchKey,
+      value: String(now),
+    });
+
+    /*
+     * Avoid sending one extremely large payload.
+     */
+    const batchSize = 100;
+
+    for (let index = 0; index < recipientIds.length; index += batchSize) {
+      const userBatch = recipientIds.slice(index, index + batchSize);
+
+      await ctx.scheduler.runAfter(
+        0,
+        internal.pushNotification.sendPushNotification,
+        {
+          userId: userBatch,
+          notificationType: 'newDailyChallenge',
+          options: {
+            challengeId: challenge._id,
+            challengeName: challenge.name,
+          },
+        }
+      );
+    }
+
+    return {
+      success: true,
+      sent: recipientIds.length,
+    };
   },
 });

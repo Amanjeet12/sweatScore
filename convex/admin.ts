@@ -1277,6 +1277,11 @@ export const setCurrentDailyChallenge = mutation({
       shortDescription,
     });
 
+    await ctx.scheduler.runAfter(0, internal.notifications.processNewDailyChallengeNotification, {
+      challengeId: args.challengeId,
+      expectedStartAt: startsAt,
+    });
+
     return {
       success: true,
       challengeId: args.challengeId,
@@ -1399,6 +1404,15 @@ export const setNextDailyChallenge = mutation({
       dailyEndAt: endsAt,
       shortDescription,
     });
+
+    await ctx.scheduler.runAt(
+      startsAt,
+      internal.notifications.processNewDailyChallengeNotification,
+      {
+        challengeId: args.challengeId,
+        expectedStartAt: startsAt,
+      }
+    );
 
     return {
       success: true,

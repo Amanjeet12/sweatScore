@@ -49,6 +49,12 @@ export const notificationContents = {
     title: 'Your duet is live! 🎬',
     body: 'Check it out in the community.',
   },
+
+  // Add this
+  newDailyChallenge: {
+    title: 'New Check-In 🔥',
+    body: '{challengeName} is live now. Tap to join and earn Sweat Points!',
+  },
 };
 
 function interpolate(template: string, options: Record<string, string>) {
@@ -69,13 +75,16 @@ export const sendPushNotification = internalAction({
       v.literal('newCommentPosted'),
       v.literal('newAdminPost'),
       v.literal('noActivityReminder'),
-      v.literal('challengePostLive')
+      v.literal('challengePostLive'),
+      v.literal('newDailyChallenge')
     ),
     options: v.optional(
       v.object({
         userName: v.optional(v.string()),
         date: v.optional(v.string()),
         postId: v.optional(v.id('posts')),
+        challengeId: v.optional(v.id('challenges')),
+        challengeName: v.optional(v.string()),
       })
     ),
   },
@@ -87,7 +96,7 @@ export const sendPushNotification = internalAction({
     const interpolatedBody = interpolate(body, args.options ?? {});
 
     for (const userId of args.userId) {
-      await pushNotifications.sendPushNotification(ctx as any , {
+      await pushNotifications.sendPushNotification(ctx as any, {
         userId,
         notification: {
           title: interpolatedTitle,
@@ -108,7 +117,7 @@ export const sendMarketingPushNotification = internalAction({
   handler: async (ctx, args) => {
     const pushNotifications = new PushNotifications(components.pushNotifications);
 
-    await pushNotifications.sendPushNotification(ctx as any , {
+    await pushNotifications.sendPushNotification(ctx as any, {
       userId: args.userId,
       notification: {
         title: args.title,
