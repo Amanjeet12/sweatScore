@@ -678,7 +678,7 @@ function SweatProgressRow({
                 className="font-heading text-lg font-extrabold"
                 style={{
                   color: completed
-                    ? '#FF4B1F'
+                    ? '#111111'
                     : '#111111',
                 }}>
                 {formatNumber(value)}

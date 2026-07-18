@@ -21,9 +21,7 @@ const formatChartValue = (value: number): string => {
   const compact = (divisor: number, suffix: string) => {
     const result = value / divisor;
 
-    return `${result
-      .toFixed(Math.abs(result) < 10 ? 1 : 0)
-      .replace(/\.0$/, '')}${suffix}`;
+    return `${result.toFixed(Math.abs(result) < 10 ? 1 : 0).replace(/\.0$/, '')}${suffix}`;
   };
 
   if (absoluteValue >= 1_000_000_000) {
@@ -69,18 +67,9 @@ type BarColumnProps = {
   maxValue: number;
 };
 
-function BarColumn({
-  bar,
-  index,
-  maxValue,
-}: BarColumnProps) {
+function BarColumn({ bar, index, maxValue }: BarColumnProps) {
   const targetHeight =
-    bar.value > 0
-      ? Math.min(
-          CHART_HEIGHT,
-          (bar.value / maxValue) * CHART_HEIGHT
-        )
-      : 0;
+    bar.value > 0 ? Math.min(CHART_HEIGHT, (bar.value / maxValue) * CHART_HEIGHT) : 0;
 
   const animatedHeight = useSharedValue(0);
   const animatedOpacity = useSharedValue(0);
@@ -104,12 +93,7 @@ function BarColumn({
         duration: 250,
       })
     );
-  }, [
-    animatedHeight,
-    animatedOpacity,
-    index,
-    targetHeight,
-  ]);
+  }, [animatedHeight, animatedOpacity, index, targetHeight]);
 
   const barStyle = useAnimatedStyle(() => ({
     height: animatedHeight.value,
@@ -151,9 +135,7 @@ function BarColumn({
         )}
 
         {bar.value > 0 && (
-          <Text
-            numberOfLines={1}
-            className="font-body text-xs font-semibold text-[#555555]">
+          <Text numberOfLines={1} className="font-body text-xs font-semibold text-[#555555]">
             {formatChartValue(bar.value)}
           </Text>
         )}
@@ -174,51 +156,21 @@ function BarColumn({
   );
 }
 
-export default function BarChart({
-  bars,
-  target = 0,
-  targetLabel = 'Goal',
-}: BarChartProps) {
-  const largestBarValue = Math.max(
-    0,
-    ...bars.map((bar) => bar.value)
-  );
+export default function BarChart({ bars, target = 0, targetLabel = 'Goal' }: BarChartProps) {
+  const largestBarValue = Math.max(0, ...bars.map((bar) => bar.value));
 
-  const largestValue = Math.max(
-    1,
-    largestBarValue,
-    target
-  );
+  const largestValue = Math.max(1, largestBarValue, target);
 
   const maxValue = largestValue * 1.18;
 
-  const targetHeight =
-    target > 0
-      ? Math.min(
-          CHART_HEIGHT,
-          (target / maxValue) * CHART_HEIGHT
-        )
-      : 0;
+  const targetHeight = target > 0 ? Math.min(CHART_HEIGHT, (target / maxValue) * CHART_HEIGHT) : 0;
 
-  const targetTop =
-    VALUE_LABEL_HEIGHT +
-    CHART_HEIGHT -
-    targetHeight;
+  const targetTop = VALUE_LABEL_HEIGHT + CHART_HEIGHT - targetHeight;
 
-  const achievedValue = Math.max(
-    0,
-    ...bars.map((bar) => bar.value)
-  );
+  const achievedValue = Math.max(0, ...bars.map((bar) => bar.value));
 
   const progressPercent =
-    target > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (achievedValue / target) * 100
-          )
-        )
-      : 0;
+    target > 0 ? Math.min(100, Math.round((achievedValue / target) * 100)) : 0;
 
   return (
     <View>
@@ -226,9 +178,7 @@ export default function BarChart({
       {target > 0 && (
         <View className="mb-3 flex-row items-center justify-between">
           <View>
-            <Text className="font-body text-xs text-[#838383]">
-              Current best
-            </Text>
+            <Text className="font-body text-xs text-[#838383]">Current best</Text>
 
             <Text className="font-heading text-base font-bold text-[#1A1A1A]">
               {formatChartValue(achievedValue)}
@@ -241,20 +191,15 @@ export default function BarChart({
               alignItems: 'center',
               gap: 6,
               borderRadius: 20,
-              backgroundColor: '#FFF3EC',
+              // backgroundColor: '#FFF3EC',
               paddingHorizontal: 12,
               paddingVertical: 7,
             }}>
-            <View
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: 4,
-                backgroundColor: ORANGE,
-              }}
-            />
+            <View>
+              <Text>---</Text>
+            </View>
 
-            <Text className="font-body text-xs font-semibold text-[#F76B1C]">
+            <Text className="font-body text-xs font-semibold text-[#000]">
               {targetLabel} {formatChartValue(target)}
             </Text>
 
@@ -297,12 +242,7 @@ export default function BarChart({
             zIndex: 2,
           }}>
           {bars.map((bar, index) => (
-            <BarColumn
-              key={`${bar.label}-${index}`}
-              bar={bar}
-              index={index}
-              maxValue={maxValue}
-            />
+            <BarColumn key={`${bar.label}-${index}`} bar={bar} index={index} maxValue={maxValue} />
           ))}
         </View>
       </View>

@@ -17,6 +17,7 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
+import { ImageSquare, VideoCamera } from 'phosphor-react-native';
 
 const COMMUNITY_TAGLINES = [
   "Share what's on your plate today, [name]!",
@@ -140,28 +141,37 @@ const TabShare = () => {
               <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleCreatePost}
-              className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">
-              <View style={styles.avatar}>
-                {userImage ? (
-                  <Image
-                    source={{ uri: userImage }}
-                    style={StyleSheet.absoluteFillObject}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <Text className="font-heading text-sm font-bold text-white">{userInitial}</Text>
-                )}
-              </View>
+            <View className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleCreatePost}
+                className="flex-1 flex-row items-center">
+                <View style={styles.avatar}>
+                  {userImage ? (
+                    <Image
+                      source={{ uri: userImage }}
+                      style={StyleSheet.absoluteFillObject}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <Text className="font-heading text-sm font-bold text-white">{userInitial}</Text>
+                  )}
+                </View>
 
-              <Text
-                className="text-[#555658 ] flex-1 pr-2 font-body text-sm"
-                numberOfLines={2}>
-                {communityTagline}
-              </Text>
-            </TouchableOpacity>
+                <Text className="flex-1 pr-2 font-body text-sm text-[#555658]" numberOfLines={2}>
+                  {communityTagline}
+                </Text>
+              </TouchableOpacity>
+
+              <View className="ml-2 flex-row items-center gap-x-2">
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleCreatePost}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-[#FFF2E9]">
+                  <ImageSquare size={20} color="#F76B1C" weight="bold" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
 
           {status === 'LoadingFirstPage' ? (

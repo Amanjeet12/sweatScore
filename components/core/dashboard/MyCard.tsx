@@ -1,12 +1,10 @@
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { ArrowUpRightIcon } from 'lucide-react-native';
 import * as Icon from 'phosphor-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Modal, Platform, TouchableOpacity, View } from 'react-native';
-import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import { useMemo, useState } from 'react';
+import { Linking, Platform, TouchableOpacity, View } from 'react-native';
 
 import SwipeableMissionCard from './SwipeableMissionCard';
 
@@ -28,59 +26,6 @@ import { pointText } from '~/utils/helpers';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
 import { CHALLENGE_TYPE } from '~/utils/types';
 
-type MilestonePopupContent = {
-  key: string;
-  points: number;
-  icon: string;
-  title: string;
-  highlight: string;
-  body: string;
-  buttonText: string;
-};
-
-const POINT_MILESTONES: MilestonePopupContent[] = [
-  {
-    key: 'points-1000',
-    points: 1000,
-    icon: '🔥',
-    title: "You’re on a roll!",
-    highlight: '1,000 points earned ✓',
-    body: "You've earned 1,000 lifetime points, sis. Let the sisterhood know you’re killing it!",
-    buttonText: 'Share Your Milestone!',
-  },
-  {
-    key: 'points-5000',
-    points: 5000,
-    icon: '🔥',
-    title: "You’re on a roll!",
-    highlight: '5,000 points earned ✓',
-    body: "You've earned 5,000 lifetime points, sis. Let the sisterhood know you’re killing it!",
-    buttonText: 'Share Your Milestone!',
-  },
-  {
-    key: 'points-10000',
-    points: 10000,
-    icon: '🔥',
-    title: "You’re on a roll!",
-    highlight: '10,000 points earned ✓',
-    body: "You've earned 10,000 lifetime points, sis. Let the sisterhood know you’re killing it!",
-    buttonText: 'Share Your Milestone!',
-  },
-  {
-    key: 'points-25000',
-    points: 25000,
-    icon: '🔥',
-    title: "You’re on a roll!",
-    highlight: '25,000 points earned ✓',
-    body: "You've earned 25,000 lifetime points, sis. Let the sisterhood know you’re killing it!",
-    buttonText: 'Share Your Milestone!',
-  },
-];
-
-const getReachedPointMilestone = (totalPoints: number) => {
-  return [...POINT_MILESTONES].reverse().find((milestone) => totalPoints >= milestone.points);
-};
-
 const MyCard = ({ refreshKey }: { refreshKey: number }) => {
   const [showCheckInAlertDialog, setShowCheckInAlertDialog] = useState(false);
   const [showStepsAlertDialog, setShowStepsAlertDialog] = useState(false);
@@ -90,11 +35,6 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
   const [showPointsAlertDialog, setShowPointsAlertDialog] = useState(false);
   const [showMissionLeftDaysCountAlertDialog, setShowMissionLeftDaysCountAlertDialog] =
     useState(false);
-  const [activeMilestonePopup, setActiveMilestonePopup] = useState<MilestonePopupContent | null>(
-    null
-  );
-  const shownMilestoneKeysRef = useRef<Set<string>>(new Set());
-
   const yearMonth = useMemo(() => {
     const today = new Date();
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -135,21 +75,7 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
     })
   );
 
-  const { data: rewardsBanner } = useQuery(convexQuery(api.admin.getRewardsBanner, {}));
-
   const { isPro } = useRevenueCat();
-
-  useEffect(() => {
-    const totalPoints = leaderboard?.displayTotalPoints ?? 0;
-    const reachedMilestone = getReachedPointMilestone(totalPoints);
-
-    if (!reachedMilestone || shownMilestoneKeysRef.current.has(reachedMilestone.key)) {
-      return;
-    }
-
-    shownMilestoneKeysRef.current.add(reachedMilestone.key);
-    setActiveMilestonePopup(reachedMilestone);
-  }, [leaderboard?.displayTotalPoints]);
 
   const progress = useMemo(() => {
     if (!challenge || !challenge.target || !pointsForDate) return null;
@@ -585,16 +511,6 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
         </View>
       </View>
 
-      <MilestonePopup
-        visible={!!activeMilestonePopup}
-        content={activeMilestonePopup}
-        onClose={() => setActiveMilestonePopup(null)}
-        onShare={() => {
-          setActiveMilestonePopup(null);
-          router.push('/share');
-        }}
-      />
-
       <MyCardAlertDialog
         showAlertDialog={showMissionPointsAlertDialog}
         handleClose={() => setShowMissionPointsAlertDialog(false)}
@@ -676,64 +592,6 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
         }}
       />
     </>
-  );
-};
-
-const MilestonePopup = ({
-  visible,
-  content,
-  onClose,
-  onShare,
-}: {
-  visible: boolean;
-  content: MilestonePopupContent | null;
-  onClose: () => void;
-  onShare: () => void;
-}) => {
-  if (!content) return null;
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View className="flex-1 items-center justify-center bg-black/30 px-5">
-        <View className="relative w-full rounded-[28px] bg-white px-6 pb-6 pt-5">
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={onClose}
-            className="absolute right-3 top-3 z-10 h-8 w-8 items-center justify-center rounded-full bg-[#E5E5E5]">
-            <Icon.X size={22} weight="bold" color="white" />
-          </TouchableOpacity>
-
-          <Text className="text-center text-[42px] leading-[48px]">{content.icon}</Text>
-
-          <Text className="mt-1 text-center font-heading text-[20px] font-bold text-[#202020]">
-            {content.title}
-          </Text>
-
-          <Text className="mt-4 text-center text-[15px] font-extrabold text-primary-500">
-            {content.highlight}
-          </Text>
-
-          <Text className="mx-2 mt-3 text-center text-[15px] leading-5 text-[#555555]">
-            {content.body}
-          </Text>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={onShare}
-            className="mt-8 h-12 items-center justify-center rounded-full bg-primary-500">
-            <Text className="font-heading text-[15px] font-bold text-white">
-              {content.buttonText}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity activeOpacity={0.85} onPress={onClose} className="mt-4">
-            <Text className="text-center text-[15px] font-medium text-[#555555]">
-              Keep sweating
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
   );
 };
 

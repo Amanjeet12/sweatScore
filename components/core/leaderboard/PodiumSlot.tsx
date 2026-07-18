@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
-import { Avatar } from '~/components/core/Avatar';
 import { Text } from '~/components/ui/text';
 import { formatName } from '~/utils/formatter';
 
@@ -22,6 +21,12 @@ const MEDAL_SRC = {
   1: require('~/assets/icons/Gold cup.png'),
   2: require('~/assets/icons/Silver medal.png'),
   3: require('~/assets/icons/Bronze medal.png'),
+} as const;
+
+const RANK_LABEL = {
+  1: '1st',
+  2: '2nd',
+  3: '3rd',
 } as const;
 
 export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotProps) {
@@ -47,12 +52,6 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
         }
       : {};
 
-  const hasValidImage = Boolean(entry?.image) && !imageFailed;
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [entry?.image]);
-
   return (
     <Wrapper {...wrapperProps} className="items-center" style={{ width: isHero ? 130 : 100 }}>
       <Image
@@ -60,22 +59,31 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
         style={{
           width: medalSize,
           height: medalSize,
-          marginBottom: 4,
-          zIndex: 2,
         }}
         contentFit="contain"
       />
+
+      {/* Rank text */}
+      <Text
+        className="mt-1 text-xs font-bold text-[#6B6B6B]"
+        style={{ fontFamily: 'Inter_700Bold' }}>
+        {RANK_LABEL[rank]}
+      </Text>
 
       {entry ? (
         <View
           className="rounded-full bg-[#F9F9F9] px-3 py-1"
           style={{
+            marginTop: 4,
             marginBottom: -14,
             zIndex: 3,
             shadowColor: '#000',
             shadowOpacity: 0.08,
             shadowRadius: 4,
-            shadowOffset: { width: 0, height: 2 },
+            shadowOffset: {
+              width: 0,
+              height: 2,
+            },
             elevation: 3,
           }}>
           <Text className="text-sm text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
@@ -113,7 +121,7 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
               style={{
                 fontSize: isHero ? 34 : 28,
                 lineHeight: isHero ? 40 : 34,
-                color: '#fff',
+                color: '#FFFFFF',
                 fontFamily: 'Inter_700Bold',
                 textAlign: 'center',
               }}>
@@ -122,6 +130,7 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
           )
         ) : null}
       </View>
+
       <Text className="mt-3 font-body text-base font-medium text-[#1A1A1A]" numberOfLines={1}>
         {entry?.name ? formatName(entry.name) : '-'}
       </Text>

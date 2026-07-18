@@ -17,6 +17,7 @@ import {
 
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useAuthStore } from '~/store/useAuthStore';
 import { colors } from '~/utils/constants';
 
 function formatRemainingTime(seconds: number) {
@@ -41,6 +42,8 @@ export default function DailyChallengeCard() {
    * to rerun the time-based query.
    */
   const [refreshToken, setRefreshToken] = useState(0);
+  const currentUser = useAuthStore((state) => state.currentUser);
+
 
   const dailyChallenge = useQuery(api.challengeCompletions.getTodayDailyChallenge, {
     refreshToken,
@@ -201,6 +204,10 @@ export default function DailyChallengeCard() {
     inputRange: [0, 0.6, 1],
     outputRange: [0.55, 0.25, 0],
   });
+
+
+  const firstName =
+  currentUser?.name?.trim().split(/\s+/)[0] || '';
 
   if (dailyChallenge === undefined) {
     return (
@@ -416,10 +423,9 @@ export default function DailyChallengeCard() {
             </View>
 
             {dailyChallenge.communityDoneToday > 0 && (
-              <Text
-                className="text-right text-[12px] font-semibold leading-4 text-white"
-                style={Platform.OS === 'ios' ? { fontFamily: 'Inter_600SemiBold' } : undefined}>
-                {dailyChallenge.communityDoneToday} Sweat Sisters
+              <Text className="text-right text-[12px] font-semibold leading-4 text-white">
+                {dailyChallenge.communityDoneToday}{' '}
+                {dailyChallenge.communityDoneToday > 1 ? 'Sweat Sisters' : 'Sweat Sister'}
                 {'\n'}
                 checked in
               </Text>
@@ -517,21 +523,25 @@ export default function DailyChallengeCard() {
                 <View className="flex-row items-center justify-center">
                   {isCompleted && <Check size={16} color="#555" weight="bold" />}
 
-                  <Text
-                    className={`text-[14px] font-extrabold ${
-                      isCompleted
-                        ? 'ml-1 text-gray-600'
-                        : secondsRemaining <= 0
-                          ? 'text-gray-500'
-                          : 'text-[#161616]'
-                    }`}
-                    style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
-                    {isCompleted
-                      ? 'Check-In Completed'
-                      : secondsRemaining <= 0
-                        ? 'Challenge Ended'
-                        : 'Check In Now'}
-                  </Text>
+                 <Text
+  className={`text-[14px] font-extrabold ${
+    isCompleted
+      ? 'ml-1 text-gray-600'
+      : secondsRemaining <= 0
+        ? 'text-gray-500'
+        : 'text-[#161616]'
+  }`}
+  style={
+    Platform.OS === 'ios'
+      ? { fontFamily: 'Inter_700Bold' }
+      : undefined
+  }>
+  {isCompleted
+    ? 'Check-In Completed'
+    : secondsRemaining <= 0
+      ? 'Challenge Ended'
+      : `Check In Now${firstName ? ` ${firstName}` : ''}`}
+</Text>
                 </View>
               </TouchableOpacity>
             </Animated.View>

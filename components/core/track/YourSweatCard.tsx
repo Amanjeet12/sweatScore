@@ -129,7 +129,7 @@ function buildEmptyBars(period: Period): Bar[] {
 
   if (period === 'month') {
     return [1, 2, 3, 4, 5].map((week) => ({
-      label: `W${week}`,
+      label: `WK${week}`,
       value: 0,
       color: GREY,
       showMedal: false,
@@ -171,7 +171,7 @@ function buildBars(
       const value = valueFor(weeks[index] as any, category);
 
       return {
-        label: `W${week}`,
+        label: `WK${week}`,
         value,
         color: getBarColor(period, category, value),
         showMedal: category === 'points' && value >= 500,
@@ -275,8 +275,12 @@ export default function YourSweatCard() {
         marginHorizontal: 20,
         overflow: 'hidden',
       }}>
-      <View className="flex-row items-center justify-between">
-        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Sweat</Text>
+      <View className="flex-row items-center">
+        <Text
+          numberOfLines={1}
+          className="flex-1 pr-3 font-heading text-xl font-bold text-[#1A1A1A]">
+          Your Activity
+        </Text>
 
         <PeriodDropdown value={period} onChange={setPeriod} />
       </View>

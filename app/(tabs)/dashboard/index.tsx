@@ -5,26 +5,18 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Linking,
-  RefreshControl,
-  ScrollView,
-  View,
-  Platform,
-  AppState,
-  TouchableOpacity,
-} from 'react-native';
+import { AppState, Linking, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
 import SafeAreaView from '~/components/core/SafeAreaView';
+import AchievementPopupManager from '~/components/core/dashboard/AchievementPopupManager';
 import Confetti from '~/components/core/dashboard/Confetti';
+import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 import { FirstTimeOnboardingModal } from '~/components/core/dashboard/FirstTimeOnboardingModal';
-import MonthlyProgressCard from '~/components/core/dashboard/MonthlyProgressCard';
-import MoveWithUs from '~/components/core/dashboard/MoveWithUs';
-import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
 import { MyCardAlertDialog } from '~/components/core/dashboard/MyCard';
 import TodaysSweat from '~/components/core/dashboard/TodaysSweat';
+import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -34,7 +26,6 @@ import { useRefreshStore } from '~/store/useRefreshStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { storage } from '~/utils/storage';
-import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 
 function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -79,6 +70,10 @@ export default function TabDashboard() {
   }, [refreshKey]);
   const leaderboard = useQuery(api.activities.getUserLeaderboardPosition, { yearMonth });
   const streakData = useQuery(api.challengeCompletions.getUserStreaksForMonth);
+  const trackOverview = useQuery(
+    api.track.queries.getTrackOverview,
+    currentUser?._id ? {} : 'skip'
+  );
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const { syncAllMissedDays } = useHealthSync(
     currentUser?._id as Id<'users'>,
@@ -118,7 +113,8 @@ export default function TabDashboard() {
     try {
       await syncAllMissedDays();
       incrementRefreshKey();
-    } catch (error) {
+    } catch {
+      // Keep the existing dashboard data visible when a manual health refresh fails.
     } finally {
       setIsRefreshing(false);
     }
@@ -326,6 +322,30 @@ export default function TabDashboard() {
         icon={<Icon.Heart size={16} weight="fill" color="white" />}
         iconBgColor={colors.primary}
       />
+
+      {currentUser?._id ? (
+        <AchievementPopupManager
+          key={currentUser._id}
+          userId={currentUser._id}
+          yearMonth={yearMonth}
+          monthlyPoints={
+            leaderboard === undefined ? undefined : (leaderboard.displayTotalPoints ?? 0)
+          }
+          monthlyChallengeTarget={
+            rewardsBanner === undefined || rewardsBanner === null
+              ? undefined
+              : (rewardsBanner.targetPoints ?? 500)
+          }
+          lifetimePoints={trackOverview?.lifetime.points}
+          currentWeeklyStreak={trackOverview?.lifetime.currentWeeklyStreak}
+          enabled={
+            showSuccess !== 'yes' &&
+            showSuccess !== 'install' &&
+            !showFirstTimeModal &&
+            !showInstallDialog
+          }
+        />
+      ) : null}
 
       <View
         pointerEvents="none"
