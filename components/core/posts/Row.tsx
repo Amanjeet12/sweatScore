@@ -619,12 +619,16 @@ export default function PostRow({
                           <Text className="text-base text-black">Report Post</Text>
                         </View>
                       </MenuOption>
-                      <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons size={20} name="download-outline" color="black" />
-                          <Text className="text-base text-black">Download</Text>
-                        </View>
-                      </MenuOption>
+                      {downloadableVideoUrl &&
+                        (post.user.isAuthor ||
+                          (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
+                          <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                            <View className="flex-row items-center gap-x-3 px-2 py-2">
+                              <Ionicons size={20} name="download-outline" color="black" />
+                              <Text className="text-base text-black">Download</Text>
+                            </View>
+                          </MenuOption>
+                        )}
                       <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
                         <View className="flex-row items-center gap-x-3 px-2 py-2">
                           <Ionicons name="ban-outline" size={18} color="red" />

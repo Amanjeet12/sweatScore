@@ -2,7 +2,7 @@ import { useIsFocused } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
@@ -21,24 +21,31 @@ type AchievementPopupManagerProps = {
   enabled?: boolean;
 };
 
+/*
+ * Change this only once because the previous implementation
+ * may have saved achievements without displaying them.
+ *
+ * Do not keep changing this version later.
+ */
+const STORAGE_VERSION = 'v4';
+
 function getStorageKey(userId: string) {
-  /*
-   * SecureStore keys should only contain safe characters.
-   */
   const safeUserId = userId.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-  return `achievement_popups_${safeUserId}`;
+  return `achievement_popups_${STORAGE_VERSION}_${safeUserId}`;
 }
 
-async function getShownAchievementKeys(userId: string): Promise<Set<string>> {
+async function getShownKeys(userId: string): Promise<Set<string>> {
   try {
-    const storedValue = await SecureStore.getItemAsync(getStorageKey(userId));
+    const storedValue = await SecureStore.getItemAsync(
+      getStorageKey(userId)
+    );
 
     if (!storedValue) {
       return new Set();
     }
 
-    const parsedValue = JSON.parse(storedValue);
+    const parsedValue: unknown = JSON.parse(storedValue);
 
     if (!Array.isArray(parsedValue)) {
       return new Set();
@@ -50,13 +57,16 @@ async function getShownAchievementKeys(userId: string): Promise<Set<string>> {
       )
     );
   } catch (error) {
-    console.warn('Unable to read achievement popup history:', error);
+    console.warn(
+      'Unable to read achievement popup history:',
+      error
+    );
 
     return new Set();
   }
 }
 
-async function saveShownAchievementKeys(
+async function saveShownKeys(
   userId: string,
   shownKeys: ReadonlySet<string>
 ) {
@@ -65,10 +75,15 @@ async function saveShownAchievementKeys(
       getStorageKey(userId),
       JSON.stringify(Array.from(shownKeys))
     );
-  } catch (error) {
-    console.warn('Unable to save achievement popup history:', error);
 
-    throw error;
+    return true;
+  } catch (error) {
+    console.warn(
+      'Unable to save achievement popup history:',
+      error
+    );
+
+    return false;
   }
 }
 
@@ -83,29 +98,33 @@ export default function AchievementPopupManager({
 }: AchievementPopupManagerProps) {
   const isFocused = useIsFocused();
 
+  const checkingRef = useRef(false);
+  const pendingConsumedKeysRef = useRef<string[]>([]);
+
   const [activePopup, setActivePopup] =
     useState<AchievementPopupContent | null>(null);
-
-  const [isCheckingAchievements, setIsCheckingAchievements] =
-    useState(false);
 
   useEffect(() => {
     if (
       !enabled ||
       !isFocused ||
       activePopup ||
-      isCheckingAchievements
+      checkingRef.current
     ) {
       return;
     }
 
     let cancelled = false;
 
-    const checkAchievements = async () => {
-      setIsCheckingAchievements(true);
+    const checkForAchievement = async () => {
+      checkingRef.current = true;
 
       try {
-        const shownKeys = await getShownAchievementKeys(userId);
+        const shownKeys = await getShownKeys(userId);
+
+        if (cancelled) {
+          return;
+        }
 
         const [decision] = getAchievementPopupDecisions(
           {
@@ -118,38 +137,42 @@ export default function AchievementPopupManager({
           shownKeys
         );
 
+        console.log('Achievement popup check:', {
+          yearMonth,
+          monthlyPoints,
+          monthlyChallengeTarget,
+          lifetimePoints,
+          currentWeeklyStreak,
+          shownKeys: Array.from(shownKeys),
+          popupKey: decision?.popup.key ?? null,
+        });
+
         if (!decision || cancelled) {
           return;
         }
 
         /*
-         * Mark every reached achievement as consumed before
-         * displaying the popup.
+         * Keep the keys in memory.
+         * Do not save them yet.
          */
-        decision.consumedKeys.forEach((key) => {
-          shownKeys.add(key);
-        });
+        pendingConsumedKeysRef.current =
+          decision.consumedKeys;
 
         /*
-         * Await persistent storage before opening the modal.
-         * This prevents app restarts or component remounts from
-         * displaying the same achievement again.
+         * Display the popup immediately.
          */
-        await saveShownAchievementKeys(userId, shownKeys);
-
-        if (!cancelled) {
-          setActivePopup(decision.popup);
-        }
+        setActivePopup(decision.popup);
       } catch (error) {
-        console.warn('Achievement popup check failed:', error);
+        console.warn(
+          'Achievement popup check failed:',
+          error
+        );
       } finally {
-        if (!cancelled) {
-          setIsCheckingAchievements(false);
-        }
+        checkingRef.current = false;
       }
     };
 
-    void checkAchievements();
+    void checkForAchievement();
 
     return () => {
       cancelled = true;
@@ -158,7 +181,6 @@ export default function AchievementPopupManager({
     activePopup,
     currentWeeklyStreak,
     enabled,
-    isCheckingAchievements,
     isFocused,
     lifetimePoints,
     monthlyChallengeTarget,
@@ -167,8 +189,37 @@ export default function AchievementPopupManager({
     yearMonth,
   ]);
 
-  const closePopup = () => {
+  /*
+   * Save the achievement only after the user has
+   * actually seen and dismissed the popup.
+   */
+  const markActivePopupAsShown = async () => {
+    const consumedKeys = pendingConsumedKeysRef.current;
+
+    if (consumedKeys.length === 0) {
+      return;
+    }
+
+    const shownKeys = await getShownKeys(userId);
+
+    consumedKeys.forEach((key) => {
+      shownKeys.add(key);
+    });
+
+    await saveShownKeys(userId, shownKeys);
+
+    pendingConsumedKeysRef.current = [];
+  };
+
+  const closePopup = async () => {
+    await markActivePopupAsShown();
     setActivePopup(null);
+  };
+
+  const handleShare = async () => {
+    await markActivePopupAsShown();
+    setActivePopup(null);
+    router.push('/posts/new');
   };
 
   if (!activePopup) {
@@ -181,7 +232,9 @@ export default function AchievementPopupManager({
       transparent
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={closePopup}>
+      onRequestClose={() => {
+        void closePopup();
+      }}>
       <View
         accessibilityViewIsModal
         className="flex-1 items-center justify-center bg-black/40 px-5">
@@ -190,7 +243,9 @@ export default function AchievementPopupManager({
             accessibilityRole="button"
             accessibilityLabel="Close achievement popup"
             activeOpacity={0.85}
-            onPress={closePopup}
+            onPress={() => {
+              void closePopup();
+            }}
             className="absolute right-4 top-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-[#DEDEDE]">
             <Icon.X
               size={28}
@@ -219,8 +274,7 @@ export default function AchievementPopupManager({
             accessibilityRole="button"
             activeOpacity={0.9}
             onPress={() => {
-              closePopup();
-              router.push('/share');
+              void handleShare();
             }}
             className="mt-8 h-14 items-center justify-center rounded-full bg-primary-500">
             <Text className="font-heading text-base font-bold text-white">
@@ -231,7 +285,9 @@ export default function AchievementPopupManager({
           <TouchableOpacity
             accessibilityRole="button"
             activeOpacity={0.85}
-            onPress={closePopup}
+            onPress={() => {
+              void closePopup();
+            }}
             className="mt-4 py-1">
             <Text className="text-center font-body text-base font-medium text-[#3C3C3C]">
               Keep sweating
