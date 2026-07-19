@@ -22,24 +22,24 @@ export const notificationContents = {
     body: 'Heads up: {userName} just claimed a reward!',
   },
   newRewardUnlocked500: {
-    title: "You've hit 500 points!",
-    body: "Congratulations. 500 points earned 🏆. You've hit the prize pot milestone.",
+    title: 'Challenge complete 🏆',
+    body: "500 points earned! You finished this month's challenge. Take your flowers and keep earning. 🎉",
   },
   newRewardUnlocked250: {
-    title: "You've hit 200 points!",
-    body: "200 points earned 🎉 You've hit a rewards milestone this month.",
+    title: "200 points 💪",
+    body: "Look at you climb. You're right in your rhythm this week.",
   },
   newRewardUnlocked100: {
-    title: "You've hit 100 points!",
-    body: 'You can now claim your monthly reward. Tap to choose before the month ends. Only one reward can be claimed each month.',
+    title: " 100 points 🎉",
+    body: 'Great start to the challenge. Keep it going, sis.',
   },
   newCommentPosted: {
-    title: 'Someone commented on your post',
-    body: '{userName} just commented on your post.',
+    title: ' New comment 💬',
+    body: '{userName} commented on your post. Tap to see the sisterhood love',
   },
   newAdminPost: {
-    title: 'New post by SweatScore',
-    body: 'SweatScore has posted a new community post. Check it out!',
+    title: 'Community update 📣',
+    body: `There's a fresh post in the community. Tap to see what's new.`,
   },
   noActivityReminder: {
     title: 'SweatScore',
@@ -51,9 +51,19 @@ export const notificationContents = {
   },
 
   // Add this
-  newDailyChallenge: {
-    title: 'New Check-In 🔥',
-    body: '{challengeName} is live now. Tap to join and earn Sweat Points!',
+  dailyCheckInLive: {
+    title: "Today's move is here 👟",
+    body: "Your check-in is live. Show the sisters what you're doing today and keep your streak going.",
+  },
+
+  dailyCheckInReminder: {
+    title: '5 hours left ⏰',
+    body: "Your check-in closes soon. Tap in now to lock today's points before the window shuts.",
+  },
+
+  videoFeedLive: {
+    title: 'Your video is live 🎥',
+    body: 'Your video just dropped on the feed. 🙌🏾',
   },
 };
 
@@ -76,7 +86,10 @@ export const sendPushNotification = internalAction({
       v.literal('newAdminPost'),
       v.literal('noActivityReminder'),
       v.literal('challengePostLive'),
-      v.literal('newDailyChallenge')
+
+      v.literal('dailyCheckInLive'),
+      v.literal('dailyCheckInReminder'),
+      v.literal('videoFeedLive')
     ),
     options: v.optional(
       v.object({
@@ -84,7 +97,6 @@ export const sendPushNotification = internalAction({
         date: v.optional(v.string()),
         postId: v.optional(v.id('posts')),
         challengeId: v.optional(v.id('challenges')),
-        challengeName: v.optional(v.string()),
       })
     ),
   },

@@ -24,6 +24,7 @@ export enum NOTIFICATION_TYPE {
   NEW_ADMIN_POST = 'newAdminPost',
   NO_ACTIVITY_REMINDER = 'noActivityReminder',
   CHALLENGE_POST_LIVE = 'challengePostLive',
+  VIDEO_FEED_LIVE = 'videoFeedLive',
 }
 
 export interface PreviewData {

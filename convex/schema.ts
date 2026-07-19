@@ -139,6 +139,7 @@ const schema = defineSchema({
     isPinned: v.optional(v.boolean()),
     challengeId: v.optional(v.id('challenges')),
     challengeCompletionId: v.optional(v.id('challengeCompletions')),
+    feedLiveNotificationSentAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
     .index('by_pinned', ['isPinned']),

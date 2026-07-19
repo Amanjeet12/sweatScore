@@ -361,11 +361,13 @@ export const processDailyMissionNotifications = internalMutation({
   },
 });
 
-
-export const processNewDailyChallengeNotification = internalMutation({
+export const processScheduledCheckInNotification = internalMutation({
   args: {
     challengeId: v.id('challenges'),
     expectedStartAt: v.number(),
+    expectedEndAt: v.number(),
+
+    notificationType: v.union(v.literal('dailyCheckInLive'), v.literal('dailyCheckInReminder')),
   },
 
   handler: async (ctx, args) => {
@@ -379,37 +381,51 @@ export const processNewDailyChallengeNotification = internalMutation({
       };
     }
 
-    const now = Date.now();
-    const startsAt = challenge.dailyStartAt ?? 0;
-    const endsAt = challenge.dailyEndAt ?? 0;
-
     /*
-     * Prevent an old scheduled function from sending a
-     * notification after the admin replaces or removes
-     * the daily challenge.
+     * Only check-in challenges should send these
+     * two notifications.
      */
-    const challengeIsCurrentlyActive =
-      challenge.isPublished &&
-      challenge.isDailyChallenge === true &&
-      startsAt === args.expectedStartAt &&
-      startsAt <= now &&
-      endsAt > now;
-
-    if (!challengeIsCurrentlyActive) {
+    if (challenge.type !== 'check_in') {
       return {
         success: false,
         sent: 0,
-        reason: 'Challenge is no longer active',
+        reason: 'Challenge is not a check-in',
+      };
+    }
+
+    const now = Date.now();
+
+    /*
+     * Check that the scheduled challenge has not been
+     * removed, replaced or rescheduled.
+     */
+    const isStillActive =
+      challenge.isPublished === true &&
+      challenge.isDailyChallenge === true &&
+      challenge.dailyStartAt === args.expectedStartAt &&
+      challenge.dailyEndAt === args.expectedEndAt &&
+      args.expectedStartAt <= now &&
+      args.expectedEndAt > now;
+
+    if (!isStillActive) {
+      return {
+        success: false,
+        sent: 0,
+        reason: 'Check-in is no longer active',
       };
     }
 
     /*
-     * Prevent duplicate broadcasts.
-     *
-     * setNextDailyChallenge can be called more than once,
-     * which could otherwise create multiple scheduled jobs.
+     * Prevent duplicate notifications when the same
+     * challenge is scheduled more than once.
      */
-    const dispatchKey = `dailyChallengeNotification:${challenge._id}:${args.expectedStartAt}`;
+    const dispatchKey = [
+      'checkInNotification',
+      args.notificationType,
+      challenge._id,
+      args.expectedStartAt,
+      args.expectedEndAt,
+    ].join(':');
 
     const existingDispatch = await ctx.db
       .query('appConfig')
@@ -420,53 +436,40 @@ export const processNewDailyChallengeNotification = internalMutation({
       return {
         success: true,
         sent: 0,
-        reason: 'Notification already dispatched',
+        reason: 'Notification already sent',
       };
     }
 
-    /*
-     * Only notify onboarded users who enabled notifications
-     * and have an Expo push token.
-     */
     const users = await ctx.db
       .query('users')
       .withIndex('notificationEnabled', (q) => q.eq('notificationEnabled', true))
       .collect();
 
-    const recipientIds: Id<'users'>[] = users
+    const recipientIds = users
       .filter((user) => user.onboarded === true && Boolean(user.expoPushToken))
       .map((user) => user._id);
 
     /*
-     * Store the dispatch marker in the same transaction.
-     * Convex also atomically schedules the following actions
-     * when this mutation commits.
+     * Save before scheduling the push batches so duplicate
+     * scheduled jobs cannot send the notification twice.
      */
     await ctx.db.insert('appConfig', {
       key: dispatchKey,
       value: String(now),
     });
 
-    /*
-     * Avoid sending one extremely large payload.
-     */
     const batchSize = 100;
 
     for (let index = 0; index < recipientIds.length; index += batchSize) {
       const userBatch = recipientIds.slice(index, index + batchSize);
 
-      await ctx.scheduler.runAfter(
-        0,
-        internal.pushNotification.sendPushNotification,
-        {
-          userId: userBatch,
-          notificationType: 'newDailyChallenge',
-          options: {
-            challengeId: challenge._id,
-            challengeName: challenge.name,
-          },
-        }
-      );
+      await ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
+        userId: userBatch,
+        notificationType: args.notificationType,
+        options: {
+          challengeId: challenge._id,
+        },
+      });
     }
 
     return {

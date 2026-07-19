@@ -359,6 +359,9 @@ export const completeChallenge = mutation({
     /*
      * Process the user's uploaded video.
      */
+    /*
+     * Process the user's uploaded video.
+     */
     if (args.videoStorageId) {
       /*
        * CHECK-IN:
@@ -384,7 +387,6 @@ export const completeChallenge = mutation({
           mediaType: 'video',
 
           challengeId: args.challengeId,
-
           challengeCompletionId: completionId,
         });
 
@@ -395,10 +397,15 @@ export const completeChallenge = mutation({
           userId,
           dailyWindowStartAt,
         });
+
+        await ctx.scheduler.runAfter(0, internal.http.sendChallengeNotification, {
+          userId,
+          postId,
+        });
       } else {
         /*
          * NORMAL CHALLENGE:
-         * Keep the transformation video flow.
+         * Keep the Trigger.dev transformation video flow.
          */
         const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
 
@@ -417,17 +424,11 @@ export const completeChallenge = mutation({
           challengeId: args.challengeId,
           completionId,
           attemptNumber,
-
           day1CompletionId: day1Completion?._id,
-
           day1VideoStorageId: day1Completion?.videoStorageId,
-
           hasDay1VideoUrl: Boolean(day1VideoUrl),
-
           hasAdminVideoUrl: Boolean(adminVideoUrl),
-
           hasUserVideoUrl: Boolean(userVideoUrl),
-
           leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
         });
 
@@ -445,21 +446,16 @@ export const completeChallenge = mutation({
           });
 
           const leftLabel = day1VideoUrl ? 'Day 1' : undefined;
-
           const rightLabel = `Day ${attemptNumber}`;
 
           await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
             adminVideoUrl,
             userVideoUrl,
-
             challengeCompletionId: completionId,
             userId,
-
             caption: args.caption?.trim() || '',
             challengeId: args.challengeId,
 
-            // Day 1 has a predefined video on the left,
-            // so the left side should not display a day.
             ...(leftLabel
               ? {
                   leftLabel,

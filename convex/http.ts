@@ -83,17 +83,92 @@ export const sendChallengeNotification = internalMutation({
     userId: v.id('users'),
     postId: v.id('posts'),
   },
+
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    if (user?.notificationEnabled) {
-      await ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-        userId: [args.userId],
-        notificationType: 'challengePostLive',
-        options: {
-          postId: args.postId,
-        },
+    const post = await ctx.db.get(args.postId);
+
+    if (!post) {
+      console.error('Cannot send feed notification: post not found', {
+        postId: args.postId,
       });
+
+      return {
+        success: false,
+        sent: false,
+        reason: 'post_not_found',
+      };
     }
+
+    /*
+     * Security check:
+     * The notification recipient must own the feed post.
+     */
+    if (post.userId !== args.userId) {
+      console.error('Cannot send feed notification: post owner mismatch', {
+        postId: args.postId,
+        postOwnerId: post.userId,
+        requestedUserId: args.userId,
+      });
+
+      return {
+        success: false,
+        sent: false,
+        reason: 'post_owner_mismatch',
+      };
+    }
+
+    /*
+     * Trigger.dev may retry the merge task.
+     * Do not notify the user more than once for the same post.
+     */
+    if (post.feedLiveNotificationSentAt) {
+      return {
+        success: true,
+        sent: false,
+        reason: 'notification_already_sent',
+      };
+    }
+
+    const user = await ctx.db.get(args.userId);
+
+    if (!user) {
+      return {
+        success: false,
+        sent: false,
+        reason: 'user_not_found',
+      };
+    }
+
+    if (!user.notificationEnabled || !user.expoPushToken) {
+      return {
+        success: true,
+        sent: false,
+        reason: 'notifications_disabled',
+      };
+    }
+
+    /*
+     * Mark the post before scheduling.
+     * The database update and scheduled notification are committed
+     * together by Convex.
+     */
+    await ctx.db.patch(args.postId, {
+      feedLiveNotificationSentAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
+      userId: [args.userId],
+      notificationType: 'videoFeedLive',
+      options: {
+        postId: args.postId,
+      },
+    });
+
+    return {
+      success: true,
+      sent: true,
+      postId: args.postId,
+    };
   },
 });
 

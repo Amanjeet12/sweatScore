@@ -13,6 +13,11 @@ import {
 } from './challenges';
 import { getNextMidnightTimestamp } from './utils/timezone';
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+const DAILY_CHECK_IN_LIVE_DELAY_MS = 7 * ONE_HOUR_MS;
+const DAILY_CHECK_IN_REMINDER_BEFORE_END_MS = 5 * ONE_HOUR_MS;
+
 export const users = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
@@ -1172,8 +1177,8 @@ export const setCurrentDailyChallenge = mutation({
     const now = Date.now();
 
     /*
-     * Today's challenge always expires at the next
-     * 12:00 AM in the admin user's timezone.
+     * Today's daily challenge expires at the next
+     * midnight in the admin user's timezone.
      */
     const todayEndsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
 
@@ -1184,16 +1189,16 @@ export const setCurrentDailyChallenge = mutation({
 
     const currentChallenge = scheduledChallenges.find((challenge) => {
       const startsAt = challenge.dailyStartAt ?? 0;
-
       const endsAt = challenge.dailyEndAt ?? 0;
 
       return startsAt <= now && endsAt > now;
     });
 
     /*
-     * If the selected challenge is already today's
-     * challenge, update its description and make sure
-     * that it expires at the upcoming midnight.
+     * The selected challenge is already today's challenge.
+     * Only update its description and end time.
+     *
+     * Do not schedule notifications again here.
      */
     if (currentChallenge?._id === args.challengeId) {
       await ctx.db.patch(args.challengeId, {
@@ -1201,10 +1206,6 @@ export const setCurrentDailyChallenge = mutation({
         dailyEndAt: todayEndsAt,
       });
 
-      /*
-       * Find the existing next-day challenge, if one
-       * has already been scheduled.
-       */
       const futureChallenges = scheduledChallenges
         .filter(
           (challenge) =>
@@ -1215,7 +1216,7 @@ export const setCurrentDailyChallenge = mutation({
       const nextChallenge = futureChallenges[0];
 
       /*
-       * Keep only one future challenge.
+       * Keep only one future daily challenge.
        */
       for (let index = 1; index < futureChallenges.length; index++) {
         const extraFutureChallenge = futureChallenges[index];
@@ -1229,8 +1230,8 @@ export const setCurrentDailyChallenge = mutation({
       }
 
       /*
-       * Realign the next challenge so that it starts
-       * at midnight and ends at the following midnight.
+       * Realign tomorrow's challenge with the updated
+       * ending time of today's challenge.
        */
       if (nextChallenge) {
         const nextEndsAt = getNextMidnightTimestamp(new Date(todayEndsAt), user.timezone);
@@ -1251,8 +1252,7 @@ export const setCurrentDailyChallenge = mutation({
     }
 
     /*
-     * Selecting a different current challenge removes
-     * all existing current and future daily schedules.
+     * Remove all existing current and future daily schedules.
      */
     for (const challenge of scheduledChallenges) {
       await ctx.db.patch(challenge._id, {
@@ -1264,8 +1264,7 @@ export const setCurrentDailyChallenge = mutation({
     }
 
     /*
-     * The challenge becomes active immediately but
-     * expires at the upcoming local midnight.
+     * The newly selected daily challenge starts immediately.
      */
     const startsAt = now;
     const endsAt = todayEndsAt;
@@ -1277,10 +1276,47 @@ export const setCurrentDailyChallenge = mutation({
       shortDescription,
     });
 
-    await ctx.scheduler.runAfter(0, internal.notifications.processNewDailyChallengeNotification, {
-      challengeId: args.challengeId,
-      expectedStartAt: startsAt,
-    });
+    /*
+     * Notification 1:
+     * 7 hours after the daily challenge starts.
+     */
+    const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
+
+    /*
+     * Notification 2:
+     * 5 hours before the daily challenge closes.
+     */
+    const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
+
+    if (liveNotificationAt > now && liveNotificationAt < endsAt) {
+      await ctx.scheduler.runAt(
+        liveNotificationAt,
+        internal.notifications.processScheduledCheckInNotification,
+        {
+          challengeId: args.challengeId,
+          expectedStartAt: startsAt,
+          expectedEndAt: endsAt,
+          notificationType: 'dailyCheckInLive',
+        }
+      );
+    }
+
+    if (
+      reminderNotificationAt > now &&
+      reminderNotificationAt > startsAt &&
+      reminderNotificationAt < endsAt
+    ) {
+      await ctx.scheduler.runAt(
+        reminderNotificationAt,
+        internal.notifications.processScheduledCheckInNotification,
+        {
+          challengeId: args.challengeId,
+          expectedStartAt: startsAt,
+          expectedEndAt: endsAt,
+          notificationType: 'dailyCheckInReminder',
+        }
+      );
+    }
 
     return {
       success: true,
@@ -1336,7 +1372,6 @@ export const setNextDailyChallenge = mutation({
 
     const currentChallenge = scheduledChallenges.find((challenge) => {
       const startsAt = challenge.dailyStartAt ?? 0;
-
       const endsAt = challenge.dailyEndAt ?? 0;
 
       return startsAt <= now && endsAt > now;
@@ -1351,20 +1386,19 @@ export const setNextDailyChallenge = mutation({
     }
 
     /*
-     * Today's challenge must end at the upcoming
-     * local midnight.
+     * Tomorrow's challenge starts at the next midnight
+     * in the admin user's timezone.
      */
     const startsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
 
     /*
-     * The next challenge ends at the following
-     * local midnight.
+     * Tomorrow's challenge ends at the following midnight.
      */
     const endsAt = getNextMidnightTimestamp(new Date(startsAt), user.timezone);
 
     /*
-     * Make sure the current challenge expires exactly
-     * at midnight.
+     * Ensure today's challenge ends exactly when
+     * tomorrow's challenge begins.
      */
     if (currentChallenge.dailyEndAt !== startsAt) {
       await ctx.db.patch(currentChallenge._id, {
@@ -1374,8 +1408,6 @@ export const setNextDailyChallenge = mutation({
 
     /*
      * Remove every other future scheduled challenge.
-     * Keep the current challenge and the selected
-     * next-day challenge.
      */
     for (const challenge of scheduledChallenges) {
       if (challenge._id === currentChallenge._id || challenge._id === args.challengeId) {
@@ -1394,10 +1426,6 @@ export const setNextDailyChallenge = mutation({
       }
     }
 
-    /*
-     * The next video becomes active at 12:00 AM
-     * and expires at the next 12:00 AM.
-     */
     await ctx.db.patch(args.challengeId, {
       isDailyChallenge: true,
       dailyStartAt: startsAt,
@@ -1405,14 +1433,47 @@ export const setNextDailyChallenge = mutation({
       shortDescription,
     });
 
-    await ctx.scheduler.runAt(
-      startsAt,
-      internal.notifications.processNewDailyChallengeNotification,
-      {
-        challengeId: args.challengeId,
-        expectedStartAt: startsAt,
-      }
-    );
+    /*
+     * Notification 1:
+     * 7 hours after tomorrow's challenge becomes active.
+     */
+    const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
+
+    /*
+     * Notification 2:
+     * 5 hours before tomorrow's challenge closes.
+     */
+    const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
+
+    if (liveNotificationAt > now && liveNotificationAt < endsAt) {
+      await ctx.scheduler.runAt(
+        liveNotificationAt,
+        internal.notifications.processScheduledCheckInNotification,
+        {
+          challengeId: args.challengeId,
+          expectedStartAt: startsAt,
+          expectedEndAt: endsAt,
+          notificationType: 'dailyCheckInLive',
+        }
+      );
+    }
+
+    if (
+      reminderNotificationAt > now &&
+      reminderNotificationAt > startsAt &&
+      reminderNotificationAt < endsAt
+    ) {
+      await ctx.scheduler.runAt(
+        reminderNotificationAt,
+        internal.notifications.processScheduledCheckInNotification,
+        {
+          challengeId: args.challengeId,
+          expectedStartAt: startsAt,
+          expectedEndAt: endsAt,
+          notificationType: 'dailyCheckInReminder',
+        }
+      );
+    }
 
     return {
       success: true,
