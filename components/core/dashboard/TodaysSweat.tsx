@@ -675,7 +675,7 @@ function SweatProgressRow({
 
             <View className="flex-row items-center">
               <Text
-                className="font-heading text-lg font-extrabold"
+                className="font-heading text-base font-extrabold"
                 style={{
                   color: completed
                     ? '#111111'
@@ -703,7 +703,7 @@ function SweatProgressRow({
 
                 backgroundColor:
                   completed
-                    ? '#FF5C1A'
+                    ? '#F1D9CE'
                     : '#FFC3A4',
               }}
             />

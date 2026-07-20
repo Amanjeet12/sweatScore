@@ -17,7 +17,6 @@ import {
 
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
-import { useAuthStore } from '~/store/useAuthStore';
 import { colors } from '~/utils/constants';
 
 function formatRemainingTime(seconds: number) {
@@ -42,8 +41,6 @@ export default function DailyChallengeCard() {
    * to rerun the time-based query.
    */
   const [refreshToken, setRefreshToken] = useState(0);
-  const currentUser = useAuthStore((state) => state.currentUser);
-
 
   const dailyChallenge = useQuery(api.challengeCompletions.getTodayDailyChallenge, {
     refreshToken,
@@ -204,10 +201,6 @@ export default function DailyChallengeCard() {
     inputRange: [0, 0.6, 1],
     outputRange: [0.55, 0.25, 0],
   });
-
-
-  const firstName =
-  currentUser?.name?.trim().split(/\s+/)[0] || '';
 
   if (dailyChallenge === undefined) {
     return (
@@ -540,7 +533,7 @@ export default function DailyChallengeCard() {
     ? 'Check-In Completed'
     : secondsRemaining <= 0
       ? 'Challenge Ended'
-      : `Check In Now${firstName ? ` ${firstName}` : ''}`}
+      : 'Check In Now'}
 </Text>
                 </View>
               </TouchableOpacity>

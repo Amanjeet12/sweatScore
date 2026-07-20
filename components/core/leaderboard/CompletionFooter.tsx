@@ -17,7 +17,7 @@ export default function CompletionFooter({ completedCount }: CompletionFooterPro
         style={{ width: 22, height: 22 }}
         contentFit="contain"
       />
-      <Text className="font-body text-sm text-[#1A1A1A]">
+      <Text className="font-body text-base text-[#1A1A1A]">
         <Text className="text-[#F76B1C]" >
           {completedCount} Sweat {completedCount === 1 ? 'Sister' : 'Sisters'}
         </Text>{' '}
