@@ -1,7 +1,7 @@
 import { useQuery } from 'convex/react';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -64,7 +64,11 @@ export default function SinglePost() {
           {isLoading ? (
             <ScreenLoading className="bg-transparent" />
           ) : post ? (
-            <PostRow post={post} menuMarginTop={-60} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
+              <PostRow post={post} menuMarginTop={-60} />
+            </ScrollView>
           ) : (
             <View className="flex-1 items-center justify-center px-8">
               <Text className="text-center text-xl text-hint">Post not found</Text>
