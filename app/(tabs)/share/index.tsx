@@ -18,6 +18,7 @@ import { Id } from '~/convex/_generated/dataModel';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 import { ImageSquare, VideoCamera } from 'phosphor-react-native';
+import { ChatCircleDots } from 'phosphor-react-native';
 
 const COMMUNITY_TAGLINES = [
   "Share what's on your plate today, [name]!",
@@ -45,6 +46,7 @@ const COMMUNITY_TAGLINES = [
   'Post your water intake so far, [name]!',
   "What's motivating you this week, [name]?",
 ];
+
 const TabShare = () => {
   const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams();
@@ -136,9 +138,30 @@ const TabShare = () => {
           className="flex-1 flex-col"
           style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
           <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] px-4 pb-5 pt-5">
-            <View>
-              <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">Community</Text>
-              <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">
+                  Community
+                </Text>
+
+                <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Open group chats"
+                onPress={() =>
+                  router.push({
+                    pathname: '/group-chat/[groupId]',
+                    params: {
+                      groupId: '1', // Replace with the actual group ID
+                    },
+                  })
+                }
+                className="h-11 w-11 items-center justify-center rounded-full border border-[#EEE1D8] bg-white">
+                <ChatCircleDots size={28} color="#F76B1C" weight="fill" />
+              </TouchableOpacity>
             </View>
 
             <View className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">

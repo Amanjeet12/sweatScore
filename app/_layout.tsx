@@ -162,6 +162,8 @@ export default function Layout() {
                     }>
                     <Stack>
                       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+                      <Stack.Screen name="group-chat" options={{ headerShown: false }} />
                       <Stack.Screen
                         name="posts/new"
                         options={{
