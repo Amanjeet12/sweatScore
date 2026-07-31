@@ -1,10 +1,13 @@
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ArrowBendUpLeft,
   Camera,
   ImageSquare,
   Microphone,
   PaperPlaneRight,
+  Play,
   Plus,
   VideoCamera,
   X,
@@ -24,7 +27,7 @@ type ChatComposerProps = {
   onFocus: () => void;
   onSendText: (text: string) => Promise<boolean> | boolean;
   onSendVoice: (voiceNote: PendingVoiceNote) => Promise<boolean> | boolean;
-  onSendAttachment: (attachment: ChatAttachment) => Promise<boolean> | boolean;
+  onSendAttachment: (attachment: ChatAttachment, text?: string) => Promise<boolean> | boolean;
 };
 
 type AttachmentOption = {
@@ -33,6 +36,13 @@ type AttachmentOption = {
   source: 'library' | 'camera';
   Icon: typeof ImageSquare;
   color: string;
+};
+
+type PendingAttachmentPreviewProps = {
+  attachment: ChatAttachment;
+  disabled: boolean;
+  onChange: () => void;
+  onRemove: () => void;
 };
 
 const ATTACHMENT_OPTIONS: AttachmentOption[] = [
@@ -59,6 +69,99 @@ const ATTACHMENT_OPTIONS: AttachmentOption[] = [
   },
 ];
 
+const PendingVideoPreview = ({ uri }: { uri: string }) => {
+  const player = useVideoPlayer(uri, (videoPlayer) => {
+    videoPlayer.loop = false;
+    videoPlayer.volume = 0;
+    videoPlayer.pause();
+  });
+
+  return (
+    <View style={styles.previewThumbnail}>
+      <VideoView
+        player={player}
+        style={styles.previewMedia}
+        contentFit="cover"
+        nativeControls={false}
+      />
+
+      <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-black/60">
+          <Play size={16} color="#FFFFFF" weight="fill" />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const PendingAttachmentPreview = ({
+  attachment,
+  disabled,
+  onChange,
+  onRemove,
+}: PendingAttachmentPreviewProps) => {
+  const isVideo = attachment.type === 'video';
+
+  return (
+    <View className="mx-3 mt-2 flex-row items-center rounded-2xl border border-[#E8DED8] bg-[#FFF9F5] p-2">
+      <View className="h-20 w-20 overflow-hidden rounded-xl bg-black">
+        {isVideo ? (
+          <PendingVideoPreview uri={attachment.uri} />
+        ) : (
+          <Image
+            source={{ uri: attachment.uri }}
+            style={styles.previewMedia}
+            contentFit="cover"
+            transition={150}
+          />
+        )}
+      </View>
+
+      <View className="ml-3 flex-1">
+        <View className="flex-row items-center">
+          {isVideo ? (
+            <VideoCamera size={15} color="#7C3AED" weight="fill" />
+          ) : (
+            <ImageSquare size={15} color="#F35E16" weight="fill" />
+          )}
+
+          <Text className="ml-1.5 font-body text-[11px] font-bold uppercase text-[#555555]">
+            {isVideo ? 'Video selected' : 'Photo selected'}
+          </Text>
+        </View>
+
+        <Text className="mt-1 font-body text-sm font-semibold text-[#252525]" numberOfLines={1}>
+          {attachment.name || (isVideo ? 'Selected video' : 'Selected photo')}
+        </Text>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          disabled={disabled}
+          onPress={onChange}
+          className="mt-1 self-start"
+          style={{
+            opacity: disabled ? 0.5 : 1,
+          }}>
+          <Text className="font-body text-xs font-bold text-[#F35E16]">Change</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        activeOpacity={0.75}
+        disabled={disabled}
+        onPress={onRemove}
+        accessibilityRole="button"
+        accessibilityLabel="Remove selected attachment"
+        className="h-9 w-9 items-center justify-center rounded-full bg-[#F2E9E4]"
+        style={{
+          opacity: disabled ? 0.5 : 1,
+        }}>
+        <X size={17} color="#4A4A4A" weight="bold" />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 const ChatComposer = ({
   groupName,
   replyingTo,
@@ -70,6 +173,7 @@ const ChatComposer = ({
 }: ChatComposerProps) => {
   const [messageText, setMessageText] = useState('');
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<ChatAttachment | null>(null);
   const [isSending, setIsSending] = useState(false);
 
   const { isRecording, recordingSeconds, startRecording, cancelRecording, finishRecording } =
@@ -103,6 +207,39 @@ const ChatComposer = ({
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSendPendingAttachment = async () => {
+    if (!pendingAttachment || isSending) {
+      return;
+    }
+
+    const cleanText = messageText.trim();
+
+    setIsSending(true);
+
+    try {
+      const sent = await onSendAttachment(pendingAttachment, cleanText || undefined);
+
+      if (sent) {
+        setPendingAttachment(null);
+        setMessageText('');
+        setAttachmentMenuOpen(false);
+      }
+    } catch (error) {
+      showError('Attachment not sent', error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handlePrimarySend = async () => {
+    if (pendingAttachment) {
+      await handleSendPendingAttachment();
+      return;
+    }
+
+    await handleSendText();
   };
 
   const handleVoiceButton = async () => {
@@ -210,7 +347,7 @@ const ChatComposer = ({
 
       const defaultMimeType = selectedType === 'video' ? 'video/mp4' : 'image/jpeg';
 
-      const attachment: ChatAttachment = {
+      setPendingAttachment({
         id: asset.assetId ?? `local-attachment-${Date.now()}`,
         type: selectedType,
         uri: asset.uri,
@@ -221,21 +358,13 @@ const ChatComposer = ({
               sizeBytes: asset.fileSize,
             }
           : {}),
-      };
-
-      setIsSending(true);
-
-      const sent = await onSendAttachment(attachment);
-
-      if (!sent) {
-        throw new Error('The attachment could not be sent.');
-      }
+      });
     } catch (error) {
-      showError('Attachment not sent', error);
-    } finally {
-      setIsSending(false);
+      showError('Attachment not selected', error);
     }
   };
+
+  const hasSendableContent = Boolean(messageText.trim() || pendingAttachment);
 
   return (
     <View className="border-t border-[#EFE8E3] bg-white">
@@ -307,6 +436,19 @@ const ChatComposer = ({
         </View>
       ) : null}
 
+      {/* Small preview shown immediately above text input */}
+      {pendingAttachment ? (
+        <PendingAttachmentPreview
+          attachment={pendingAttachment}
+          disabled={isSending}
+          onChange={() => setAttachmentMenuOpen(true)}
+          onRemove={() => {
+            setPendingAttachment(null);
+            setAttachmentMenuOpen(false);
+          }}
+        />
+      ) : null}
+
       <View className="flex-row items-end px-3 pb-2 pt-2">
         {isRecording ? (
           <View className="flex-1 flex-row items-center rounded-full border border-[#F0D9CC] bg-[#FFF8F4] px-3 py-2.5">
@@ -366,13 +508,13 @@ const ChatComposer = ({
           </>
         )}
 
-        {messageText.trim() && !isRecording ? (
+        {hasSendableContent && !isRecording ? (
           <TouchableOpacity
             activeOpacity={0.8}
             disabled={isSending}
-            onPress={() => void handleSendText()}
+            onPress={() => void handlePrimarySend()}
             accessibilityRole="button"
-            accessibilityLabel="Send message"
+            accessibilityLabel={pendingAttachment ? 'Send attachment' : 'Send message'}
             className="ml-2 h-11 w-11 items-center justify-center rounded-full bg-[#F76B1C]"
             style={[
               styles.sendButton,
@@ -416,6 +558,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 7,
     elevation: 5,
+  },
+  previewThumbnail: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    backgroundColor: '#000000',
+  },
+
+  previewMedia: {
+    width: '100%',
+    height: '100%',
   },
 });
 

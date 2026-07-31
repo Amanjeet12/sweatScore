@@ -114,11 +114,14 @@ export default function GroupChatScreen() {
   );
 
   const handleSendAttachment = useCallback(
-    async (attachment: ChatAttachment) => {
-      if (!groupId) return false;
+    async (attachment: ChatAttachment, text?: string) => {
+      if (!groupId) {
+        return false;
+      }
 
       const sent = await sendAttachment({
         attachment,
+        text,
         replyToMessageId: replyingTo?.id,
       });
 

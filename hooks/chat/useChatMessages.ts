@@ -241,7 +241,7 @@ export const useChatMessages = (groupId?: string) => {
   }, []);
 
   const sendAttachment = useCallback(
-    async ({ attachment, replyToMessageId }: SendAttachmentInput) => {
+    async ({ attachment, text, replyToMessageId }: SendAttachmentInput) => {
       if (!convexGroupId) {
         return false;
       }
@@ -256,6 +256,14 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       }
 
+      const cleanText = text?.trim() ?? '';
+
+      if (cleanText.length > 2000) {
+        Alert.alert('Message too long', 'The message cannot exceed 2000 characters.');
+
+        return false;
+      }
+
       attachmentUploadRef.current = true;
       setIsUploadingAttachment(true);
 
@@ -263,6 +271,10 @@ export const useChatMessages = (groupId?: string) => {
         const type = attachment.type;
 
         const fileResponse = await fetch(attachment.uri);
+
+        if (!fileResponse.ok) {
+          throw new Error('The selected file could not be read.');
+        }
 
         const fileBlob = await fileResponse.blob();
 
@@ -290,10 +302,16 @@ export const useChatMessages = (groupId?: string) => {
           fileName
         );
 
+        /*
+         * Step 1: get the Convex Storage upload URL.
+         */
         const uploadUrl = await generateUploadUrlMutation({
           groupId: convexGroupId,
         });
 
+        /*
+         * Step 2: upload the image/video to Convex Storage.
+         */
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
@@ -314,6 +332,10 @@ export const useChatMessages = (groupId?: string) => {
           throw new Error('The upload did not return a storage ID.');
         }
 
+        /*
+         * Step 3: create one chatMessages document
+         * containing both text and attachment.
+         */
         await sendAttachmentMutation({
           groupId: convexGroupId,
           storageId: uploadResult.storageId as Id<'_storage'>,
@@ -322,6 +344,12 @@ export const useChatMessages = (groupId?: string) => {
           sizeBytes,
           fileName,
           clientMessageId: createClientMessageId(),
+
+          ...(cleanText
+            ? {
+                text: cleanText,
+              }
+            : {}),
 
           ...(replyToMessageId
             ? {

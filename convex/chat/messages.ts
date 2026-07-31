@@ -9,14 +9,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_CLIENT_MESSAGE_ID_LENGTH = 100;
 const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
 
-const AVATAR_COLORS = [
-  '#D97706',
-  '#9F1239',
-  '#047857',
-  '#7C3AED',
-  '#2563EB',
-  '#C2410C',
-];
+const AVATAR_COLORS = ['#D97706', '#9F1239', '#047857', '#7C3AED', '#2563EB', '#C2410C'];
 
 function getAvatarColor(userId: string) {
   let hash = 0;
@@ -28,9 +21,7 @@ function getAvatarColor(userId: string) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-function getSenderName(
-  user: Doc<'users'> | null
-) {
+function getSenderName(user: Doc<'users'> | null) {
   const name = user?.name?.trim();
 
   if (name) {
@@ -83,11 +74,7 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(
-      ctx,
-      args.groupId,
-      currentUser._id
-    );
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const group = await ctx.db.get(args.groupId);
 
@@ -97,9 +84,7 @@ export const listMessages = query({
 
     const result = await ctx.db
       .query('chatMessages')
-      .withIndex('by_group', (q) =>
-        q.eq('groupId', args.groupId)
-      )
+      .withIndex('by_group', (q) => q.eq('groupId', args.groupId))
       .order('desc')
       .paginate(args.paginationOpts);
 
@@ -115,17 +100,10 @@ export const listMessages = query({
         } | null = null;
 
         if (message.replyToMessageId) {
-          const repliedMessage = await ctx.db.get(
-            message.replyToMessageId
-          );
+          const repliedMessage = await ctx.db.get(message.replyToMessageId);
 
-          if (
-            repliedMessage &&
-            repliedMessage.groupId === args.groupId
-          ) {
-            const repliedSender = await ctx.db.get(
-              repliedMessage.senderId
-            );
+          if (repliedMessage && repliedMessage.groupId === args.groupId) {
+            const repliedSender = await ctx.db.get(repliedMessage.senderId);
 
             replyTo = {
               messageId: repliedMessage._id,
@@ -149,28 +127,18 @@ export const listMessages = query({
         let voiceDuration: number | null = null;
 
         if (message.attachment && !message.deletedAt) {
-          const fileUrl = await ctx.storage.getUrl(
-            message.attachment.storageId
-          );
+          const fileUrl = await ctx.storage.getUrl(message.attachment.storageId);
 
-          const thumbnailUrl =
-            message.attachment.thumbnailStorageId
-              ? await ctx.storage.getUrl(
-                  message.attachment.thumbnailStorageId
-                )
-              : null;
+          const thumbnailUrl = message.attachment.thumbnailStorageId
+            ? await ctx.storage.getUrl(message.attachment.thumbnailStorageId)
+            : null;
 
           if (message.type === 'voice') {
             voiceUri = fileUrl;
-            voiceDuration =
-              message.attachment.durationSeconds ?? 0;
+            voiceDuration = message.attachment.durationSeconds ?? 0;
           } else if (
             fileUrl &&
-            (
-              message.type === 'image' ||
-              message.type === 'video' ||
-              message.type === 'file'
-            )
+            (message.type === 'image' || message.type === 'video' || message.type === 'file')
           ) {
             attachment = {
               id: String(message.attachment.storageId),
@@ -186,9 +154,7 @@ export const listMessages = query({
 
         const reactionDocuments = await ctx.db
           .query('chatReactions')
-          .withIndex('by_message', (q) =>
-            q.eq('messageId', message._id)
-          )
+          .withIndex('by_message', (q) => q.eq('messageId', message._id))
           .collect();
 
         const groupedReactions = new Map<
@@ -201,62 +167,42 @@ export const listMessages = query({
         >();
 
         for (const reaction of reactionDocuments) {
-          const existing = groupedReactions.get(
-            reaction.emoji
-          );
+          const existing = groupedReactions.get(reaction.emoji);
 
           if (existing) {
             existing.count += 1;
 
-            if (
-              String(reaction.userId) ===
-              String(currentUser._id)
-            ) {
+            if (String(reaction.userId) === String(currentUser._id)) {
               existing.reactedByMe = true;
             }
           } else {
             groupedReactions.set(reaction.emoji, {
               emoji: reaction.emoji,
               count: 1,
-              reactedByMe:
-                String(reaction.userId) ===
-                String(currentUser._id),
+              reactedByMe: String(reaction.userId) === String(currentUser._id),
             });
           }
         }
 
-        const isMine =
-          String(message.senderId) ===
-          String(currentUser._id);
+        const isMine = String(message.senderId) === String(currentUser._id);
 
         return {
           _id: message._id,
           groupId: message.groupId,
           senderId: message.senderId,
           senderName,
-          senderInitial:
-            senderName.charAt(0).toUpperCase() || '?',
-          senderColor: isMine
-            ? '#F76B1C'
-            : getAvatarColor(String(message.senderId)),
+          senderInitial: senderName.charAt(0).toUpperCase() || '?',
+          senderColor: isMine ? '#F76B1C' : getAvatarColor(String(message.senderId)),
           type: message.deletedAt ? ('text' as const) : message.type,
-          text: message.deletedAt
-            ? 'Message deleted'
-            : message.text ?? null,
+          text: message.deletedAt ? 'Message deleted' : (message.text ?? null),
           createdAt: message._creationTime,
           isMine,
           deliveryStatus: isMine ? ('sent' as const) : null,
           attachment,
           voiceUri,
           voiceDuration,
-          linkTitle:
-            !message.deletedAt
-              ? message.linkPreview?.title ?? null
-              : null,
-          linkUrl:
-            !message.deletedAt
-              ? message.linkPreview?.url ?? null
-              : null,
+          linkTitle: !message.deletedAt ? (message.linkPreview?.title ?? null) : null,
+          linkUrl: !message.deletedAt ? (message.linkPreview?.url ?? null) : null,
           replyTo,
           reactions: Array.from(groupedReactions.values()),
         };
@@ -281,11 +227,7 @@ export const sendMessage = mutation({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(
-      ctx,
-      args.groupId,
-      currentUser._id
-    );
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const group = await ctx.db.get(args.groupId);
 
@@ -300,54 +242,35 @@ export const sendMessage = mutation({
     }
 
     if (text.length > MAX_MESSAGE_LENGTH) {
-      throw new ConvexError(
-        `Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`
-      );
+      throw new ConvexError(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
     }
 
     const clientMessageId = args.clientMessageId.trim();
 
-    if (
-      !clientMessageId ||
-      clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH
-    ) {
+    if (!clientMessageId || clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH) {
       throw new ConvexError('Invalid client message ID');
     }
 
     const duplicateMessage = await ctx.db
       .query('chatMessages')
       .withIndex('by_sender_client', (q) =>
-        q
-          .eq('senderId', currentUser._id)
-          .eq('clientMessageId', clientMessageId)
+        q.eq('senderId', currentUser._id).eq('clientMessageId', clientMessageId)
       )
       .first();
 
     if (duplicateMessage) {
-      if (
-        String(duplicateMessage.groupId) !==
-        String(args.groupId)
-      ) {
-        throw new ConvexError(
-          'Client message ID was already used'
-        );
+      if (String(duplicateMessage.groupId) !== String(args.groupId)) {
+        throw new ConvexError('Client message ID was already used');
       }
 
       return duplicateMessage._id;
     }
 
     if (args.replyToMessageId) {
-      const repliedMessage = await ctx.db.get(
-        args.replyToMessageId
-      );
+      const repliedMessage = await ctx.db.get(args.replyToMessageId);
 
-      if (
-        !repliedMessage ||
-        repliedMessage.groupId !== args.groupId
-      ) {
-        throw new ConvexError(
-          'The replied message does not belong to this group'
-        );
+      if (!repliedMessage || repliedMessage.groupId !== args.groupId) {
+        throw new ConvexError('The replied message does not belong to this group');
       }
     }
 
@@ -395,11 +318,7 @@ export const toggleReaction = mutation({
       throw new ConvexError('Message not found');
     }
 
-    await requireGroupMember(
-      ctx,
-      message.groupId,
-      currentUser._id
-    );
+    await requireGroupMember(ctx, message.groupId, currentUser._id);
 
     const group = await ctx.db.get(message.groupId);
 
@@ -410,10 +329,7 @@ export const toggleReaction = mutation({
     const existingReaction = await ctx.db
       .query('chatReactions')
       .withIndex('by_message_user_emoji', (q) =>
-        q
-          .eq('messageId', args.messageId)
-          .eq('userId', currentUser._id)
-          .eq('emoji', args.emoji)
+        q.eq('messageId', args.messageId).eq('userId', currentUser._id).eq('emoji', args.emoji)
       )
       .first();
 
@@ -445,18 +361,12 @@ export const markGroupRead = mutation({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(
-      ctx,
-      args.groupId,
-      currentUser._id
-    );
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const membership = await ctx.db
       .query('chatMembers')
       .withIndex('by_group_user', (q) =>
-        q
-          .eq('groupId', args.groupId)
-          .eq('userId', currentUser._id)
+        q.eq('groupId', args.groupId).eq('userId', currentUser._id)
       )
       .unique();
 
@@ -472,29 +382,24 @@ export const markGroupRead = mutation({
   },
 });
 
-
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_ATTACHMENT_NAME_LENGTH = 180;
 
 export const generateUploadUrl = mutation({
   args: {
-    groupId: v.id("chatGroups"),
+    groupId: v.id('chatGroups'),
   },
 
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(
-      ctx,
-      args.groupId,
-      currentUser._id,
-    );
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const group = await ctx.db.get(args.groupId);
 
     if (!group || !group.isActive) {
-      throw new ConvexError("Group not found");
+      throw new ConvexError('Group not found');
     }
 
     return ctx.storage.generateUploadUrl();
@@ -503,163 +408,146 @@ export const generateUploadUrl = mutation({
 
 export const sendAttachment = mutation({
   args: {
-    groupId: v.id("chatGroups"),
-    storageId: v.id("_storage"),
+    groupId: v.id('chatGroups'),
+    storageId: v.id('_storage'),
 
-    type: v.union(
-      v.literal("image"),
-      v.literal("video"),
-    ),
+    type: v.union(v.literal('image'), v.literal('video')),
 
+    text: v.optional(v.string()),
     mimeType: v.string(),
     sizeBytes: v.number(),
     fileName: v.optional(v.string()),
     clientMessageId: v.string(),
-    replyToMessageId: v.optional(v.id("chatMessages")),
+    replyToMessageId: v.optional(v.id('chatMessages')),
   },
 
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(
-      ctx,
-      args.groupId,
-      currentUser._id,
-    );
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const group = await ctx.db.get(args.groupId);
 
     if (!group || !group.isActive) {
-      throw new ConvexError("Group not found");
+      throw new ConvexError('Group not found');
     }
 
     const clientMessageId = args.clientMessageId.trim();
 
-    if (
-      !clientMessageId ||
-      clientMessageId.length > 100
-    ) {
-      throw new ConvexError("Invalid client message ID");
+    if (!clientMessageId || clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH) {
+      throw new ConvexError('Invalid client message ID');
     }
 
+    /*
+     * Prevent duplicate attachment messages when the client
+     * retries the mutation.
+     */
     const duplicateMessage = await ctx.db
-      .query("chatMessages")
-      .withIndex("by_sender_client", (q) =>
-        q
-          .eq("senderId", currentUser._id)
-          .eq("clientMessageId", clientMessageId),
+      .query('chatMessages')
+      .withIndex('by_sender_client', (q) =>
+        q.eq('senderId', currentUser._id).eq('clientMessageId', clientMessageId)
       )
       .first();
 
     if (duplicateMessage) {
-      if (
-        String(duplicateMessage.groupId) !==
-        String(args.groupId)
-      ) {
-        throw new ConvexError(
-          "Client message ID was already used",
-        );
+      if (String(duplicateMessage.groupId) !== String(args.groupId)) {
+        throw new ConvexError('Client message ID was already used');
       }
 
       return duplicateMessage._id;
     }
 
-    const metadata = await ctx.db.system.get(
-      "_storage",
-      args.storageId,
-    );
+    /*
+     * The text acts as the attachment caption.
+     * An attachment can also be sent without text.
+     */
+    const cleanText = args.text?.trim() ?? '';
+
+    if (cleanText.length > MAX_MESSAGE_LENGTH) {
+      throw new ConvexError(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
+    }
+
+    /*
+     * Read the real file metadata from Convex Storage.
+     * Do not trust the client-provided size or MIME type alone.
+     */
+    const metadata = await ctx.db.system.get('_storage', args.storageId);
 
     if (!metadata) {
-      throw new ConvexError("Uploaded file not found");
+      throw new ConvexError('Uploaded file not found');
     }
 
-    const mimeType = (
-      metadata.contentType ||
-      args.mimeType
-    )
-      .trim()
-      .toLowerCase();
+    const mimeType = (metadata.contentType || args.mimeType).trim().toLowerCase();
 
-    if (
-      args.type === "image" &&
-      !mimeType.startsWith("image/")
-    ) {
-      throw new ConvexError(
-        "The uploaded file is not an image",
-      );
+    if (args.type === 'image' && !mimeType.startsWith('image/')) {
+      throw new ConvexError('The uploaded file is not an image');
     }
 
-    if (
-      args.type === "video" &&
-      !mimeType.startsWith("video/")
-    ) {
-      throw new ConvexError(
-        "The uploaded file is not a video",
-      );
+    if (args.type === 'video' && !mimeType.startsWith('video/')) {
+      throw new ConvexError('The uploaded file is not a video');
     }
 
-    const maximumSize =
-      args.type === "image"
-        ? MAX_IMAGE_SIZE_BYTES
-        : MAX_VIDEO_SIZE_BYTES;
+    const maximumSize = args.type === 'image' ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES;
 
     if (metadata.size > maximumSize) {
       throw new ConvexError(
-        args.type === "image"
-          ? "Image cannot be larger than 20 MB"
-          : "Video cannot be larger than 100 MB",
+        args.type === 'image'
+          ? 'Image cannot be larger than 20 MB'
+          : 'Video cannot be larger than 100 MB'
       );
     }
 
-    const fileName = args.fileName
-      ?.trim()
-      .slice(0, MAX_ATTACHMENT_NAME_LENGTH);
+    const fileName = args.fileName?.trim().slice(0, MAX_ATTACHMENT_NAME_LENGTH);
 
+    /*
+     * Validate that the replied message belongs to
+     * the same chat group.
+     */
     if (args.replyToMessageId) {
-      const repliedMessage = await ctx.db.get(
-        args.replyToMessageId,
-      );
+      const repliedMessage = await ctx.db.get(args.replyToMessageId);
 
-      if (
-        !repliedMessage ||
-        String(repliedMessage.groupId) !==
-          String(args.groupId)
-      ) {
-        throw new ConvexError(
-          "The replied message does not belong to this group",
-        );
+      if (!repliedMessage || String(repliedMessage.groupId) !== String(args.groupId)) {
+        throw new ConvexError('The replied message does not belong to this group');
       }
     }
 
-    const messageId = await ctx.db.insert(
-      "chatMessages",
-      {
-        groupId: args.groupId,
-        senderId: currentUser._id,
-        clientMessageId,
-        type: args.type,
-        mentionedUserIds: [],
+    /*
+     * One database document contains both:
+     *
+     * - image/video attachment
+     * - optional typed caption
+     */
+    const messageId = await ctx.db.insert('chatMessages', {
+      groupId: args.groupId,
+      senderId: currentUser._id,
+      clientMessageId,
+      type: args.type,
+      mentionedUserIds: [],
 
-        attachment: {
-          storageId: args.storageId,
-          mimeType,
-          sizeBytes: metadata.size,
+      ...(cleanText
+        ? {
+            text: cleanText,
+          }
+        : {}),
 
-          ...(fileName
-            ? {
-                fileName,
-              }
-            : {}),
-        },
+      attachment: {
+        storageId: args.storageId,
+        mimeType,
+        sizeBytes: metadata.size,
 
-        ...(args.replyToMessageId
+        ...(fileName
           ? {
-              replyToMessageId:
-                args.replyToMessageId,
+              fileName,
             }
           : {}),
       },
-    );
+
+      ...(args.replyToMessageId
+        ? {
+            replyToMessageId: args.replyToMessageId,
+          }
+        : {}),
+    });
 
     await ctx.db.patch(args.groupId, {
       lastMessageId: messageId,

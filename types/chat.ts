@@ -82,5 +82,6 @@ export type SendVoiceMessageInput = PendingVoiceNote & {
 
 export type SendAttachmentInput = {
   attachment: ChatAttachment;
+  text?: string;
   replyToMessageId?: string;
 };
