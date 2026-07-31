@@ -87,6 +87,18 @@ export default function AdminView() {
             </View>
           </View>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/dashboard/settings/admin/chat-groups');
+          }}
+          disabled={loading}>
+          <View className="flex-row items-center gap-x-4">
+            <Ionicons size={25} name="chatbubbles-outline" color="#1A1A1A" />
+
+            <Text className="font-lsBold text-2xl">Manage Chat Groups</Text>
+          </View>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

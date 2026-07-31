@@ -1,175 +1,355 @@
-import { useCallback, useEffect, useState } from "react";
-
-import { createMockMessages, MOCK_TYPING_USERS } from "~/mocks/chatMessages";
+import { useMutation, usePaginatedQuery } from 'convex/react';
+import { Alert } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { api } from '~/convex/_generated/api';
+import type { Id } from '~/convex/_generated/dataModel';
 import type {
   ChatMessage,
+  ChatTypingUser,
   SendAttachmentInput,
   SendTextMessageInput,
   SendVoiceMessageInput,
-} from "~/types/chat";
-import {
-  createReplyDetails,
-  CURRENT_CHAT_USER,
-  formatMessageTime,
-} from "~/utils/chat";
+} from '~/types/chat';
+import { formatMessageTime } from '~/utils/chat';
 
-/**
- * Local UI data adapter.
- *
- * Keep this return shape when Convex is added. The internals can then be
- * replaced with usePaginatedQuery/useMutation without rewriting the screen.
- */
+function createClientMessageId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function showChatError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : 'Something went wrong while sending the message.';
+
+  Alert.alert('Chat error', message);
+}
+
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+
+function getAttachmentMimeType(type: 'image' | 'video', mimeType?: string, fileName?: string) {
+  if (mimeType?.trim()) {
+    return mimeType.trim().toLowerCase();
+  }
+
+  const extension = fileName?.split('.').pop()?.toLowerCase();
+
+  if (type === 'image') {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+
+      case 'heic':
+        return 'image/heic';
+
+      case 'webp':
+        return 'image/webp';
+
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  if (extension === 'mov') {
+    return 'video/quicktime';
+  }
+
+  return 'video/mp4';
+}
+
+function getAttachmentName(type: 'image' | 'video', name?: string) {
+  if (name?.trim()) {
+    return name.trim();
+  }
+
+  return type === 'image' ? `chat-photo-${Date.now()}.jpg` : `chat-video-${Date.now()}.mp4`;
+}
+
 export const useChatMessages = (groupId?: string) => {
-  const resolvedGroupId = groupId || "local-preview";
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    createMockMessages(resolvedGroupId),
+  const convexGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
+
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.chat.messages.listMessages,
+    convexGroupId
+      ? {
+          groupId: convexGroupId,
+        }
+      : 'skip',
+    {
+      initialNumItems: 50,
+    }
   );
 
-  useEffect(() => {
-    setMessages(createMockMessages(resolvedGroupId));
-  }, [resolvedGroupId]);
+  const generateUploadUrlMutation = useMutation(api.chat.messages.generateUploadUrl);
+  const sendAttachmentMutation = useMutation(api.chat.messages.sendAttachment);
+  const attachmentUploadRef = useRef(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
-  const getReply = useCallback(
-    (replyToMessageId?: string) =>
-      createReplyDetails(
-        messages.find((message) => message.id === replyToMessageId),
-      ),
-    [messages],
-  );
+  const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
+  const toggleReactionMutation = useMutation(api.chat.messages.toggleReaction);
+  const markGroupReadMutation = useMutation(api.chat.messages.markGroupRead);
+  const lastReadUpdateRef = useRef(0);
+
+  const messages = useMemo<ChatMessage[]>(() => {
+    return [...results].reverse().map((message) => ({
+      id: String(message._id),
+      groupId: String(message.groupId),
+      senderId: String(message.senderId),
+      senderName: message.senderName,
+      senderInitial: message.senderInitial,
+      senderColor: message.senderColor,
+      type: message.type,
+      createdAt: message.createdAt,
+      time: formatMessageTime(new Date(message.createdAt)),
+      isMine: message.isMine,
+      ...(message.deliveryStatus
+        ? {
+            deliveryStatus: message.deliveryStatus,
+          }
+        : {}),
+      ...(message.text
+        ? {
+            text: message.text,
+          }
+        : {}),
+      ...(message.attachment
+        ? {
+            attachment: {
+              id: message.attachment.id,
+              type: message.attachment.type,
+              uri: message.attachment.uri,
+              ...(message.attachment.name
+                ? {
+                    name: message.attachment.name,
+                  }
+                : {}),
+              mimeType: message.attachment.mimeType,
+              sizeBytes: message.attachment.sizeBytes,
+              ...(message.attachment.thumbnailUri
+                ? {
+                    thumbnailUri: message.attachment.thumbnailUri,
+                  }
+                : {}),
+            },
+          }
+        : {}),
+      ...(message.voiceUri
+        ? {
+            voiceUri: message.voiceUri,
+            voiceDuration: message.voiceDuration ?? 0,
+          }
+        : {}),
+      ...(message.linkTitle
+        ? {
+            linkTitle: message.linkTitle,
+          }
+        : {}),
+      ...(message.linkUrl
+        ? {
+            linkUrl: message.linkUrl,
+          }
+        : {}),
+      ...(message.replyTo
+        ? {
+            replyTo: {
+              messageId: String(message.replyTo.messageId),
+              senderName: message.replyTo.senderName,
+              text: message.replyTo.text,
+            },
+          }
+        : {}),
+      reactions: message.reactions,
+    }));
+  }, [results]);
 
   const sendTextMessage = useCallback(
     async ({ text, replyToMessageId }: SendTextMessageInput) => {
+      if (!convexGroupId) {
+        return false;
+      }
+
       const cleanText = text.trim();
-      if (!cleanText) return false;
 
-      const now = new Date();
-      const message: ChatMessage = {
-        id: `local-text-${Date.now()}`,
-        groupId: resolvedGroupId,
-        senderId: CURRENT_CHAT_USER.id,
-        senderName: CURRENT_CHAT_USER.name,
-        senderInitial: CURRENT_CHAT_USER.initial,
-        senderColor: CURRENT_CHAT_USER.color,
-        type: "text",
-        text: cleanText,
-        createdAt: now.getTime(),
-        time: formatMessageTime(now),
-        isMine: true,
-        deliveryStatus: "read",
-        replyTo: getReply(replyToMessageId),
-      };
+      if (!cleanText) {
+        return false;
+      }
 
-      setMessages((current) => [...current, message]);
-      return true;
+      try {
+        await sendMessageMutation({
+          groupId: convexGroupId,
+          text: cleanText,
+          clientMessageId: createClientMessageId(),
+          ...(replyToMessageId
+            ? {
+                replyToMessageId: replyToMessageId as Id<'chatMessages'>,
+              }
+            : {}),
+        });
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+        return false;
+      }
     },
-    [getReply, resolvedGroupId],
+    [convexGroupId, sendMessageMutation]
   );
 
-  const sendVoiceMessage = useCallback(
-    async ({
-      uri,
-      durationSeconds,
-      replyToMessageId,
-    }: SendVoiceMessageInput) => {
-      const now = new Date();
-      const message: ChatMessage = {
-        id: `local-voice-${Date.now()}`,
-        groupId: resolvedGroupId,
-        senderId: CURRENT_CHAT_USER.id,
-        senderName: CURRENT_CHAT_USER.name,
-        senderInitial: CURRENT_CHAT_USER.initial,
-        senderColor: CURRENT_CHAT_USER.color,
-        type: "voice",
-        voiceUri: uri,
-        voiceDuration: durationSeconds,
-        createdAt: now.getTime(),
-        time: formatMessageTime(now),
-        isMine: true,
-        deliveryStatus: "sent",
-        replyTo: getReply(replyToMessageId),
-      };
-
-      setMessages((current) => [...current, message]);
-      return true;
+  const reactToMessage = useCallback(
+    (messageId: string, emoji: string) => {
+      void toggleReactionMutation({
+        messageId: messageId as Id<'chatMessages'>,
+        emoji,
+      }).catch(showChatError);
     },
-    [getReply, resolvedGroupId],
+    [toggleReactionMutation]
   );
+
+  const markMessageRead = useCallback(
+    (_messageId: string) => {
+      if (!convexGroupId) {
+        return;
+      }
+
+      const now = Date.now();
+
+      // Prevent a mutation for every visible message.
+      if (now - lastReadUpdateRef.current < 3000) {
+        return;
+      }
+
+      lastReadUpdateRef.current = now;
+
+      void markGroupReadMutation({
+        groupId: convexGroupId,
+      }).catch(() => {
+        // Read-receipt failure should not interrupt chat.
+      });
+    },
+    [convexGroupId, markGroupReadMutation]
+  );
+
+  const loadEarlier = useCallback(() => {
+    if (status === 'CanLoadMore') {
+      loadMore(30);
+    }
+  }, [loadMore, status]);
+
+  const sendVoiceMessage = useCallback(async (_input: SendVoiceMessageInput) => {
+    Alert.alert('Coming next', 'Voice-message uploading is not connected yet.');
+
+    return false;
+  }, []);
 
   const sendAttachment = useCallback(
     async ({ attachment, replyToMessageId }: SendAttachmentInput) => {
-      const now = new Date();
-      const message: ChatMessage = {
-        id: `local-attachment-${Date.now()}`,
-        groupId: resolvedGroupId,
-        senderId: CURRENT_CHAT_USER.id,
-        senderName: CURRENT_CHAT_USER.name,
-        senderInitial: CURRENT_CHAT_USER.initial,
-        senderColor: CURRENT_CHAT_USER.color,
-        type: attachment.type,
-        attachment,
-        text:
-          attachment.type === "image"
-            ? "Shared a photo"
-            : attachment.type === "video"
-              ? "Shared a workout video"
-              : undefined,
-        createdAt: now.getTime(),
-        time: formatMessageTime(now),
-        isMine: true,
-        deliveryStatus: "sent",
-        replyTo: getReply(replyToMessageId),
-      };
+      if (!convexGroupId) {
+        return false;
+      }
 
-      setMessages((current) => [...current, message]);
-      return true;
-    },
-    [getReply, resolvedGroupId],
-  );
+      if (attachmentUploadRef.current) {
+        return false;
+      }
 
-  const reactToMessage = useCallback((messageId: string, emoji: string) => {
-    setMessages((current) =>
-      current.map((message) => {
-        if (message.id !== messageId) return message;
+      if (attachment.type !== 'image' && attachment.type !== 'video') {
+        Alert.alert('Unsupported attachment', 'Only images and videos are currently supported.');
 
-        const reactions = [...(message.reactions || [])];
-        const existingIndex = reactions.findIndex(
-          (reaction) => reaction.emoji === emoji,
-        );
+        return false;
+      }
 
-        if (existingIndex >= 0) {
-          const existing = reactions[existingIndex];
+      attachmentUploadRef.current = true;
+      setIsUploadingAttachment(true);
 
-          reactions[existingIndex] = {
-            ...existing,
-            count: existing.reactedByMe
-              ? Math.max(existing.count - 1, 0)
-              : existing.count + 1,
-            reactedByMe: !existing.reactedByMe,
-          };
-        } else {
-          reactions.push({
-            emoji,
-            count: 1,
-            reactedByMe: true,
-          });
+      try {
+        const type = attachment.type;
+
+        const fileResponse = await fetch(attachment.uri);
+
+        const fileBlob = await fileResponse.blob();
+
+        const sizeBytes = fileBlob.size || attachment.sizeBytes || 0;
+
+        const maximumSize = type === 'image' ? MAX_IMAGE_SIZE_BYTES : MAX_VIDEO_SIZE_BYTES;
+
+        if (sizeBytes > maximumSize) {
+          throw new Error(
+            type === 'image'
+              ? 'Image cannot be larger than 20 MB.'
+              : 'Video cannot be larger than 100 MB.'
+          );
         }
 
-        return {
-          ...message,
-          reactions: reactions.filter((reaction) => reaction.count > 0),
-        };
-      }),
-    );
-  }, []);
+        if (sizeBytes <= 0) {
+          throw new Error('The selected file could not be read.');
+        }
 
-  const markMessageRead = useCallback((_messageId: string) => {
-    // Convex phase: call a debounced markRead mutation here.
-  }, []);
+        const fileName = getAttachmentName(type, attachment.name);
+
+        const mimeType = getAttachmentMimeType(
+          type,
+          attachment.mimeType || fileBlob.type,
+          fileName
+        );
+
+        const uploadUrl = await generateUploadUrlMutation({
+          groupId: convexGroupId,
+        });
+
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': mimeType,
+          },
+          body: fileBlob,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('The attachment upload failed.');
+        }
+
+        const uploadResult = (await uploadResponse.json()) as {
+          storageId?: string;
+        };
+
+        if (!uploadResult.storageId) {
+          throw new Error('The upload did not return a storage ID.');
+        }
+
+        await sendAttachmentMutation({
+          groupId: convexGroupId,
+          storageId: uploadResult.storageId as Id<'_storage'>,
+          type,
+          mimeType,
+          sizeBytes,
+          fileName,
+          clientMessageId: createClientMessageId(),
+
+          ...(replyToMessageId
+            ? {
+                replyToMessageId: replyToMessageId as Id<'chatMessages'>,
+              }
+            : {}),
+        });
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+        return false;
+      } finally {
+        attachmentUploadRef.current = false;
+        setIsUploadingAttachment(false);
+      }
+    },
+    [convexGroupId, generateUploadUrlMutation, sendAttachmentMutation]
+  );
 
   return {
     messages,
-    isLoading: false,
-    typingUsers: MOCK_TYPING_USERS,
+    isLoading: status === 'LoadingFirstPage',
+    isLoadingMore: status === 'LoadingMore',
+    canLoadEarlier: status === 'CanLoadMore',
+    isUploadingAttachment,
+    loadEarlier,
+    typingUsers: [] as ChatTypingUser[],
     sendTextMessage,
     sendVoiceMessage,
     sendAttachment,

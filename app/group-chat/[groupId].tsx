@@ -1,32 +1,27 @@
-import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import SafeAreaView from "~/components/core/SafeAreaView";
-import ChatComposer from "~/components/group-chat/ChatComposer";
-import ChatHeader from "~/components/group-chat/ChatHeader";
-import MessageList from "~/components/group-chat/MessageList";
-import { useChatKeyboard } from "~/hooks/chat/useChatKeyboard";
-import { useChatMessages } from "~/hooks/chat/useChatMessages";
-import type {
-  ChatAttachment,
-  ChatMessage,
-  PendingVoiceNote,
-} from "~/types/chat";
-
-const GROUP_NAME = "Sweat Sisters";
+import SafeAreaView from '~/components/core/SafeAreaView';
+import ChatComposer from '~/components/group-chat/ChatComposer';
+import ChatHeader from '~/components/group-chat/ChatHeader';
+import MessageList from '~/components/group-chat/MessageList';
+import { useChatKeyboard } from '~/hooks/chat/useChatKeyboard';
+import { useChatMessages } from '~/hooks/chat/useChatMessages';
+import type { ChatAttachment, ChatMessage, PendingVoiceNote } from '~/types/chat';
+import { useQuery } from 'convex/react';
+import type { Id } from '~/convex/_generated/dataModel';
+import { api } from '~/convex/_generated/api';
 
 export default function GroupChatScreen() {
   const params = useLocalSearchParams<{ groupId?: string | string[] }>();
-  const groupId = Array.isArray(params.groupId)
-    ? params.groupId[0]
-    : params.groupId;
+  const groupId = Array.isArray(params.groupId) ? params.groupId[0] : params.groupId;
 
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
 
   const {
@@ -39,6 +34,17 @@ export default function GroupChatScreen() {
     reactToMessage,
     markMessageRead,
   } = useChatMessages(groupId);
+
+  const typedGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
+
+  const group = useQuery(
+    api.chat.groups.getGroup,
+    typedGroupId
+      ? {
+          groupId: typedGroupId,
+        }
+      : 'skip'
+  );
 
   const { androidKeyboardInset, scrollToLatest } = useChatKeyboard(listRef);
 
@@ -57,7 +63,7 @@ export default function GroupChatScreen() {
         message.replyTo?.text,
       ]
         .filter(Boolean)
-        .join(" ")
+        .join(' ')
         .toLowerCase();
 
       return searchableText.includes(query);
@@ -66,7 +72,7 @@ export default function GroupChatScreen() {
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
-    setSearchText("");
+    setSearchText('');
   }, []);
 
   const handleSendText = useCallback(
@@ -85,7 +91,7 @@ export default function GroupChatScreen() {
 
       return sent;
     },
-    [groupId, replyingTo?.id, scrollToLatest, sendTextMessage],
+    [groupId, replyingTo?.id, scrollToLatest, sendTextMessage]
   );
 
   const handleSendVoice = useCallback(
@@ -104,7 +110,7 @@ export default function GroupChatScreen() {
 
       return sent;
     },
-    [groupId, replyingTo?.id, scrollToLatest, sendVoiceMessage],
+    [groupId, replyingTo?.id, scrollToLatest, sendVoiceMessage]
   );
 
   const handleSendAttachment = useCallback(
@@ -123,7 +129,7 @@ export default function GroupChatScreen() {
 
       return sent;
     },
-    [groupId, replyingTo?.id, scrollToLatest, sendAttachment],
+    [groupId, replyingTo?.id, scrollToLatest, sendAttachment]
   );
 
   const typingLabel = useMemo(() => {
@@ -142,22 +148,21 @@ export default function GroupChatScreen() {
       <View
         className="flex-1"
         style={{
-          paddingTop: Platform.OS === "android" ? insets.top + 8 : 8,
-        }}
-      >
+          paddingTop: Platform.OS === 'android' ? insets.top + 8 : 8,
+        }}>
         <KeyboardAvoidingView
           className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={0}
           style={{
             flex: 1,
-            paddingBottom: Platform.OS === "android" ? androidKeyboardInset : 0,
-          }}
-        >
+            paddingBottom: Platform.OS === 'android' ? androidKeyboardInset : 0,
+          }}>
           <ChatHeader
             groupId={groupId}
-            groupName={GROUP_NAME}
-            memberCount={8}
+            groupName={group?.name ?? 'Group Chat'}
+            imageUrl={group?.imageUrl ?? null}
+            memberCount={group?.memberCount ?? 0}
             typingLabel={typingLabel}
             searchOpen={searchOpen}
             searchText={searchText}
@@ -166,7 +171,6 @@ export default function GroupChatScreen() {
             onCloseSearch={closeSearch}
             onChangeSearch={setSearchText}
           />
-
           <View className="flex-1">
             <MessageList
               ref={listRef}
@@ -183,7 +187,7 @@ export default function GroupChatScreen() {
           </View>
 
           <ChatComposer
-            groupName={GROUP_NAME}
+            groupName={group?.name ?? 'Group Chat'}
             replyingTo={replyingTo}
             onCancelReply={() => setReplyingTo(null)}
             onFocus={() => scrollToLatest(true)}

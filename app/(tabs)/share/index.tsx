@@ -151,14 +151,7 @@ const TabShare = () => {
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel="Open group chats"
-                onPress={() =>
-                  router.push({
-                    pathname: '/group-chat/[groupId]',
-                    params: {
-                      groupId: '1', // Replace with the actual group ID
-                    },
-                  })
-                }
+                onPress={() => router.push('/group-chat')}
                 className="h-11 w-11 items-center justify-center rounded-full border border-[#EEE1D8] bg-white">
                 <ChatCircleDots size={28} color="#F76B1C" weight="fill" />
               </TouchableOpacity>

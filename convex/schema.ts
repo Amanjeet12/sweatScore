@@ -331,6 +331,105 @@ const schema = defineSchema({
     storeUrl: v.string(),
     updatedAt: v.number(),
   }).index('by_platform', ['platform']),
+
+  //group-chat
+
+  chatGroups: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    imageStorageId: v.optional(v.id('_storage')),
+    createdBy: v.id('users'),
+    isActive: v.boolean(),
+    lastMessageId: v.optional(v.id('chatMessages')),
+    lastMessageAt: v.optional(v.number()),
+  }).index('by_slug', ['slug']),
+
+  chatMembers: defineTable({
+    groupId: v.id('chatGroups'),
+    userId: v.id('users'),
+    role: v.union(v.literal('owner'), v.literal('admin'), v.literal('member')),
+    status: v.union(v.literal('active'), v.literal('removed'), v.literal('left')),
+    joinedAt: v.number(),
+    lastReadAt: v.optional(v.number()),
+    lastDeliveredAt: v.optional(v.number()),
+    notificationsMuted: v.boolean(),
+  })
+    .index('by_group_user', ['groupId', 'userId'])
+    .index('by_group_status', ['groupId', 'status'])
+    .index('by_user_status', ['userId', 'status']),
+
+  chatMessages: defineTable({
+    groupId: v.id('chatGroups'),
+    senderId: v.id('users'),
+    clientMessageId: v.string(),
+
+    type: v.union(
+      v.literal('text'),
+      v.literal('image'),
+      v.literal('video'),
+      v.literal('file'),
+      v.literal('voice'),
+      v.literal('link')
+    ),
+
+    text: v.optional(v.string()),
+    replyToMessageId: v.optional(v.id('chatMessages')),
+    mentionedUserIds: v.array(v.id('users')),
+
+    attachment: v.optional(
+      v.object({
+        storageId: v.id('_storage'),
+        thumbnailStorageId: v.optional(v.id('_storage')),
+        fileName: v.optional(v.string()),
+        mimeType: v.string(),
+        sizeBytes: v.number(),
+        durationSeconds: v.optional(v.number()),
+      })
+    ),
+
+    linkPreview: v.optional(
+      v.object({
+        url: v.string(),
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+      })
+    ),
+
+    editedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
+  })
+    .index('by_group', ['groupId'])
+    .index('by_sender_client', ['senderId', 'clientMessageId']),
+
+  chatReactions: defineTable({
+    messageId: v.id('chatMessages'),
+    userId: v.id('users'),
+    emoji: v.string(),
+  })
+    .index('by_message', ['messageId'])
+    .index('by_message_user_emoji', ['messageId', 'userId', 'emoji']),
+
+  chatTyping: defineTable({
+    groupId: v.id('chatGroups'),
+    userId: v.id('users'),
+    isTyping: v.boolean(),
+    updatedAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index('by_group_user', ['groupId', 'userId'])
+    .index('by_group_expires', ['groupId', 'expiresAt']),
+
+  chatDevices: defineTable({
+    userId: v.id('users'),
+    token: v.string(),
+    platform: v.union(v.literal('ios'), v.literal('android')),
+    active: v.boolean(),
+    updatedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_active', ['userId', 'active'])
+    .index('by_token', ['token']),
 });
 
 export default schema;

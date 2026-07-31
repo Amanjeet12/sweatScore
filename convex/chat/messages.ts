@@ -1,0 +1,671 @@
+import { paginationOptsValidator } from 'convex/server';
+import { ConvexError, v } from 'convex/values';
+
+import type { Doc } from '../_generated/dataModel';
+import { mutation, query } from '../_generated/server';
+import { requireCurrentUser, requireGroupMember } from './helpers';
+
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_CLIENT_MESSAGE_ID_LENGTH = 100;
+const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
+
+const AVATAR_COLORS = [
+  '#D97706',
+  '#9F1239',
+  '#047857',
+  '#7C3AED',
+  '#2563EB',
+  '#C2410C',
+];
+
+function getAvatarColor(userId: string) {
+  let hash = 0;
+
+  for (let index = 0; index < userId.length; index += 1) {
+    hash = (hash * 31 + userId.charCodeAt(index)) >>> 0;
+  }
+
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function getSenderName(
+  user: Doc<'users'> | null
+) {
+  const name = user?.name?.trim();
+
+  if (name) {
+    return name;
+  }
+
+  if (user?.email) {
+    return user.email.split('@')[0];
+  }
+
+  return 'Member';
+}
+
+function getReplyText(message: Doc<'chatMessages'>) {
+  if (message.deletedAt) {
+    return 'Message deleted';
+  }
+
+  if (message.text?.trim()) {
+    return message.text.trim();
+  }
+
+  switch (message.type) {
+    case 'image':
+      return 'Photo';
+
+    case 'video':
+      return 'Video';
+
+    case 'voice':
+      return 'Voice note';
+
+    case 'file':
+      return message.attachment?.fileName || 'File';
+
+    case 'link':
+      return message.linkPreview?.title || 'Link';
+
+    default:
+      return 'Message';
+  }
+}
+
+export const listMessages = query({
+  args: {
+    groupId: v.id('chatGroups'),
+    paginationOpts: paginationOptsValidator,
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(
+      ctx,
+      args.groupId,
+      currentUser._id
+    );
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    const result = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_group', (q) =>
+        q.eq('groupId', args.groupId)
+      )
+      .order('desc')
+      .paginate(args.paginationOpts);
+
+    const messages = await Promise.all(
+      result.page.map(async (message) => {
+        const sender = await ctx.db.get(message.senderId);
+        const senderName = getSenderName(sender);
+
+        let replyTo: {
+          messageId: typeof message._id;
+          senderName: string;
+          text: string;
+        } | null = null;
+
+        if (message.replyToMessageId) {
+          const repliedMessage = await ctx.db.get(
+            message.replyToMessageId
+          );
+
+          if (
+            repliedMessage &&
+            repliedMessage.groupId === args.groupId
+          ) {
+            const repliedSender = await ctx.db.get(
+              repliedMessage.senderId
+            );
+
+            replyTo = {
+              messageId: repliedMessage._id,
+              senderName: getSenderName(repliedSender),
+              text: getReplyText(repliedMessage),
+            };
+          }
+        }
+
+        let attachment: {
+          id: string;
+          type: 'image' | 'video' | 'file';
+          uri: string;
+          name: string | null;
+          mimeType: string;
+          sizeBytes: number;
+          thumbnailUri: string | null;
+        } | null = null;
+
+        let voiceUri: string | null = null;
+        let voiceDuration: number | null = null;
+
+        if (message.attachment && !message.deletedAt) {
+          const fileUrl = await ctx.storage.getUrl(
+            message.attachment.storageId
+          );
+
+          const thumbnailUrl =
+            message.attachment.thumbnailStorageId
+              ? await ctx.storage.getUrl(
+                  message.attachment.thumbnailStorageId
+                )
+              : null;
+
+          if (message.type === 'voice') {
+            voiceUri = fileUrl;
+            voiceDuration =
+              message.attachment.durationSeconds ?? 0;
+          } else if (
+            fileUrl &&
+            (
+              message.type === 'image' ||
+              message.type === 'video' ||
+              message.type === 'file'
+            )
+          ) {
+            attachment = {
+              id: String(message.attachment.storageId),
+              type: message.type,
+              uri: fileUrl,
+              name: message.attachment.fileName ?? null,
+              mimeType: message.attachment.mimeType,
+              sizeBytes: message.attachment.sizeBytes,
+              thumbnailUri: thumbnailUrl,
+            };
+          }
+        }
+
+        const reactionDocuments = await ctx.db
+          .query('chatReactions')
+          .withIndex('by_message', (q) =>
+            q.eq('messageId', message._id)
+          )
+          .collect();
+
+        const groupedReactions = new Map<
+          string,
+          {
+            emoji: string;
+            count: number;
+            reactedByMe: boolean;
+          }
+        >();
+
+        for (const reaction of reactionDocuments) {
+          const existing = groupedReactions.get(
+            reaction.emoji
+          );
+
+          if (existing) {
+            existing.count += 1;
+
+            if (
+              String(reaction.userId) ===
+              String(currentUser._id)
+            ) {
+              existing.reactedByMe = true;
+            }
+          } else {
+            groupedReactions.set(reaction.emoji, {
+              emoji: reaction.emoji,
+              count: 1,
+              reactedByMe:
+                String(reaction.userId) ===
+                String(currentUser._id),
+            });
+          }
+        }
+
+        const isMine =
+          String(message.senderId) ===
+          String(currentUser._id);
+
+        return {
+          _id: message._id,
+          groupId: message.groupId,
+          senderId: message.senderId,
+          senderName,
+          senderInitial:
+            senderName.charAt(0).toUpperCase() || '?',
+          senderColor: isMine
+            ? '#F76B1C'
+            : getAvatarColor(String(message.senderId)),
+          type: message.deletedAt ? ('text' as const) : message.type,
+          text: message.deletedAt
+            ? 'Message deleted'
+            : message.text ?? null,
+          createdAt: message._creationTime,
+          isMine,
+          deliveryStatus: isMine ? ('sent' as const) : null,
+          attachment,
+          voiceUri,
+          voiceDuration,
+          linkTitle:
+            !message.deletedAt
+              ? message.linkPreview?.title ?? null
+              : null,
+          linkUrl:
+            !message.deletedAt
+              ? message.linkPreview?.url ?? null
+              : null,
+          replyTo,
+          reactions: Array.from(groupedReactions.values()),
+        };
+      })
+    );
+
+    return {
+      ...result,
+      page: messages,
+    };
+  },
+});
+
+export const sendMessage = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+    text: v.string(),
+    clientMessageId: v.string(),
+    replyToMessageId: v.optional(v.id('chatMessages')),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(
+      ctx,
+      args.groupId,
+      currentUser._id
+    );
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    const text = args.text.trim();
+
+    if (!text) {
+      throw new ConvexError('Message cannot be empty');
+    }
+
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      throw new ConvexError(
+        `Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`
+      );
+    }
+
+    const clientMessageId = args.clientMessageId.trim();
+
+    if (
+      !clientMessageId ||
+      clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH
+    ) {
+      throw new ConvexError('Invalid client message ID');
+    }
+
+    const duplicateMessage = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender_client', (q) =>
+        q
+          .eq('senderId', currentUser._id)
+          .eq('clientMessageId', clientMessageId)
+      )
+      .first();
+
+    if (duplicateMessage) {
+      if (
+        String(duplicateMessage.groupId) !==
+        String(args.groupId)
+      ) {
+        throw new ConvexError(
+          'Client message ID was already used'
+        );
+      }
+
+      return duplicateMessage._id;
+    }
+
+    if (args.replyToMessageId) {
+      const repliedMessage = await ctx.db.get(
+        args.replyToMessageId
+      );
+
+      if (
+        !repliedMessage ||
+        repliedMessage.groupId !== args.groupId
+      ) {
+        throw new ConvexError(
+          'The replied message does not belong to this group'
+        );
+      }
+    }
+
+    const now = Date.now();
+
+    const messageId = await ctx.db.insert('chatMessages', {
+      groupId: args.groupId,
+      senderId: currentUser._id,
+      clientMessageId,
+      type: 'text',
+      text,
+      mentionedUserIds: [],
+      ...(args.replyToMessageId
+        ? {
+            replyToMessageId: args.replyToMessageId,
+          }
+        : {}),
+    });
+
+    await ctx.db.patch(args.groupId, {
+      lastMessageId: messageId,
+      lastMessageAt: now,
+    });
+
+    return messageId;
+  },
+});
+
+export const toggleReaction = mutation({
+  args: {
+    messageId: v.id('chatMessages'),
+    emoji: v.string(),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    if (!ALLOWED_REACTIONS.includes(args.emoji)) {
+      throw new ConvexError('Unsupported reaction');
+    }
+
+    const message = await ctx.db.get(args.messageId);
+
+    if (!message || message.deletedAt) {
+      throw new ConvexError('Message not found');
+    }
+
+    await requireGroupMember(
+      ctx,
+      message.groupId,
+      currentUser._id
+    );
+
+    const group = await ctx.db.get(message.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    const existingReaction = await ctx.db
+      .query('chatReactions')
+      .withIndex('by_message_user_emoji', (q) =>
+        q
+          .eq('messageId', args.messageId)
+          .eq('userId', currentUser._id)
+          .eq('emoji', args.emoji)
+      )
+      .first();
+
+    if (existingReaction) {
+      await ctx.db.delete(existingReaction._id);
+
+      return {
+        active: false,
+      };
+    }
+
+    await ctx.db.insert('chatReactions', {
+      messageId: args.messageId,
+      userId: currentUser._id,
+      emoji: args.emoji,
+    });
+
+    return {
+      active: true,
+    };
+  },
+});
+
+export const markGroupRead = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(
+      ctx,
+      args.groupId,
+      currentUser._id
+    );
+
+    const membership = await ctx.db
+      .query('chatMembers')
+      .withIndex('by_group_user', (q) =>
+        q
+          .eq('groupId', args.groupId)
+          .eq('userId', currentUser._id)
+      )
+      .unique();
+
+    if (!membership || membership.status !== 'active') {
+      throw new ConvexError('Active membership required');
+    }
+
+    await ctx.db.patch(membership._id, {
+      lastReadAt: Date.now(),
+    });
+
+    return true;
+  },
+});
+
+
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_ATTACHMENT_NAME_LENGTH = 180;
+
+export const generateUploadUrl = mutation({
+  args: {
+    groupId: v.id("chatGroups"),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(
+      ctx,
+      args.groupId,
+      currentUser._id,
+    );
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError("Group not found");
+    }
+
+    return ctx.storage.generateUploadUrl();
+  },
+});
+
+export const sendAttachment = mutation({
+  args: {
+    groupId: v.id("chatGroups"),
+    storageId: v.id("_storage"),
+
+    type: v.union(
+      v.literal("image"),
+      v.literal("video"),
+    ),
+
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    fileName: v.optional(v.string()),
+    clientMessageId: v.string(),
+    replyToMessageId: v.optional(v.id("chatMessages")),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(
+      ctx,
+      args.groupId,
+      currentUser._id,
+    );
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError("Group not found");
+    }
+
+    const clientMessageId = args.clientMessageId.trim();
+
+    if (
+      !clientMessageId ||
+      clientMessageId.length > 100
+    ) {
+      throw new ConvexError("Invalid client message ID");
+    }
+
+    const duplicateMessage = await ctx.db
+      .query("chatMessages")
+      .withIndex("by_sender_client", (q) =>
+        q
+          .eq("senderId", currentUser._id)
+          .eq("clientMessageId", clientMessageId),
+      )
+      .first();
+
+    if (duplicateMessage) {
+      if (
+        String(duplicateMessage.groupId) !==
+        String(args.groupId)
+      ) {
+        throw new ConvexError(
+          "Client message ID was already used",
+        );
+      }
+
+      return duplicateMessage._id;
+    }
+
+    const metadata = await ctx.db.system.get(
+      "_storage",
+      args.storageId,
+    );
+
+    if (!metadata) {
+      throw new ConvexError("Uploaded file not found");
+    }
+
+    const mimeType = (
+      metadata.contentType ||
+      args.mimeType
+    )
+      .trim()
+      .toLowerCase();
+
+    if (
+      args.type === "image" &&
+      !mimeType.startsWith("image/")
+    ) {
+      throw new ConvexError(
+        "The uploaded file is not an image",
+      );
+    }
+
+    if (
+      args.type === "video" &&
+      !mimeType.startsWith("video/")
+    ) {
+      throw new ConvexError(
+        "The uploaded file is not a video",
+      );
+    }
+
+    const maximumSize =
+      args.type === "image"
+        ? MAX_IMAGE_SIZE_BYTES
+        : MAX_VIDEO_SIZE_BYTES;
+
+    if (metadata.size > maximumSize) {
+      throw new ConvexError(
+        args.type === "image"
+          ? "Image cannot be larger than 20 MB"
+          : "Video cannot be larger than 100 MB",
+      );
+    }
+
+    const fileName = args.fileName
+      ?.trim()
+      .slice(0, MAX_ATTACHMENT_NAME_LENGTH);
+
+    if (args.replyToMessageId) {
+      const repliedMessage = await ctx.db.get(
+        args.replyToMessageId,
+      );
+
+      if (
+        !repliedMessage ||
+        String(repliedMessage.groupId) !==
+          String(args.groupId)
+      ) {
+        throw new ConvexError(
+          "The replied message does not belong to this group",
+        );
+      }
+    }
+
+    const messageId = await ctx.db.insert(
+      "chatMessages",
+      {
+        groupId: args.groupId,
+        senderId: currentUser._id,
+        clientMessageId,
+        type: args.type,
+        mentionedUserIds: [],
+
+        attachment: {
+          storageId: args.storageId,
+          mimeType,
+          sizeBytes: metadata.size,
+
+          ...(fileName
+            ? {
+                fileName,
+              }
+            : {}),
+        },
+
+        ...(args.replyToMessageId
+          ? {
+              replyToMessageId:
+                args.replyToMessageId,
+            }
+          : {}),
+      },
+    );
+
+    await ctx.db.patch(args.groupId, {
+      lastMessageId: messageId,
+      lastMessageAt: Date.now(),
+    });
+
+    return messageId;
+  },
+});
