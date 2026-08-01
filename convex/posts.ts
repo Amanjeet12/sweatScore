@@ -152,8 +152,7 @@ export const getPinnedPost = query({
                 (await ctx.storage.getUrl(completion.compositeVideoStorageId)) ?? undefined;
             }
             if (completion?.thumbnailStorageId) {
-              thumbnailUrl =
-                (await ctx.storage.getUrl(completion.thumbnailStorageId)) ?? undefined;
+              thumbnailUrl = (await ctx.storage.getUrl(completion.thumbnailStorageId)) ?? undefined;
             }
             allowRepost = completion?.allowRepost ?? false;
           }
@@ -726,8 +725,10 @@ export const deleteComment = mutation({
 export const getLatestPosts = query({
   args: {
     paginationOpts: paginationOptsValidator,
+
     channel: v.optional(v.number()),
   },
+
   returns: v.object({
     page: v.array(
       v.object({
@@ -735,23 +736,36 @@ export const getLatestPosts = query({
         userId: v.id('users'),
         createdAt: v.number(),
         body: v.string(),
+
         media: v.optional(v.union(v.id('_storage'), v.null())),
+
         mediaWidth: v.optional(v.union(v.number(), v.null())),
+
         mediaHeight: v.optional(v.union(v.number(), v.null())),
+
         mediaType: v.optional(v.string()),
+
         mediaThumbnailUrl: v.optional(v.string()),
+
         mediaUrl: v.optional(v.string()),
+
         challengeId: v.optional(v.id('challenges')),
+
         challenge: v.optional(
           v.object({
             name: v.string(),
             points: v.number(),
+
             instructionalVideoUrl: v.optional(v.string()),
+
             compositeVideoUrl: v.optional(v.string()),
+
             thumbnailUrl: v.optional(v.string()),
+
             allowRepost: v.optional(v.boolean()),
           })
         ),
+
         likeCount: v.number(),
         fireLikesCount: v.number(),
         clapLikesCount: v.number(),
@@ -759,21 +773,28 @@ export const getLatestPosts = query({
         isLiked: v.boolean(),
         isPinned: v.boolean(),
         commentCount: v.number(),
+
         user: v.object({
           name: v.string(),
+
           image: v.optional(v.id('_storage')),
+
           imageUrl: v.optional(v.string()),
+
           isAuthor: v.boolean(),
           isAdmin: v.boolean(),
           hasHit500: v.boolean(),
         }),
       })
     ),
+
     continueCursor: v.string(),
     isDone: v.boolean(),
   }),
+
   handler: async (ctx, args) => {
     const currentUserId = await getAuthUserId(ctx);
+
     if (!currentUserId) {
       return {
         page: [],
@@ -782,138 +803,333 @@ export const getLatestPosts = query({
       };
     }
 
-    const posts = await ctx.db.query('posts').order('desc').paginate(args.paginationOpts);
+    /*
+     * Keep the existing pagination behavior.
+     */
+    const postsPage = await ctx.db.query('posts').order('desc').paginate(args.paginationOpts);
 
-    const results = [];
-    for (const post of posts.page) {
-      // Skip pinned posts (they are shown separately)
-      if (post.isPinned) continue;
-
-      // Check if user reported this post
-      const hasReported = await ctx.db
-        .query('postReports')
-        .withIndex('by_post_user', (q) => q.eq('postId', post._id).eq('userId', currentUserId))
-        .unique();
-
-      // Skip if user has reported this post
-      if (hasReported) continue;
-
-      // Check if user blocked the post author
-      const hasBlockedAuthor = await ctx.db
+    /*
+     * Load block relationships once instead
+     * of performing two block queries for
+     * every post.
+     */
+    const [blockedByCurrentUser, usersBlockingCurrentUser] = await Promise.all([
+      ctx.db
         .query('blockedUsers')
-        .withIndex('by_user_blocked_user', (q) =>
-          q.eq('userId', currentUserId).eq('blockedUserId', post.userId)
-        )
-        .unique();
+        .withIndex('by_user', (queryBuilder) => queryBuilder.eq('userId', currentUserId))
+        .collect(),
 
-      // Skip if user has blocked the post author
-      if (hasBlockedAuthor) continue;
-
-      // Check if post author blocked the current user
-      const isBlockedByAuthor = await ctx.db
+      ctx.db
         .query('blockedUsers')
-        .withIndex('by_user_blocked_user', (q) =>
-          q.eq('userId', post.userId).eq('blockedUserId', currentUserId)
+        .withIndex('by_blocked_user', (queryBuilder) =>
+          queryBuilder.eq('blockedUserId', currentUserId)
         )
-        .unique();
+        .collect(),
+    ]);
 
-      // Skip if post author has blocked the current user
-      if (isBlockedByAuthor) continue;
+    const blockedAuthorIds = new Set(
+      blockedByCurrentUser.map((block) => String(block.blockedUserId))
+    );
 
-      const user = await ctx.db.get(post.userId);
-      const likeCount = await postCounter.count(ctx, `likes:${post._id}`);
-      const fireLikesCount = await postCounter.count(ctx, `likes:${post._id}:fire`);
-      const clapLikesCount = await postCounter.count(ctx, `likes:${post._id}:clap`);
-      const heartLikesCount = await postCounter.count(ctx, `likes:${post._id}:heart`);
-      const isLiked = await ctx.db
-        .query('postLikes')
-        .withIndex('by_post_user', (q) => q.eq('postId', post._id).eq('userId', currentUserId))
-        .unique();
-      const commentCount = await postCounter.count(ctx, `comments:${post._id}`);
+    const blockingAuthorIds = new Set(
+      usersBlockingCurrentUser.map((block) => String(block.userId))
+    );
 
-      if (user) {
-        // Check if user hit 500 points this month
-        const yearMonth = new Date().toISOString().slice(0, 7);
-        const leaderboardEntry = await ctx.db
-          .query('monthlyLeaderboard')
-          .withIndex('by_user_and_year_month', (q) =>
-            q.eq('userId', post.userId).eq('yearMonth', yearMonth)
+    /*
+     * Remove pinned and blocked posts before
+     * doing media, counter and challenge work.
+     */
+    const candidatePosts = postsPage.page.filter((post) => {
+      if (post.isPinned) {
+        return false;
+      }
+
+      const authorId = String(post.userId);
+
+      if (blockedAuthorIds.has(authorId)) {
+        return false;
+      }
+
+      if (blockingAuthorIds.has(authorId)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    /*
+     * Report checks remain per post because
+     * postReports currently has no by_user
+     * index. Run them concurrently and stop
+     * processing reported posts early.
+     */
+    const reportResults = await Promise.all(
+      candidatePosts.map(async (post) => {
+        const report = await ctx.db
+          .query('postReports')
+          .withIndex('by_post_user', (queryBuilder) =>
+            queryBuilder.eq('postId', post._id).eq('userId', currentUserId)
           )
           .unique();
-        const hasHit500 = (leaderboardEntry?.displayTotalPoints ?? 0) >= BADGE_POINTS_THRESHOLD;
 
-        results.push({
+        return {
+          post,
+          reported: Boolean(report),
+        };
+      })
+    );
+
+    const visiblePosts = reportResults
+      .filter((result) => !result.reported)
+      .map((result) => result.post);
+
+    const yearMonth = new Date().toISOString().slice(0, 7);
+
+    /*
+     * Resolve each author once. A feed page
+     * often contains several posts from the
+     * same user.
+     */
+    const uniqueAuthorIds = [
+      ...new Map(visiblePosts.map((post) => [String(post.userId), post.userId])).values(),
+    ];
+
+    const authorEntries = await Promise.all(
+      uniqueAuthorIds.map(async (authorId) => {
+        const user = await ctx.db.get(authorId);
+
+        if (!user) {
+          return null;
+        }
+
+        const [leaderboardEntry, imageUrl] = await Promise.all([
+          ctx.db
+            .query('monthlyLeaderboard')
+            .withIndex('by_user_and_year_month', (queryBuilder) =>
+              queryBuilder.eq('userId', authorId).eq('yearMonth', yearMonth)
+            )
+            .unique(),
+
+          user.image
+            ? ctx.storage.getUrl(user.image).then((url) => url ?? undefined)
+            : Promise.resolve(undefined),
+        ]);
+
+        return [
+          String(authorId),
+
+          {
+            user,
+            imageUrl,
+
+            hasHit500: (leaderboardEntry?.displayTotalPoints ?? 0) >= BADGE_POINTS_THRESHOLD,
+          },
+        ] as const;
+      })
+    );
+
+    const validAuthorEntries = authorEntries.filter(
+      (entry): entry is NonNullable<typeof entry> => entry !== null
+    );
+
+    const authorMap = new Map(validAuthorEntries);
+
+    const results = await Promise.all(
+      visiblePosts.map(async (post) => {
+        const author = authorMap.get(String(post.userId));
+
+        if (!author) {
+          return null;
+        }
+
+        /*
+         * Replace five sharded-counter
+         * reads plus the separate isLiked
+         * query with one indexed likes
+         * query.
+         *
+         * Replace the sharded comment
+         * counter with one indexed comments
+         * query.
+         */
+        const [likes, comments, mediaThumbnailUrl, mediaUrl] = await Promise.all([
+          ctx.db
+            .query('postLikes')
+            .withIndex('by_post', (queryBuilder) => queryBuilder.eq('postId', post._id))
+            .collect(),
+
+          ctx.db
+            .query('postComments')
+            .withIndex('by_post', (queryBuilder) => queryBuilder.eq('postId', post._id))
+            .collect(),
+
+          post.mediaThumbnail
+            ? ctx.storage.getUrl(post.mediaThumbnail).then((url) => url ?? undefined)
+            : Promise.resolve(undefined),
+
+          post.media
+            ? ctx.storage.getUrl(post.media).then((url) => url ?? undefined)
+            : Promise.resolve(undefined),
+        ]);
+
+        let fireLikesCount = 0;
+        let clapLikesCount = 0;
+        let heartLikesCount = 0;
+        let isLiked = false;
+
+        for (const like of likes) {
+          if (like.likeIcon === 'fire') {
+            fireLikesCount += 1;
+          }
+
+          if (like.likeIcon === 'clap') {
+            clapLikesCount += 1;
+          }
+
+          if (like.likeIcon === 'heart') {
+            heartLikesCount += 1;
+          }
+
+          if (String(like.userId) === String(currentUserId)) {
+            isLiked = true;
+          }
+        }
+
+        const challenge = post.challengeId
+          ? await (async () => {
+              const challengeDocument = await ctx.db.get(post.challengeId!);
+
+              if (!challengeDocument) {
+                return undefined;
+              }
+
+              const [instructionalVideoUrl, completion] = await Promise.all([
+                ctx.storage
+                  .getUrl(challengeDocument.instructionalVideo)
+                  .then((url) => url ?? undefined),
+
+                post.challengeCompletionId
+                  ? ctx.db.get(post.challengeCompletionId)
+                  : Promise.resolve(null),
+              ]);
+
+              const [compositeVideoUrl, thumbnailUrl] = await Promise.all([
+                completion?.compositeVideoStorageId
+                  ? ctx.storage
+                      .getUrl(completion.compositeVideoStorageId)
+                      .then((url) => url ?? undefined)
+                  : Promise.resolve(undefined),
+
+                completion?.thumbnailStorageId
+                  ? ctx.storage
+                      .getUrl(completion.thumbnailStorageId)
+                      .then((url) => url ?? undefined)
+                  : Promise.resolve(undefined),
+              ]);
+
+              return {
+                name: challengeDocument.name,
+
+                points: challengeDocument.points,
+
+                ...(instructionalVideoUrl
+                  ? {
+                      instructionalVideoUrl,
+                    }
+                  : {}),
+
+                ...(compositeVideoUrl
+                  ? {
+                      compositeVideoUrl,
+                    }
+                  : {}),
+
+                ...(thumbnailUrl
+                  ? {
+                      thumbnailUrl,
+                    }
+                  : {}),
+
+                allowRepost: completion?.allowRepost ?? false,
+              };
+            })()
+          : undefined;
+
+        return {
           _id: post._id,
           userId: post.userId,
           createdAt: post.createdAt,
           body: post.body,
           media: post.media,
+
           mediaWidth: post.mediaWidth,
+
           mediaHeight: post.mediaHeight,
+
           mediaType: post.mediaType,
-          mediaThumbnailUrl: post.mediaThumbnail
-            ? ((await ctx.storage.getUrl(post.mediaThumbnail)) ?? undefined)
-            : undefined,
-          likeCount,
+
+          ...(mediaThumbnailUrl
+            ? {
+                mediaThumbnailUrl,
+              }
+            : {}),
+
+          ...(mediaUrl
+            ? {
+                mediaUrl,
+              }
+            : {}),
+
+          challengeId: post.challengeId,
+
+          ...(challenge
+            ? {
+                challenge,
+              }
+            : {}),
+
+          likeCount: likes.length,
+
           fireLikesCount,
           clapLikesCount,
           heartLikesCount,
-          isLiked: !!isLiked,
-          isPinned: !!post.isPinned,
-          commentCount,
+          isLiked,
+
+          isPinned: Boolean(post.isPinned),
+
+          commentCount: comments.length,
+
           user: {
-            name: formatUserName(user.name),
-            image: user.image,
-            imageUrl: user.image
-              ? ((await ctx.storage.getUrl(user.image)) ?? undefined)
-              : undefined,
-            isAuthor: user._id === currentUserId,
-            isAdmin: user.isAdmin ?? false,
-            hasHit500,
-          },
-          mediaUrl: post.media ? ((await ctx.storage.getUrl(post.media)) ?? undefined) : undefined,
-          challengeId: post.challengeId,
-          challenge: post.challengeId
-            ? await (async () => {
-                const challenge = await ctx.db.get(post.challengeId!);
-                if (!challenge) return undefined;
-                const instructionalVideoUrl = await ctx.storage.getUrl(
-                  challenge.instructionalVideo
-                );
-                // Get composite video from completion record if available
-                let compositeVideoUrl: string | undefined;
-                let thumbnailUrl: string | undefined;
-                let allowRepost = false;
-                if (post.challengeCompletionId) {
-                  const completion = await ctx.db.get(post.challengeCompletionId);
-                  if (completion?.compositeVideoStorageId) {
-                    compositeVideoUrl =
-                      (await ctx.storage.getUrl(completion.compositeVideoStorageId)) ?? undefined;
-                  }
-                  if (completion?.thumbnailStorageId) {
-                    thumbnailUrl =
-                      (await ctx.storage.getUrl(completion.thumbnailStorageId)) ?? undefined;
-                  }
-                  allowRepost = completion?.allowRepost ?? false;
+            name: author.user.isAdmin ? 'SweatScore' : formatUserName(author.user.name),
+
+            image: author.user.image,
+
+            ...(author.imageUrl
+              ? {
+                  imageUrl: author.imageUrl,
                 }
-                return {
-                  name: challenge.name,
-                  points: challenge.points,
-                  instructionalVideoUrl: instructionalVideoUrl ?? undefined,
-                  compositeVideoUrl,
-                  thumbnailUrl,
-                  allowRepost,
-                };
-              })()
-            : undefined,
-        });
-      }
-    }
+              : {}),
+
+            isAuthor: String(author.user._id) === String(currentUserId),
+
+            isAdmin: author.user.isAdmin ?? false,
+
+            hasHit500: author.hasHit500,
+          },
+        };
+      })
+    );
+
+    const validResults = results.filter(
+      (result): result is NonNullable<typeof result> => result !== null
+    );
 
     return {
-      page: results,
-      continueCursor: posts.continueCursor,
-      isDone: posts.isDone,
+      page: validResults,
+
+      continueCursor: postsPage.continueCursor,
+
+      isDone: postsPage.isDone,
     };
   },
 });

@@ -1,14 +1,8 @@
-export type ChatMessageType =
-  | "text"
-  | "image"
-  | "video"
-  | "file"
-  | "link"
-  | "voice";
+export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'link' | 'voice';
 
-export type ChatDeliveryStatus = "sent" | "delivered" | "read";
+export type ChatDeliveryStatus = 'sent' | 'delivered' | 'read';
 
-export type ChatAttachmentType = "image" | "video" | "file";
+export type ChatAttachmentType = 'image' | 'video' | 'file';
 
 export type ChatAttachment = {
   id: string;
@@ -34,6 +28,7 @@ export type ChatReply = {
 
 export type ChatSeenMember = {
   id: string;
+  name: string;
   initial: string;
   color: string;
 };
@@ -69,6 +64,9 @@ export type ChatTypingUser = {
 export type PendingVoiceNote = {
   uri: string;
   durationSeconds: number;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
 };
 
 export type SendTextMessageInput = {

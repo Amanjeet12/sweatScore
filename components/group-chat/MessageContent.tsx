@@ -34,10 +34,6 @@ const extractLinkData = (text?: string) => {
     };
   }
 
-  /*
-   * Remove punctuation that may be written immediately
-   * after the URL.
-   */
   const originalUrl = match[0];
 
   const cleanUrl = originalUrl.replace(/[.,!?;:)\]}]+$/, '');
@@ -46,9 +42,6 @@ const extractLinkData = (text?: string) => {
     ? `https://${cleanUrl}`
     : cleanUrl;
 
-  /*
-   * Keep all remaining text as the caption under the card.
-   */
   const caption = text
     .replace(originalUrl, '')
     .replace(/\s{2,}/g, ' ')
@@ -81,12 +74,6 @@ const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentPro
 
   const { url: detectedUrl, caption } = extractLinkData(message.text);
 
-  /*
-   * Support both:
-   *
-   * 1. Old Convex link messages
-   * 2. Normal text messages containing a URL
-   */
   const linkUrl = message.linkUrl || detectedUrl;
 
   const hasLink = Boolean(linkUrl);
@@ -111,6 +98,7 @@ const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentPro
 
       {message.type === 'voice' ? (
         <VoiceMessage
+          uri={message.voiceUri}
           duration={message.voiceDuration}
           isMine={isMine}
           isPlaying={isPlaying}

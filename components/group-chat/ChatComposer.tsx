@@ -10,10 +10,18 @@ import {
   Play,
   Plus,
   VideoCamera,
+  WarningCircle,
   X,
 } from 'phosphor-react-native';
 import { useState } from 'react';
-import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { Text } from '~/components/ui/text';
 import { useVoiceRecorder } from '~/hooks/chat/useVoiceRecorder';
@@ -23,10 +31,16 @@ import { formatDuration, getReplyText } from '~/utils/chat';
 type ChatComposerProps = {
   groupName: string;
   replyingTo: ChatMessage | null;
+  isUploadingAttachment: boolean;
+  isUploadingVoice: boolean;
   onCancelReply: () => void;
   onFocus: () => void;
+  onTypingChange: (isTyping: boolean) => void;
+
   onSendText: (text: string) => Promise<boolean> | boolean;
+
   onSendVoice: (voiceNote: PendingVoiceNote) => Promise<boolean> | boolean;
+
   onSendAttachment: (attachment: ChatAttachment, text?: string) => Promise<boolean> | boolean;
 };
 
@@ -41,6 +55,8 @@ type AttachmentOption = {
 type PendingAttachmentPreviewProps = {
   attachment: ChatAttachment;
   disabled: boolean;
+  isUploading: boolean;
+  errorMessage: string | null;
   onChange: () => void;
   onRemove: () => void;
 };
@@ -97,6 +113,8 @@ const PendingVideoPreview = ({ uri }: { uri: string }) => {
 const PendingAttachmentPreview = ({
   attachment,
   disabled,
+  isUploading,
+  errorMessage,
   onChange,
   onRemove,
 }: PendingAttachmentPreviewProps) => {
@@ -109,12 +127,20 @@ const PendingAttachmentPreview = ({
           <PendingVideoPreview uri={attachment.uri} />
         ) : (
           <Image
-            source={{ uri: attachment.uri }}
+            source={{
+              uri: attachment.uri,
+            }}
             style={styles.previewMedia}
             contentFit="cover"
             transition={150}
           />
         )}
+
+        {isUploading ? (
+          <View pointerEvents="none" style={styles.previewUploadOverlay}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          </View>
+        ) : null}
       </View>
 
       <View className="ml-3 flex-1">
@@ -126,7 +152,13 @@ const PendingAttachmentPreview = ({
           )}
 
           <Text className="ml-1.5 font-body text-[11px] font-bold uppercase text-[#555555]">
-            {isVideo ? 'Video selected' : 'Photo selected'}
+            {isUploading
+              ? isVideo
+                ? 'Uploading video'
+                : 'Uploading photo'
+              : isVideo
+                ? 'Video selected'
+                : 'Photo selected'}
           </Text>
         </View>
 
@@ -134,16 +166,31 @@ const PendingAttachmentPreview = ({
           {attachment.name || (isVideo ? 'Selected video' : 'Selected photo')}
         </Text>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          disabled={disabled}
-          onPress={onChange}
-          className="mt-1 self-start"
-          style={{
-            opacity: disabled ? 0.5 : 1,
-          }}>
-          <Text className="font-body text-xs font-bold text-[#F35E16]">Change</Text>
-        </TouchableOpacity>
+        {isUploading ? (
+          <View className="mt-1 flex-row items-center">
+            <ActivityIndicator size="small" color="#F35E16" />
+
+            <Text className="ml-2 font-body text-xs font-semibold text-[#F35E16]">
+              Please wait…
+            </Text>
+          </View>
+        ) : errorMessage ? (
+          <View className="mt-1 flex-row items-start pr-2">
+            <WarningCircle size={15} color="#D92D20" weight="fill" />
+
+            <Text className="ml-1.5 flex-1 font-body text-xs leading-4 text-[#D92D20]">
+              {errorMessage}
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={disabled}
+            onPress={onChange}
+            className="mt-1 self-start">
+            <Text className="font-body text-xs font-bold text-[#F35E16]">Change</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity
@@ -154,7 +201,7 @@ const PendingAttachmentPreview = ({
         accessibilityLabel="Remove selected attachment"
         className="h-9 w-9 items-center justify-center rounded-full bg-[#F2E9E4]"
         style={{
-          opacity: disabled ? 0.5 : 1,
+          opacity: disabled ? 0.45 : 1,
         }}>
         <X size={17} color="#4A4A4A" weight="bold" />
       </TouchableOpacity>
@@ -165,23 +212,40 @@ const PendingAttachmentPreview = ({
 const ChatComposer = ({
   groupName,
   replyingTo,
+  isUploadingAttachment,
+  isUploadingVoice,
   onCancelReply,
   onFocus,
+  onTypingChange,
   onSendText,
   onSendVoice,
   onSendAttachment,
 }: ChatComposerProps) => {
   const [messageText, setMessageText] = useState('');
+
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+
   const [pendingAttachment, setPendingAttachment] = useState<ChatAttachment | null>(null);
+
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
   const [isSending, setIsSending] = useState(false);
 
-  const { isRecording, recordingSeconds, startRecording, cancelRecording, finishRecording } =
-    useVoiceRecorder();
+  const {
+    isRecording,
+    isRecorderBusy,
+    recordingSeconds,
+    startRecording,
+    cancelRecording,
+    finishRecording,
+  } = useVoiceRecorder();
+
+  const isBusy = isSending || isUploadingAttachment || isUploadingVoice || isRecorderBusy;
 
   const showError = (title: string, error: unknown) => {
     Alert.alert(
       title,
+
       error instanceof Error ? error.message : 'Something went wrong. Please try again.'
     );
   };
@@ -189,7 +253,7 @@ const ChatComposer = ({
   const handleSendText = async () => {
     const cleanText = messageText.trim();
 
-    if (!cleanText || isSending) {
+    if (!cleanText || isBusy) {
       return;
     }
 
@@ -210,12 +274,13 @@ const ChatComposer = ({
   };
 
   const handleSendPendingAttachment = async () => {
-    if (!pendingAttachment || isSending) {
+    if (!pendingAttachment || isBusy) {
       return;
     }
 
     const cleanText = messageText.trim();
 
+    setAttachmentError(null);
     setIsSending(true);
 
     try {
@@ -225,8 +290,13 @@ const ChatComposer = ({
         setPendingAttachment(null);
         setMessageText('');
         setAttachmentMenuOpen(false);
+        setAttachmentError(null);
+      } else {
+        setAttachmentError('Upload failed. Tap Send to retry.');
       }
     } catch (error) {
+      setAttachmentError('Upload failed. Tap Send to retry.');
+
       showError('Attachment not sent', error);
     } finally {
       setIsSending(false);
@@ -243,12 +313,13 @@ const ChatComposer = ({
   };
 
   const handleVoiceButton = async () => {
-    if (isSending) {
+    if (isUploadingAttachment || isUploadingVoice || isSending || isRecorderBusy) {
       return;
     }
 
     if (!isRecording) {
       setAttachmentMenuOpen(false);
+      onTypingChange(false);
 
       try {
         await startRecording();
@@ -301,7 +372,7 @@ const ChatComposer = ({
   };
 
   const handleAttachment = async (option: AttachmentOption) => {
-    if (isSending) {
+    if (isBusy || isRecording) {
       return;
     }
 
@@ -319,6 +390,7 @@ const ChatComposer = ({
           option.type === 'video'
             ? ImagePicker.MediaTypeOptions.Videos
             : ImagePicker.MediaTypeOptions.Images,
+
         allowsEditing: false,
         allowsMultipleSelection: false,
         quality: 0.85,
@@ -330,7 +402,7 @@ const ChatComposer = ({
           ? await ImagePicker.launchCameraAsync(pickerOptions)
           : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
+      if (result.canceled || !result.assets?.length) {
         return;
       }
 
@@ -347,12 +419,18 @@ const ChatComposer = ({
 
       const defaultMimeType = selectedType === 'video' ? 'video/mp4' : 'image/jpeg';
 
+      setAttachmentError(null);
+
       setPendingAttachment({
         id: asset.assetId ?? `local-attachment-${Date.now()}`,
+
         type: selectedType,
         uri: asset.uri,
+
         name: asset.fileName ?? defaultFileName,
+
         mimeType: asset.mimeType ?? defaultMimeType,
+
         ...(typeof asset.fileSize === 'number'
           ? {
               sizeBytes: asset.fileSize,
@@ -362,6 +440,12 @@ const ChatComposer = ({
     } catch (error) {
       showError('Attachment not selected', error);
     }
+  };
+
+  const handleMessageTextChange = (text: string) => {
+    setMessageText(text);
+
+    onTypingChange(Boolean(text.trim()));
   };
 
   const hasSendableContent = Boolean(messageText.trim() || pendingAttachment);
@@ -377,13 +461,13 @@ const ChatComposer = ({
               <TouchableOpacity
                 key={label}
                 activeOpacity={0.75}
-                disabled={isSending}
+                disabled={isBusy}
                 onPress={() => void handleAttachment(option)}
                 accessibilityRole="button"
                 accessibilityLabel={`Attach ${label.toLowerCase()}`}
                 className="items-center"
                 style={{
-                  opacity: isSending ? 0.5 : 1,
+                  opacity: isBusy ? 0.5 : 1,
                 }}>
                 <View
                   className="h-11 w-11 items-center justify-center rounded-full"
@@ -427,6 +511,7 @@ const ChatComposer = ({
 
           <TouchableOpacity
             activeOpacity={0.7}
+            disabled={isBusy}
             onPress={onCancelReply}
             accessibilityRole="button"
             accessibilityLabel="Cancel reply"
@@ -436,21 +521,34 @@ const ChatComposer = ({
         </View>
       ) : null}
 
-      {/* Small preview shown immediately above text input */}
       {pendingAttachment ? (
         <PendingAttachmentPreview
           attachment={pendingAttachment}
-          disabled={isSending}
-          onChange={() => setAttachmentMenuOpen(true)}
+          disabled={isBusy}
+          isUploading={isUploadingAttachment}
+          errorMessage={attachmentError}
+          onChange={() => {
+            setAttachmentError(null);
+            setAttachmentMenuOpen(true);
+          }}
           onRemove={() => {
             setPendingAttachment(null);
             setAttachmentMenuOpen(false);
+            setAttachmentError(null);
           }}
         />
       ) : null}
 
       <View className="flex-row items-end px-3 pb-2 pt-2">
-        {isRecording ? (
+        {isUploadingVoice ? (
+          <View className="min-h-11 flex-1 flex-row items-center rounded-full border border-[#F0D9CC] bg-[#FFF8F4] px-4">
+            <ActivityIndicator size="small" color="#F76B1C" />
+
+            <Text className="ml-3 flex-1 font-body text-sm font-semibold text-[#4B4541]">
+              Uploading voice message…
+            </Text>
+          </View>
+        ) : isRecording ? (
           <View className="flex-1 flex-row items-center rounded-full border border-[#F0D9CC] bg-[#FFF8F4] px-3 py-2.5">
             <View className="mr-2 h-2.5 w-2.5 rounded-full bg-[#F04438]" />
 
@@ -464,8 +562,8 @@ const ChatComposer = ({
 
             <TouchableOpacity
               activeOpacity={0.7}
-              disabled={isSending}
-              onPress={cancelRecording}
+              disabled={isRecorderBusy}
+              onPress={() => void cancelRecording()}
               className="px-2 py-1">
               <Text className="font-body text-xs font-bold text-[#D04437]">Cancel</Text>
             </TouchableOpacity>
@@ -474,7 +572,7 @@ const ChatComposer = ({
           <>
             <TouchableOpacity
               activeOpacity={0.75}
-              disabled={isSending}
+              disabled={isBusy}
               onPress={() => setAttachmentMenuOpen((current) => !current)}
               accessibilityRole="button"
               accessibilityLabel={
@@ -482,7 +580,7 @@ const ChatComposer = ({
               }
               className="mr-2 h-11 w-11 items-center justify-center rounded-full border border-[#E8E2DE] bg-[#FAF9F8]"
               style={{
-                opacity: isSending ? 0.5 : 1,
+                opacity: isBusy ? 0.5 : 1,
               }}>
               {attachmentMenuOpen ? (
                 <X size={21} color="#F35E16" weight="bold" />
@@ -494,8 +592,9 @@ const ChatComposer = ({
             <View className="min-h-11 flex-1 flex-row items-end rounded-[23px] border border-[#DDD7D3] bg-white pl-4 pr-1.5">
               <TextInput
                 value={messageText}
-                editable={!isSending}
-                onChangeText={setMessageText}
+                editable={!isBusy}
+                onChangeText={handleMessageTextChange}
+                onBlur={() => onTypingChange(false)}
                 placeholder={`Message ${groupName}`}
                 placeholderTextColor="#8A8A8A"
                 multiline
@@ -508,10 +607,31 @@ const ChatComposer = ({
           </>
         )}
 
-        {hasSendableContent && !isRecording ? (
+        {isUploadingVoice ? (
+          <View className="ml-2 h-11 w-11 items-center justify-center rounded-full bg-[#F76B1C]">
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          </View>
+        ) : isRecording ? (
           <TouchableOpacity
             activeOpacity={0.8}
-            disabled={isSending}
+            disabled={isRecorderBusy}
+            onPress={() => void handleVoiceButton()}
+            accessibilityRole="button"
+            accessibilityLabel="Send voice note"
+            className="ml-2 h-11 w-11 items-center justify-center rounded-full bg-[#F76B1C]"
+            style={{
+              opacity: isRecorderBusy ? 0.65 : 1,
+            }}>
+            {isRecorderBusy ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <PaperPlaneRight size={20} color="#FFFFFF" weight="fill" />
+            )}
+          </TouchableOpacity>
+        ) : hasSendableContent ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            disabled={isBusy}
             onPress={() => void handlePrimarySend()}
             accessibilityRole="button"
             accessibilityLabel={pendingAttachment ? 'Send attachment' : 'Send message'}
@@ -519,25 +639,28 @@ const ChatComposer = ({
             style={[
               styles.sendButton,
               {
-                opacity: isSending ? 0.65 : 1,
+                opacity: isBusy ? 0.72 : 1,
               },
             ]}>
-            <PaperPlaneRight size={21} color="#FFFFFF" weight="fill" />
+            {isUploadingAttachment ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <PaperPlaneRight size={21} color="#FFFFFF" weight="fill" />
+            )}
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             activeOpacity={0.8}
-            disabled={isSending}
+            disabled={isBusy}
             onPress={() => void handleVoiceButton()}
             accessibilityRole="button"
-            accessibilityLabel={isRecording ? 'Send voice note' : 'Record voice note'}
-            className="ml-2 h-11 w-11 items-center justify-center rounded-full"
+            accessibilityLabel="Record voice note"
+            className="ml-2 h-11 w-11 items-center justify-center rounded-full bg-[#FFF1E8]"
             style={{
-              backgroundColor: isRecording ? '#F76B1C' : '#FFF1E8',
-              opacity: isSending ? 0.65 : 1,
+              opacity: isBusy ? 0.65 : 1,
             }}>
-            {isRecording ? (
-              <PaperPlaneRight size={20} color="#FFFFFF" weight="fill" />
+            {isRecorderBusy ? (
+              <ActivityIndicator size="small" color="#F35E16" />
             ) : (
               <Microphone size={21} color="#F35E16" weight="bold" />
             )}
@@ -551,14 +674,17 @@ const ChatComposer = ({
 const styles = StyleSheet.create({
   sendButton: {
     shadowColor: '#F76B1C',
+
     shadowOffset: {
       width: 0,
       height: 4,
     },
+
     shadowOpacity: 0.28,
     shadowRadius: 7,
     elevation: 5,
   },
+
   previewThumbnail: {
     width: '100%',
     height: '100%',
@@ -569,6 +695,13 @@ const styles = StyleSheet.create({
   previewMedia: {
     width: '100%',
     height: '100%',
+  },
+
+  previewUploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
   },
 });
 

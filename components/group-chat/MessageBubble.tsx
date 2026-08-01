@@ -1,54 +1,67 @@
-import { Pressable, StyleSheet, View } from "react-native";
-
-import { Avatar } from "~/components/group-chat/Avatar";
-import MessageContent from "~/components/group-chat/MessageContent";
-import MessageReactions from "~/components/group-chat/MessageReactions";
-import { Text } from "~/components/ui/text";
-import type { ChatMessage } from "~/types/chat";
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Avatar } from '~/components/group-chat/Avatar';
+import MessageContent from '~/components/group-chat/MessageContent';
+import MessageReactions from '~/components/group-chat/MessageReactions';
+import { Text } from '~/components/ui/text';
+import type { ChatMessage } from '~/types/chat';
+import SeenByModal from '~/components/group-chat/SeenByModal';
 
 type MessageBubbleProps = {
   message: ChatMessage;
   actionOpen: boolean;
   isVoicePlaying: boolean;
+  showSeenReceipt?: boolean;
+
   onToggleActions: () => void;
+  onCloseActions: () => void;
   onToggleVoice: () => void;
   onReply: () => void;
   onReact: (emoji: string) => void;
 };
+const MAX_VISIBLE_SEEN_AVATARS = 3;
 
 const MessageBubble = ({
   message,
   actionOpen,
   isVoicePlaying,
+  showSeenReceipt = false,
   onToggleActions,
+  onCloseActions,
   onToggleVoice,
   onReply,
   onReact,
 }: MessageBubbleProps) => {
   const isMine = Boolean(message.isMine);
 
+  const [seenModalOpen, setSeenModalOpen] = useState(false);
+  const seenMembers = message.seenBy ?? [];
+
+  const visibleSeenMembers = seenMembers.slice(0, MAX_VISIBLE_SEEN_AVATARS);
+
+  const remainingSeenCount = Math.max(0, seenMembers.length - MAX_VISIBLE_SEEN_AVATARS);
+
+  const shouldShowSeenReceipt = isMine && showSeenReceipt && seenMembers.length > 0;
+
   return (
-    <View className="mb-4 px-4">
+    <View className="mb-3 px-4">
       <View
         className="flex-row items-end"
-        style={{ justifyContent: isMine ? "flex-end" : "flex-start" }}
-      >
+        style={{
+          justifyContent: isMine ? 'flex-end' : 'flex-start',
+        }}>
         {!isMine ? (
           <View className="mr-2 self-start pt-5">
-            <Avatar
-              initial={message.senderInitial}
-              color={message.senderColor}
-              size={35}
-            />
+            <Avatar initial={message.senderInitial} color={message.senderColor} size={35} />
           </View>
         ) : null}
 
         <View
           style={{
-            maxWidth: "82%",
-            alignItems: isMine ? "flex-end" : "flex-start",
-          }}
-        >
+            maxWidth: '82%',
+
+            alignItems: isMine ? 'flex-end' : 'flex-start',
+          }}>
           {!isMine ? (
             <Text className="mb-1 ml-1 font-body text-xs font-bold text-[#F35E16]">
               {message.senderName}
@@ -62,9 +75,9 @@ const MessageBubble = ({
             accessibilityHint="Long press for reactions and reply"
             style={[
               styles.messageBubble,
+
               isMine ? styles.myMessageBubble : styles.otherMessageBubble,
-            ]}
-          >
+            ]}>
             <MessageContent
               message={message}
               isPlaying={isVoicePlaying}
@@ -75,33 +88,74 @@ const MessageBubble = ({
           <MessageReactions
             reactions={message.reactions}
             actionOpen={actionOpen}
+            canShowSeen={isMine && seenMembers.length > 0}
+            seenCount={seenMembers.length}
+            onCloseActions={onCloseActions}
+            onShowSeen={() => {
+              onCloseActions();
+              setSeenModalOpen(true);
+            }}
             onReact={onReact}
             onReply={onReply}
           />
 
-          {message.seenBy?.length ? (
-            <View className="mt-2 flex-row items-center">
-              <View className="flex-row">
-                {message.seenBy.map((member, index) => (
-                  <View
-                    key={member.id}
-                    style={{ marginLeft: index === 0 ? 0 : -6 }}
-                  >
-                    <Avatar
-                      initial={member.initial}
-                      color={member.color}
-                      size={22}
-                    />
+          {shouldShowSeenReceipt ? (
+            <View
+              className="mt-1 flex-row items-center"
+              style={{
+                paddingRight: 2,
+              }}>
+              {seenMembers.length === 1 ? (
+                <Text className="font-body text-[10px] font-medium text-[#99918C]">Seen</Text>
+              ) : (
+                <>
+                  <View className="flex-row items-center">
+                    {visibleSeenMembers.map((member, index) => (
+                      <View
+                        key={member.id}
+                        style={{
+                          marginLeft: index === 0 ? 0 : -5,
+
+                          zIndex: visibleSeenMembers.length - index,
+                        }}>
+                        <View style={styles.seenAvatarBorder}>
+                          <Avatar initial={member.initial} color={member.color} size={17} />
+                        </View>
+                      </View>
+                    ))}
+
+                    {remainingSeenCount > 0 ? (
+                      <View
+                        style={[
+                          styles.remainingCount,
+
+                          {
+                            marginLeft: -5,
+                          },
+                        ]}>
+                        <Text className="font-body text-[8px] font-bold text-[#736B66]">
+                          +{remainingSeenCount}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                ))}
-              </View>
-              <Text className="ml-1.5 font-body text-[10px] text-[#828282]">
-                Seen by {message.seenBy.length}
-              </Text>
+
+                  <Text className="ml-1.5 font-body text-[10px] font-medium text-[#99918C]">
+                    Seen by {seenMembers.length}
+                  </Text>
+                </>
+              )}
             </View>
           ) : null}
         </View>
       </View>
+      <SeenByModal
+        visible={seenModalOpen}
+        members={seenMembers}
+        onClose={() => {
+          setSeenModalOpen(false);
+        }}
+      />
     </View>
   );
 };
@@ -113,15 +167,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
+
   myMessageBubble: {
-    backgroundColor: "#F76B1C",
+    backgroundColor: '#F76B1C',
     borderBottomRightRadius: 5,
   },
+
   otherMessageBubble: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: "#E7E2DE",
+    borderColor: '#E7E2DE',
     borderBottomLeftRadius: 5,
+  },
+
+  seenAvatarBorder: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+
+  remainingCount: {
+    width: 19,
+    height: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#EFEAE7',
   },
 });
 

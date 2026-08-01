@@ -1,6 +1,7 @@
 import { useMutation, usePaginatedQuery } from 'convex/react';
-import { Alert } from 'react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert } from 'react-native';
+
 import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
 import type {
@@ -12,6 +13,14 @@ import type {
 } from '~/types/chat';
 import { formatMessageTime } from '~/utils/chat';
 
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+
+const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
+
+const MAX_VOICE_DURATION_SECONDS = 300;
+
 function createClientMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
@@ -22,9 +31,6 @@ function showChatError(error: unknown) {
 
   Alert.alert('Chat error', message);
 }
-
-const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
 
 function getAttachmentMimeType(type: 'image' | 'video', mimeType?: string, fileName?: string) {
   if (mimeType?.trim()) {
@@ -64,30 +70,83 @@ function getAttachmentName(type: 'image' | 'video', name?: string) {
   return type === 'image' ? `chat-photo-${Date.now()}.jpg` : `chat-video-${Date.now()}.mp4`;
 }
 
+function getVoiceMimeType(mimeType?: string, fileName?: string) {
+  const normalizedMimeType = mimeType?.trim().toLowerCase();
+
+  if (normalizedMimeType?.startsWith('audio/')) {
+    return normalizedMimeType;
+  }
+
+  const extension = fileName?.split('.').pop()?.toLowerCase();
+
+  switch (extension) {
+    case 'aac':
+      return 'audio/aac';
+
+    case 'wav':
+      return 'audio/wav';
+
+    case 'mp3':
+      return 'audio/mpeg';
+
+    case 'webm':
+      return 'audio/webm';
+
+    case 'caf':
+      return 'audio/x-caf';
+
+    case 'm4a':
+    default:
+      return 'audio/mp4';
+  }
+}
+
+function getVoiceFileName(fileName?: string) {
+  if (fileName?.trim()) {
+    return fileName.trim();
+  }
+
+  return `voice-message-${Date.now()}.m4a`;
+}
+
 export const useChatMessages = (groupId?: string) => {
   const convexGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.chat.messages.listMessages,
+
     convexGroupId
       ? {
           groupId: convexGroupId,
         }
       : 'skip',
+
     {
-      initialNumItems: 50,
+      initialNumItems: 20,
     }
   );
 
   const generateUploadUrlMutation = useMutation(api.chat.messages.generateUploadUrl);
+
   const sendAttachmentMutation = useMutation(api.chat.messages.sendAttachment);
-  const attachmentUploadRef = useRef(false);
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  const sendVoiceMessageMutation = useMutation(api.chat.messages.sendVoiceMessage);
 
   const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
+
   const toggleReactionMutation = useMutation(api.chat.messages.toggleReaction);
+
   const markGroupReadMutation = useMutation(api.chat.messages.markGroupRead);
+
+  const attachmentUploadRef = useRef(false);
+
+  const voiceUploadRef = useRef(false);
+
   const lastReadUpdateRef = useRef(0);
+
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  const [isUploadingVoice, setIsUploadingVoice] = useState(false);
 
   const messages = useMemo<ChatMessage[]>(() => {
     return [...results].reverse().map((message) => ({
@@ -101,29 +160,38 @@ export const useChatMessages = (groupId?: string) => {
       createdAt: message.createdAt,
       time: formatMessageTime(new Date(message.createdAt)),
       isMine: message.isMine,
+
       ...(message.deliveryStatus
         ? {
             deliveryStatus: message.deliveryStatus,
           }
         : {}),
+
       ...(message.text
         ? {
             text: message.text,
           }
         : {}),
+
       ...(message.attachment
         ? {
             attachment: {
               id: message.attachment.id,
+
               type: message.attachment.type,
+
               uri: message.attachment.uri,
+
               ...(message.attachment.name
                 ? {
                     name: message.attachment.name,
                   }
                 : {}),
+
               mimeType: message.attachment.mimeType,
+
               sizeBytes: message.attachment.sizeBytes,
+
               ...(message.attachment.thumbnailUri
                 ? {
                     thumbnailUri: message.attachment.thumbnailUri,
@@ -132,31 +200,39 @@ export const useChatMessages = (groupId?: string) => {
             },
           }
         : {}),
+
       ...(message.voiceUri
         ? {
             voiceUri: message.voiceUri,
+
             voiceDuration: message.voiceDuration ?? 0,
           }
         : {}),
+
       ...(message.linkTitle
         ? {
             linkTitle: message.linkTitle,
           }
         : {}),
+
       ...(message.linkUrl
         ? {
             linkUrl: message.linkUrl,
           }
         : {}),
+
       ...(message.replyTo
         ? {
             replyTo: {
               messageId: String(message.replyTo.messageId),
+
               senderName: message.replyTo.senderName,
+
               text: message.replyTo.text,
             },
           }
         : {}),
+
       reactions: message.reactions,
     }));
   }, [results]);
@@ -178,6 +254,7 @@ export const useChatMessages = (groupId?: string) => {
           groupId: convexGroupId,
           text: cleanText,
           clientMessageId: createClientMessageId(),
+
           ...(replyToMessageId
             ? {
                 replyToMessageId: replyToMessageId as Id<'chatMessages'>,
@@ -212,7 +289,6 @@ export const useChatMessages = (groupId?: string) => {
 
       const now = Date.now();
 
-      // Prevent a mutation for every visible message.
       if (now - lastReadUpdateRef.current < 3000) {
         return;
       }
@@ -222,7 +298,7 @@ export const useChatMessages = (groupId?: string) => {
       void markGroupReadMutation({
         groupId: convexGroupId,
       }).catch(() => {
-        // Read-receipt failure should not interrupt chat.
+        // Read failures should not interrupt chat.
       });
     },
     [convexGroupId, markGroupReadMutation]
@@ -234,11 +310,154 @@ export const useChatMessages = (groupId?: string) => {
     }
   }, [loadMore, status]);
 
-  const sendVoiceMessage = useCallback(async (_input: SendVoiceMessageInput) => {
-    Alert.alert('Coming next', 'Voice-message uploading is not connected yet.');
+  const sendVoiceMessage = useCallback(
+    async ({
+      uri,
+      durationSeconds,
+      fileName,
+      mimeType,
+      sizeBytes: providedSizeBytes,
+      replyToMessageId,
+    }: SendVoiceMessageInput) => {
+      if (!convexGroupId) {
+        return false;
+      }
 
-    return false;
-  }, []);
+      if (voiceUploadRef.current) {
+        return false;
+      }
+
+      if (!uri?.trim()) {
+        Alert.alert('Voice message unavailable', 'The recorded audio file could not be read.');
+
+        return false;
+      }
+
+      const cleanDuration = Math.round(durationSeconds);
+
+      if (cleanDuration < 1) {
+        Alert.alert('Voice message too short', 'Record for at least one second before sending.');
+
+        return false;
+      }
+
+      if (cleanDuration > MAX_VOICE_DURATION_SECONDS) {
+        Alert.alert('Voice message too long', 'Voice messages cannot be longer than 5 minutes.');
+
+        return false;
+      }
+
+      voiceUploadRef.current = true;
+      setIsUploadingVoice(true);
+
+      try {
+        let fileResponse: Response;
+
+        try {
+          fileResponse = await fetch(uri);
+        } catch {
+          throw new Error('The recorded audio file could not be read.');
+        }
+
+        if (!fileResponse.ok) {
+          throw new Error('The recorded audio file could not be read.');
+        }
+
+        const fileBlob = await fileResponse.blob();
+
+        const sizeBytes = fileBlob.size || providedSizeBytes || 0;
+
+        if (sizeBytes <= 0) {
+          throw new Error('The recorded audio file is empty.');
+        }
+
+        if (sizeBytes > MAX_AUDIO_SIZE_BYTES) {
+          throw new Error('Voice messages cannot be larger than 20 MB.');
+        }
+
+        const resolvedFileName = getVoiceFileName(fileName);
+
+        const resolvedMimeType = getVoiceMimeType(mimeType || fileBlob.type, resolvedFileName);
+
+        let uploadUrl: string;
+
+        try {
+          uploadUrl = await generateUploadUrlMutation({
+            groupId: convexGroupId,
+          });
+        } catch {
+          throw new Error(
+            'The voice upload could not be started. Check your connection and try again.'
+          );
+        }
+
+        let uploadResponse: Response;
+
+        try {
+          uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+
+            headers: {
+              'Content-Type': resolvedMimeType,
+            },
+
+            body: fileBlob,
+          });
+        } catch {
+          throw new Error('Network error while uploading the voice message.');
+        }
+
+        if (!uploadResponse.ok) {
+          throw new Error('The voice message could not be uploaded.');
+        }
+
+        const uploadResult = (await uploadResponse.json()) as {
+          storageId?: string;
+        };
+
+        if (!uploadResult.storageId) {
+          throw new Error('The voice upload did not return a storage ID.');
+        }
+
+        try {
+          await sendVoiceMessageMutation({
+            groupId: convexGroupId,
+
+            storageId: uploadResult.storageId as Id<'_storage'>,
+
+            mimeType: resolvedMimeType,
+
+            sizeBytes,
+            durationSeconds: cleanDuration,
+
+            fileName: resolvedFileName,
+
+            clientMessageId: createClientMessageId(),
+
+            ...(replyToMessageId
+              ? {
+                  replyToMessageId: replyToMessageId as Id<'chatMessages'>,
+                }
+              : {}),
+          });
+        } catch (error) {
+          throw error instanceof Error
+            ? error
+            : new Error('The uploaded voice message could not be saved.');
+        }
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+        return false;
+      } finally {
+        voiceUploadRef.current = false;
+
+        setIsUploadingVoice(false);
+      }
+    },
+    [convexGroupId, generateUploadUrlMutation, sendVoiceMessageMutation]
+  );
 
   const sendAttachment = useCallback(
     async ({ attachment, text, replyToMessageId }: SendAttachmentInput) => {
@@ -265,6 +484,7 @@ export const useChatMessages = (groupId?: string) => {
       }
 
       attachmentUploadRef.current = true;
+
       setIsUploadingAttachment(true);
 
       try {
@@ -296,27 +516,23 @@ export const useChatMessages = (groupId?: string) => {
 
         const fileName = getAttachmentName(type, attachment.name);
 
-        const mimeType = getAttachmentMimeType(
+        const resolvedMimeType = getAttachmentMimeType(
           type,
           attachment.mimeType || fileBlob.type,
           fileName
         );
 
-        /*
-         * Step 1: get the Convex Storage upload URL.
-         */
         const uploadUrl = await generateUploadUrlMutation({
           groupId: convexGroupId,
         });
 
-        /*
-         * Step 2: upload the image/video to Convex Storage.
-         */
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
+
           headers: {
-            'Content-Type': mimeType,
+            'Content-Type': resolvedMimeType,
           },
+
           body: fileBlob,
         });
 
@@ -332,17 +548,16 @@ export const useChatMessages = (groupId?: string) => {
           throw new Error('The upload did not return a storage ID.');
         }
 
-        /*
-         * Step 3: create one chatMessages document
-         * containing both text and attachment.
-         */
         await sendAttachmentMutation({
           groupId: convexGroupId,
+
           storageId: uploadResult.storageId as Id<'_storage'>,
+
           type,
-          mimeType,
+          mimeType: resolvedMimeType,
           sizeBytes,
           fileName,
+
           clientMessageId: createClientMessageId(),
 
           ...(cleanText
@@ -364,6 +579,7 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       } finally {
         attachmentUploadRef.current = false;
+
         setIsUploadingAttachment(false);
       }
     },
@@ -372,12 +588,20 @@ export const useChatMessages = (groupId?: string) => {
 
   return {
     messages,
+
     isLoading: status === 'LoadingFirstPage',
+
     isLoadingMore: status === 'LoadingMore',
+
     canLoadEarlier: status === 'CanLoadMore',
+
     isUploadingAttachment,
+    isUploadingVoice,
+
     loadEarlier,
+
     typingUsers: [] as ChatTypingUser[],
+
     sendTextMessage,
     sendVoiceMessage,
     sendAttachment,

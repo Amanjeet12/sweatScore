@@ -6,7 +6,19 @@ import { mutation, query } from '../_generated/server';
 import { requireCurrentUser, requireGroupMember } from './helpers';
 
 const MAX_MESSAGE_LENGTH = 2000;
+
 const MAX_CLIENT_MESSAGE_ID_LENGTH = 100;
+
+const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
+
+const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
+
+const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
+
+const MAX_VOICE_DURATION_SECONDS = 300;
+
+const MAX_ATTACHMENT_NAME_LENGTH = 180;
+
 const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
 
 const AVATAR_COLORS = ['#D97706', '#9F1239', '#047857', '#7C3AED', '#2563EB', '#C2410C'];
@@ -91,6 +103,7 @@ export const listMessages = query({
     const messages = await Promise.all(
       result.page.map(async (message) => {
         const sender = await ctx.db.get(message.senderId);
+
         const senderName = getSenderName(sender);
 
         let replyTo: {
@@ -107,7 +120,9 @@ export const listMessages = query({
 
             replyTo = {
               messageId: repliedMessage._id,
+
               senderName: getSenderName(repliedSender),
+
               text: getReplyText(repliedMessage),
             };
           }
@@ -124,6 +139,7 @@ export const listMessages = query({
         } | null = null;
 
         let voiceUri: string | null = null;
+
         let voiceDuration: number | null = null;
 
         if (message.attachment && !message.deletedAt) {
@@ -135,6 +151,7 @@ export const listMessages = query({
 
           if (message.type === 'voice') {
             voiceUri = fileUrl;
+
             voiceDuration = message.attachment.durationSeconds ?? 0;
           } else if (
             fileUrl &&
@@ -142,11 +159,17 @@ export const listMessages = query({
           ) {
             attachment = {
               id: String(message.attachment.storageId),
+
               type: message.type,
+
               uri: fileUrl,
+
               name: message.attachment.fileName ?? null,
+
               mimeType: message.attachment.mimeType,
+
               sizeBytes: message.attachment.sizeBytes,
+
               thumbnailUri: thumbnailUrl,
             };
           }
@@ -178,7 +201,9 @@ export const listMessages = query({
           } else {
             groupedReactions.set(reaction.emoji, {
               emoji: reaction.emoji,
+
               count: 1,
+
               reactedByMe: String(reaction.userId) === String(currentUser._id),
             });
           }
@@ -191,19 +216,31 @@ export const listMessages = query({
           groupId: message.groupId,
           senderId: message.senderId,
           senderName,
+
           senderInitial: senderName.charAt(0).toUpperCase() || '?',
+
           senderColor: isMine ? '#F76B1C' : getAvatarColor(String(message.senderId)),
+
           type: message.deletedAt ? ('text' as const) : message.type,
+
           text: message.deletedAt ? 'Message deleted' : (message.text ?? null),
+
           createdAt: message._creationTime,
+
           isMine,
+
           deliveryStatus: isMine ? ('sent' as const) : null,
+
           attachment,
           voiceUri,
           voiceDuration,
+
           linkTitle: !message.deletedAt ? (message.linkPreview?.title ?? null) : null,
+
           linkUrl: !message.deletedAt ? (message.linkPreview?.url ?? null) : null,
+
           replyTo,
+
           reactions: Array.from(groupedReactions.values()),
         };
       })
@@ -221,6 +258,7 @@ export const sendMessage = mutation({
     groupId: v.id('chatGroups'),
     text: v.string(),
     clientMessageId: v.string(),
+
     replyToMessageId: v.optional(v.id('chatMessages')),
   },
 
@@ -274,15 +312,17 @@ export const sendMessage = mutation({
       }
     }
 
-    const now = Date.now();
-
     const messageId = await ctx.db.insert('chatMessages', {
       groupId: args.groupId,
+
       senderId: currentUser._id,
+
       clientMessageId,
       type: 'text',
       text,
+
       mentionedUserIds: [],
+
       ...(args.replyToMessageId
         ? {
             replyToMessageId: args.replyToMessageId,
@@ -292,7 +332,8 @@ export const sendMessage = mutation({
 
     await ctx.db.patch(args.groupId, {
       lastMessageId: messageId,
-      lastMessageAt: now,
+
+      lastMessageAt: Date.now(),
     });
 
     return messageId;
@@ -343,7 +384,9 @@ export const toggleReaction = mutation({
 
     await ctx.db.insert('chatReactions', {
       messageId: args.messageId,
+
       userId: currentUser._id,
+
       emoji: args.emoji,
     });
 
@@ -382,10 +425,6 @@ export const markGroupRead = mutation({
   },
 });
 
-const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024;
-const MAX_ATTACHMENT_NAME_LENGTH = 180;
-
 export const generateUploadUrl = mutation({
   args: {
     groupId: v.id('chatGroups'),
@@ -409,15 +448,20 @@ export const generateUploadUrl = mutation({
 export const sendAttachment = mutation({
   args: {
     groupId: v.id('chatGroups'),
+
     storageId: v.id('_storage'),
 
     type: v.union(v.literal('image'), v.literal('video')),
 
     text: v.optional(v.string()),
+
     mimeType: v.string(),
     sizeBytes: v.number(),
+
     fileName: v.optional(v.string()),
+
     clientMessageId: v.string(),
+
     replyToMessageId: v.optional(v.id('chatMessages')),
   },
 
@@ -438,10 +482,6 @@ export const sendAttachment = mutation({
       throw new ConvexError('Invalid client message ID');
     }
 
-    /*
-     * Prevent duplicate attachment messages when the client
-     * retries the mutation.
-     */
     const duplicateMessage = await ctx.db
       .query('chatMessages')
       .withIndex('by_sender_client', (q) =>
@@ -457,20 +497,12 @@ export const sendAttachment = mutation({
       return duplicateMessage._id;
     }
 
-    /*
-     * The text acts as the attachment caption.
-     * An attachment can also be sent without text.
-     */
     const cleanText = args.text?.trim() ?? '';
 
     if (cleanText.length > MAX_MESSAGE_LENGTH) {
       throw new ConvexError(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
     }
 
-    /*
-     * Read the real file metadata from Convex Storage.
-     * Do not trust the client-provided size or MIME type alone.
-     */
     const metadata = await ctx.db.system.get('_storage', args.storageId);
 
     if (!metadata) {
@@ -499,10 +531,6 @@ export const sendAttachment = mutation({
 
     const fileName = args.fileName?.trim().slice(0, MAX_ATTACHMENT_NAME_LENGTH);
 
-    /*
-     * Validate that the replied message belongs to
-     * the same chat group.
-     */
     if (args.replyToMessageId) {
       const repliedMessage = await ctx.db.get(args.replyToMessageId);
 
@@ -511,17 +539,14 @@ export const sendAttachment = mutation({
       }
     }
 
-    /*
-     * One database document contains both:
-     *
-     * - image/video attachment
-     * - optional typed caption
-     */
     const messageId = await ctx.db.insert('chatMessages', {
       groupId: args.groupId,
+
       senderId: currentUser._id,
+
       clientMessageId,
       type: args.type,
+
       mentionedUserIds: [],
 
       ...(cleanText
@@ -532,7 +557,9 @@ export const sendAttachment = mutation({
 
       attachment: {
         storageId: args.storageId,
+
         mimeType,
+
         sizeBytes: metadata.size,
 
         ...(fileName
@@ -551,6 +578,143 @@ export const sendAttachment = mutation({
 
     await ctx.db.patch(args.groupId, {
       lastMessageId: messageId,
+
+      lastMessageAt: Date.now(),
+    });
+
+    return messageId;
+  },
+});
+
+export const sendVoiceMessage = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+
+    storageId: v.id('_storage'),
+
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    durationSeconds: v.number(),
+
+    fileName: v.optional(v.string()),
+
+    clientMessageId: v.string(),
+
+    replyToMessageId: v.optional(v.id('chatMessages')),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    const clientMessageId = args.clientMessageId.trim();
+
+    if (!clientMessageId || clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH) {
+      throw new ConvexError('Invalid client message ID');
+    }
+
+    const duplicateMessage = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_sender_client', (q) =>
+        q.eq('senderId', currentUser._id).eq('clientMessageId', clientMessageId)
+      )
+      .first();
+
+    if (duplicateMessage) {
+      if (String(duplicateMessage.groupId) !== String(args.groupId)) {
+        throw new ConvexError('Client message ID was already used');
+      }
+
+      return duplicateMessage._id;
+    }
+
+    const durationSeconds = Math.round(args.durationSeconds);
+
+    if (!Number.isFinite(durationSeconds) || durationSeconds < 1) {
+      throw new ConvexError('Voice message duration is invalid');
+    }
+
+    if (durationSeconds > MAX_VOICE_DURATION_SECONDS) {
+      throw new ConvexError('Voice messages cannot be longer than 5 minutes');
+    }
+
+    if (args.sizeBytes <= 0) {
+      throw new ConvexError('Voice message file is empty');
+    }
+
+    const metadata = await ctx.db.system.get('_storage', args.storageId);
+
+    if (!metadata) {
+      throw new ConvexError('Uploaded voice file not found');
+    }
+
+    const mimeType = (metadata.contentType || args.mimeType).trim().toLowerCase();
+
+    if (!mimeType.startsWith('audio/')) {
+      throw new ConvexError('The uploaded file is not an audio file');
+    }
+
+    if (metadata.size <= 0) {
+      throw new ConvexError('Voice message file is empty');
+    }
+
+    if (metadata.size > MAX_AUDIO_SIZE_BYTES) {
+      throw new ConvexError('Voice messages cannot be larger than 20 MB');
+    }
+
+    const fileName = args.fileName?.trim().slice(0, MAX_ATTACHMENT_NAME_LENGTH);
+
+    if (args.replyToMessageId) {
+      const repliedMessage = await ctx.db.get(args.replyToMessageId);
+
+      if (!repliedMessage || String(repliedMessage.groupId) !== String(args.groupId)) {
+        throw new ConvexError('The replied message does not belong to this group');
+      }
+    }
+
+    const messageId = await ctx.db.insert('chatMessages', {
+      groupId: args.groupId,
+
+      senderId: currentUser._id,
+
+      clientMessageId,
+      type: 'voice',
+
+      mentionedUserIds: [],
+
+      attachment: {
+        storageId: args.storageId,
+
+        mimeType,
+
+        sizeBytes: metadata.size,
+
+        durationSeconds,
+
+        ...(fileName
+          ? {
+              fileName,
+            }
+          : {}),
+      },
+
+      ...(args.replyToMessageId
+        ? {
+            replyToMessageId: args.replyToMessageId,
+          }
+        : {}),
+    });
+
+    await ctx.db.patch(args.groupId, {
+      lastMessageId: messageId,
+
       lastMessageAt: Date.now(),
     });
 
