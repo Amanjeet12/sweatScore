@@ -133,8 +133,32 @@ export default function Layout() {
               params: { postId: notificationData.postId as Id<'posts'> },
             });
           }
+        } else if (notificationData.notificationType === NOTIFICATION_TYPE.CHALLENGE_POST_LIVE) {
+          if (notificationData.postId) {
+            router.push({
+              pathname: '/(tabs)/share/[postId]',
+
+              params: {
+                postId: notificationData.postId as Id<'posts'>,
+              },
+            });
+          }
+        } else if (notificationData.notificationType === NOTIFICATION_TYPE.NEW_CHAT_MESSAGE) {
+          const notificationGroupId = notificationData.groupId;
+
+          if (typeof notificationGroupId === 'string' && notificationGroupId) {
+            router.push({
+              pathname: '/group-chat/[groupId]',
+
+              params: {
+                groupId: notificationGroupId as Id<'chatGroups'>,
+              },
+            });
+          } else {
+            router.push('/group-chat');
+          }
         } else {
-          // console.log('Unknown notification type', notificationData.notificationType);
+          // Unknown notification type
         }
       }
     }

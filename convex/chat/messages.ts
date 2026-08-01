@@ -1,9 +1,8 @@
-import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
-
 import type { Doc } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
 import { requireCurrentUser, requireGroupMember } from './helpers';
+import { anyApi, paginationOptsValidator } from 'convex/server';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -18,6 +17,8 @@ const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_VOICE_DURATION_SECONDS = 300;
 
 const MAX_ATTACHMENT_NAME_LENGTH = 180;
+const CHAT_PUSH_DELAY_MS = 1500;
+const chatNotificationsApi = anyApi['chat/notifications'];
 
 const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
 
@@ -332,8 +333,13 @@ export const sendMessage = mutation({
 
     await ctx.db.patch(args.groupId, {
       lastMessageId: messageId,
-
       lastMessageAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
+      groupId: args.groupId,
+      messageId,
+      senderId: currentUser._id,
     });
 
     return messageId;
@@ -582,6 +588,12 @@ export const sendAttachment = mutation({
       lastMessageAt: Date.now(),
     });
 
+    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
+      groupId: args.groupId,
+      messageId,
+      senderId: currentUser._id,
+    });
+
     return messageId;
   },
 });
@@ -717,6 +729,16 @@ export const sendVoiceMessage = mutation({
 
       lastMessageAt: Date.now(),
     });
+
+    await ctx.scheduler.runAfter(
+      CHAT_PUSH_DELAY_MS,
+      chatNotificationsApi.queueChatMessagePush,
+      {
+        groupId: args.groupId,
+        messageId,
+        senderId: currentUser._id,
+      }
+    );
 
     return messageId;
   },

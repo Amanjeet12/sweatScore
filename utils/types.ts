@@ -14,17 +14,30 @@ export enum PROFILE_FIELD {
 
 export enum NOTIFICATION_TYPE {
   NEW_ACTIVITY_SUBMITTED = 'newActivitySubmitted',
+
   NEW_ACTIVITY_APPROVED = 'newActivityApproved',
+
   NEW_ACTIVITY_REJECTED = 'newActivityRejected',
+
   NEW_REWARD_CLAIMED = 'newRewardClaimed',
+
   NEW_REWARD_UNLOCKED_500 = 'newRewardUnlocked500',
+
   NEW_REWARD_UNLOCKED_250 = 'newRewardUnlocked250',
+
   NEW_REWARD_UNLOCKED_100 = 'newRewardUnlocked100',
+
   NEW_COMMENT_POSTED = 'newCommentPosted',
+
   NEW_ADMIN_POST = 'newAdminPost',
+
   NO_ACTIVITY_REMINDER = 'noActivityReminder',
+
   CHALLENGE_POST_LIVE = 'challengePostLive',
+
   VIDEO_FEED_LIVE = 'videoFeedLive',
+
+  NEW_CHAT_MESSAGE = 'newChatMessage',
 }
 
 export interface PreviewData {
