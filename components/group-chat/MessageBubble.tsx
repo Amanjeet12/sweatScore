@@ -12,12 +12,14 @@ type MessageBubbleProps = {
   actionOpen: boolean;
   isVoicePlaying: boolean;
   showSeenReceipt?: boolean;
+  canPin?: boolean;
 
   onToggleActions: () => void;
   onCloseActions: () => void;
   onToggleVoice: () => void;
   onReply: () => void;
   onReact: (emoji: string) => void;
+  onTogglePin: () => void;
 };
 const MAX_VISIBLE_SEEN_AVATARS = 3;
 
@@ -26,11 +28,13 @@ const MessageBubble = ({
   actionOpen,
   isVoicePlaying,
   showSeenReceipt = false,
+  canPin = false,
   onToggleActions,
   onCloseActions,
   onToggleVoice,
   onReply,
   onReact,
+  onTogglePin,
 }: MessageBubbleProps) => {
   const isMine = Boolean(message.isMine);
 
@@ -89,6 +93,8 @@ const MessageBubble = ({
             reactions={message.reactions}
             actionOpen={actionOpen}
             canShowSeen={isMine && seenMembers.length > 0}
+            canPin={canPin}
+            isPinned={Boolean(message.isPinned)}
             seenCount={seenMembers.length}
             onCloseActions={onCloseActions}
             onShowSeen={() => {
@@ -97,6 +103,7 @@ const MessageBubble = ({
             }}
             onReact={onReact}
             onReply={onReply}
+            onTogglePin={onTogglePin}
           />
 
           {shouldShowSeenReceipt ? (

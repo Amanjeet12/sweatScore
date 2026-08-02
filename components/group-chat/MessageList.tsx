@@ -30,10 +30,13 @@ type MessageListProps = {
   isLoadingMore: boolean;
   canLoadEarlier: boolean;
   isSearching: boolean;
+  canPinMessages: boolean;
+  pinnedScrollRequest: { messageId: string; requestId: number } | null;
 
   onLoadEarlier: () => void;
   onReply: (message: ChatMessage) => void;
   onReact: (messageId: string, emoji: string) => void;
+  onTogglePin: (message: ChatMessage) => void;
   onMessageVisible?: (messageId: string) => void;
   onNearBottomChange?: (isNearBottom: boolean) => void;
 };
@@ -142,9 +145,12 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
       isLoadingMore,
       canLoadEarlier,
       isSearching,
+      canPinMessages,
+      pinnedScrollRequest,
       onLoadEarlier,
       onReply,
       onReact,
+      onTogglePin,
       onMessageVisible,
       onNearBottomChange,
     },
@@ -161,6 +167,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
     const isNearBottomRef = useRef(true);
     const previousLatestIdRef = useRef<string | null>(null);
     const initialScrollDoneRef = useRef(false);
+    const handledPinnedRequestRef = useRef<number | null>(null);
     const onMessageVisibleRef = useRef(onMessageVisible);
 
     /*
@@ -177,6 +184,46 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
     const wasNearTopRef = useRef(false);
 
     const rows = useMemo(() => buildRows(messages), [messages]);
+
+    useEffect(() => {
+      if (
+        !pinnedScrollRequest ||
+        handledPinnedRequestRef.current === pinnedScrollRequest.requestId ||
+        isLoading ||
+        isLoadingMore
+      ) {
+        return;
+      }
+
+      const rowIndex = rows.findIndex(
+        (row) => row.type === 'message' && row.message.id === pinnedScrollRequest.messageId
+      );
+
+      if (rowIndex >= 0) {
+        handledPinnedRequestRef.current = pinnedScrollRequest.requestId;
+
+        requestAnimationFrame(() => {
+          internalListRef.current?.scrollToIndex({
+            index: rowIndex,
+            animated: true,
+            viewPosition: 0.45,
+          });
+        });
+        return;
+      }
+
+      if (canLoadEarlier && !isSearching) {
+        onLoadEarlier();
+      }
+    }, [
+      canLoadEarlier,
+      isLoading,
+      isLoadingMore,
+      isSearching,
+      onLoadEarlier,
+      pinnedScrollRequest,
+      rows,
+    ]);
 
     const latestOwnMessageId = useMemo(() => {
       for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -370,6 +417,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
             actionOpen={actionMessageId === message.id}
             isVoicePlaying={playingVoiceId === message.id}
             showSeenReceipt={message.id === latestOwnMessageId}
+            canPin={canPinMessages}
             onToggleActions={() => {
               setActionMessageId((current) => (current === message.id ? null : message.id));
             }}
@@ -388,10 +436,22 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
 
               setActionMessageId(null);
             }}
+            onTogglePin={() => {
+              onTogglePin(message);
+              setActionMessageId(null);
+            }}
           />
         );
       },
-      [actionMessageId, latestOwnMessageId, onReact, onReply, playingVoiceId]
+      [
+        actionMessageId,
+        canPinMessages,
+        latestOwnMessageId,
+        onReact,
+        onReply,
+        onTogglePin,
+        playingVoiceId,
+      ]
     );
 
     /*
@@ -452,6 +512,12 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
           onScroll={handleScroll}
           scrollEventThrottle={16}
           onViewableItemsChanged={handleViewableItemsChanged}
+          onScrollToIndexFailed={(info) => {
+            internalListRef.current?.scrollToOffset({
+              offset: info.averageItemLength * info.index,
+              animated: true,
+            });
+          }}
           viewabilityConfig={{
             itemVisiblePercentThreshold: 60,
             minimumViewTime: 250,

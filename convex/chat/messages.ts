@@ -1,8 +1,10 @@
 import { ConvexError, v } from 'convex/values';
-import type { Doc } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
 import { requireCurrentUser, requireGroupMember } from './helpers';
 import { anyApi, paginationOptsValidator } from 'convex/server';
+
+import type { MutationCtx } from '../_generated/server';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -76,6 +78,31 @@ function getReplyText(message: Doc<'chatMessages'>) {
     default:
       return 'Message';
   }
+}
+
+async function requirePinManager(ctx: MutationCtx, groupId: Id<'chatGroups'>) {
+  const currentUser = await requireCurrentUser(ctx);
+
+  const membership = await requireGroupMember(ctx, groupId, currentUser._id);
+
+  const group = await ctx.db.get(groupId);
+
+  if (!group || !group.isActive) {
+    throw new ConvexError('Group not found');
+  }
+
+  const canPinMessages =
+    currentUser.isAdmin === true || membership.role === 'owner' || membership.role === 'admin';
+
+  if (!canPinMessages) {
+    throw new ConvexError('Only group admins can pin messages');
+  }
+
+  return {
+    currentUser,
+    membership,
+    group,
+  };
 }
 
 export const listMessages = query({
@@ -216,8 +243,8 @@ export const listMessages = query({
           _id: message._id,
           groupId: message.groupId,
           senderId: message.senderId,
-          senderName,
 
+          senderName,
           senderInitial: senderName.charAt(0).toUpperCase() || '?',
 
           senderColor: isMine ? '#F76B1C' : getAvatarColor(String(message.senderId)),
@@ -230,18 +257,19 @@ export const listMessages = query({
 
           isMine,
 
+          isPinned:
+            Boolean(group.pinnedMessageId) && String(group.pinnedMessageId) === String(message._id),
+
           deliveryStatus: isMine ? ('sent' as const) : null,
 
           attachment,
           voiceUri,
           voiceDuration,
-
           linkTitle: !message.deletedAt ? (message.linkPreview?.title ?? null) : null,
 
           linkUrl: !message.deletedAt ? (message.linkPreview?.url ?? null) : null,
 
           replyTo,
-
           reactions: Array.from(groupedReactions.values()),
         };
       })
@@ -730,16 +758,147 @@ export const sendVoiceMessage = mutation({
       lastMessageAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(
-      CHAT_PUSH_DELAY_MS,
-      chatNotificationsApi.queueChatMessagePush,
-      {
-        groupId: args.groupId,
-        messageId,
-        senderId: currentUser._id,
-      }
-    );
+    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
+      groupId: args.groupId,
+      messageId,
+      senderId: currentUser._id,
+    });
 
     return messageId;
+  },
+});
+
+export const pinMessage = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+    messageId: v.id('chatMessages'),
+  },
+
+  handler: async (ctx, args) => {
+    const { currentUser } = await requirePinManager(ctx, args.groupId);
+
+    const message = await ctx.db.get(args.messageId);
+
+    if (!message || String(message.groupId) !== String(args.groupId)) {
+      throw new ConvexError('Message not found in this group');
+    }
+
+    if (message.deletedAt) {
+      throw new ConvexError('Deleted messages cannot be pinned');
+    }
+
+    await ctx.db.patch(args.groupId, {
+      pinnedMessageId: message._id,
+
+      pinnedBy: currentUser._id,
+
+      pinnedAt: Date.now(),
+    });
+
+    return {
+      pinned: true,
+      messageId: message._id,
+    };
+  },
+});
+
+export const unpinMessage = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+
+    messageId: v.optional(v.id('chatMessages')),
+  },
+
+  handler: async (ctx, args) => {
+    const { group } = await requirePinManager(ctx, args.groupId);
+
+    if (!group.pinnedMessageId) {
+      return {
+        unpinned: false,
+      };
+    }
+
+    /*
+     * Prevent an old message action from
+     * unpinning a newly pinned message.
+     */
+    if (args.messageId && String(args.messageId) !== String(group.pinnedMessageId)) {
+      throw new ConvexError('This message is no longer pinned');
+    }
+
+    await ctx.db.patch(args.groupId, {
+      pinnedMessageId: undefined,
+      pinnedBy: undefined,
+      pinnedAt: undefined,
+    });
+
+    return {
+      unpinned: true,
+    };
+  },
+});
+
+export const getPinnedMessage = query({
+  args: {
+    groupId: v.id('chatGroups'),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    const membership = await requireGroupMember(ctx, args.groupId, currentUser._id);
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    const canPinMessages =
+      currentUser.isAdmin === true || membership.role === 'owner' || membership.role === 'admin';
+
+    if (!group.pinnedMessageId) {
+      return {
+        message: null,
+        canPinMessages,
+      };
+    }
+
+    const message = await ctx.db.get(group.pinnedMessageId);
+
+    /*
+     * Ignore invalid, deleted, or cross-group
+     * pinned message references.
+     */
+    if (!message || message.deletedAt || String(message.groupId) !== String(args.groupId)) {
+      return {
+        message: null,
+        canPinMessages,
+      };
+    }
+
+    const sender = await ctx.db.get(message.senderId);
+
+    const pinnedByUser = group.pinnedBy ? await ctx.db.get(group.pinnedBy) : null;
+
+    return {
+      canPinMessages,
+
+      message: {
+        messageId: message._id,
+
+        senderId: message.senderId,
+
+        senderName: getSenderName(sender),
+
+        preview: getReplyText(message),
+
+        type: message.type,
+
+        pinnedAt: group.pinnedAt ?? null,
+
+        pinnedByName: pinnedByUser ? getSenderName(pinnedByUser) : 'Admin',
+      },
+    };
   },
 });

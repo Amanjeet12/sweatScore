@@ -55,6 +55,7 @@ export type ChatMessage = {
   replyTo?: ChatReply;
   seenBy?: ChatSeenMember[];
   mentions?: ChatMention[];
+  isPinned?: boolean;
 };
 
 export type ChatTypingUser = {
@@ -97,4 +98,14 @@ export type ChatMentionMember = {
 export type ChatMention = {
   userId: string;
   displayName: string;
+};
+
+export type ChatPinnedMessage = {
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  preview: string;
+  type: ChatMessageType;
+  pinnedAt: number | null;
+  pinnedByName: string;
 };

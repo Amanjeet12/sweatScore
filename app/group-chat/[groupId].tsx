@@ -1,13 +1,14 @@
 import { useQuery } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { Alert, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ChatComposer from '~/components/group-chat/ChatComposer';
 import ChatHeader from '~/components/group-chat/ChatHeader';
 import MessageList from '~/components/group-chat/MessageList';
+import PinnedMessageBanner from '~/components/group-chat/PinnedMessageBanner';
 import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
 import { useChatKeyboard } from '~/hooks/chat/useChatKeyboard';
@@ -76,7 +77,18 @@ export default function GroupChatScreen() {
     sendVoiceMessage,
     sendAttachment,
     reactToMessage,
+    pinnedMessage,
+    canPinMessages,
+    pinMessage,
+    unpinMessage,
   } = useChatMessages(groupId);
+
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
+
+  const [pinnedScrollRequest, setPinnedScrollRequest] = useState<{
+    messageId: string;
+    requestId: number;
+  } | null>(null);
   const currentUser = useAuthStore((state) => state.currentUser);
   /*
    * useChatPresence adds:
@@ -211,6 +223,49 @@ export default function GroupChatScreen() {
     }
   }, [scrollToLatest]);
 
+  const handleTogglePin = useCallback(
+    async (message: ChatMessage) => {
+      if (!canPinMessages || isUpdatingPin) {
+        return;
+      }
+
+      setIsUpdatingPin(true);
+
+      try {
+        if (message.isPinned) {
+          await unpinMessage(message.id);
+        } else {
+          await pinMessage(message.id);
+        }
+      } finally {
+        setIsUpdatingPin(false);
+      }
+    },
+    [canPinMessages, isUpdatingPin, pinMessage, unpinMessage]
+  );
+
+  const handleUnpinBanner = useCallback(() => {
+    if (!pinnedMessage || !canPinMessages || isUpdatingPin) {
+      return;
+    }
+
+    Alert.alert(
+      'Unpin message?',
+      'This will remove the pinned message for everyone in the group.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unpin',
+          style: 'destructive',
+          onPress: () => {
+            setIsUpdatingPin(true);
+            void unpinMessage(pinnedMessage.messageId).finally(() => setIsUpdatingPin(false));
+          },
+        },
+      ]
+    );
+  }, [canPinMessages, isUpdatingPin, pinnedMessage, unpinMessage]);
+
   const handleSendText = useCallback(
     async (text: string, mentions: ChatMention[]) => {
       if (!groupId) {
@@ -342,6 +397,24 @@ export default function GroupChatScreen() {
             onChangeSearch={setSearchText}
           />
 
+          <PinnedMessageBanner
+            message={pinnedMessage}
+            canUnpin={canPinMessages}
+            isUnpinning={isUpdatingPin}
+            onUnpin={handleUnpinBanner}
+            onPress={() => {
+              if (!pinnedMessage) {
+                return;
+              }
+
+              closeSearch();
+              setPinnedScrollRequest((current) => ({
+                messageId: pinnedMessage.messageId,
+                requestId: (current?.requestId ?? 0) + 1,
+              }));
+            }}
+          />
+
           <View className="flex-1">
             <MessageList
               ref={listRef}
@@ -350,9 +423,12 @@ export default function GroupChatScreen() {
               isLoadingMore={isLoadingMore}
               canLoadEarlier={canLoadEarlier}
               isSearching={Boolean(searchText.trim())}
+              canPinMessages={canPinMessages && !isUpdatingPin}
+              pinnedScrollRequest={pinnedScrollRequest}
               onLoadEarlier={loadEarlier}
               onReply={setReplyingTo}
               onReact={reactToMessage}
+              onTogglePin={(message) => void handleTogglePin(message)}
               onMessageVisible={markMessageRead}
               onNearBottomChange={(nearBottom) => {
                 isNearBottomRef.current = nearBottom;

@@ -342,6 +342,9 @@ const schema = defineSchema({
     isActive: v.boolean(),
     lastMessageId: v.optional(v.id('chatMessages')),
     lastMessageAt: v.optional(v.number()),
+    pinnedMessageId: v.optional(v.id('chatMessages')),
+    pinnedBy: v.optional(v.id('users')),
+    pinnedAt: v.optional(v.number()),
   }).index('by_slug', ['slug']),
 
   chatMembers: defineTable({

@@ -1,4 +1,4 @@
-import { useMutation, usePaginatedQuery } from 'convex/react';
+import { useMutation, usePaginatedQuery, useQuery } from 'convex/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
@@ -126,6 +126,20 @@ export const useChatMessages = (groupId?: string) => {
     }
   );
 
+  const pinnedMessageResult = useQuery(
+    api.chat.messages.getPinnedMessage,
+
+    convexGroupId
+      ? {
+          groupId: convexGroupId,
+        }
+      : 'skip'
+  );
+
+  const pinMessageMutation = useMutation(api.chat.messages.pinMessage);
+
+  const unpinMessageMutation = useMutation(api.chat.messages.unpinMessage);
+
   const generateUploadUrlMutation = useMutation(api.chat.messages.generateUploadUrl);
 
   const sendAttachmentMutation = useMutation(api.chat.messages.sendAttachment);
@@ -160,6 +174,7 @@ export const useChatMessages = (groupId?: string) => {
       createdAt: message.createdAt,
       time: formatMessageTime(new Date(message.createdAt)),
       isMine: message.isMine,
+      isPinned: message.isPinned,
 
       ...(message.deliveryStatus
         ? {
@@ -586,8 +601,79 @@ export const useChatMessages = (groupId?: string) => {
     [convexGroupId, generateUploadUrlMutation, sendAttachmentMutation]
   );
 
+  const pinMessage = useCallback(
+    async (messageId: string) => {
+      if (!convexGroupId) {
+        return false;
+      }
+
+      try {
+        await pinMessageMutation({
+          groupId: convexGroupId,
+
+          messageId: messageId as Id<'chatMessages'>,
+        });
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+        return false;
+      }
+    },
+    [convexGroupId, pinMessageMutation]
+  );
+
+  const unpinMessage = useCallback(
+    async (messageId?: string) => {
+      if (!convexGroupId) {
+        return false;
+      }
+
+      try {
+        await unpinMessageMutation({
+          groupId: convexGroupId,
+
+          ...(messageId
+            ? {
+                messageId: messageId as Id<'chatMessages'>,
+              }
+            : {}),
+        });
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+        return false;
+      }
+    },
+    [convexGroupId, unpinMessageMutation]
+  );
+
   return {
     messages,
+
+    pinnedMessage: pinnedMessageResult?.message
+      ? {
+          messageId: String(pinnedMessageResult.message.messageId),
+
+          senderId: String(pinnedMessageResult.message.senderId),
+
+          senderName: pinnedMessageResult.message.senderName,
+
+          preview: pinnedMessageResult.message.preview,
+
+          type: pinnedMessageResult.message.type,
+
+          pinnedAt: pinnedMessageResult.message.pinnedAt,
+
+          pinnedByName: pinnedMessageResult.message.pinnedByName,
+        }
+      : null,
+
+    canPinMessages: pinnedMessageResult?.canPinMessages ?? false,
+
+    pinMessage,
+    unpinMessage,
 
     isLoading: status === 'LoadingFirstPage',
 
