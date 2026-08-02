@@ -673,3 +673,41 @@ export const deactivateGroup = mutation({
     return true;
   },
 });
+
+export const listMentionableMembers = query({
+  args: {
+    groupId: v.id('chatGroups'),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    await requireGroupMember(ctx, args.groupId, currentUser._id);
+
+    const memberships = await ctx.db
+      .query('chatMembers')
+      .withIndex('by_group_status', (q) => q.eq('groupId', args.groupId).eq('status', 'active'))
+      .collect();
+
+    const members = [];
+
+    for (const membership of memberships) {
+      const user = await ctx.db.get(membership.userId);
+
+      if (!user) {
+        continue;
+      }
+
+      const name = user.name?.trim() || user.email?.split('@')[0] || 'Member';
+
+      members.push({
+        userId: membership.userId,
+        name,
+        initial: name.charAt(0).toUpperCase() || '?',
+        avatarColor: getAvatarColor(String(membership.userId)),
+      });
+    }
+
+    return members.sort((first, second) => first.name.localeCompare(second.name));
+  },
+});

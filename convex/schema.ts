@@ -375,6 +375,14 @@ const schema = defineSchema({
     text: v.optional(v.string()),
     replyToMessageId: v.optional(v.id('chatMessages')),
     mentionedUserIds: v.array(v.id('users')),
+    mentions: v.optional(
+      v.array(
+        v.object({
+          userId: v.id('users'),
+          displayName: v.string(),
+        })
+      )
+    ),
 
     attachment: v.optional(
       v.object({

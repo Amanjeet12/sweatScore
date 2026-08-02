@@ -54,6 +54,7 @@ export type ChatMessage = {
   reactions?: ChatReaction[];
   replyTo?: ChatReply;
   seenBy?: ChatSeenMember[];
+  mentions?: ChatMention[];
 };
 
 export type ChatTypingUser = {
@@ -72,6 +73,7 @@ export type PendingVoiceNote = {
 export type SendTextMessageInput = {
   text: string;
   replyToMessageId?: string;
+  mentions?: ChatMention[];
 };
 
 export type SendVoiceMessageInput = PendingVoiceNote & {
@@ -82,6 +84,17 @@ export type SendAttachmentInput = {
   attachment: ChatAttachment;
   text?: string;
   replyToMessageId?: string;
+  mentions?: ChatMention[];
 };
 
+export type ChatMentionMember = {
+  userId: string;
+  name: string;
+  initial: string;
+  avatarColor: string;
+};
 
+export type ChatMention = {
+  userId: string;
+  displayName: string;
+};

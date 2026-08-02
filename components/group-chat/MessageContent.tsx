@@ -108,11 +108,11 @@ const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentPro
 
       {displayedText ? (
         <View className={hasContentBeforeText ? (hasVisualMedia ? 'mx-2 mt-2' : 'mt-3') : ''}>
-          {isMine ? (
-            <Text className="font-body text-[15px] leading-[22px] text-white">{displayedText}</Text>
-          ) : (
-            <MentionText>{displayedText}</MentionText>
-          )}
+          <MentionText
+            text={displayedText}
+            mentions={message.mentions ?? []}
+            isMine={isMine}
+          />
         </View>
       ) : null}
 

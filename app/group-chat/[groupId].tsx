@@ -13,7 +13,14 @@ import type { Id } from '~/convex/_generated/dataModel';
 import { useChatKeyboard } from '~/hooks/chat/useChatKeyboard';
 import { useChatMessages } from '~/hooks/chat/useChatMessages';
 import { useChatPresence } from '~/hooks/chat/useChatPresence';
-import type { ChatAttachment, ChatMessage, PendingVoiceNote } from '~/types/chat';
+import { useAuthStore } from '~/store/useAuthStore';
+import type {
+  ChatAttachment,
+  ChatMessage,
+  PendingVoiceNote,
+  ChatMention,
+  ChatMentionMember,
+} from '~/types/chat';
 
 export default function GroupChatScreen() {
   const params = useLocalSearchParams<{
@@ -70,7 +77,7 @@ export default function GroupChatScreen() {
     sendAttachment,
     reactToMessage,
   } = useChatMessages(groupId);
-
+  const currentUser = useAuthStore((state) => state.currentUser);
   /*
    * useChatPresence adds:
    *
@@ -94,6 +101,30 @@ export default function GroupChatScreen() {
           groupId: typedGroupId,
         }
       : 'skip'
+  );
+
+  const mentionMembersResult = useQuery(
+    api.chat.groupInfo.listMentionableMembers,
+
+    typedGroupId
+      ? {
+          groupId: typedGroupId,
+        }
+      : 'skip'
+  );
+
+  const mentionMembers = useMemo<ChatMentionMember[]>(
+    () =>
+      (mentionMembersResult ?? []).map((member) => ({
+        userId: String(member.userId),
+
+        name: member.name,
+        initial: member.initial,
+
+        avatarColor: member.avatarColor,
+      })),
+
+    [mentionMembersResult]
   );
 
   const shouldScrollForKeyboard = useCallback(() => {
@@ -181,13 +212,14 @@ export default function GroupChatScreen() {
   }, [scrollToLatest]);
 
   const handleSendText = useCallback(
-    async (text: string) => {
+    async (text: string, mentions: ChatMention[]) => {
       if (!groupId) {
         return false;
       }
 
       const sent = await sendTextMessage({
         text,
+        mentions,
 
         replyToMessageId: replyingTo?.id,
       });
@@ -195,11 +227,6 @@ export default function GroupChatScreen() {
       if (sent) {
         setTyping(false);
         setReplyingTo(null);
-
-        /*
-         * The current user's sent message
-         * should always become visible.
-         */
         scrollToLatest(true);
       }
 
@@ -233,7 +260,13 @@ export default function GroupChatScreen() {
   );
 
   const handleSendAttachment = useCallback(
-    async (attachment: ChatAttachment, text?: string) => {
+    async (
+      attachment: ChatAttachment,
+
+      text?: string,
+
+      mentions: ChatMention[] = []
+    ) => {
       if (!groupId) {
         return false;
       }
@@ -241,6 +274,7 @@ export default function GroupChatScreen() {
       const sent = await sendAttachment({
         attachment,
         text,
+        mentions,
 
         replyToMessageId: replyingTo?.id,
       });
@@ -329,6 +363,9 @@ export default function GroupChatScreen() {
           <ChatComposer
             groupName={group?.name ?? 'Group Chat'}
             replyingTo={replyingTo}
+            mentionMembers={mentionMembers}
+            currentUserId={currentUser?._id ? String(currentUser._id) : undefined}
+            isMentionMembersLoading={mentionMembersResult === undefined}
             isUploadingAttachment={isUploadingAttachment}
             isUploadingVoice={isUploadingVoice}
             onCancelReply={() => setReplyingTo(null)}

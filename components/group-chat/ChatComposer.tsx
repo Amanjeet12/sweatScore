@@ -13,7 +13,7 @@ import {
   WarningCircle,
   X,
 } from 'phosphor-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,43 +23,77 @@ import {
   View,
 } from 'react-native';
 
+import MentionSuggestions from '~/components/group-chat/MentionSuggestions';
 import { Text } from '~/components/ui/text';
 import { useVoiceRecorder } from '~/hooks/chat/useVoiceRecorder';
-import type { ChatAttachment, ChatMessage, PendingVoiceNote } from '~/types/chat';
+import type {
+  ChatAttachment,
+  ChatMention,
+  ChatMentionMember,
+  ChatMessage,
+  PendingVoiceNote,
+} from '~/types/chat';
 import { formatDuration, getReplyText } from '~/utils/chat';
 
 type ChatComposerProps = {
   groupName: string;
+
   replyingTo: ChatMessage | null;
+
+  mentionMembers: ChatMentionMember[];
+
+  currentUserId?: string;
+
+  isMentionMembersLoading?: boolean;
+
   isUploadingAttachment: boolean;
+
   isUploadingVoice: boolean;
+
   onCancelReply: () => void;
+
   onFocus: () => void;
+
   onTypingChange: (isTyping: boolean) => void;
 
-  onSendText: (text: string) => Promise<boolean> | boolean;
+  onSendText: (text: string, mentions: ChatMention[]) => Promise<boolean> | boolean;
 
   onSendVoice: (voiceNote: PendingVoiceNote) => Promise<boolean> | boolean;
 
-  onSendAttachment: (attachment: ChatAttachment, text?: string) => Promise<boolean> | boolean;
+  onSendAttachment: (
+    attachment: ChatAttachment,
+    text?: string,
+    mentions?: ChatMention[]
+  ) => Promise<boolean> | boolean;
 };
 
 type AttachmentOption = {
   label: string;
+
   type: 'image' | 'video';
+
   source: 'library' | 'camera';
+
   Icon: typeof ImageSquare;
+
   color: string;
 };
 
 type PendingAttachmentPreviewProps = {
   attachment: ChatAttachment;
+
   disabled: boolean;
+
   isUploading: boolean;
+
   errorMessage: string | null;
+
   onChange: () => void;
+
   onRemove: () => void;
 };
+
+const MAX_MESSAGE_LENGTH = 2000;
 
 const ATTACHMENT_OPTIONS: AttachmentOption[] = [
   {
@@ -212,11 +246,18 @@ const PendingAttachmentPreview = ({
 const ChatComposer = ({
   groupName,
   replyingTo,
+
+  mentionMembers,
+  currentUserId,
+  isMentionMembersLoading = false,
+
   isUploadingAttachment,
   isUploadingVoice,
+
   onCancelReply,
   onFocus,
   onTypingChange,
+
   onSendText,
   onSendVoice,
   onSendAttachment,
@@ -230,6 +271,19 @@ const ChatComposer = ({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const [isSending, setIsSending] = useState(false);
+
+  const inputRef = useRef<TextInput>(null);
+
+  const selectionRef = useRef({
+    start: 0,
+    end: 0,
+  });
+
+  const [selectedMentions, setSelectedMentions] = useState<ChatMention[]>([]);
+
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
 
   const {
     isRecording,
@@ -245,9 +299,144 @@ const ChatComposer = ({
   const showError = (title: string, error: unknown) => {
     Alert.alert(
       title,
-
       error instanceof Error ? error.message : 'Something went wrong. Please try again.'
     );
+  };
+
+  const closeMentionSuggestions = () => {
+    setMentionQuery(null);
+    setMentionStart(null);
+  };
+
+  const updateMentionSearch = (text: string, cursorPosition: number) => {
+    const textBeforeCursor = text.slice(0, cursorPosition);
+
+    const match = textBeforeCursor.match(/(^|\s)@([^\s@]*)$/);
+
+    if (!match) {
+      setMentionStart(null);
+      setMentionQuery(null);
+      return;
+    }
+
+    const whitespacePrefix = match[1] ?? '';
+
+    const searchText = match[2] ?? '';
+
+    const startIndex = (match.index ?? 0) + whitespacePrefix.length;
+
+    setMentionStart(startIndex);
+    setMentionQuery(searchText);
+  };
+
+  const getValidMentions = (text: string) => {
+    return selectedMentions.filter((mention) => text.includes(`@${mention.displayName}`));
+  };
+
+  const resetComposerText = () => {
+    setMessageText('');
+
+    setSelectedMentions([]);
+
+    selectionRef.current = {
+      start: 0,
+      end: 0,
+    };
+
+    closeMentionSuggestions();
+
+    onTypingChange(false);
+  };
+
+  const handleSelectMention = (member: ChatMentionMember) => {
+    if (mentionStart === null || isBusy) {
+      return;
+    }
+
+    const cursorPosition = Math.max(
+      mentionStart,
+      Math.min(selectionRef.current.start, messageText.length)
+    );
+
+    const mentionText = `@${member.name}`;
+
+    const textBeforeMention = messageText.slice(0, mentionStart);
+
+    const textAfterCursor = messageText.slice(cursorPosition);
+
+    const needsTrailingSpace = !textAfterCursor.startsWith(' ');
+
+    const insertedText = `${mentionText}${needsTrailingSpace ? ' ' : ''}`;
+
+    const updatedText = textBeforeMention + insertedText + textAfterCursor;
+
+    if (updatedText.length > MAX_MESSAGE_LENGTH) {
+      Alert.alert('Message too long', `Messages cannot exceed ${MAX_MESSAGE_LENGTH} characters.`);
+
+      return;
+    }
+
+    const newCursorPosition = textBeforeMention.length + insertedText.length;
+
+    setMessageText(updatedText);
+
+    /*
+     * Mention IDs are stored once even if the
+     * same person is selected more than once.
+     */
+    setSelectedMentions((currentMentions) => {
+      const withoutDuplicate = currentMentions.filter(
+        (mention) => mention.userId !== member.userId
+      );
+
+      return [
+        ...withoutDuplicate,
+        {
+          userId: member.userId,
+
+          displayName: member.name,
+        },
+      ];
+    });
+
+    selectionRef.current = {
+      start: newCursorPosition,
+      end: newCursorPosition,
+    };
+
+    requestAnimationFrame(() => {
+      inputRef.current?.setNativeProps({
+        selection: selectionRef.current,
+      });
+    });
+
+    closeMentionSuggestions();
+
+    onTypingChange(true);
+  };
+
+  const handleMessageTextChange = (text: string) => {
+    const difference = text.length - messageText.length;
+
+    const nextCursorPosition = Math.max(
+      0,
+      Math.min(text.length, selectionRef.current.start + difference)
+    );
+
+    setMessageText(text);
+
+    selectionRef.current = {
+      start: nextCursorPosition,
+      end: nextCursorPosition,
+    };
+
+    setSelectedMentions((currentMentions) =>
+      currentMentions.filter((mention) => text.includes(`@${mention.displayName}`))
+    );
+
+    updateMentionSearch(text, nextCursorPosition);
+
+    onTypingChange(Boolean(text.trim()));
   };
 
   const handleSendText = async () => {
@@ -260,10 +449,13 @@ const ChatComposer = ({
     setIsSending(true);
 
     try {
-      const sent = await onSendText(cleanText);
+      const validMentions = getValidMentions(cleanText);
+
+      const sent = await onSendText(cleanText, validMentions);
 
       if (sent) {
-        setMessageText('');
+        resetComposerText();
+
         setAttachmentMenuOpen(false);
       }
     } catch (error) {
@@ -280,16 +472,21 @@ const ChatComposer = ({
 
     const cleanText = messageText.trim();
 
+    const validMentions = cleanText ? getValidMentions(cleanText) : [];
+
     setAttachmentError(null);
     setIsSending(true);
 
     try {
-      const sent = await onSendAttachment(pendingAttachment, cleanText || undefined);
+      const sent = await onSendAttachment(pendingAttachment, cleanText || undefined, validMentions);
 
       if (sent) {
         setPendingAttachment(null);
-        setMessageText('');
+
+        resetComposerText();
+
         setAttachmentMenuOpen(false);
+
         setAttachmentError(null);
       } else {
         setAttachmentError('Upload failed. Tap Send to retry.');
@@ -304,8 +501,11 @@ const ChatComposer = ({
   };
 
   const handlePrimarySend = async () => {
+    closeMentionSuggestions();
+
     if (pendingAttachment) {
       await handleSendPendingAttachment();
+
       return;
     }
 
@@ -317,8 +517,11 @@ const ChatComposer = ({
       return;
     }
 
+    closeMentionSuggestions();
+
     if (!isRecording) {
       setAttachmentMenuOpen(false);
+
       onTypingChange(false);
 
       try {
@@ -378,6 +581,8 @@ const ChatComposer = ({
 
     setAttachmentMenuOpen(false);
 
+    closeMentionSuggestions();
+
     try {
       const hasPermission = await requestPickerPermission(option.source);
 
@@ -392,8 +597,11 @@ const ChatComposer = ({
             : ImagePicker.MediaTypeOptions.Images,
 
         allowsEditing: false,
+
         allowsMultipleSelection: false,
+
         quality: 0.85,
+
         videoMaxDuration: 60,
       };
 
@@ -425,6 +633,7 @@ const ChatComposer = ({
         id: asset.assetId ?? `local-attachment-${Date.now()}`,
 
         type: selectedType,
+
         uri: asset.uri,
 
         name: asset.fileName ?? defaultFileName,
@@ -442,13 +651,10 @@ const ChatComposer = ({
     }
   };
 
-  const handleMessageTextChange = (text: string) => {
-    setMessageText(text);
-
-    onTypingChange(Boolean(text.trim()));
-  };
-
   const hasSendableContent = Boolean(messageText.trim() || pendingAttachment);
+
+  const showMentionSuggestions =
+    mentionStart !== null && !attachmentMenuOpen && !isBusy && !isRecording && !isUploadingVoice;
 
   return (
     <View className="border-t border-[#EFE8E3] bg-white">
@@ -529,15 +735,29 @@ const ChatComposer = ({
           errorMessage={attachmentError}
           onChange={() => {
             setAttachmentError(null);
+
+            closeMentionSuggestions();
+
             setAttachmentMenuOpen(true);
           }}
           onRemove={() => {
             setPendingAttachment(null);
+
             setAttachmentMenuOpen(false);
+
             setAttachmentError(null);
           }}
         />
       ) : null}
+
+      <MentionSuggestions
+        visible={showMentionSuggestions}
+        query={mentionQuery ?? ''}
+        members={mentionMembers}
+        currentUserId={currentUserId}
+        isLoading={isMentionMembersLoading}
+        onSelect={handleSelectMention}
+      />
 
       <View className="flex-row items-end px-3 pb-2 pt-2">
         {isUploadingVoice ? (
@@ -573,7 +793,11 @@ const ChatComposer = ({
             <TouchableOpacity
               activeOpacity={0.75}
               disabled={isBusy}
-              onPress={() => setAttachmentMenuOpen((current) => !current)}
+              onPress={() => {
+                closeMentionSuggestions();
+
+                setAttachmentMenuOpen((current) => !current);
+              }}
               accessibilityRole="button"
               accessibilityLabel={
                 attachmentMenuOpen ? 'Close attachment menu' : 'Open attachment menu'
@@ -591,15 +815,26 @@ const ChatComposer = ({
 
             <View className="min-h-11 flex-1 flex-row items-end rounded-[23px] border border-[#DDD7D3] bg-white pl-4 pr-1.5">
               <TextInput
+                ref={inputRef}
                 value={messageText}
                 editable={!isBusy}
                 onChangeText={handleMessageTextChange}
-                onBlur={() => onTypingChange(false)}
+                onSelectionChange={(event) => {
+                  const nextSelection = event.nativeEvent.selection;
+
+                  selectionRef.current = nextSelection;
+
+                  updateMentionSearch(messageText, nextSelection.start);
+                }}
                 placeholder={`Message ${groupName}`}
                 placeholderTextColor="#8A8A8A"
                 multiline
                 maxLength={2000}
-                onFocus={onFocus}
+                onFocus={() => {
+                  onFocus();
+
+                  updateMentionSearch(messageText, selectionRef.current.start);
+                }}
                 className="max-h-28 min-h-11 flex-1 py-3 font-body text-[15px] text-[#242424]"
                 selectionColor="#F76B1C"
               />
@@ -681,26 +916,35 @@ const styles = StyleSheet.create({
     },
 
     shadowOpacity: 0.28,
+
     shadowRadius: 7,
+
     elevation: 5,
   },
 
   previewThumbnail: {
     width: '100%',
+
     height: '100%',
+
     position: 'relative',
+
     backgroundColor: '#000000',
   },
 
   previewMedia: {
     width: '100%',
+
     height: '100%',
   },
 
   previewUploadOverlay: {
     ...StyleSheet.absoluteFillObject,
+
     alignItems: 'center',
+
     justifyContent: 'center',
+
     backgroundColor: 'rgba(0, 0, 0, 0.48)',
   },
 });
