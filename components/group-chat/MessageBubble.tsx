@@ -1,11 +1,12 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+
 import { Avatar } from '~/components/group-chat/Avatar';
 import MessageContent from '~/components/group-chat/MessageContent';
 import MessageReactions from '~/components/group-chat/MessageReactions';
+import SeenByModal from '~/components/group-chat/SeenByModal';
 import { Text } from '~/components/ui/text';
 import type { ChatMessage } from '~/types/chat';
-import SeenByModal from '~/components/group-chat/SeenByModal';
 
 type MessageBubbleProps = {
   message: ChatMessage;
@@ -13,6 +14,7 @@ type MessageBubbleProps = {
   isVoicePlaying: boolean;
   showSeenReceipt?: boolean;
   canPin?: boolean;
+  isHighlighted?: boolean;
 
   onToggleActions: () => void;
   onCloseActions: () => void;
@@ -20,6 +22,7 @@ type MessageBubbleProps = {
   onReply: () => void;
   onReact: (emoji: string) => void;
   onTogglePin: () => void;
+  onPressReplyPreview: () => void;
 };
 const MAX_VISIBLE_SEEN_AVATARS = 3;
 
@@ -29,14 +32,18 @@ const MessageBubble = ({
   isVoicePlaying,
   showSeenReceipt = false,
   canPin = false,
+  isHighlighted = false,
   onToggleActions,
   onCloseActions,
   onToggleVoice,
   onReply,
   onReact,
   onTogglePin,
+  onPressReplyPreview,
 }: MessageBubbleProps) => {
   const isMine = Boolean(message.isMine);
+
+  const highlightScale = useRef(new Animated.Value(1)).current;
 
   const [seenModalOpen, setSeenModalOpen] = useState(false);
   const seenMembers = message.seenBy ?? [];
@@ -47,8 +54,35 @@ const MessageBubble = ({
 
   const shouldShowSeenReceipt = isMine && showSeenReceipt && seenMembers.length > 0;
 
+  useEffect(() => {
+    if (!isHighlighted) {
+      return;
+    }
+
+    highlightScale.setValue(1);
+
+    Animated.sequence([
+      Animated.timing(highlightScale, {
+        toValue: 1.035,
+        duration: 220,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(highlightScale, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [highlightScale, isHighlighted]);
+
   return (
-    <View className="mb-3 px-4">
+    <Animated.View
+      className="mb-3 px-4"
+      style={{
+        transform: [{ scale: highlightScale }],
+      }}>
       <View
         className="flex-row items-end"
         style={{
@@ -86,6 +120,7 @@ const MessageBubble = ({
               message={message}
               isPlaying={isVoicePlaying}
               onToggleVoice={onToggleVoice}
+              onPressReplyPreview={onPressReplyPreview}
             />
           </Pressable>
 
@@ -163,7 +198,7 @@ const MessageBubble = ({
           setSeenModalOpen(false);
         }}
       />
-    </View>
+    </Animated.View>
   );
 };
 

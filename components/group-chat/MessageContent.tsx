@@ -13,6 +13,7 @@ type MessageContentProps = {
   message: ChatMessage;
   isPlaying: boolean;
   onToggleVoice: () => void;
+  onPressReplyPreview: () => void;
 };
 
 const URL_REGEX = /(?:https?:\/\/|www\.)[^\s<>"']+/i;
@@ -69,7 +70,12 @@ const DeliveryStatus = ({ message }: { message: ChatMessage }) => {
   return <Check size={15} color="#FFE5D7" weight="bold" />;
 };
 
-const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentProps) => {
+const MessageContent = ({
+  message,
+  isPlaying,
+  onToggleVoice,
+  onPressReplyPreview,
+}: MessageContentProps) => {
   const isMine = Boolean(message.isMine);
 
   const { url: detectedUrl, caption } = extractLinkData(message.text);
@@ -88,7 +94,7 @@ const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentPro
     <>
       {message.replyTo ? (
         <View className={hasVisualMedia || hasLink ? 'mb-2' : ''}>
-          <ReplyPreview reply={message.replyTo} isMine={isMine} />
+          <ReplyPreview reply={message.replyTo} isMine={isMine} onPress={onPressReplyPreview} />
         </View>
       ) : null}
 
@@ -108,11 +114,7 @@ const MessageContent = ({ message, isPlaying, onToggleVoice }: MessageContentPro
 
       {displayedText ? (
         <View className={hasContentBeforeText ? (hasVisualMedia ? 'mx-2 mt-2' : 'mt-3') : ''}>
-          <MentionText
-            text={displayedText}
-            mentions={message.mentions ?? []}
-            isMine={isMine}
-          />
+          <MentionText text={displayedText} mentions={message.mentions ?? []} isMine={isMine} />
         </View>
       ) : null}
 

@@ -162,12 +162,21 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
     const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
     const [isNearBottom, setIsNearBottom] = useState(true);
     const [newMessageCount, setNewMessageCount] = useState(0);
+    const [replyScrollRequest, setReplyScrollRequest] = useState<{
+      messageId: string;
+      requestId: number;
+    } | null>(null);
+    const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
     const loadingEarlierRef = useRef(false);
     const isNearBottomRef = useRef(true);
     const previousLatestIdRef = useRef<string | null>(null);
     const initialScrollDoneRef = useRef(false);
     const handledPinnedRequestRef = useRef<number | null>(null);
+    const handledReplyRequestRef = useRef<number | null>(null);
+    const replyRequestIdRef = useRef(0);
+    const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const highlightDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const onMessageVisibleRef = useRef(onMessageVisible);
 
     /*
@@ -184,6 +193,23 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
     const wasNearTopRef = useRef(false);
 
     const rows = useMemo(() => buildRows(messages), [messages]);
+
+    const highlightMessage = useCallback((messageId: string) => {
+      setHighlightedMessageId(null);
+
+      requestAnimationFrame(() => {
+        setHighlightedMessageId(messageId);
+      });
+
+      if (highlightTimerRef.current) {
+        clearTimeout(highlightTimerRef.current);
+      }
+
+      highlightTimerRef.current = setTimeout(() => {
+        setHighlightedMessageId(null);
+        highlightTimerRef.current = null;
+      }, 1800);
+    }, []);
 
     useEffect(() => {
       if (
@@ -206,8 +232,17 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
           internalListRef.current?.scrollToIndex({
             index: rowIndex,
             animated: true,
-            viewPosition: 0.45,
+            viewPosition: 0.5,
           });
+
+          if (highlightDelayRef.current) {
+            clearTimeout(highlightDelayRef.current);
+          }
+
+          highlightDelayRef.current = setTimeout(() => {
+            highlightMessage(pinnedScrollRequest.messageId);
+            highlightDelayRef.current = null;
+          }, 400);
         });
         return;
       }
@@ -217,6 +252,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
       }
     }, [
       canLoadEarlier,
+      highlightMessage,
       isLoading,
       isLoadingMore,
       isSearching,
@@ -224,6 +260,68 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
       pinnedScrollRequest,
       rows,
     ]);
+
+    useEffect(() => {
+      if (
+        !replyScrollRequest ||
+        handledReplyRequestRef.current === replyScrollRequest.requestId ||
+        isLoading ||
+        isLoadingMore
+      ) {
+        return;
+      }
+
+      const rowIndex = rows.findIndex(
+        (row) => row.type === 'message' && row.message.id === replyScrollRequest.messageId
+      );
+
+      if (rowIndex >= 0) {
+        handledReplyRequestRef.current = replyScrollRequest.requestId;
+
+        requestAnimationFrame(() => {
+          internalListRef.current?.scrollToIndex({
+            index: rowIndex,
+            animated: true,
+            viewPosition: 0.5,
+          });
+
+          if (highlightDelayRef.current) {
+            clearTimeout(highlightDelayRef.current);
+          }
+
+          highlightDelayRef.current = setTimeout(() => {
+            highlightMessage(replyScrollRequest.messageId);
+            highlightDelayRef.current = null;
+          }, 400);
+        });
+        return;
+      }
+
+      if (canLoadEarlier && !isSearching) {
+        onLoadEarlier();
+      }
+    }, [
+      canLoadEarlier,
+      highlightMessage,
+      isLoading,
+      isLoadingMore,
+      isSearching,
+      onLoadEarlier,
+      replyScrollRequest,
+      rows,
+    ]);
+
+    useEffect(() => {
+      return () => {
+        if (highlightTimerRef.current) {
+          clearTimeout(highlightTimerRef.current);
+        }
+
+        if (highlightDelayRef.current) {
+          clearTimeout(highlightDelayRef.current);
+        }
+      };
+    }, []);
 
     const latestOwnMessageId = useMemo(() => {
       for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -418,6 +516,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
             isVoicePlaying={playingVoiceId === message.id}
             showSeenReceipt={message.id === latestOwnMessageId}
             canPin={canPinMessages}
+            isHighlighted={highlightedMessageId === message.id}
             onToggleActions={() => {
               setActionMessageId((current) => (current === message.id ? null : message.id));
             }}
@@ -440,12 +539,25 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
               onTogglePin(message);
               setActionMessageId(null);
             }}
+            onPressReplyPreview={() => {
+              if (!message.replyTo) {
+                return;
+              }
+
+              replyRequestIdRef.current += 1;
+              setReplyScrollRequest({
+                messageId: message.replyTo.messageId,
+                requestId: replyRequestIdRef.current,
+              });
+              setActionMessageId(null);
+            }}
           />
         );
       },
       [
         actionMessageId,
         canPinMessages,
+        highlightedMessageId,
         latestOwnMessageId,
         onReact,
         onReply,
