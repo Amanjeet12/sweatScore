@@ -15,6 +15,7 @@ type MessageBubbleProps = {
   showSeenReceipt?: boolean;
   canPin?: boolean;
   isHighlighted?: boolean;
+  readOnly?: boolean;
 
   onToggleActions: () => void;
   onCloseActions: () => void;
@@ -33,6 +34,8 @@ const MessageBubble = ({
   showSeenReceipt = false,
   canPin = false,
   isHighlighted = false,
+  readOnly = false,
+
   onToggleActions,
   onCloseActions,
   onToggleVoice,
@@ -107,10 +110,12 @@ const MessageBubble = ({
           ) : null}
 
           <Pressable
-            onLongPress={onToggleActions}
+            onLongPress={readOnly ? undefined : onToggleActions}
             delayLongPress={250}
             accessibilityRole="button"
-            accessibilityHint="Long press for reactions and reply"
+            accessibilityHint={
+              readOnly ? 'Read-only group message' : 'Long press for reactions and reply'
+            }
             style={[
               styles.messageBubble,
 
@@ -127,8 +132,9 @@ const MessageBubble = ({
           <MessageReactions
             reactions={message.reactions}
             actionOpen={actionOpen}
-            canShowSeen={isMine && seenMembers.length > 0}
-            canPin={canPin}
+            readOnly={readOnly}
+            canShowSeen={!readOnly && isMine && seenMembers.length > 0}
+            canPin={!readOnly && canPin}
             isPinned={Boolean(message.isPinned)}
             seenCount={seenMembers.length}
             onCloseActions={onCloseActions}

@@ -1,9 +1,16 @@
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ChatComposer from '~/components/group-chat/ChatComposer';
 import ChatHeader from '~/components/group-chat/ChatHeader';
@@ -22,6 +29,7 @@ import type {
   ChatMention,
   ChatMentionMember,
 } from '~/types/chat';
+import { Text } from '~/components/ui/text';
 
 export default function GroupChatScreen() {
   const params = useLocalSearchParams<{
@@ -98,10 +106,6 @@ export default function GroupChatScreen() {
    * - seen-by members
    * - message read updates
    */
-  const { messages, typingUsers, setTyping, markMessageRead } = useChatPresence(
-    groupId,
-    originalMessages
-  );
 
   const typedGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
 
@@ -115,10 +119,18 @@ export default function GroupChatScreen() {
       : 'skip'
   );
 
+  const isMember = group?.isMember === true;
+
+  const { messages, typingUsers, setTyping, markMessageRead } = useChatPresence(
+    groupId,
+    originalMessages,
+    isMember
+  );
+
   const mentionMembersResult = useQuery(
     api.chat.groupInfo.listMentionableMembers,
 
-    typedGroupId
+    typedGroupId && isMember
       ? {
           groupId: typedGroupId,
         }
@@ -138,6 +150,32 @@ export default function GroupChatScreen() {
 
     [mentionMembersResult]
   );
+
+  const joinGroupMutation = useMutation(api.chat.groups.joinGroup);
+
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+
+  const handleJoinGroup = useCallback(async () => {
+    if (!typedGroupId || isJoiningGroup) {
+      return;
+    }
+
+    setIsJoiningGroup(true);
+
+    try {
+      await joinGroupMutation({
+        groupId: typedGroupId,
+      });
+    } catch (error) {
+      Alert.alert(
+        'Unable to join group',
+
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+    } finally {
+      setIsJoiningGroup(false);
+    }
+  }, [isJoiningGroup, joinGroupMutation, typedGroupId]);
 
   const shouldScrollForKeyboard = useCallback(() => {
     return isNearBottomRef.current;
@@ -390,6 +428,7 @@ export default function GroupChatScreen() {
             typingLabel={typingLabel}
             searchOpen={searchOpen}
             searchText={searchText}
+            showInfoButton={group?.isMember === true}
             onBack={() => router.back()}
             onOpenSearch={() => setSearchOpen(true)}
             onOpenInfo={openGroupInfo}
@@ -419,38 +458,96 @@ export default function GroupChatScreen() {
             <MessageList
               ref={listRef}
               messages={visibleMessages}
+              readOnly={!isMember}
               isLoading={isLoading}
               isLoadingMore={isLoadingMore}
               canLoadEarlier={canLoadEarlier}
               isSearching={Boolean(searchText.trim())}
-              canPinMessages={canPinMessages && !isUpdatingPin}
+              canPinMessages={isMember && canPinMessages && !isUpdatingPin}
               pinnedScrollRequest={pinnedScrollRequest}
               onLoadEarlier={loadEarlier}
-              onReply={setReplyingTo}
-              onReact={reactToMessage}
-              onTogglePin={(message) => void handleTogglePin(message)}
-              onMessageVisible={markMessageRead}
+              onReply={(message) => {
+                if (isMember) {
+                  setReplyingTo(message);
+                }
+              }}
+              onReact={(messageId, emoji) => {
+                if (isMember) {
+                  reactToMessage(messageId, emoji);
+                }
+              }}
+              onTogglePin={(message) => {
+                if (isMember) {
+                  void handleTogglePin(message);
+                }
+              }}
+              onMessageVisible={isMember ? markMessageRead : undefined}
               onNearBottomChange={(nearBottom) => {
                 isNearBottomRef.current = nearBottom;
               }}
             />
           </View>
 
-          <ChatComposer
-            groupName={group?.name ?? 'Group Chat'}
-            replyingTo={replyingTo}
-            mentionMembers={mentionMembers}
-            currentUserId={currentUser?._id ? String(currentUser._id) : undefined}
-            isMentionMembersLoading={mentionMembersResult === undefined}
-            isUploadingAttachment={isUploadingAttachment}
-            isUploadingVoice={isUploadingVoice}
-            onCancelReply={() => setReplyingTo(null)}
-            onFocus={handleComposerFocus}
-            onTypingChange={setTyping}
-            onSendText={handleSendText}
-            onSendVoice={handleSendVoice}
-            onSendAttachment={handleSendAttachment}
-          />
+          {group === undefined ? (
+            <View className="border-t border-[#EEE7E2] bg-white px-4 py-5">
+              <ActivityIndicator size="small" color="#F76B1C" />
+            </View>
+          ) : group.isMember ? (
+            <ChatComposer
+              groupName={group.name}
+              replyingTo={replyingTo}
+              mentionMembers={mentionMembers}
+              currentUserId={currentUser?._id ? String(currentUser._id) : undefined}
+              isMentionMembersLoading={mentionMembersResult === undefined}
+              isUploadingAttachment={isUploadingAttachment}
+              isUploadingVoice={isUploadingVoice}
+              onCancelReply={() => setReplyingTo(null)}
+              onFocus={handleComposerFocus}
+              onTypingChange={setTyping}
+              onSendText={handleSendText}
+              onSendVoice={handleSendVoice}
+              onSendAttachment={handleSendAttachment}
+            />
+          ) : (
+            <View className="border-t border-[#EEE7E2] bg-white px-4 pb-4 pt-3">
+              {group.isRestricted ? (
+                <View className="rounded-2xl bg-[#FFF1F1] px-4 py-4">
+                  <Text className="text-center font-heading text-base font-bold text-[#B42318]">
+                    Group access restricted
+                  </Text>
+
+                  <Text className="mt-1 text-center font-body text-sm leading-5 text-[#7A514E]">
+                    You were removed from this group and cannot rejoin.
+                  </Text>
+                </View>
+              ) : (
+                <View className="rounded-2xl border border-[#F4D7C6] bg-[#FFF7F2] px-4 py-4">
+                  <Text className="text-center font-heading text-base font-bold text-[#1A1A1A]">
+                    Join this group to participate
+                  </Text>
+
+                  <Text className="mt-1 text-center font-body text-sm leading-5 text-[#716A65]">
+                    You can read messages, but you must join before sending, replying, reacting or
+                    tagging members.
+                  </Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    disabled={isJoiningGroup}
+                    onPress={() => {
+                      void handleJoinGroup();
+                    }}
+                    className="mt-4 h-12 items-center justify-center rounded-full bg-[#F76B1C]">
+                    {isJoiningGroup ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text className="font-heading text-sm font-bold text-white">Join Group</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
         </KeyboardAvoidingView>
       </View>
     </SafeAreaView>

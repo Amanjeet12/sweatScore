@@ -16,8 +16,13 @@ const READ_UPDATE_THROTTLE_MS = 1500;
 
 const DELIVERY_UPDATE_THROTTLE_MS = 1000;
 
-export const useChatPresence = (groupId: string | undefined, originalMessages: ChatMessage[]) => {
-  const convexGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
+export const useChatPresence = (
+  groupId: string | undefined,
+  originalMessages: ChatMessage[],
+  enabled = true
+) => {
+  
+  const convexGroupId = enabled && groupId ? (groupId as Id<'chatGroups'>) : undefined;
 
   const presence = useQuery(
     api.chat.presence.getGroupPresence,

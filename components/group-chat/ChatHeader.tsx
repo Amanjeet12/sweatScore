@@ -1,15 +1,6 @@
 import { Image } from 'expo-image';
-import {
-  ArrowLeft,
-  Info,
-  MagnifyingGlass,
-  X,
-} from 'phosphor-react-native';
-import {
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ArrowLeft, Info, MagnifyingGlass, X } from 'phosphor-react-native';
+import { TextInput, TouchableOpacity, View } from 'react-native';
 
 import TypingIndicator from '~/components/group-chat/TypingIndicator';
 import { Text } from '~/components/ui/text';
@@ -21,13 +12,14 @@ type ChatHeaderProps = {
   typingLabel?: string;
   searchOpen: boolean;
   searchText: string;
+
+  showInfoButton?: boolean;
+
   onBack: () => void;
   onOpenSearch: () => void;
   onOpenInfo: () => void;
   onCloseSearch: () => void;
-  onChangeSearch: (
-    text: string,
-  ) => void;
+  onChangeSearch: (text: string) => void;
 };
 
 const ChatHeader = ({
@@ -37,17 +29,16 @@ const ChatHeader = ({
   typingLabel,
   searchOpen,
   searchText,
+
+  showInfoButton = true,
+
   onBack,
   onOpenSearch,
   onOpenInfo,
   onCloseSearch,
   onChangeSearch,
 }: ChatHeaderProps) => {
-  const groupInitial =
-    groupName
-      .trim()
-      .charAt(0)
-      .toUpperCase() || 'G';
+  const groupInitial = groupName.trim().charAt(0).toUpperCase() || 'G';
 
   if (searchOpen) {
     return (
@@ -59,26 +50,16 @@ const ChatHeader = ({
             accessibilityRole="button"
             accessibilityLabel="Close message search"
             className="mr-2 h-10 w-10 items-center justify-center">
-            <ArrowLeft
-              size={24}
-              color="#1E1E1E"
-              weight="bold"
-            />
+            <ArrowLeft size={24} color="#1E1E1E" weight="bold" />
           </TouchableOpacity>
 
           <View className="h-11 flex-1 flex-row items-center rounded-full bg-[#F5F3F1] px-4">
-            <MagnifyingGlass
-              size={19}
-              color="#777777"
-              weight="bold"
-            />
+            <MagnifyingGlass size={19} color="#777777" weight="bold" />
 
             <TextInput
               autoFocus
               value={searchText}
-              onChangeText={
-                onChangeSearch
-              }
+              onChangeText={onChangeSearch}
               placeholder="Search messages"
               placeholderTextColor="#929292"
               className="ml-2 flex-1 font-body text-[15px] text-[#232323]"
@@ -89,17 +70,11 @@ const ChatHeader = ({
             {searchText ? (
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() =>
-                  onChangeSearch('')
-                }
+                onPress={() => onChangeSearch('')}
                 accessibilityRole="button"
                 accessibilityLabel="Clear message search"
                 className="h-7 w-7 items-center justify-center">
-                <X
-                  size={17}
-                  color="#6F6F6F"
-                  weight="bold"
-                />
+                <X size={17} color="#6F6F6F" weight="bold" />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -117,11 +92,7 @@ const ChatHeader = ({
           accessibilityRole="button"
           accessibilityLabel="Go back"
           className="mr-1 h-10 w-10 items-center justify-center">
-          <ArrowLeft
-            size={25}
-            color="#171717"
-            weight="bold"
-          />
+          <ArrowLeft size={25} color="#171717" weight="bold" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -144,9 +115,7 @@ const ChatHeader = ({
             />
           ) : (
             <View className="h-full w-full items-center justify-center bg-[#F76B1C]">
-              <Text className="text-lg font-bold text-white">
-                {groupInitial}
-              </Text>
+              <Text className="text-lg font-bold text-white">{groupInitial}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -166,11 +135,7 @@ const ChatHeader = ({
 
           <TypingIndicator
             label={typingLabel}
-            fallbackText={`${memberCount} ${
-              memberCount === 1
-                ? 'member'
-                : 'members'
-            }`}
+            fallbackText={`${memberCount} ${memberCount === 1 ? 'member' : 'members'}`}
           />
         </TouchableOpacity>
 
@@ -180,25 +145,19 @@ const ChatHeader = ({
           accessibilityRole="button"
           accessibilityLabel="Search messages"
           className="h-10 w-10 items-center justify-center">
-          <MagnifyingGlass
-            size={22}
-            color="#1D1D1D"
-            weight="bold"
-          />
+          <MagnifyingGlass size={22} color="#1D1D1D" weight="bold" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onOpenInfo}
-          accessibilityRole="button"
-          accessibilityLabel="Group information"
-          className="ml-1 h-10 w-10 items-center justify-center">
-          <Info
-            size={24}
-            color="#1D1D1D"
-            weight="bold"
-          />
-        </TouchableOpacity>
+        {showInfoButton ? (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onOpenInfo}
+            accessibilityRole="button"
+            accessibilityLabel="Group information"
+            className="ml-1 h-10 w-10 items-center justify-center">
+            <Info size={24} color="#1D1D1D" weight="bold" />
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

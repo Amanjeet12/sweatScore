@@ -1,9 +1,8 @@
 import { ConvexError, v } from 'convex/values';
 import type { Doc, Id } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
-import { requireCurrentUser, requireGroupMember } from './helpers';
+import { requireCurrentUser, requireGroupMember, getGroupMembership } from './helpers';
 import { anyApi, paginationOptsValidator } from 'convex/server';
-
 import type { MutationCtx } from '../_generated/server';
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -113,8 +112,6 @@ export const listMessages = query({
 
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
-
-    await requireGroupMember(ctx, args.groupId, currentUser._id);
 
     const group = await ctx.db.get(args.groupId);
 
@@ -846,16 +843,18 @@ export const getPinnedMessage = query({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    const membership = await requireGroupMember(ctx, args.groupId, currentUser._id);
-
     const group = await ctx.db.get(args.groupId);
 
     if (!group || !group.isActive) {
       throw new ConvexError('Group not found');
     }
 
+    const membership = await getGroupMembership(ctx, group._id, currentUser._id);
+
     const canPinMessages =
-      currentUser.isAdmin === true || membership.role === 'owner' || membership.role === 'admin';
+      currentUser.isAdmin === true ||
+      (membership?.status === 'active' &&
+        (membership.role === 'owner' || membership.role === 'admin'));
 
     if (!group.pinnedMessageId) {
       return {
@@ -866,11 +865,7 @@ export const getPinnedMessage = query({
 
     const message = await ctx.db.get(group.pinnedMessageId);
 
-    /*
-     * Ignore invalid, deleted, or cross-group
-     * pinned message references.
-     */
-    if (!message || message.deletedAt || String(message.groupId) !== String(args.groupId)) {
+    if (!message || message.deletedAt || String(message.groupId) !== String(group._id)) {
       return {
         message: null,
         canPinMessages,

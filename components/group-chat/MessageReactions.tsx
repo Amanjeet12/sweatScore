@@ -12,6 +12,7 @@ type MessageReactionsProps = {
   canPin?: boolean;
   isPinned?: boolean;
   seenCount?: number;
+  readOnly?: boolean;
 
   onReact: (emoji: string) => void;
   onReply: () => void;
@@ -27,6 +28,8 @@ const MessageReactions = ({
   canPin = false,
   isPinned = false,
   seenCount = 0,
+  readOnly = false,
+
   onReact,
   onReply,
   onShowSeen,
@@ -63,6 +66,7 @@ const MessageReactions = ({
             <TouchableOpacity
               key={reaction.emoji}
               activeOpacity={0.75}
+              disabled={readOnly}
               onPress={() => onReact(reaction.emoji)}
               className="mr-1 flex-row items-center">
               <Text className="text-sm">{reaction.emoji}</Text>
@@ -80,7 +84,7 @@ const MessageReactions = ({
       ) : null}
 
       <Modal
-        visible={actionOpen}
+        visible={!readOnly && actionOpen}
         transparent
         animationType="fade"
         statusBarTranslucent

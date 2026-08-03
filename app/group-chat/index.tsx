@@ -1,32 +1,42 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
-import { useQuery } from 'convex/react';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = {
   primary: '#F76B1C',
   primaryLight: '#FFF0E7',
+
   background: '#FAF8F6',
   white: '#FFFFFF',
+
   text: '#1A1A1A',
+
   secondaryText: '#77716D',
   mutedText: '#A09A96',
+
   border: '#EDE7E2',
+
+  joined: '#36A269',
+  joinedLight: '#EAF8EF',
+
+  restricted: '#D14343',
+  restrictedLight: '#FFF0F0',
 };
 
 function isSameDate(first: Date, second: Date) {
@@ -43,6 +53,7 @@ function formatMessageTime(timestamp: number | null) {
   }
 
   const date = new Date(timestamp);
+
   const today = new Date();
 
   if (isSameDate(date, today)) {
@@ -53,6 +64,7 @@ function formatMessageTime(timestamp: number | null) {
   }
 
   const yesterday = new Date(today);
+
   yesterday.setDate(today.getDate() - 1);
 
   if (isSameDate(date, yesterday)) {
@@ -66,8 +78,10 @@ function formatMessageTime(timestamp: number | null) {
 }
 
 export default function GroupListScreen() {
-  const groups = useQuery(api.chat.groups.listMyGroups);
+  const groups = useQuery(api.chat.groups.listAvailableGroups);
+
   const [searchText, setSearchText] = useState('');
+
   const insets = useSafeAreaInsets();
 
   const filteredGroups = useMemo(() => {
@@ -84,9 +98,14 @@ export default function GroupListScreen() {
     return groups.filter((group) => group.name.toLowerCase().includes(search));
   }, [groups, searchText]);
 
+  const joinedGroupCount = useMemo(() => {
+    return groups?.filter((group) => group.isMember).length ?? 0;
+  }, [groups]);
+
   const openGroup = (groupId: string) => {
     router.push({
       pathname: '/group-chat/[groupId]',
+
       params: {
         groupId,
       },
@@ -95,7 +114,11 @@ export default function GroupListScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#FAF8F6]">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
 
       {/* Header */}
       <View
@@ -114,10 +137,10 @@ export default function GroupListScreen() {
           </TouchableOpacity>
 
           <View className="ml-3 flex-1">
-            <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">My Groups</Text>
+            <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Groups</Text>
 
             <Text className="mt-0.5 text-sm text-[#77716D]">
-              Stay connected with your community
+              View messages and join communities
             </Text>
           </View>
 
@@ -133,10 +156,12 @@ export default function GroupListScreen() {
             </View>
 
             <View className="ml-3 flex-1">
-              <Text className="font-lsBold text-base text-[#1A1A1A]">Your communities</Text>
+              <Text className="font-lsBold text-base text-[#1A1A1A]">Available communities</Text>
 
               <Text className="mt-0.5 text-xs text-[#77716D]">
-                {groups.length} {groups.length === 1 ? 'active group' : 'active groups'}
+                {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+                {' · '}
+                {joinedGroupCount} joined
               </Text>
             </View>
           </View>
@@ -152,7 +177,7 @@ export default function GroupListScreen() {
             <TextInput
               value={searchText}
               onChangeText={setSearchText}
-              placeholder="Search your groups"
+              placeholder="Search all groups"
               placeholderTextColor={COLORS.mutedText}
               className="ml-3 flex-1 text-base text-[#1A1A1A]"
               returnKeyType="search"
@@ -170,14 +195,13 @@ export default function GroupListScreen() {
         </View>
       ) : null}
 
-      {/* Loading */}
       {groups === undefined ? (
         <View className="flex-1 items-center justify-center">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-[#FFF0E7]">
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
 
-          <Text className="mt-4 text-base text-[#77716D]">Loading your groups...</Text>
+          <Text className="mt-4 text-base text-[#77716D]">Loading groups...</Text>
         </View>
       ) : (
         <FlatList
@@ -187,63 +211,120 @@ export default function GroupListScreen() {
           contentContainerStyle={
             filteredGroups.length === 0 ? styles.emptyList : styles.listContent
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              activeOpacity={0.78}
-              onPress={() => openGroup(String(item._id))}
-              style={styles.groupCard}>
-              {/* Group image */}
-              <View>
-                {item.imageUrl ? (
-                  <Image
-                    source={{ uri: item.imageUrl }}
-                    contentFit="cover"
-                    transition={180}
-                    style={styles.groupImage}
-                  />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Ionicons name="people" size={29} color={COLORS.primary} />
+          renderItem={({ item }) => {
+            const isMember = item.isMember === true;
+
+            const isRestricted = item.isRestricted === true;
+
+            const hasUnread = isMember && (item.hasUnread === true || item.unreadCount > 0);
+
+            return (
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => openGroup(String(item._id))}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.name}`}
+                style={styles.groupCard}>
+                {/* Group image */}
+                <View style={styles.imageContainer}>
+                  {item.imageUrl ? (
+                    <Image
+                      source={{
+                        uri: item.imageUrl,
+                      }}
+                      contentFit="cover"
+                      transition={180}
+                      style={styles.groupImage}
+                    />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="people" size={29} color={COLORS.primary} />
+                    </View>
+                  )}
+
+                  <View
+                    style={[
+                      styles.groupStatus,
+
+                      isMember
+                        ? styles.joinedStatus
+                        : isRestricted
+                          ? styles.restrictedStatus
+                          : styles.availableStatus,
+                    ]}>
+                    <Ionicons
+                      name={isMember ? 'checkmark' : isRestricted ? 'lock-closed' : 'add'}
+                      size={10}
+                      color="#FFFFFF"
+                    />
                   </View>
-                )}
 
-                <View style={styles.groupStatus} />
-              </View>
-
-              {/* Group information */}
-              <View className="ml-4 flex-1">
-                <View className="flex-row items-center">
-                  <Text numberOfLines={1} className="font-lsBold flex-1 text-lg text-[#1A1A1A]">
-                    {item.name}
-                  </Text>
-
-                  {item.lastMessageAt ? (
-                    <Text className="ml-2 text-xs text-[#A09A96]">
-                      {formatMessageTime(item.lastMessageAt)}
-                    </Text>
+                  {hasUnread ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadText}>1+</Text>
+                    </View>
                   ) : null}
                 </View>
 
-                <Text numberOfLines={1} className="mt-1 text-sm text-[#77716D]">
-                  {item.lastMessage || 'No messages yet'}
-                </Text>
-
-                <View className="mt-2.5 flex-row items-center">
-                  <View className="flex-row items-center rounded-full bg-[#F7F3F0] px-2.5 py-1">
-                    <Ionicons name="people-outline" size={14} color={COLORS.secondaryText} />
-
-                    <Text className="ml-1 text-xs text-[#77716D]">
-                      {item.memberCount} {item.memberCount === 1 ? 'member' : 'members'}
+                {/* Group information */}
+                <View className="ml-4 flex-1">
+                  <View className="flex-row items-center">
+                    <Text numberOfLines={1} className="font-lsBold flex-1 text-lg text-[#1A1A1A]">
+                      {item.name}
                     </Text>
+
+                    {item.lastMessageAt ? (
+                      <Text className="ml-2 text-xs text-[#A09A96]">
+                        {formatMessageTime(item.lastMessageAt)}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <Text numberOfLines={1} className="mt-1 text-sm text-[#77716D]">
+                    {item.lastMessage || 'No messages yet'}
+                  </Text>
+
+                  <View className="mt-2.5 flex-row items-center">
+                    <View className="flex-row items-center rounded-full bg-[#F7F3F0] px-2.5 py-1">
+                      <Ionicons name="people-outline" size={14} color={COLORS.secondaryText} />
+
+                      <Text className="ml-1 text-xs text-[#77716D]">
+                        {item.memberCount} {item.memberCount === 1 ? 'member' : 'members'}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.membershipBadge,
+
+                        isMember
+                          ? styles.joinedBadge
+                          : isRestricted
+                            ? styles.restrictedBadge
+                            : styles.joinBadge,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.membershipBadgeText,
+
+                          isMember
+                            ? styles.joinedBadgeText
+                            : isRestricted
+                              ? styles.restrictedBadgeText
+                              : styles.joinBadgeText,
+                        ]}>
+                        {isMember ? 'Joined' : isRestricted ? 'Restricted' : 'Tap to join'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-[#FFF0E7]">
-                <Ionicons name="chevron-forward" size={19} color={COLORS.primary} />
-              </View>
-            </TouchableOpacity>
-          )}
+                <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-[#FFF0E7]">
+                  <Ionicons name="chevron-forward" size={19} color={COLORS.primary} />
+                </View>
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center px-8">
               <View className="h-24 w-24 items-center justify-center rounded-full bg-[#FFF0E7]">
@@ -261,7 +342,7 @@ export default function GroupListScreen() {
               <Text className="mt-2 text-center text-base leading-6 text-[#77716D]">
                 {searchText
                   ? 'Try searching with a different group name.'
-                  : 'You have not been added to a chat group yet.'}
+                  : 'There are currently no active groups available.'}
               </Text>
 
               {searchText ? (
@@ -286,51 +367,155 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     paddingTop: 10,
   },
+
   emptyList: {
     flexGrow: 1,
   },
+
   groupCard: {
-    minHeight: 100,
+    minHeight: 108,
     marginBottom: 13,
     padding: 15,
+
     flexDirection: 'row',
     alignItems: 'center',
+
     borderRadius: 22,
+
     borderWidth: 1,
     borderColor: COLORS.border,
+
     backgroundColor: COLORS.white,
+
     shadowColor: '#5E3E2B',
+
     shadowOffset: {
       width: 0,
       height: 4,
     },
+
     shadowOpacity: 0.07,
     shadowRadius: 10,
+
     elevation: 2,
   },
+
+  imageContainer: {
+    position: 'relative',
+  },
+
   groupImage: {
     width: 64,
     height: 64,
     borderRadius: 20,
+
     backgroundColor: COLORS.primaryLight,
   },
+
   imagePlaceholder: {
     width: 64,
     height: 64,
     borderRadius: 20,
+
     alignItems: 'center',
     justifyContent: 'center',
+
     backgroundColor: COLORS.primaryLight,
   },
+
   groupStatus: {
     position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 17,
-    height: 17,
-    borderRadius: 9,
+
+    right: -3,
+    bottom: -3,
+
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
     borderWidth: 3,
     borderColor: COLORS.white,
-    backgroundColor: '#36B37E',
+  },
+
+  joinedStatus: {
+    backgroundColor: COLORS.joined,
+  },
+
+  availableStatus: {
+    backgroundColor: COLORS.primary,
+  },
+
+  restrictedStatus: {
+    backgroundColor: COLORS.restricted,
+  },
+
+  unreadBadge: {
+    position: 'absolute',
+
+    top: -7,
+    right: -8,
+
+    minWidth: 25,
+    height: 23,
+
+    paddingHorizontal: 5,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: 12,
+
+    borderWidth: 2,
+    borderColor: COLORS.white,
+
+    backgroundColor: '#E5484D',
+
+    elevation: 4,
+  },
+
+  unreadText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  membershipBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+
+    borderRadius: 10,
+  },
+
+  joinedBadge: {
+    backgroundColor: COLORS.joinedLight,
+  },
+
+  joinBadge: {
+    backgroundColor: COLORS.primaryLight,
+  },
+
+  restrictedBadge: {
+    backgroundColor: COLORS.restrictedLight,
+  },
+
+  membershipBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  joinedBadgeText: {
+    color: '#27804D',
+  },
+
+  joinBadgeText: {
+    color: COLORS.primary,
+  },
+
+  restrictedBadgeText: {
+    color: COLORS.restricted,
   },
 });

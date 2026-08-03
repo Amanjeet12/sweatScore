@@ -27,12 +27,7 @@ export async function requireGroupMember(
   groupId: Id<'chatGroups'>,
   userId: Id<'users'>
 ) {
-  const membership = await ctx.db
-    .query('chatMembers')
-    .withIndex('by_group_user', (q) =>
-      q.eq('groupId', groupId).eq('userId', userId)
-    )
-    .unique();
+  const membership = await getGroupMembership(ctx, groupId, userId);
 
   if (!membership || membership.status !== 'active') {
     throw new ConvexError('You are not an active member of this group');
@@ -53,4 +48,15 @@ export async function requireGroupAdmin(
   }
 
   return membership;
+}
+
+export async function getGroupMembership(
+  ctx: DatabaseCtx,
+  groupId: Id<'chatGroups'>,
+  userId: Id<'users'>
+) {
+  return await ctx.db
+    .query('chatMembers')
+    .withIndex('by_group_user', (q) => q.eq('groupId', groupId).eq('userId', userId))
+    .unique();
 }

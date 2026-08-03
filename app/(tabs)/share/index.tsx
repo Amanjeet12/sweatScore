@@ -2,7 +2,7 @@ import { LegendList } from '@legendapp/list';
 import { usePaginatedQuery, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Compass, Plus, UsersThree } from 'phosphor-react-native';
+import { Compass, LockSimple, Plus, UsersThree } from 'phosphor-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -37,14 +37,16 @@ const TabShare = () => {
   const { isPro } = useRevenueCat();
 
   /*
-   * Returns the active groups that the
-   * authenticated user has joined.
+   * Returns every active group.
    *
-   * Each group should include:
-   *
-   * unreadCount: number
+   * Expected fields:
+   * - isMember
+   * - isRestricted
+   * - canJoin
+   * - hasUnread
+   * - unreadCount
    */
-  const joinedGroups = useQuery(api.chat.groups.listMyGroups);
+  const availableGroups = useQuery(api.chat.groups.listAvailableGroups);
 
   const pinnedPost = useQuery(api.posts.getPinnedPost);
 
@@ -145,7 +147,7 @@ const TabShare = () => {
         />
 
         <View
-          className="flex-1 flex-col"
+          className="flex-1"
           style={
             Platform.OS === 'android'
               ? {
@@ -162,7 +164,7 @@ const TabShare = () => {
                 </Text>
 
                 <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">
-                  Connect with your groups
+                  Discover and join your groups
                 </Text>
               </View>
 
@@ -176,15 +178,13 @@ const TabShare = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Joined groups */}
+            {/* Available groups */}
             <View className="mt-5">
-              {joinedGroups === undefined ? (
-                <View className="h-[104px] items-center justify-center">
+              {availableGroups === undefined ? (
+                <View className="h-[118px] items-center justify-center">
                   <ActivityIndicator size="small" color="#F76B1C" />
 
-                  <Text className="mt-2 font-body text-xs text-[#77716D]">
-                    Loading your groups…
-                  </Text>
+                  <Text className="mt-2 font-body text-xs text-[#77716D]">Loading groups…</Text>
                 </View>
               ) : (
                 <ScrollView
@@ -192,20 +192,17 @@ const TabShare = () => {
                   showsHorizontalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
                   contentContainerStyle={styles.groupsContent}>
-                  {joinedGroups.map((group) => {
+                  {availableGroups.map((group) => {
                     const groupName = group.name.trim() || 'Group';
 
                     const groupInitial = groupName.charAt(0).toUpperCase();
 
-                    /*
-                     * This fallback keeps the UI
-                     * safe while Convex generated
-                     * types are being refreshed.
-                     */
-                    const unreadCount =
-                      'unreadCount' in group && typeof group.unreadCount === 'number'
-                        ? group.unreadCount
-                        : 0;
+                    const isMember = group.isMember === true;
+
+                    const isRestricted = group.isRestricted === true;
+
+                    const hasUnread =
+                      isMember && (group.hasUnread === true || group.unreadCount > 0);
 
                     return (
                       <TouchableOpacity
@@ -216,7 +213,16 @@ const TabShare = () => {
                         accessibilityLabel={`Open ${groupName}`}
                         style={styles.groupItem}>
                         <View style={styles.groupAvatarContainer}>
-                          <View style={styles.groupAvatarOuter}>
+                          <View
+                            style={[
+                              styles.groupAvatarOuter,
+
+                              isMember
+                                ? styles.joinedAvatarBorder
+                                : isRestricted
+                                  ? styles.restrictedAvatarBorder
+                                  : styles.availableAvatarBorder,
+                            ]}>
                             <View style={styles.groupAvatarInner}>
                               {group.imageUrl ? (
                                 <Image
@@ -241,35 +247,65 @@ const TabShare = () => {
                             </View>
                           </View>
 
-                          {unreadCount > 0 ? (
+                          {hasUnread ? (
                             <View style={styles.unreadBadge}>
                               <Text
                                 className="font-body font-bold text-white"
                                 style={styles.unreadBadgeText}>
-                                {unreadCount > 99 ? '99+' : String(unreadCount)}
+                                1+
                               </Text>
+                            </View>
+                          ) : null}
+
+                          {isRestricted ? (
+                            <View style={styles.restrictedBadge}>
+                              <LockSimple size={11} color="#FFFFFF" weight="bold" />
                             </View>
                           ) : null}
                         </View>
 
                         <Text
                           className="mt-2 text-center font-body text-xs font-semibold text-[#292929]"
-                          numberOfLines={2}>
+                          numberOfLines={1}>
                           {groupName}
                         </Text>
+
+                        <View
+                          style={[
+                            styles.membershipPill,
+
+                            isMember
+                              ? styles.joinedPill
+                              : isRestricted
+                                ? styles.restrictedPill
+                                : styles.joinPill,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.membershipText,
+
+                              isMember
+                                ? styles.joinedText
+                                : isRestricted
+                                  ? styles.restrictedText
+                                  : styles.joinText,
+                            ]}>
+                            {isMember ? 'Joined' : isRestricted ? 'Restricted' : 'Join'}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
 
-                  {/* Explore groups */}
+                  {/* Explore all groups */}
                   <TouchableOpacity
                     activeOpacity={0.75}
                     onPress={openGroupsScreen}
                     accessibilityRole="button"
-                    accessibilityLabel="Explore groups"
+                    accessibilityLabel="Explore all groups"
                     style={styles.groupItem}>
                     <View style={styles.groupAvatarContainer}>
-                      <View style={styles.groupAvatarOuter}>
+                      <View style={[styles.groupAvatarOuter, styles.availableAvatarBorder]}>
                         <View style={styles.groupAvatarInner}>
                           <Compass size={31} color="#725C50" weight="regular" />
 
@@ -282,9 +318,13 @@ const TabShare = () => {
 
                     <Text
                       className="mt-2 text-center font-body text-xs font-semibold text-[#292929]"
-                      numberOfLines={2}>
-                      Explore Groups
+                      numberOfLines={1}>
+                      Explore
                     </Text>
+
+                    <View style={[styles.membershipPill, styles.joinPill]}>
+                      <Text style={[styles.membershipText, styles.joinText]}>View all</Text>
+                    </View>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -294,7 +334,7 @@ const TabShare = () => {
           {status === 'LoadingFirstPage' ? (
             <ScreenLoading className="bg-transparent" />
           ) : (
-            <View className="flex-1 flex-col bg-white">
+            <View className="flex-1 bg-white">
               <LegendList
                 showsVerticalScrollIndicator={false}
                 data={results}
@@ -341,9 +381,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     borderWidth: 2,
-    borderColor: '#B04483',
 
     backgroundColor: '#FFFFFF',
+  },
+
+  joinedAvatarBorder: {
+    borderColor: '#36A269',
+  },
+
+  availableAvatarBorder: {
+    borderColor: '#B04483',
+  },
+
+  restrictedAvatarBorder: {
+    borderColor: '#D14343',
   },
 
   groupAvatarInner: {
@@ -389,13 +440,13 @@ const styles = StyleSheet.create({
   unreadBadge: {
     position: 'absolute',
 
-    top: 5,
-    right: -5,
+    top: -2,
+    right: -6,
 
-    minWidth: 22,
+    minWidth: 25,
     height: 22,
 
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
 
     alignItems: 'center',
     justifyContent: 'center',
@@ -421,8 +472,27 @@ const styles = StyleSheet.create({
   },
 
   unreadBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     lineHeight: 12,
+  },
+
+  restrictedBadge: {
+    position: 'absolute',
+
+    right: -4,
+    bottom: -2,
+
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+
+    backgroundColor: '#D14343',
   },
 
   explorePlus: {
@@ -442,6 +512,46 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
 
     backgroundColor: '#F76B1C',
+  },
+
+  membershipPill: {
+    minHeight: 18,
+    marginTop: 4,
+    paddingHorizontal: 7,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: 9,
+  },
+
+  joinedPill: {
+    backgroundColor: '#EAF8EF',
+  },
+
+  joinPill: {
+    backgroundColor: '#FFF0E7',
+  },
+
+  restrictedPill: {
+    backgroundColor: '#FFF0F0',
+  },
+
+  membershipText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+
+  joinedText: {
+    color: '#27804D',
+  },
+
+  joinText: {
+    color: '#F35E16',
+  },
+
+  restrictedText: {
+    color: '#B42318',
   },
 });
 

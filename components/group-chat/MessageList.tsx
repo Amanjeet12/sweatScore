@@ -32,6 +32,7 @@ type MessageListProps = {
   isSearching: boolean;
   canPinMessages: boolean;
   pinnedScrollRequest: { messageId: string; requestId: number } | null;
+  readOnly?: boolean;
 
   onLoadEarlier: () => void;
   onReply: (message: ChatMessage) => void;
@@ -147,6 +148,8 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
       isSearching,
       canPinMessages,
       pinnedScrollRequest,
+      readOnly = false,
+
       onLoadEarlier,
       onReply,
       onReact,
@@ -512,6 +515,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
         return (
           <MessageBubble
             message={message}
+            readOnly={readOnly}
             actionOpen={actionMessageId === message.id}
             isVoicePlaying={playingVoiceId === message.id}
             showSeenReceipt={message.id === latestOwnMessageId}

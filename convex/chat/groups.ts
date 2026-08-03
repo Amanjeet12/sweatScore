@@ -2,8 +2,7 @@ import { ConvexError, v } from 'convex/values';
 
 import type { Doc } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
-import { requireCurrentUser, requireGroupMember } from './helpers';
-
+import { getGroupMembership, requireCurrentUser, requireGroupMember } from './helpers';
 const DEFAULT_GROUP_SLUG = 'sweat-sisters';
 
 /**
@@ -185,23 +184,37 @@ export const getGroup = query({
   handler: async (ctx, args) => {
     const currentUser = await requireCurrentUser(ctx);
 
-    await requireGroupMember(ctx, args.groupId, currentUser._id);
-
     const group = await ctx.db.get(args.groupId);
 
     if (!group || !group.isActive) {
       throw new ConvexError('Group not found');
     }
 
-    const memberships = await ctx.db
+    const membership = await getGroupMembership(ctx, group._id, currentUser._id);
+
+    const activeMemberships = await ctx.db
       .query('chatMembers')
-      .withIndex('by_group_user', (q) => q.eq('groupId', group._id))
+      .withIndex('by_group_status', (q) => q.eq('groupId', group._id).eq('status', 'active'))
       .collect();
+
+    const isMember = membership?.status === 'active';
 
     return {
       ...group,
+
       imageUrl: group.imageStorageId ? await ctx.storage.getUrl(group.imageStorageId) : null,
-      memberCount: memberships.filter((membership) => membership.status === 'active').length,
+
+      memberCount: activeMemberships.length,
+
+      membershipStatus: membership?.status ?? 'not_joined',
+
+      isMember,
+
+      role: isMember ? membership.role : null,
+
+      canJoin: !membership || membership.status === 'left',
+
+      isRestricted: membership?.status === 'removed',
     };
   },
 });
@@ -293,5 +306,170 @@ export const listMyGroups = query({
     }
 
     return groups.sort((firstGroup, secondGroup) => secondGroup.sortAt - firstGroup.sortAt);
+  },
+});
+
+export const listAvailableGroups = query({
+  args: {},
+
+  handler: async (ctx) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    const groups = (await ctx.db.query('chatGroups').order('desc').collect()).filter(
+      (group) => group.isActive
+    );
+
+    const results = await Promise.all(
+      groups.map(async (group) => {
+        const membership = await getGroupMembership(ctx, group._id, currentUser._id);
+
+        const isMember = membership?.status === 'active';
+
+        const [imageUrl, activeMembers, lastMessage] = await Promise.all([
+          group.imageStorageId ? ctx.storage.getUrl(group.imageStorageId) : Promise.resolve(null),
+
+          ctx.db
+            .query('chatMembers')
+            .withIndex('by_group_status', (q) => q.eq('groupId', group._id).eq('status', 'active'))
+            .collect(),
+
+          group.lastMessageId ? ctx.db.get(group.lastMessageId) : Promise.resolve(null),
+        ]);
+
+        let hasUnread = false;
+
+        /*
+         * Only active members participate
+         * in unread-message tracking.
+         */
+        if (membership?.status === 'active') {
+          const unreadFrom = membership.lastReadAt ?? membership.joinedAt;
+
+          const unreadMessage = await ctx.db
+            .query('chatMessages')
+            .withIndex('by_group', (q) =>
+              q.eq('groupId', group._id).gt('_creationTime', unreadFrom)
+            )
+            .filter((q) => q.neq(q.field('senderId'), currentUser._id))
+            .first();
+
+          hasUnread = Boolean(unreadMessage);
+        }
+
+        return {
+          _id: group._id,
+          name: group.name,
+          slug: group.slug,
+          imageUrl,
+
+          memberCount: activeMembers.length,
+
+          lastMessage: getMessagePreview(lastMessage),
+
+          lastMessageAt: group.lastMessageAt ?? null,
+
+          membershipStatus: membership?.status ?? 'not_joined',
+
+          isMember,
+
+          canJoin: !membership || membership.status === 'left',
+
+          isRestricted: membership?.status === 'removed',
+
+          role: isMember ? membership.role : null,
+
+          hasUnread,
+
+          /*
+           * Keep compatibility with the
+           * badge already added to the UI.
+           */
+          unreadCount: hasUnread ? 1 : 0,
+
+          sortAt: group.lastMessageAt ?? group._creationTime,
+        };
+      })
+    );
+
+    return results.sort((first, second) => second.sortAt - first.sortAt);
+  },
+});
+
+export const joinGroup = mutation({
+  args: {
+    groupId: v.id('chatGroups'),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    const group = await ctx.db.get(args.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group is not available');
+    }
+
+    const membership = await getGroupMembership(ctx, group._id, currentUser._id);
+
+    if (membership?.status === 'removed') {
+      throw new ConvexError('You were removed from this group and cannot rejoin');
+    }
+
+    if (membership?.status === 'active') {
+      return {
+        groupId: group._id,
+
+        joined: false,
+
+        alreadyMember: true,
+      };
+    }
+
+    const joinedAt = Date.now();
+
+    if (membership) {
+      /*
+       * A member who voluntarily left
+       * can join again.
+       */
+      await ctx.db.patch(membership._id, {
+        role: String(group.createdBy) === String(currentUser._id) ? 'owner' : 'member',
+
+        status: 'active',
+
+        joinedAt,
+
+        /*
+         * Old messages are visible but
+         * should not appear unread.
+         */
+        lastReadAt: joinedAt,
+
+        notificationsMuted: false,
+      });
+    } else {
+      await ctx.db.insert('chatMembers', {
+        groupId: group._id,
+
+        userId: currentUser._id,
+
+        role: String(group.createdBy) === String(currentUser._id) ? 'owner' : 'member',
+
+        status: 'active',
+
+        joinedAt,
+        lastReadAt: joinedAt,
+
+        notificationsMuted: false,
+      });
+    }
+
+    return {
+      groupId: group._id,
+
+      joined: true,
+
+      alreadyMember: false,
+    };
   },
 });
