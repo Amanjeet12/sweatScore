@@ -2,8 +2,16 @@ import { LegendList } from '@legendapp/list';
 import { usePaginatedQuery, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState, useMemo } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Compass, Plus, UsersThree } from 'phosphor-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,52 +22,40 @@ import PostRow, { stopCurrentVideo } from '~/components/core/posts/Row';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
-import { Id } from '~/convex/_generated/dataModel';
-import { useAuthStore } from '~/store/useAuthStore';
+import type { Id } from '~/convex/_generated/dataModel';
 import { storage } from '~/utils/storage';
-import { ImageSquare, VideoCamera } from 'phosphor-react-native';
-import { ChatCircleDots } from 'phosphor-react-native';
-
-const COMMUNITY_TAGLINES = [
-  "Share what's on your plate today, [name]!",
-  'Show us your pre- or post-workout snack, [name]!',
-  'What are we cooking for dinner tonight, [name]?',
-  'Drop your lunch photo below, [name]!',
-  'Hydration check! Show us your water bottle right now, [name]!',
-  'Show us your workout space today, [name]!',
-  'Drop a pic of your view right now, [name]!',
-  'Show us your workout outfit today, [name]!',
-  'What song or playlist is keeping you moving right now, [name]?',
-  'Drop a quick video clip of your workout today, [name]!',
-  'How many points did you lock in today, [name]?',
-  'Drop a selfie after your workout today, [name]!',
-  'Drop an emoji that sums up your energy level right now, [name]!',
-  'How many steps did you clock today, [name]?',
-  'Show us your breakfast today, [name]!',
-  "Coffee, tea, or a smoothie? What's in your cup right now, [name]?",
-  'Show us your gym bag essentials, [name]!',
-  "How did today's session go, [name]?",
-  'Drop your favourite healthy meal right now, [name]!',
-  'What time did you train today, [name]?',
-  "What's your fitness goal this month, [name]?",
-  'Rest day or active day today, [name]?',
-  'Post your water intake so far, [name]!',
-  "What's motivating you this week, [name]?",
-];
 
 const TabShare = () => {
   const insets = useSafeAreaInsets();
-  const { postId } = useLocalSearchParams();
-  const [channel, setChannel] = useState<number>(0);
+
+  const { postId } = useLocalSearchParams<{
+    postId?: string | string[];
+  }>();
+
+  const [channel] = useState<number>(0);
+
   const { isPro } = useRevenueCat();
-  const currentUser = useAuthStore((state) => state.currentUser);
+
+  /*
+   * Returns the active groups that the
+   * authenticated user has joined.
+   *
+   * Each group should include:
+   *
+   * unreadCount: number
+   */
+  const joinedGroups = useQuery(api.chat.groups.listMyGroups);
 
   const pinnedPost = useQuery(api.posts.getPinnedPost);
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.posts.getLatestPosts,
-    { channel },
-    { initialNumItems: 15 }
+    {
+      channel,
+    },
+    {
+      initialNumItems: 15,
+    }
   );
 
   const loadMorePages = () => {
@@ -71,14 +67,31 @@ const TabShare = () => {
   const handleCreatePost = () => {
     if (!isPro) {
       router.push('/(tabs)/share/paywall');
+
       return;
     }
 
     router.push('/posts/new');
   };
 
+  const openGroup = (groupId: string) => {
+    router.push({
+      pathname: '/group-chat/[groupId]',
+
+      params: {
+        groupId,
+      },
+    });
+  };
+
+  const openGroupsScreen = () => {
+    router.push('/group-chat');
+  };
+
   const renderPinnedPost = () => {
-    if (!pinnedPost) return null;
+    if (!pinnedPost) {
+      return null;
+    }
 
     return (
       <View>
@@ -88,9 +101,9 @@ const TabShare = () => {
   };
 
   useEffect(() => {
-    const CommunityGuidelinesShown = storage.getBoolean('communityGuidelinesShown');
+    const communityGuidelinesShown = storage.getBoolean('communityGuidelinesShown');
 
-    if (!CommunityGuidelinesShown && isPro) {
+    if (!communityGuidelinesShown && isPro) {
       router.push({
         pathname: '/legals/community-guidelines',
       });
@@ -98,12 +111,19 @@ const TabShare = () => {
   }, [isPro]);
 
   useEffect(() => {
-    if (postId) {
-      router.push({
-        pathname: '/(tabs)/share/[postId]',
-        params: { postId: postId as Id<'posts'> },
-      });
+    const selectedPostId = Array.isArray(postId) ? postId[0] : postId;
+
+    if (!selectedPostId) {
+      return;
     }
+
+    router.push({
+      pathname: '/(tabs)/share/[postId]',
+
+      params: {
+        postId: selectedPostId as Id<'posts'>,
+      },
+    });
   }, [postId]);
 
   useFocusEffect(
@@ -113,16 +133,6 @@ const TabShare = () => {
       };
     }, [])
   );
-
-  const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
-  const userInitial = userName.charAt(0).toUpperCase();
-  const userImage = currentUser?.image?.trim();
-
-  const communityTagline = useMemo(() => {
-    const randomIndex = Math.floor(Math.random() * COMMUNITY_TAGLINES.length);
-
-    return COMMUNITY_TAGLINES[randomIndex].replace(/\[name\]/g, userName);
-  }, [userName]);
 
   return (
     <MenuProvider>
@@ -136,57 +146,148 @@ const TabShare = () => {
 
         <View
           className="flex-1 flex-col"
-          style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-          <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] px-4 pb-5 pt-5">
-            <View className="flex-row items-center justify-between">
-              <View>
+          style={
+            Platform.OS === 'android'
+              ? {
+                  paddingTop: insets.top,
+                }
+              : undefined
+          }>
+          <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] pb-4 pt-5">
+            {/* Header */}
+            <View className="flex-row items-center justify-between px-4">
+              <View className="flex-1">
                 <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">
                   Community
                 </Text>
 
-                <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
+                <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">
+                  Connect with your groups
+                </Text>
               </View>
 
               <TouchableOpacity
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="Open group chats"
-                onPress={() => router.push('/group-chat')}
-                className="h-11 w-11 items-center justify-center rounded-full border border-[#EEE1D8] bg-white">
-                <ChatCircleDots size={28} color="#F76B1C" weight="fill" />
+                accessibilityLabel="Create community post"
+                onPress={handleCreatePost}
+                className="ml-3 h-11 w-11 items-center justify-center rounded-full border border-[#EEE1D8] bg-white">
+                <Plus size={24} color="#F76B1C" weight="bold" />
               </TouchableOpacity>
             </View>
 
-            <View className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleCreatePost}
-                className="flex-1 flex-row items-center">
-                <View style={styles.avatar}>
-                  {userImage ? (
-                    <Image
-                      source={{ uri: userImage }}
-                      style={StyleSheet.absoluteFillObject}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <Text className="font-heading text-sm font-bold text-white">{userInitial}</Text>
-                  )}
+            {/* Joined groups */}
+            <View className="mt-5">
+              {joinedGroups === undefined ? (
+                <View className="h-[104px] items-center justify-center">
+                  <ActivityIndicator size="small" color="#F76B1C" />
+
+                  <Text className="mt-2 font-body text-xs text-[#77716D]">
+                    Loading your groups…
+                  </Text>
                 </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.groupsContent}>
+                  {joinedGroups.map((group) => {
+                    const groupName = group.name.trim() || 'Group';
 
-                <Text className="flex-1 pr-2 font-body text-sm text-[#555658]" numberOfLines={2}>
-                  {communityTagline}
-                </Text>
-              </TouchableOpacity>
+                    const groupInitial = groupName.charAt(0).toUpperCase();
 
-              <View className="ml-2 flex-row items-center gap-x-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={handleCreatePost}
-                  className="h-9 w-9 items-center justify-center rounded-full bg-[#FFF2E9]">
-                  <ImageSquare size={20} color="#F76B1C" weight="bold" />
-                </TouchableOpacity>
-              </View>
+                    /*
+                     * This fallback keeps the UI
+                     * safe while Convex generated
+                     * types are being refreshed.
+                     */
+                    const unreadCount =
+                      'unreadCount' in group && typeof group.unreadCount === 'number'
+                        ? group.unreadCount
+                        : 0;
+
+                    return (
+                      <TouchableOpacity
+                        key={String(group._id)}
+                        activeOpacity={0.75}
+                        onPress={() => openGroup(String(group._id))}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${groupName}`}
+                        style={styles.groupItem}>
+                        <View style={styles.groupAvatarContainer}>
+                          <View style={styles.groupAvatarOuter}>
+                            <View style={styles.groupAvatarInner}>
+                              {group.imageUrl ? (
+                                <Image
+                                  source={{
+                                    uri: group.imageUrl,
+                                  }}
+                                  contentFit="cover"
+                                  transition={150}
+                                  style={styles.groupImage}
+                                />
+                              ) : (
+                                <>
+                                  <UsersThree size={29} color="#725C50" weight="regular" />
+
+                                  <View style={styles.groupInitialBadge}>
+                                    <Text className="font-heading text-[9px] font-bold text-white">
+                                      {groupInitial}
+                                    </Text>
+                                  </View>
+                                </>
+                              )}
+                            </View>
+                          </View>
+
+                          {unreadCount > 0 ? (
+                            <View style={styles.unreadBadge}>
+                              <Text
+                                className="font-body font-bold text-white"
+                                style={styles.unreadBadgeText}>
+                                {unreadCount > 99 ? '99+' : String(unreadCount)}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+
+                        <Text
+                          className="mt-2 text-center font-body text-xs font-semibold text-[#292929]"
+                          numberOfLines={2}>
+                          {groupName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Explore groups */}
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    onPress={openGroupsScreen}
+                    accessibilityRole="button"
+                    accessibilityLabel="Explore groups"
+                    style={styles.groupItem}>
+                    <View style={styles.groupAvatarContainer}>
+                      <View style={styles.groupAvatarOuter}>
+                        <View style={styles.groupAvatarInner}>
+                          <Compass size={31} color="#725C50" weight="regular" />
+
+                          <View style={styles.explorePlus}>
+                            <Plus size={10} color="#FFFFFF" weight="bold" />
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text
+                      className="mt-2 text-center font-body text-xs font-semibold text-[#292929]"
+                      numberOfLines={2}>
+                      Explore Groups
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
             </View>
           </View>
 
@@ -204,7 +305,7 @@ const TabShare = () => {
                 ListHeaderComponent={renderPinnedPost}
                 ListFooterComponent={<View className="mb-4" />}
                 onEndReached={loadMorePages}
-                onEndReachedThreshold={2.0}
+                onEndReachedThreshold={2}
                 recycleItems
               />
             </View>
@@ -216,15 +317,132 @@ const TabShare = () => {
 };
 
 const styles = StyleSheet.create({
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
-    overflow: 'hidden',
+  groupsContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 2,
+  },
+
+  groupItem: {
+    width: 88,
+    alignItems: 'center',
+    marginHorizontal: 3,
+  },
+
+  groupAvatarContainer: {
+    position: 'relative',
+  },
+
+  groupAvatarOuter: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF5C1A',
+
+    borderWidth: 2,
+    borderColor: '#B04483',
+
+    backgroundColor: '#FFFFFF',
+  },
+
+  groupAvatarInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    overflow: 'hidden',
+
+    borderWidth: 1,
+    borderColor: '#E4BE9D',
+
+    backgroundColor: '#F8F1E8',
+  },
+
+  groupImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  groupInitialBadge: {
+    position: 'absolute',
+
+    right: 2,
+    bottom: 2,
+
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+
+    backgroundColor: '#F76B1C',
+  },
+
+  unreadBadge: {
+    position: 'absolute',
+
+    top: 5,
+    right: -5,
+
+    minWidth: 22,
+    height: 22,
+
+    paddingHorizontal: 6,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderRadius: 11,
+
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+
+    backgroundColor: '#E5484D',
+
+    shadowColor: '#7F1D1D',
+
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+
+    elevation: 4,
+  },
+
+  unreadBadgeText: {
+    fontSize: 11,
+    lineHeight: 12,
+  },
+
+  explorePlus: {
+    position: 'absolute',
+
+    right: 5,
+    top: 4,
+
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+
+    backgroundColor: '#F76B1C',
   },
 });
+
 export default TabShare;

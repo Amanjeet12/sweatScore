@@ -6,7 +6,7 @@ import { mutation, query } from "../_generated/server";
 import { requireCurrentUser } from "./helpers";
 
 const MAX_GROUP_NAME_LENGTH = 60;
-const MAX_MEMBERS_PER_MUTATION = 100;
+const MAX_MEMBERS_PER_MUTATION = 1000;
 const MAX_GROUP_IMAGE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_GROUP_SLUG = "sweat-sisters";
 

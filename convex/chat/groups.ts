@@ -222,13 +222,12 @@ export const listMyGroups = query({
       .collect();
 
     const groups = [];
+
     const processedGroupIds = new Set<string>();
 
     for (const membership of memberships) {
       const groupIdString = String(membership.groupId);
 
-      // Prevent duplicate groups if duplicate membership
-      // documents accidentally exist.
       if (processedGroupIds.has(groupIdString)) {
         continue;
       }
@@ -241,7 +240,14 @@ export const listMyGroups = query({
         continue;
       }
 
-      const [imageUrl, activeMembers, lastMessage] = await Promise.all([
+      /*
+       * New members should not see every old
+       * message as unread. Use joinedAt until
+       * lastReadAt has been created.
+       */
+      const unreadFrom = membership.lastReadAt ?? membership.joinedAt;
+
+      const [imageUrl, activeMembers, lastMessage, messagesAfterLastRead] = await Promise.all([
         group.imageStorageId ? ctx.storage.getUrl(group.imageStorageId) : Promise.resolve(null),
 
         ctx.db
@@ -250,17 +256,38 @@ export const listMyGroups = query({
           .collect(),
 
         group.lastMessageId ? ctx.db.get(group.lastMessageId) : Promise.resolve(null),
+
+        ctx.db
+          .query('chatMessages')
+          .withIndex('by_group', (q) => q.eq('groupId', group._id).gt('_creationTime', unreadFrom))
+          .collect(),
       ]);
+
+      const unreadCount = messagesAfterLastRead.filter((message) => {
+        const isOwnMessage = String(message.senderId) === String(currentUser._id);
+
+        return !isOwnMessage && !message.deletedAt;
+      }).length;
 
       groups.push({
         _id: group._id,
+
         name: group.name,
+
         slug: group.slug,
+
         imageUrl,
+
         memberCount: activeMembers.length,
+
         role: membership.role,
+
         lastMessage: getMessagePreview(lastMessage),
+
         lastMessageAt: group.lastMessageAt ?? null,
+
+        unreadCount,
+
         sortAt: group.lastMessageAt ?? group._creationTime,
       });
     }

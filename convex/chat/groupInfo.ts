@@ -16,20 +16,6 @@ function normalizeGroupName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function getMemberName(user: Doc<'users'> | null) {
-  const name = user?.name?.trim();
-
-  if (name) {
-    return name;
-  }
-
-  if (user?.email) {
-    return user.email.split('@')[0];
-  }
-
-  return 'Member';
-}
-
 function getAvatarColor(userId: string) {
   const colors = ['#F76B1C', '#7C3AED', '#2563EB', '#047857', '#C2410C', '#9F1239', '#D97706'];
 
@@ -164,9 +150,15 @@ function sanitizeUnicodeString(value: unknown, fallback = '', maximumLength = 50
     sanitized += value[index];
   }
 
-  const normalized = sanitized.normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, maximumLength);
+  const normalized = sanitized.normalize('NFC').replace(/\s+/g, ' ').trim();
 
-  return normalized || fallback;
+  /*
+   * Truncate by Unicode code point so the limit cannot split a valid
+   * surrogate pair and create a value that Convex cannot serialize.
+   */
+  const truncated = Array.from(normalized).slice(0, maximumLength).join('');
+
+  return truncated || fallback;
 }
 
 function getSafeMemberName(user: Doc<'users'> | null) {
@@ -248,7 +240,9 @@ export const getGroupInfo = query({
       memberships.map(async (membership) => {
         const user = await ctx.db.get(membership.userId);
 
-        const name = getMemberName(user);
+        const name = getSafeMemberName(user);
+
+        const imageUrl = await getSafeUserImageUrl(ctx, user?.image);
 
         const isCurrentUser = String(membership.userId) === String(currentUser._id);
 
@@ -265,11 +259,11 @@ export const getGroupInfo = query({
 
           name,
 
-          email: canManageMembers ? (user?.email ?? null) : null,
+          email: canManageMembers ? getSafeEmail(user?.email) : null,
 
-          imageUrl: user?.image ? await ctx.storage.getUrl(user.image) : null,
+          imageUrl,
 
-          initial: name.charAt(0).toUpperCase() || '?',
+          initial: sanitizeUnicodeString(Array.from(name)[0]?.toUpperCase(), '?', 2),
 
           avatarColor: getAvatarColor(String(membership.userId)),
 
@@ -299,10 +293,10 @@ export const getGroupInfo = query({
 
     return {
       _id: group._id,
-      name: group.name,
-      slug: group.slug,
+      name: sanitizeUnicodeString(group.name, 'Group', MAX_GROUP_NAME_LENGTH),
+      slug: sanitizeUnicodeString(group.slug, '', 120),
 
-      imageUrl: group.imageStorageId ? await ctx.storage.getUrl(group.imageStorageId) : null,
+      imageUrl: await getSafeUserImageUrl(ctx, group.imageStorageId),
 
       memberCount: members.length,
       members,
@@ -698,12 +692,12 @@ export const listMentionableMembers = query({
         continue;
       }
 
-      const name = user.name?.trim() || user.email?.split('@')[0] || 'Member';
+      const name = getSafeMemberName(user);
 
       members.push({
         userId: membership.userId,
         name,
-        initial: name.charAt(0).toUpperCase() || '?',
+        initial: sanitizeUnicodeString(Array.from(name)[0]?.toUpperCase(), '?', 2),
         avatarColor: getAvatarColor(String(membership.userId)),
       });
     }
