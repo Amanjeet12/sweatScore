@@ -127,8 +127,10 @@ export const processRewardNotifications = internalMutation({
 
 export const processNotifications = internalMutation({
   args: {},
-  handler: async (ctx, args): Promise<void> => {
+
+  handler: async (ctx): Promise<void> => {
     const pushNotifications = new PushNotifications(components.pushNotifications);
+
     const now = new Date();
 
     const users = await ctx.db
@@ -137,59 +139,116 @@ export const processNotifications = internalMutation({
       .collect();
 
     for (const user of users) {
-      // Skip users without timezone or push token
-      if (!user.timezone || !user.expoPushToken) continue;
+      /*
+       * Skip users who cannot receive notifications.
+       */
+      if (!user.timezone || !user.expoPushToken) {
+        continue;
+      }
 
-      // Check if it's 10pm or 8am in the user's timezone
-      const userTime = new Date(now.toLocaleString('en-US', { timeZone: user.timezone }));
+      /*
+       * Determine the current hour in the user's timezone.
+       */
+      const userTime = new Date(
+        now.toLocaleString('en-US', {
+          timeZone: user.timezone,
+        })
+      );
+
       const hour = userTime.getHours();
 
-      // Only send notification if it's 10pm (22:00) or 8am (8:00) in user's timezone
-      if (hour !== 22 && hour !== 8) continue;
+      /*
+       * This legacy notification flow only runs
+       * at 8:00 AM or 10:00 PM in the user's timezone.
+       */
+      if (hour !== 8 && hour !== 22) {
+        continue;
+      }
 
+      /*
+       * Users on the newer mission-enabled app version
+       * are handled by the newer notification flow.
+       */
       const userAppVersion = user.appVersion ?? '1.0.0';
+
       const userMissionFeatureFlagEnabled = compare(
         userAppVersion,
         appVersions.minVersionForMission,
         '>='
       );
 
-      if (userMissionFeatureFlagEnabled) continue;
+      if (userMissionFeatureFlagEnabled) {
+        continue;
+      }
 
-      const today = now;
-      const todayFormatted = formatDateYYYYMMDD(today, user.timezone);
+      const todayFormatted = formatDateYYYYMMDD(now, user.timezone);
 
+      /*
+       * Prevent multiple engagement notifications
+       * from being sent to the same user on the same day.
+       *
+       * Use first() instead of unique() because there may
+       * already be multiple notification-history records
+       * for the same user and date.
+       */
       const notificationHistory = await ctx.db
         .query('notificationHistory')
         .withIndex('by_user_date', (q) => q.eq('userId', user._id).eq('date', todayFormatted))
-        .unique();
+        .first();
 
-      if (notificationHistory) continue;
+      if (notificationHistory) {
+        continue;
+      }
 
-      const yesterday = new Date(today);
+      const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
 
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const yearMonth = `${today.getFullYear()}-${month}`;
       const yesterdayFormatted = formatDateYYYYMMDD(yesterday, user.timezone);
-      let notificationBody: string | null = null;
-      const firstName = user.name?.split(' ')[0];
-      const lastActiveAt = user.lastActiveAt ? new Date(user.lastActiveAt) : null;
-      if (!lastActiveAt) continue;
 
-      const daysLastActive = getDaysBetweenDates(today, lastActiveAt);
-      const openedAppToday = lastActiveAt.toDateString() === today.toDateString();
+      /*
+       * Use the user's local date for the leaderboard month.
+       */
+      const yearMonth = todayFormatted.slice(0, 7);
+
+      let notificationBody: string | null = null;
+
+      const firstName = user.name?.trim().split(/\s+/)[0] || 'Sis';
+
+      const lastActiveAt = user.lastActiveAt ? new Date(user.lastActiveAt) : null;
+
+      if (!lastActiveAt) {
+        continue;
+      }
+
+      const daysLastActive = getDaysBetweenDates(now, lastActiveAt);
+
+      /*
+       * Compare formatted dates in the user's timezone.
+       * Using toDateString() here could produce incorrect
+       * results when the server and user have different
+       * timezones.
+       */
+      const lastActiveDateFormatted = formatDateYYYYMMDD(lastActiveAt, user.timezone);
+
+      const openedAppToday = lastActiveDateFormatted === todayFormatted;
 
       if (openedAppToday) {
-        if (hour === 8) continue;
+        /*
+         * Do not send the opened-app notification at 8 AM.
+         */
+        if (hour === 8) {
+          continue;
+        }
 
         const userOnStreak = await ctx.db
           .query('userCheckIns')
           .withIndex('by_user_date', (q) => q.eq('userId', user._id).eq('date', yesterdayFormatted))
-          .unique();
+          .first();
+
         if (userOnStreak) {
-          const tenDaysAgo = new Date(today);
-          tenDaysAgo.setDate(today.getDate() - 10);
+          const tenDaysAgo = new Date(now);
+          tenDaysAgo.setDate(now.getDate() - 10);
+
           const tenDaysAgoFormatted = formatDateYYYYMMDD(tenDaysAgo, user.timezone);
 
           const checkIns = await ctx.db
@@ -206,32 +265,37 @@ export const processNotifications = internalMutation({
             continue;
           }
 
-          const hasCheckedInYesterday = checkIns.some(
-            (checkIn) => checkIn.date === yesterdayFormatted
-          );
-          if (!hasCheckedInYesterday) {
+          const checkedInDates = new Set(checkIns.map((checkIn) => checkIn.date));
+
+          if (!checkedInDates.has(yesterdayFormatted)) {
             continue;
           }
 
-          let streak = 1; // Start with 1 for yesterday
+          /*
+           * Yesterday is the first day of the streak.
+           */
+          let streak = 1;
           const currentDate = new Date(yesterday);
 
           while (currentDate > tenDaysAgo) {
             currentDate.setDate(currentDate.getDate() - 1);
-            const dateStr = formatDateYYYYMMDD(currentDate, user.timezone);
-            const hasCheckedIn = checkIns.some((checkIn) => checkIn.date === dateStr);
 
-            if (hasCheckedIn) {
-              streak++;
+            const dateStr = formatDateYYYYMMDD(currentDate, user.timezone);
+
+            if (checkedInDates.has(dateStr)) {
+              streak += 1;
             } else {
               break;
             }
           }
 
           if (streak === 3) {
-            notificationBody = `${streak} days in a row. you're on a streak 🔥 Keep showing up your way.`;
+            notificationBody =
+              `${streak} days in a row. ` + `you're on a streak 🔥 Keep showing up your way.`;
           } else if (streak === 5) {
-            notificationBody = `Consistency is a flex — and you're on a ${streak} day streak 🔥 Keep showing up your way.`;
+            notificationBody =
+              `Consistency is a flex — and you're on a ` +
+              `${streak} day streak 🔥 Keep showing up your way.`;
           }
         } else {
           const userEntry = await ctx.db
@@ -241,48 +305,95 @@ export const processNotifications = internalMutation({
             )
             .unique();
 
-          if (userEntry && userEntry.displayTotalPoints && userEntry.displayTotalPoints > 1) {
-            notificationBody = `You're on ${userEntry.displayTotalPoints} Sweat Points so far 💜 Let's see what you can finish the month with.`;
+          if (userEntry?.displayTotalPoints && userEntry.displayTotalPoints > 1) {
+            notificationBody =
+              `You're on ${userEntry.displayTotalPoints} ` +
+              `Sweat Points so far 💜 Let's see what you ` +
+              `can finish the month with.`;
           }
         }
       } else {
-        if (hour === 22) continue;
+        /*
+         * When the user has not opened the app today,
+         * only send this flow at 8 AM.
+         */
+        if (hour === 22) {
+          continue;
+        }
 
         if (daysLastActive === 1) {
+          /*
+           * Check whether this user has already completed
+           * today's check-in.
+           *
+           * If the record exists, do not send the
+           * "check in before today ends" reminder.
+           */
+          const userCompletedCheckInToday = await ctx.db
+            .query('userCheckIns')
+            .withIndex('by_user_date', (q) => q.eq('userId', user._id).eq('date', todayFormatted))
+            .first();
+
+          if (userCompletedCheckInToday) {
+            continue;
+          }
+
+          /*
+           * Count how many users have checked in today.
+           * This count is only used in the reminder copy.
+           */
           const totalCheckIns = await ctx.db
             .query('userCheckIns')
             .withIndex('by_date', (q) => q.eq('date', todayFormatted))
             .collect();
+
           const totalCheckInsCount = totalCheckIns.length;
+
           if (totalCheckInsCount > 0) {
-            notificationBody = `${totalCheckInsCount} Sweat Sisters already checked in today. Don't miss your point — check in before today ends!`;
+            notificationBody =
+              `${totalCheckInsCount} Sweat Sisters already ` +
+              `checked in today. Don't miss your point — ` +
+              `check in before today ends!`;
           } else {
-            notificationBody = `${firstName}! Be the first Sweat Sister to check in today. Don't miss your point — check in before today ends!`;
+            notificationBody =
+              `${firstName}! Be the first Sweat Sister to ` +
+              `check in today. Don't miss your point — ` +
+              `check in before today ends!`;
           }
         } else if (daysLastActive >= 3 && daysLastActive < 10) {
-          notificationBody = `We miss your name popping up ${firstName} 👀 Last log was ${daysLastActive} days ago — just sayin.`;
+          notificationBody =
+            `We miss your name popping up ${firstName} 👀 ` +
+            `Last log was ${daysLastActive} days ago — just sayin.`;
         } else if (daysLastActive > 10) {
-          notificationBody = `Still on our minds ${firstName} 💭 Let's call it a reset and start fresh tomorrow?`;
+          notificationBody =
+            `Still on our minds ${firstName} 💭 ` +
+            `Let's call it a reset and start fresh tomorrow?`;
         }
       }
 
-      if (notificationBody) {
-        pushNotifications.sendPushNotification(ctx, {
-          userId: user._id,
-          notification: {
-            title: 'SweatScore',
-            body: notificationBody,
-            data: { notificationType: 'engagementNotification' },
-          },
-        });
-
-        ctx.db.insert('notificationHistory', {
-          userId: user._id,
-          date: todayFormatted,
-          notificationType: 'engagementNotification',
-          notificationBody,
-        });
+      if (!notificationBody) {
+        continue;
       }
+
+      await pushNotifications.sendPushNotification(ctx, {
+        userId: user._id,
+
+        notification: {
+          title: 'SweatScore',
+          body: notificationBody,
+
+          data: {
+            notificationType: 'engagementNotification',
+          },
+        },
+      });
+
+      await ctx.db.insert('notificationHistory', {
+        userId: user._id,
+        date: todayFormatted,
+        notificationType: 'engagementNotification',
+        notificationBody,
+      });
     }
   },
 });
@@ -445,10 +556,38 @@ export const processScheduledCheckInNotification = internalMutation({
       .withIndex('notificationEnabled', (q) => q.eq('notificationEnabled', true))
       .collect();
 
-    const recipientIds = users
-      .filter((user) => user.onboarded === true && Boolean(user.expoPushToken))
-      .map((user) => user._id);
+    const recipientIds: Id<'users'>[] = [];
 
+    for (const user of users) {
+      if (user.onboarded !== true || !user.expoPushToken) {
+        continue;
+      }
+
+      /*
+       * The live notification should go to every eligible user.
+       *
+       * The reminder should only go to users who have not
+       * completed this exact daily check-in window.
+       */
+      if (args.notificationType === 'dailyCheckInReminder') {
+        const existingCompletion = await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_challenge_window', (q) =>
+            q
+              .eq('userId', user._id)
+              .eq('challengeId', challenge._id)
+              .eq('dailyWindowStartAt', args.expectedStartAt)
+          )
+          .filter((q) => q.neq(q.field('removed'), true))
+          .first();
+
+        if (existingCompletion) {
+          continue;
+        }
+      }
+
+      recipientIds.push(user._id);
+    }
     /*
      * Save before scheduling the push batches so duplicate
      * scheduled jobs cannot send the notification twice.

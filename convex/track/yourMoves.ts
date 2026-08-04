@@ -4,6 +4,8 @@ import { Id } from '../_generated/dataModel';
 import { query } from '../_generated/server';
 import { formatDateInTZ, getMondayInTZ, ymdUTC } from '../utils/timezone';
 
+const JOURNEY_VIDEO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 type CompletionRow = {
   _id: Id<'challengeCompletions'>;
   challengeId: Id<'challenges'>;
@@ -39,23 +41,29 @@ export const getYourMoves = query({
     const tz = user?.timezone ?? null;
 
     const now = new Date();
+    const nowTimestamp = now.getTime();
+    const retentionCutoffTimestamp = nowTimestamp - JOURNEY_VIDEO_RETENTION_MS;
+
     const todayStr = formatDateInTZ(now, tz);
     const mondayStr = ymdUTC(getMondayInTZ(now, tz));
-    const monthStartStr = `${todayStr.slice(0, 7)}-01`;
-
-    const rows = await ctx.db
-      .query('challengeCompletions')
-      .withIndex('by_user_date', (q) =>
-        q.eq('userId', userId).gte('date', monthStartStr).lte('date', todayStr)
-      )
-      .filter((q) => q.neq(q.field('removed'), true))
-      .collect();
 
     const allUserCompletions = await ctx.db
       .query('challengeCompletions')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
+
+    /**
+     * Keep Journey videos for exactly 30 days from
+     * the challenge-completion timestamp.
+     *
+     * They will no longer disappear when the month changes.
+     */
+    const rows = allUserCompletions.filter(
+      (completion) =>
+        completion._creationTime >= retentionCutoffTimestamp &&
+        completion._creationTime <= nowTimestamp
+    );
 
     const completionsByChallenge = new Map<string, typeof allUserCompletions>();
 
@@ -173,7 +181,7 @@ export const getYourMoves = query({
         today.push(row);
       } else if (row.date >= mondayStr && row.date < todayStr) {
         earlierThisWeek.push(row);
-      } else if (row.date >= monthStartStr && row.date < mondayStr) {
+      } else {
         earlierThisMonth.push(row);
       }
     }
