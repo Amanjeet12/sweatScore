@@ -136,9 +136,7 @@ function getMessagePreview(message: Doc<'chatMessages'>) {
 export const queueChatMessagePush = internalMutation({
   args: {
     groupId: v.id('chatGroups'),
-
     messageId: v.id('chatMessages'),
-
     senderId: v.id('users'),
   },
 
@@ -156,7 +154,7 @@ export const queueChatMessagePush = internalMutation({
     }
 
     /*
-     * Prevent invalid or mismatched scheduling.
+     * Prevent invalid or mismatched scheduled jobs.
      */
     if (
       String(message.groupId) !== String(args.groupId) ||
@@ -174,48 +172,134 @@ export const queueChatMessagePush = internalMutation({
       )
       .collect();
 
-    const mentionedUserIds = new Set(message.mentionedUserIds.map(String));
+    /*
+     * Explicitly mentioned users.
+     *
+     * Use an empty array fallback so older messages
+     * without mentionedUserIds do not cause an error.
+     */
+    const mentionedUserIds = new Set(
+      (message.mentionedUserIds ?? []).map((userId) => String(userId))
+    );
 
+    /*
+     * Detect @all as a separate notification event.
+     */
     const hasAllMention = /(^|\s)@all\b/i.test(message.text ?? '');
 
+    /*
+     * Find the sender of the message being replied to.
+     */
     const repliedMessage = message.replyToMessageId
       ? await ctx.db.get(message.replyToMessageId)
       : null;
 
     const replyRecipientId =
-      repliedMessage && String(repliedMessage.groupId) === String(args.groupId)
+      repliedMessage &&
+      !repliedMessage.deletedAt &&
+      String(repliedMessage.groupId) === String(args.groupId)
         ? String(repliedMessage.senderId)
         : null;
 
-    const recipients: { userId: Id<'users'>; eventType: ChatNotificationEvent }[] = [];
+    type DirectChatNotificationEvent = 'mention' | 'reply' | 'allMention';
+
+    /*
+     * This map contains only directly involved users.
+     *
+     * Normal messages leave this map empty, so no
+     * push notification is sent.
+     */
+    const targetEventByUserId = new Map<string, DirectChatNotificationEvent>();
+
+    if (hasAllMention) {
+      /*
+       * @all targets every active group member except
+       * the sender. Mute and global notification settings
+       * are checked later.
+       */
+      for (const membership of memberships) {
+        const membershipUserId = String(membership.userId);
+
+        if (membershipUserId !== String(args.senderId)) {
+          targetEventByUserId.set(membershipUserId, 'allMention');
+        }
+      }
+    } else {
+      /*
+       * A reply notification goes only to the sender
+       * of the replied-to message.
+       */
+      if (replyRecipientId && replyRecipientId !== String(args.senderId)) {
+        targetEventByUserId.set(replyRecipientId, 'reply');
+      }
+
+      /*
+       * Mention notifications go only to explicitly
+       * tagged users.
+       *
+       * When the same user is both replied to and
+       * mentioned, keep the more specific reply event
+       * and send only one notification.
+       */
+      for (const mentionedUserId of mentionedUserIds) {
+        if (mentionedUserId === String(args.senderId)) {
+          continue;
+        }
+
+        if (!targetEventByUserId.has(mentionedUserId)) {
+          targetEventByUserId.set(mentionedUserId, 'mention');
+        }
+      }
+    }
+
+    /*
+     * A normal message has no reply, mention or @all.
+     * Stop here without notifying group members.
+     */
+    if (targetEventByUserId.size === 0) {
+      return {
+        queued: 0,
+      };
+    }
+
+    const recipients: {
+      userId: Id<'users'>;
+      eventType: DirectChatNotificationEvent;
+    }[] = [];
 
     for (const membership of memberships) {
+      const membershipUserId = String(membership.userId);
+
+      const eventType = targetEventByUserId.get(membershipUserId);
+
       /*
-       * Never notify the sender.
+       * This member was not directly involved.
        */
-      if (String(membership.userId) === String(args.senderId)) {
+      if (!eventType) {
         continue;
       }
 
       /*
-       * Respect per-group mute state.
+       * Never notify the message sender.
+       */
+      if (membershipUserId === String(args.senderId)) {
+        continue;
+      }
+
+      /*
+       * Respect the member's per-group mute setting.
        */
       if (membership.notificationsMuted) {
         continue;
       }
 
       /*
-       * If the chat screen already marked this
-       * message delivered/read, the recipient is
-       * likely viewing the group. Do not show a
-       * redundant push notification.
+       * Do not show a push if the user already received
+       * or read the message while viewing the group.
        */
       const hasAlreadyReceivedMessage =
-        Math.max(
-          membership.lastDeliveredAt ?? 0,
-
-          membership.lastReadAt ?? 0
-        ) >= message._creationTime;
+        Math.max(membership.lastDeliveredAt ?? 0, membership.lastReadAt ?? 0) >=
+        message._creationTime;
 
       if (hasAlreadyReceivedMessage) {
         continue;
@@ -228,31 +312,20 @@ export const queueChatMessagePush = internalMutation({
       }
 
       /*
-       * Respect the app-wide notification switch.
+       * Respect the app-wide notification setting.
        */
       if (user.notificationEnabled === false) {
         continue;
       }
 
-      /*
-       * The existing app records this token in both
-       * the users table and the Convex push component.
-       */
       if (!user.expoPushToken) {
         continue;
       }
 
-      const userId = String(user._id);
-
-      const eventType: ChatNotificationEvent = hasAllMention
-        ? 'allMention'
-        : mentionedUserIds.has(userId)
-          ? 'mention'
-          : replyRecipientId === userId
-            ? 'reply'
-            : 'newMessage';
-
-      recipients.push({ userId: user._id, eventType });
+      recipients.push({
+        userId: user._id,
+        eventType,
+      });
     }
 
     if (recipients.length === 0) {
@@ -268,22 +341,21 @@ export const queueChatMessagePush = internalMutation({
     );
 
     const senderName = getSenderName(sender);
-
     const preview = getMessagePreview(message);
 
-    const bodies: Record<Exclude<ChatNotificationEvent, 'reaction'>, string> = {
-      newMessage: `${senderName}: ${preview}`,
+    const bodies: Record<DirectChatNotificationEvent, string> = {
       mention: `${senderName} mentioned you: ${preview}`,
+
       reply: `${senderName} replied to your message: ${preview}`,
+
       allMention: `${senderName} mentioned everyone: ${preview}`,
     };
 
     /*
-     * Split large groups into separate scheduled
-     * jobs so one action does not receive a very
-     * large argument payload.
+     * Queue each event type separately so every
+     * recipient gets the correct notification copy.
      */
-    for (const eventType of ['newMessage', 'mention', 'reply', 'allMention'] as const) {
+    for (const eventType of ['mention', 'reply', 'allMention'] as const) {
       const recipientIds = recipients
         .filter((recipient) => recipient.eventType === eventType)
         .map((recipient) => recipient.userId);
@@ -297,11 +369,13 @@ export const queueChatMessagePush = internalMutation({
           messageId: args.messageId,
           senderId: args.senderId,
           title: groupName,
+
           body: sanitizeNotificationText(
             bodies[eventType],
             'You have a new group notification',
             MAX_NOTIFICATION_BODY_LENGTH
           ),
+
           eventType,
         });
       }

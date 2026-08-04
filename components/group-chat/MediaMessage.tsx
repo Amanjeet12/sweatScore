@@ -2,7 +2,7 @@ import { useEvent } from 'expo';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { ArrowClockwise, FileText, WarningCircle, X } from 'phosphor-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -152,6 +152,14 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
 
   const [retryKey, setRetryKey] = useState(0);
 
+  const openViewer = useCallback(() => {
+    setViewerVisible(true);
+  }, []);
+
+  const closeViewer = useCallback(() => {
+    setViewerVisible(false);
+  }, []);
+
   const retryImage = () => {
     setViewerVisible(false);
     setLoadState('loading');
@@ -193,7 +201,7 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
             activeOpacity={0.92}
             accessibilityRole="imagebutton"
             accessibilityLabel="Open image preview"
-            onPress={() => setViewerVisible(true)}
+            onPressIn={openViewer}
             style={styles.imageOpenButton}>
             <View pointerEvents="none" style={styles.imageOverlay}>
               <View style={styles.openHint}>
@@ -211,18 +219,18 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
           },
         ]}
         imageIndex={0}
-        visible={viewerVisible && imageLoaded}
+        visible={viewerVisible}
         backgroundColor="#000000"
         swipeToCloseEnabled
         doubleTapToZoomEnabled
-        onRequestClose={() => setViewerVisible(false)}
+        onRequestClose={closeViewer}
         HeaderComponent={() => (
           <View style={styles.viewerHeader}>
             <TouchableOpacity
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Close image viewer"
-              onPress={() => setViewerVisible(false)}
+              onPressIn={closeViewer}
               style={styles.viewerCloseButton}>
               <X size={24} color="#FFFFFF" weight="bold" />
             </TouchableOpacity>
