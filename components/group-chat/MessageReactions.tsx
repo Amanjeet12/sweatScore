@@ -1,5 +1,6 @@
 import { ArrowBendUpLeft, Eye, PushPin, Trash } from 'phosphor-react-native';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
 import type { ChatReaction } from '~/types/chat';
@@ -103,12 +104,19 @@ const MessageReactions = ({
             style={styles.actionContainer}
             onPress={(event) => {
               /*
-               * Do not close when the user
-               * taps inside the action menu.
+               * Prevent taps inside the menu from
+               * closing the modal backdrop.
                */
               event.stopPropagation();
             }}>
-            <View className="flex-row items-center">
+            <ScrollView
+              horizontal
+              bounces={false}
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.actionScroll}
+              contentContainerStyle={styles.actionContent}>
               {REACTION_OPTIONS.map((emoji) => (
                 <TouchableOpacity
                   key={emoji}
@@ -121,7 +129,7 @@ const MessageReactions = ({
                 </TouchableOpacity>
               ))}
 
-              <View className="mx-1 h-7 w-px bg-[#E8E2DE]" />
+              <View style={styles.separator} />
 
               {canShowSeen ? (
                 <>
@@ -140,7 +148,7 @@ const MessageReactions = ({
                     ) : null}
                   </TouchableOpacity>
 
-                  <View className="mx-1 h-7 w-px bg-[#E8E2DE]" />
+                  <View style={styles.separator} />
                 </>
               ) : null}
 
@@ -155,7 +163,7 @@ const MessageReactions = ({
                     <PushPin size={18} color="#F35E16" weight={isPinned ? 'fill' : 'bold'} />
                   </TouchableOpacity>
 
-                  <View className="mx-1 h-7 w-px bg-[#E8E2DE]" />
+                  <View style={styles.separator} />
                 </>
               ) : null}
 
@@ -170,7 +178,7 @@ const MessageReactions = ({
 
               {canDelete ? (
                 <>
-                  <View className="mx-1 h-7 w-px bg-[#E8E2DE]" />
+                  <View style={styles.separator} />
 
                   <TouchableOpacity
                     activeOpacity={0.7}
@@ -182,7 +190,7 @@ const MessageReactions = ({
                   </TouchableOpacity>
                 </>
               ) : null}
-            </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -216,13 +224,19 @@ const styles = StyleSheet.create({
   },
 
   actionContainer: {
-    maxWidth: '100%',
+    width: '100%',
+    maxWidth: 460,
+
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#EDE5DF',
+
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
+
+    paddingHorizontal: 4,
     paddingVertical: 7,
+
+    overflow: 'hidden',
 
     shadowColor: '#352219',
 
@@ -234,6 +248,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 9,
+  },
+
+  actionScroll: {
+    width: '100%',
+  },
+
+  actionContent: {
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    paddingHorizontal: 4,
+  },
+
+  separator: {
+    width: 1,
+    height: 28,
+
+    marginHorizontal: 4,
+
+    backgroundColor: '#E8E2DE',
   },
 });
 

@@ -7,6 +7,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   TextInput,
@@ -41,6 +44,8 @@ export default function AdminChatGroupsScreen() {
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasInitializedCreateMembers = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const isEditDescriptionFocused = useRef(false);
 
   const groups = useQuery(api.chat.admin.listGroupsForAdmin) ?? [];
   const userQueryArgs = mode === 'add' && selectedGroupId ? { groupId: selectedGroupId } : {};
@@ -91,6 +96,19 @@ export default function AdminChatGroupsScreen() {
     setSelectedImage(null);
     setRemoveExistingImage(false);
   }, [mode, selectedGroup?._id, selectedGroup?.name, selectedGroup?.description]);
+
+  useEffect(() => {
+    const keyboardDidShow = Keyboard.addListener('keyboardDidShow', () => {
+      if (!isEditDescriptionFocused.current) return;
+
+      // Android only exposes the final, keyboard-sized scroll range after this event.
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      });
+    });
+
+    return () => keyboardDidShow.remove();
+  }, []);
 
   const resetImageState = () => {
     setSelectedImage(null);
@@ -381,6 +399,17 @@ export default function AdminChatGroupsScreen() {
       ? selectedGroup?.imageUrl
       : null;
 
+  const keepEditDescriptionVisible = () => {
+    if (mode !== 'edit') return;
+
+    isEditDescriptionFocused.current = true;
+
+    // This also handles focusing the field while the keyboard is already open.
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 250);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <Stack.Screen
@@ -398,183 +427,199 @@ export default function AdminChatGroupsScreen() {
         }}
       />
 
-      <ScrollView
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
-        contentContainerClassName="px-4 pb-10 pt-4"
-        keyboardShouldPersistTaps="handled">
-        <Text className="text-2xl font-bold text-neutral-900">Manage chat groups</Text>
-        <Text className="mt-1 text-sm text-neutral-500">
-          Create groups, upload their images, add members, or edit group details.
-        </Text>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}>
+        <ScrollView
+          ref={scrollViewRef}
+          className="flex-1"
+          contentContainerClassName="px-4 pt-4"
+          contentContainerStyle={{ paddingBottom: mode === 'edit' ? 180 : 40 }}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled">
+          <Text className="text-2xl font-bold text-neutral-900">Manage chat groups</Text>
+          <Text className="mt-1 text-sm text-neutral-500">
+            Create groups, upload their images, add members, or edit group details.
+          </Text>
 
-        <View className="mt-5 flex-row rounded-2xl bg-neutral-100 p-1">
-          <ModeButton
-            active={mode === 'create'}
-            icon="add-circle-outline"
-            label="Create"
-            onPress={() => changeMode('create')}
-          />
-          <ModeButton
-            active={mode === 'add'}
-            icon="person-add-outline"
-            label="Members"
-            onPress={() => changeMode('add')}
-          />
-          <ModeButton
-            active={mode === 'edit'}
-            icon="create-outline"
-            label="Edit"
-            onPress={() => changeMode('edit')}
-          />
-        </View>
+          <View className="mt-5 flex-row rounded-2xl bg-neutral-100 p-1">
+            <ModeButton
+              active={mode === 'create'}
+              icon="add-circle-outline"
+              label="Create"
+              onPress={() => changeMode('create')}
+            />
+            <ModeButton
+              active={mode === 'add'}
+              icon="person-add-outline"
+              label="Members"
+              onPress={() => changeMode('add')}
+            />
+            <ModeButton
+              active={mode === 'edit'}
+              icon="create-outline"
+              label="Edit"
+              onPress={() => changeMode('edit')}
+            />
+          </View>
 
-        {mode !== 'create' ? (
-          <GroupSelector groups={groups} selectedGroupId={selectedGroupId} onSelect={selectGroup} />
-        ) : null}
+          {mode !== 'create' ? (
+            <GroupSelector
+              groups={groups}
+              selectedGroupId={selectedGroupId}
+              onSelect={selectGroup}
+            />
+          ) : null}
 
-        {mode === 'create' || mode === 'edit' ? (
-          <View className="mt-6">
-            <Text className="mb-2 text-sm font-semibold text-neutral-800">Group image</Text>
+          {mode === 'create' || mode === 'edit' ? (
+            <View className="mt-6">
+              <Text className="mb-2 text-sm font-semibold text-neutral-800">Group image</Text>
 
-            <View className="flex-row items-center">
-              <TouchableOpacity
-                className="h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-orange-300 bg-orange-50"
-                disabled={isSubmitting}
-                onPress={pickGroupImage}>
-                {previewImageUri ? (
-                  <Image
-                    className="h-full w-full"
-                    resizeMode="cover"
-                    source={{ uri: previewImageUri }}
-                  />
-                ) : (
-                  <Ionicons name="camera-outline" size={30} color="#F97316" />
-                )}
-              </TouchableOpacity>
-
-              <View className="ml-4 flex-1">
+              <View className="flex-row items-center">
                 <TouchableOpacity
-                  className="self-start rounded-xl bg-orange-500 px-4 py-2.5"
+                  className="h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-orange-300 bg-orange-50"
                   disabled={isSubmitting}
                   onPress={pickGroupImage}>
-                  <Text className="font-semibold text-white">
-                    {previewImageUri ? 'Change image' : 'Upload image'}
-                  </Text>
+                  {previewImageUri ? (
+                    <Image
+                      className="h-full w-full"
+                      resizeMode="cover"
+                      source={{ uri: previewImageUri }}
+                    />
+                  ) : (
+                    <Ionicons name="camera-outline" size={30} color="#F97316" />
+                  )}
                 </TouchableOpacity>
 
-                {previewImageUri ? (
+                <View className="ml-4 flex-1">
                   <TouchableOpacity
-                    className="mt-2 self-start px-1 py-1"
+                    className="self-start rounded-xl bg-orange-500 px-4 py-2.5"
                     disabled={isSubmitting}
-                    onPress={removeGroupImage}>
-                    <Text className="font-semibold text-red-500">Remove image</Text>
+                    onPress={pickGroupImage}>
+                    <Text className="font-semibold text-white">
+                      {previewImageUri ? 'Change image' : 'Upload image'}
+                    </Text>
                   </TouchableOpacity>
-                ) : null}
 
-                <Text className="mt-1 text-xs text-neutral-500">
-                  Square JPG or PNG, maximum 5 MB.
-                </Text>
+                  {previewImageUri ? (
+                    <TouchableOpacity
+                      className="mt-2 self-start px-1 py-1"
+                      disabled={isSubmitting}
+                      onPress={removeGroupImage}>
+                      <Text className="font-semibold text-red-500">Remove image</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  <Text className="mt-1 text-xs text-neutral-500">
+                    Square JPG or PNG, maximum 5 MB.
+                  </Text>
+                </View>
               </View>
+
+              <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">Group name</Text>
+              <TextInput
+                className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
+                editable={!isSubmitting}
+                maxLength={60}
+                placeholder="Example: Morning Warriors"
+                placeholderTextColor="#A3A3A3"
+                value={groupName}
+                onChangeText={setGroupName}
+              />
+
+              <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">
+                Group description
+              </Text>
+              <TextInput
+                className="min-h-28 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
+                editable={!isSubmitting}
+                maxLength={500}
+                multiline
+                placeholder="Tell members what this group is about"
+                placeholderTextColor="#A3A3A3"
+                textAlignVertical="top"
+                value={groupDescription}
+                onChangeText={setGroupDescription}
+                onBlur={() => {
+                  isEditDescriptionFocused.current = false;
+                }}
+                onFocus={keepEditDescriptionVisible}
+              />
+              <Text className="mt-2 text-right text-xs text-neutral-500">
+                {groupDescription.length}/500
+              </Text>
             </View>
+          ) : null}
 
-            <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">Group name</Text>
-            <TextInput
-              className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
-              editable={!isSubmitting}
-              maxLength={60}
-              placeholder="Example: Morning Warriors"
-              placeholderTextColor="#A3A3A3"
-              value={groupName}
-              onChangeText={setGroupName}
+          {mode === 'create' || mode === 'add' ? (
+            <MemberPicker
+              mode={mode}
+              search={search}
+              selectedUserIds={selectedUserIds}
+              users={visibleUsers}
+              onSearchChange={setSearch}
+              onToggleUser={toggleUser}
             />
+          ) : null}
 
-            <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">
-              Group description
+          {mode === 'edit' && !selectedGroup ? (
+            <Text className="mt-8 text-center text-neutral-500">
+              Create a group before editing it.
             </Text>
-            <TextInput
-              className="min-h-28 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
-              editable={!isSubmitting}
-              maxLength={500}
-              multiline
-              placeholder="Tell members what this group is about"
-              placeholderTextColor="#A3A3A3"
-              textAlignVertical="top"
-              value={groupDescription}
-              onChangeText={setGroupDescription}
-            />
-            <Text className="mt-2 text-right text-xs text-neutral-500">
-              {groupDescription.length}/500
-            </Text>
-          </View>
-        ) : null}
+          ) : null}
 
-        {mode === 'create' || mode === 'add' ? (
-          <MemberPicker
-            mode={mode}
-            search={search}
-            selectedUserIds={selectedUserIds}
-            users={visibleUsers}
-            onSearchChange={setSearch}
-            onToggleUser={toggleUser}
-          />
-        ) : null}
+          {mode === 'edit' && selectedGroup ? (
+            <TouchableOpacity
+              className={`mt-6 flex-row items-center justify-center rounded-2xl border border-red-200 py-4 ${
+                selectedGroup.canDelete ? 'bg-red-50' : 'bg-neutral-100'
+              }`}
+              disabled={isSubmitting}
+              onPress={handleDeleteGroup}>
+              <Ionicons
+                name={selectedGroup.canDelete ? 'trash-outline' : 'lock-closed-outline'}
+                size={20}
+                color={selectedGroup.canDelete ? '#DC2626' : '#737373'}
+              />
+              <Text
+                className={`ml-2 text-base font-bold ${
+                  selectedGroup.canDelete ? 'text-red-600' : 'text-neutral-500'
+                }`}>
+                {selectedGroup.canDelete ? 'Delete group' : 'Default group cannot be deleted'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </ScrollView>
 
-        {mode === 'edit' && !selectedGroup ? (
-          <Text className="mt-8 text-center text-neutral-500">
-            Create a group before editing it.
-          </Text>
-        ) : null}
-
-        {mode === 'edit' && selectedGroup ? (
+        <View className="border-t border-neutral-100 bg-white px-4 pb-3 pt-3">
           <TouchableOpacity
-            className={`mt-6 flex-row items-center justify-center rounded-2xl border border-red-200 py-4 ${
-              selectedGroup.canDelete ? 'bg-red-50' : 'bg-neutral-100'
+            className={`items-center rounded-2xl py-4 ${
+              isSubmitting ? 'bg-orange-300' : 'bg-orange-500'
             }`}
-            disabled={isSubmitting}
-            onPress={handleDeleteGroup}>
-            <Ionicons
-              name={selectedGroup.canDelete ? 'trash-outline' : 'lock-closed-outline'}
-              size={20}
-              color={selectedGroup.canDelete ? '#DC2626' : '#737373'}
-            />
-            <Text
-              className={`ml-2 text-base font-bold ${
-                selectedGroup.canDelete ? 'text-red-600' : 'text-neutral-500'
-              }`}>
-              {selectedGroup.canDelete ? 'Delete group' : 'Default group cannot be deleted'}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
-
-      <View className="border-t border-neutral-100 bg-white px-4 pb-3 pt-3">
-        <TouchableOpacity
-          className={`items-center rounded-2xl py-4 ${
-            isSubmitting ? 'bg-orange-300' : 'bg-orange-500'
-          }`}
-          disabled={isSubmitting || (mode !== 'create' && !selectedGroupId)}
-          onPress={
-            mode === 'create'
-              ? handleCreateGroup
-              : mode === 'add'
-                ? handleAddMembers
-                : handleUpdateGroup
-          }>
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-base font-bold text-white">
-              {mode === 'create'
-                ? `Create group${
-                    selectedUserIds.length ? ` with ${selectedUserIds.length} member(s)` : ''
-                  }`
+            disabled={isSubmitting || (mode !== 'create' && !selectedGroupId)}
+            onPress={
+              mode === 'create'
+                ? handleCreateGroup
                 : mode === 'add'
-                  ? `Add ${selectedUserIds.length} member(s)`
-                  : 'Save group changes'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+                  ? handleAddMembers
+                  : handleUpdateGroup
+            }>
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-base font-bold text-white">
+                {mode === 'create'
+                  ? `Create group${
+                      selectedUserIds.length ? ` with ${selectedUserIds.length} member(s)` : ''
+                    }`
+                  : mode === 'add'
+                    ? `Add ${selectedUserIds.length} member(s)`
+                    : 'Save group changes'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

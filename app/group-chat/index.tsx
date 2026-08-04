@@ -140,7 +140,7 @@ export default function GroupListScreen() {
             <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Groups</Text>
 
             <Text className="mt-0.5 text-sm text-[#77716D]">
-              View messages and join communities
+              View messages and join groups
             </Text>
           </View>
 
@@ -156,7 +156,7 @@ export default function GroupListScreen() {
             </View>
 
             <View className="ml-3 flex-1">
-              <Text className="font-lsBold text-base text-[#1A1A1A]">Available communities</Text>
+              <Text className="font-lsBold text-base text-[#1A1A1A]">Available groups</Text>
 
               <Text className="mt-0.5 text-xs text-[#77716D]">
                 {groups.length} {groups.length === 1 ? 'group' : 'groups'}
@@ -261,7 +261,7 @@ export default function GroupListScreen() {
 
                   {hasUnread ? (
                     <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>1+</Text>
+                      <Text style={styles.unreadText}>{item.unreadCount}</Text>
                     </View>
                   ) : null}
                 </View>
