@@ -715,6 +715,12 @@ export default function GroupInfoScreen() {
               {groupInfo.name}
             </Text>
 
+            {groupInfo.description ? (
+              <Text className="mt-3 text-center font-body text-sm leading-5 text-[#625C58]">
+                {groupInfo.description}
+              </Text>
+            ) : null}
+
             <View className="mt-2 flex-row items-center">
               <UsersThree size={17} color="#77716D" weight="bold" />
 

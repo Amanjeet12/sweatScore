@@ -544,8 +544,8 @@ export default function GroupChatScreen() {
                   </Text>
 
                   <Text className="mt-1 text-center font-body text-sm leading-5 text-[#716A65]">
-                    You can read messages, but you must join before sending, replying, reacting or
-                    tagging members.
+                    {group.description?.trim() ||
+                      'You can read messages, but you must join before sending, replying, reacting or tagging members.'}
                   </Text>
 
                   <TouchableOpacity

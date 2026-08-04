@@ -336,6 +336,7 @@ const schema = defineSchema({
 
   chatGroups: defineTable({
     name: v.string(),
+    description: v.optional(v.string()),
     slug: v.string(),
     imageStorageId: v.optional(v.id('_storage')),
     createdBy: v.id('users'),

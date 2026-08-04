@@ -7,6 +7,7 @@ import { requireCurrentUser, requireGroupMember } from './helpers';
 
 const DEFAULT_GROUP_SLUG = 'sweat-sisters';
 const MAX_GROUP_NAME_LENGTH = 60;
+const MAX_GROUP_DESCRIPTION_LENGTH = 500;
 const MAX_GROUP_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_MEMBERS_PER_MUTATION = 100;
 
@@ -294,6 +295,9 @@ export const getGroupInfo = query({
     return {
       _id: group._id,
       name: sanitizeUnicodeString(group.name, 'Group', MAX_GROUP_NAME_LENGTH),
+      description: group.description
+        ? sanitizeUnicodeString(group.description, '', MAX_GROUP_DESCRIPTION_LENGTH)
+        : null,
       slug: sanitizeUnicodeString(group.slug, '', 120),
 
       imageUrl: await getSafeUserImageUrl(ctx, group.imageStorageId),

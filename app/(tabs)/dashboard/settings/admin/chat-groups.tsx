@@ -1,8 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { Stack } from "expo-router";
-import { useMutation, useQuery } from "convex/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack } from 'expo-router';
+import { useMutation, useQuery } from 'convex/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,15 +12,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
+} from 'react-native';
 
-import { BackButton } from "~/components/core/BackButton";
-import SafeAreaView from "~/components/core/SafeAreaView";
-import { Text } from "~/components/ui/text";
-import { api } from "~/convex/_generated/api";
-import type { Id } from "~/convex/_generated/dataModel";
+import { BackButton } from '~/components/core/BackButton';
+import SafeAreaView from '~/components/core/SafeAreaView';
+import { Text } from '~/components/ui/text';
+import { api } from '~/convex/_generated/api';
+import type { Id } from '~/convex/_generated/dataModel';
 
-type ScreenMode = "create" | "add" | "edit";
+type ScreenMode = 'create' | 'add' | 'edit';
 
 type PickedGroupImage = {
   uri: string;
@@ -31,38 +31,31 @@ type PickedGroupImage = {
 const MAX_GROUP_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export default function AdminChatGroupsScreen() {
-  const [mode, setMode] = useState<ScreenMode>("create");
-  const [groupName, setGroupName] = useState("");
-  const [search, setSearch] = useState("");
-  const [selectedGroupId, setSelectedGroupId] =
-    useState<Id<"chatGroups"> | null>(null);
-  const [selectedUserIds, setSelectedUserIds] = useState<Id<"users">[]>([]);
-  const [selectedImage, setSelectedImage] = useState<PickedGroupImage | null>(
-    null,
-  );
+  const [mode, setMode] = useState<ScreenMode>('create');
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [search, setSearch] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState<Id<'chatGroups'> | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Id<'users'>[]>([]);
+  const [selectedImage, setSelectedImage] = useState<PickedGroupImage | null>(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasInitializedCreateMembers = useRef(false);
 
   const groups = useQuery(api.chat.admin.listGroupsForAdmin) ?? [];
-  const userQueryArgs =
-    mode === "add" && selectedGroupId ? { groupId: selectedGroupId } : {};
+  const userQueryArgs = mode === 'add' && selectedGroupId ? { groupId: selectedGroupId } : {};
   const users = useQuery(api.chat.admin.listUsersForAdmin, userQueryArgs) ?? [];
 
   const createGroup = useMutation(api.chat.admin.createGroup);
   const addMembers = useMutation(api.chat.admin.addMembers);
   const updateGroup = useMutation(api.chat.admin.updateGroup);
   const deleteGroup = useMutation(api.chat.admin.deleteGroup);
-  const generateGroupImageUploadUrl = useMutation(
-    api.chat.admin.generateGroupImageUploadUrl,
-  );
-  const cleanupUnusedGroupImage = useMutation(
-    api.chat.admin.cleanupUnusedGroupImage,
-  );
+  const generateGroupImageUploadUrl = useMutation(api.chat.admin.generateGroupImageUploadUrl);
+  const cleanupUnusedGroupImage = useMutation(api.chat.admin.cleanupUnusedGroupImage);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group._id === selectedGroupId) ?? null,
-    [groups, selectedGroupId],
+    [groups, selectedGroupId]
   );
 
   const visibleUsers = useMemo(() => {
@@ -71,22 +64,18 @@ export default function AdminChatGroupsScreen() {
     return users.filter((user) => {
       if (!query) return true;
 
-      return `${user.name} ${user.email ?? ""}`.toLowerCase().includes(query);
+      return `${user.name} ${user.email ?? ''}`.toLowerCase().includes(query);
     });
   }, [search, users]);
 
   useEffect(() => {
-    if ((mode === "add" || mode === "edit") && !selectedGroupId) {
+    if ((mode === 'add' || mode === 'edit') && !selectedGroupId) {
       setSelectedGroupId(groups[0]?._id ?? null);
     }
   }, [groups, mode, selectedGroupId]);
 
   useEffect(() => {
-    if (
-      mode !== "create" ||
-      hasInitializedCreateMembers.current ||
-      users.length === 0
-    ) {
+    if (mode !== 'create' || hasInitializedCreateMembers.current || users.length === 0) {
       return;
     }
 
@@ -95,12 +84,13 @@ export default function AdminChatGroupsScreen() {
   }, [mode, users]);
 
   useEffect(() => {
-    if (mode !== "edit") return;
+    if (mode !== 'edit') return;
 
-    setGroupName(selectedGroup?.name ?? "");
+    setGroupName(selectedGroup?.name ?? '');
+    setGroupDescription(selectedGroup?.description ?? '');
     setSelectedImage(null);
     setRemoveExistingImage(false);
-  }, [mode, selectedGroup?._id, selectedGroup?.name]);
+  }, [mode, selectedGroup?._id, selectedGroup?.name, selectedGroup?.description]);
 
   const resetImageState = () => {
     setSelectedImage(null);
@@ -110,45 +100,48 @@ export default function AdminChatGroupsScreen() {
   const changeMode = (nextMode: ScreenMode) => {
     hasInitializedCreateMembers.current = false;
     setMode(nextMode);
-    setSearch("");
+    setSearch('');
     setSelectedUserIds([]);
     resetImageState();
 
-    if (nextMode === "create") {
+    if (nextMode === 'create') {
       setSelectedGroupId(null);
-      setGroupName("");
+      setGroupName('');
+      setGroupDescription('');
       return;
     }
 
     const nextGroupId = selectedGroupId ?? groups[0]?._id ?? null;
     setSelectedGroupId(nextGroupId);
 
-    if (nextMode === "edit") {
+    if (nextMode === 'edit') {
       const nextGroup = groups.find((group) => group._id === nextGroupId);
-      setGroupName(nextGroup?.name ?? "");
+      setGroupName(nextGroup?.name ?? '');
+      setGroupDescription(nextGroup?.description ?? '');
     } else {
-      setGroupName("");
+      setGroupName('');
     }
   };
 
-  const selectGroup = (groupId: Id<"chatGroups">) => {
+  const selectGroup = (groupId: Id<'chatGroups'>) => {
     setSelectedGroupId(groupId);
     setSelectedUserIds([]);
     resetImageState();
 
-    if (mode === "edit") {
+    if (mode === 'edit') {
       const group = groups.find((item) => item._id === groupId);
-      setGroupName(group?.name ?? "");
+      setGroupName(group?.name ?? '');
+      setGroupDescription(group?.description ?? '');
     }
   };
 
-  const toggleUser = (userId: Id<"users">, isAlreadyMember: boolean) => {
+  const toggleUser = (userId: Id<'users'>, isAlreadyMember: boolean) => {
     if (isAlreadyMember) return;
 
     setSelectedUserIds((current) =>
       current.some((id) => id === userId)
         ? current.filter((id) => id !== userId)
-        : [...current, userId],
+        : [...current, userId]
     );
   };
 
@@ -165,13 +158,13 @@ export default function AdminChatGroupsScreen() {
     const asset = result.assets[0];
 
     if (asset.fileSize && asset.fileSize > MAX_GROUP_IMAGE_BYTES) {
-      Alert.alert("Image is too large", "Choose an image smaller than 5 MB.");
+      Alert.alert('Image is too large', 'Choose an image smaller than 5 MB.');
       return;
     }
 
     setSelectedImage({
       uri: asset.uri,
-      mimeType: asset.mimeType ?? "image/jpeg",
+      mimeType: asset.mimeType ?? 'image/jpeg',
       fileSize: asset.fileSize,
     });
     setRemoveExistingImage(false);
@@ -180,7 +173,7 @@ export default function AdminChatGroupsScreen() {
   const removeGroupImage = () => {
     setSelectedImage(null);
 
-    if (mode === "edit" && selectedGroup?.imageUrl) {
+    if (mode === 'edit' && selectedGroup?.imageUrl) {
       setRemoveExistingImage(true);
     }
   };
@@ -192,33 +185,30 @@ export default function AdminChatGroupsScreen() {
     const localResponse = await fetch(selectedImage.uri);
 
     if (!localResponse.ok) {
-      throw new Error("Unable to read the selected image.");
+      throw new Error('Unable to read the selected image.');
     }
 
     const imageBlob = await localResponse.blob();
     const uploadResponse = await fetch(uploadUrl, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type":
-          selectedImage.mimeType || imageBlob.type || "image/jpeg",
+        'Content-Type': selectedImage.mimeType || imageBlob.type || 'image/jpeg',
       },
       body: imageBlob,
     });
 
     if (!uploadResponse.ok) {
-      throw new Error("Unable to upload the group image.");
+      throw new Error('Unable to upload the group image.');
     }
 
     const result = (await uploadResponse.json()) as {
-      storageId: Id<"_storage">;
+      storageId: Id<'_storage'>;
     };
 
     return result.storageId;
   };
 
-  const cleanupUploadedImage = async (
-    storageId: Id<"_storage"> | undefined,
-  ) => {
+  const cleanupUploadedImage = async (storageId: Id<'_storage'> | undefined) => {
     if (!storageId) return;
 
     try {
@@ -232,11 +222,11 @@ export default function AdminChatGroupsScreen() {
     const name = groupName.trim();
 
     if (name.length < 2) {
-      Alert.alert("Group name required", "Enter a valid group name.");
+      Alert.alert('Group name required', 'Enter a valid group name.');
       return;
     }
 
-    let uploadedImageStorageId: Id<"_storage"> | undefined;
+    let uploadedImageStorageId: Id<'_storage'> | undefined;
 
     try {
       setIsSubmitting(true);
@@ -244,23 +234,23 @@ export default function AdminChatGroupsScreen() {
 
       const groupId = await createGroup({
         name,
+        description: groupDescription.trim() || undefined,
         memberIds: selectedUserIds,
-        ...(uploadedImageStorageId
-          ? { imageStorageId: uploadedImageStorageId }
-          : {}),
+        ...(uploadedImageStorageId ? { imageStorageId: uploadedImageStorageId } : {}),
       });
 
-      setGroupName("");
+      setGroupName('');
+      setGroupDescription('');
       setSelectedUserIds(users.map((user) => user._id));
       resetImageState();
       setSelectedGroupId(groupId);
 
-      Alert.alert("Group created", `${name} is ready.`);
+      Alert.alert('Group created', `${name} is ready.`);
     } catch (error) {
       await cleanupUploadedImage(uploadedImageStorageId);
       Alert.alert(
-        "Unable to create group",
-        error instanceof Error ? error.message : "Please try again.",
+        'Unable to create group',
+        error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
       setIsSubmitting(false);
@@ -269,12 +259,12 @@ export default function AdminChatGroupsScreen() {
 
   const handleAddMembers = async () => {
     if (!selectedGroupId) {
-      Alert.alert("Select a group", "Choose the group to update.");
+      Alert.alert('Select a group', 'Choose the group to update.');
       return;
     }
 
     if (selectedUserIds.length === 0) {
-      Alert.alert("Select members", "Select at least one new member.");
+      Alert.alert('Select members', 'Select at least one new member.');
       return;
     }
 
@@ -288,14 +278,11 @@ export default function AdminChatGroupsScreen() {
 
       setSelectedUserIds([]);
 
-      Alert.alert(
-        "Members updated",
-        `${result.added + result.reactivated} member(s) added.`,
-      );
+      Alert.alert('Members updated', `${result.added + result.reactivated} member(s) added.`);
     } catch (error) {
       Alert.alert(
-        "Unable to add members",
-        error instanceof Error ? error.message : "Please try again.",
+        'Unable to add members',
+        error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
       setIsSubmitting(false);
@@ -304,18 +291,18 @@ export default function AdminChatGroupsScreen() {
 
   const handleUpdateGroup = async () => {
     if (!selectedGroupId) {
-      Alert.alert("Select a group", "Choose the group to edit.");
+      Alert.alert('Select a group', 'Choose the group to edit.');
       return;
     }
 
     const name = groupName.trim();
 
     if (name.length < 2) {
-      Alert.alert("Group name required", "Enter a valid group name.");
+      Alert.alert('Group name required', 'Enter a valid group name.');
       return;
     }
 
-    let uploadedImageStorageId: Id<"_storage"> | undefined;
+    let uploadedImageStorageId: Id<'_storage'> | undefined;
 
     try {
       setIsSubmitting(true);
@@ -324,19 +311,18 @@ export default function AdminChatGroupsScreen() {
       await updateGroup({
         groupId: selectedGroupId,
         name,
+        description: groupDescription.trim() || undefined,
         removeImage: removeExistingImage,
-        ...(uploadedImageStorageId
-          ? { imageStorageId: uploadedImageStorageId }
-          : {}),
+        ...(uploadedImageStorageId ? { imageStorageId: uploadedImageStorageId } : {}),
       });
 
       resetImageState();
-      Alert.alert("Group updated", "The group details were saved.");
+      Alert.alert('Group updated', 'The group details were saved.');
     } catch (error) {
       await cleanupUploadedImage(uploadedImageStorageId);
       Alert.alert(
-        "Unable to update group",
-        error instanceof Error ? error.message : "Please try again.",
+        'Unable to update group',
+        error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
       setIsSubmitting(false);
@@ -345,55 +331,53 @@ export default function AdminChatGroupsScreen() {
 
   const handleDeleteGroup = () => {
     if (!selectedGroup) {
-      Alert.alert("Select a group", "Choose the group to delete.");
+      Alert.alert('Select a group', 'Choose the group to delete.');
       return;
     }
 
     if (!selectedGroup.canDelete) {
-      Alert.alert(
-        "Protected group",
-        "The default Sweat Sisters group cannot be deleted.",
-      );
+      Alert.alert('Protected group', 'The default Sweat Sisters group cannot be deleted.');
       return;
     }
 
     Alert.alert(
-      "Delete group?",
+      'Delete group?',
       `${selectedGroup.name} will disappear for all members. Its message history will be retained.`,
       [
         {
-          text: "Cancel",
-          style: "cancel",
+          text: 'Cancel',
+          style: 'cancel',
         },
         {
-          text: "Delete",
-          style: "destructive",
+          text: 'Delete',
+          style: 'destructive',
           onPress: async () => {
             try {
               setIsSubmitting(true);
               await deleteGroup({ groupId: selectedGroup._id });
               setSelectedGroupId(null);
-              setGroupName("");
+              setGroupName('');
+              setGroupDescription('');
               resetImageState();
-              setMode("create");
-              Alert.alert("Group deleted", "The group is no longer active.");
+              setMode('create');
+              Alert.alert('Group deleted', 'The group is no longer active.');
             } catch (error) {
               Alert.alert(
-                "Unable to delete group",
-                error instanceof Error ? error.message : "Please try again.",
+                'Unable to delete group',
+                error instanceof Error ? error.message : 'Please try again.'
               );
             } finally {
               setIsSubmitting(false);
             }
           },
         },
-      ],
+      ]
     );
   };
 
   const previewImageUri = selectedImage?.uri
     ? selectedImage.uri
-    : mode === "edit" && !removeExistingImage
+    : mode === 'edit' && !removeExistingImage
       ? selectedGroup?.imageUrl
       : null;
 
@@ -402,74 +386,61 @@ export default function AdminChatGroupsScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerTitleAlign: "center",
-          title: "",
+          headerTitleAlign: 'center',
+          title: '',
           headerTitle: () => (
             <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
               Chat Groups
             </Text>
           ),
           headerShadowVisible: false,
-          headerLeft: () => (
-            <BackButton fallbackHref="/dashboard/settings/admin" />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/dashboard/settings/admin" />,
         }}
       />
 
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-4 pb-10 pt-4"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text className="text-2xl font-bold text-neutral-900">
-          Manage chat groups
-        </Text>
+        keyboardShouldPersistTaps="handled">
+        <Text className="text-2xl font-bold text-neutral-900">Manage chat groups</Text>
         <Text className="mt-1 text-sm text-neutral-500">
-          Create groups, upload their images, add members, or edit group
-          details.
+          Create groups, upload their images, add members, or edit group details.
         </Text>
 
         <View className="mt-5 flex-row rounded-2xl bg-neutral-100 p-1">
           <ModeButton
-            active={mode === "create"}
+            active={mode === 'create'}
             icon="add-circle-outline"
             label="Create"
-            onPress={() => changeMode("create")}
+            onPress={() => changeMode('create')}
           />
           <ModeButton
-            active={mode === "add"}
+            active={mode === 'add'}
             icon="person-add-outline"
             label="Members"
-            onPress={() => changeMode("add")}
+            onPress={() => changeMode('add')}
           />
           <ModeButton
-            active={mode === "edit"}
+            active={mode === 'edit'}
             icon="create-outline"
             label="Edit"
-            onPress={() => changeMode("edit")}
+            onPress={() => changeMode('edit')}
           />
         </View>
 
-        {mode !== "create" ? (
-          <GroupSelector
-            groups={groups}
-            selectedGroupId={selectedGroupId}
-            onSelect={selectGroup}
-          />
+        {mode !== 'create' ? (
+          <GroupSelector groups={groups} selectedGroupId={selectedGroupId} onSelect={selectGroup} />
         ) : null}
 
-        {mode === "create" || mode === "edit" ? (
+        {mode === 'create' || mode === 'edit' ? (
           <View className="mt-6">
-            <Text className="mb-2 text-sm font-semibold text-neutral-800">
-              Group image
-            </Text>
+            <Text className="mb-2 text-sm font-semibold text-neutral-800">Group image</Text>
 
             <View className="flex-row items-center">
               <TouchableOpacity
                 className="h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-orange-300 bg-orange-50"
                 disabled={isSubmitting}
-                onPress={pickGroupImage}
-              >
+                onPress={pickGroupImage}>
                 {previewImageUri ? (
                   <Image
                     className="h-full w-full"
@@ -485,10 +456,9 @@ export default function AdminChatGroupsScreen() {
                 <TouchableOpacity
                   className="self-start rounded-xl bg-orange-500 px-4 py-2.5"
                   disabled={isSubmitting}
-                  onPress={pickGroupImage}
-                >
+                  onPress={pickGroupImage}>
                   <Text className="font-semibold text-white">
-                    {previewImageUri ? "Change image" : "Upload image"}
+                    {previewImageUri ? 'Change image' : 'Upload image'}
                   </Text>
                 </TouchableOpacity>
 
@@ -496,11 +466,8 @@ export default function AdminChatGroupsScreen() {
                   <TouchableOpacity
                     className="mt-2 self-start px-1 py-1"
                     disabled={isSubmitting}
-                    onPress={removeGroupImage}
-                  >
-                    <Text className="font-semibold text-red-500">
-                      Remove image
-                    </Text>
+                    onPress={removeGroupImage}>
+                    <Text className="font-semibold text-red-500">Remove image</Text>
                   </TouchableOpacity>
                 ) : null}
 
@@ -510,9 +477,7 @@ export default function AdminChatGroupsScreen() {
               </View>
             </View>
 
-            <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">
-              Group name
-            </Text>
+            <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">Group name</Text>
             <TextInput
               className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
               editable={!isSubmitting}
@@ -522,10 +487,28 @@ export default function AdminChatGroupsScreen() {
               value={groupName}
               onChangeText={setGroupName}
             />
+
+            <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">
+              Group description
+            </Text>
+            <TextInput
+              className="min-h-28 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
+              editable={!isSubmitting}
+              maxLength={500}
+              multiline
+              placeholder="Tell members what this group is about"
+              placeholderTextColor="#A3A3A3"
+              textAlignVertical="top"
+              value={groupDescription}
+              onChangeText={setGroupDescription}
+            />
+            <Text className="mt-2 text-right text-xs text-neutral-500">
+              {groupDescription.length}/500
+            </Text>
           </View>
         ) : null}
 
-        {mode === "create" || mode === "add" ? (
+        {mode === 'create' || mode === 'add' ? (
           <MemberPicker
             mode={mode}
             search={search}
@@ -536,37 +519,29 @@ export default function AdminChatGroupsScreen() {
           />
         ) : null}
 
-        {mode === "edit" && !selectedGroup ? (
+        {mode === 'edit' && !selectedGroup ? (
           <Text className="mt-8 text-center text-neutral-500">
             Create a group before editing it.
           </Text>
         ) : null}
 
-        {mode === "edit" && selectedGroup ? (
+        {mode === 'edit' && selectedGroup ? (
           <TouchableOpacity
             className={`mt-6 flex-row items-center justify-center rounded-2xl border border-red-200 py-4 ${
-              selectedGroup.canDelete ? "bg-red-50" : "bg-neutral-100"
+              selectedGroup.canDelete ? 'bg-red-50' : 'bg-neutral-100'
             }`}
             disabled={isSubmitting}
-            onPress={handleDeleteGroup}
-          >
+            onPress={handleDeleteGroup}>
             <Ionicons
-              name={
-                selectedGroup.canDelete
-                  ? "trash-outline"
-                  : "lock-closed-outline"
-              }
+              name={selectedGroup.canDelete ? 'trash-outline' : 'lock-closed-outline'}
               size={20}
-              color={selectedGroup.canDelete ? "#DC2626" : "#737373"}
+              color={selectedGroup.canDelete ? '#DC2626' : '#737373'}
             />
             <Text
               className={`ml-2 text-base font-bold ${
-                selectedGroup.canDelete ? "text-red-600" : "text-neutral-500"
-              }`}
-            >
-              {selectedGroup.canDelete
-                ? "Delete group"
-                : "Default group cannot be deleted"}
+                selectedGroup.canDelete ? 'text-red-600' : 'text-neutral-500'
+              }`}>
+              {selectedGroup.canDelete ? 'Delete group' : 'Default group cannot be deleted'}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -575,30 +550,27 @@ export default function AdminChatGroupsScreen() {
       <View className="border-t border-neutral-100 bg-white px-4 pb-3 pt-3">
         <TouchableOpacity
           className={`items-center rounded-2xl py-4 ${
-            isSubmitting ? "bg-orange-300" : "bg-orange-500"
+            isSubmitting ? 'bg-orange-300' : 'bg-orange-500'
           }`}
-          disabled={isSubmitting || (mode !== "create" && !selectedGroupId)}
+          disabled={isSubmitting || (mode !== 'create' && !selectedGroupId)}
           onPress={
-            mode === "create"
+            mode === 'create'
               ? handleCreateGroup
-              : mode === "add"
+              : mode === 'add'
                 ? handleAddMembers
                 : handleUpdateGroup
-          }
-        >
+          }>
           {isSubmitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text className="text-base font-bold text-white">
-              {mode === "create"
+              {mode === 'create'
                 ? `Create group${
-                    selectedUserIds.length
-                      ? ` with ${selectedUserIds.length} member(s)`
-                      : ""
+                    selectedUserIds.length ? ` with ${selectedUserIds.length} member(s)` : ''
                   }`
-                : mode === "add"
+                : mode === 'add'
                   ? `Add ${selectedUserIds.length} member(s)`
-                  : "Save group changes"}
+                  : 'Save group changes'}
             </Text>
           )}
         </TouchableOpacity>
@@ -613,26 +585,24 @@ function GroupSelector({
   onSelect,
 }: {
   groups: Array<{
-    _id: Id<"chatGroups">;
+    _id: Id<'chatGroups'>;
     name: string;
+    description: string;
     memberCount: number;
     imageUrl: string | null;
   }>;
-  selectedGroupId: Id<"chatGroups"> | null;
-  onSelect: (groupId: Id<"chatGroups">) => void;
+  selectedGroupId: Id<'chatGroups'> | null;
+  onSelect: (groupId: Id<'chatGroups'>) => void;
 }) {
   return (
     <View className="mt-5">
-      <Text className="mb-2 text-sm font-semibold text-neutral-800">
-        Select group
-      </Text>
+      <Text className="mb-2 text-sm font-semibold text-neutral-800">Select group</Text>
 
       {groups.length ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2"
-        >
+          contentContainerClassName="gap-2">
           {groups.map((group) => {
             const selected = selectedGroupId === group._id;
 
@@ -640,12 +610,9 @@ function GroupSelector({
               <TouchableOpacity
                 key={group._id}
                 className={`min-w-40 flex-row items-center rounded-2xl border px-3 py-3 ${
-                  selected
-                    ? "border-orange-500 bg-orange-50"
-                    : "border-neutral-200 bg-white"
+                  selected ? 'border-orange-500 bg-orange-50' : 'border-neutral-200 bg-white'
                 }`}
-                onPress={() => onSelect(group._id)}
-              >
+                onPress={() => onSelect(group._id)}>
                 {group.imageUrl ? (
                   <Image
                     className="h-11 w-11 rounded-full"
@@ -654,21 +621,14 @@ function GroupSelector({
                   />
                 ) : (
                   <View className="h-11 w-11 items-center justify-center rounded-full bg-orange-100">
-                    <Ionicons
-                      name="chatbubbles-outline"
-                      size={22}
-                      color="#F97316"
-                    />
+                    <Ionicons name="chatbubbles-outline" size={22} color="#F97316" />
                   </View>
                 )}
 
                 <View className="ml-3">
                   <Text
-                    className={`font-semibold ${
-                      selected ? "text-orange-600" : "text-neutral-800"
-                    }`}
-                    numberOfLines={1}
-                  >
+                    className={`font-semibold ${selected ? 'text-orange-600' : 'text-neutral-800'}`}
+                    numberOfLines={1}>
                     {group.name}
                   </Text>
                   <Text className="mt-0.5 text-xs text-neutral-500">
@@ -681,9 +641,7 @@ function GroupSelector({
         </ScrollView>
       ) : (
         <View className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-6">
-          <Text className="text-center text-neutral-500">
-            No active groups found.
-          </Text>
+          <Text className="text-center text-neutral-500">No active groups found.</Text>
         </View>
       )}
     </View>
@@ -698,26 +656,24 @@ function MemberPicker({
   onSearchChange,
   onToggleUser,
 }: {
-  mode: "create" | "add";
+  mode: 'create' | 'add';
   search: string;
-  selectedUserIds: Id<"users">[];
+  selectedUserIds: Id<'users'>[];
   users: Array<{
-    _id: Id<"users">;
+    _id: Id<'users'>;
     name: string;
     email: string | null;
     isMember: boolean;
   }>;
   onSearchChange: (value: string) => void;
-  onToggleUser: (userId: Id<"users">, isAlreadyMember: boolean) => void;
+  onToggleUser: (userId: Id<'users'>, isAlreadyMember: boolean) => void;
 }) {
   return (
     <View className="mt-6">
       <Text className="text-base font-bold text-neutral-900">
-        {mode === "create" ? "Select initial members" : "Select new members"}
+        {mode === 'create' ? 'Select initial members' : 'Select new members'}
       </Text>
-      <Text className="mt-0.5 text-xs text-neutral-500">
-        {selectedUserIds.length} selected
-      </Text>
+      <Text className="mt-0.5 text-xs text-neutral-500">{selectedUserIds.length} selected</Text>
 
       <TextInput
         className="mt-3 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900"
@@ -729,20 +685,17 @@ function MemberPicker({
 
       <View className="mt-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
         {users.map((user, index) => {
-          const selected = selectedUserIds.some(
-            (userId) => userId === user._id,
-          );
-          const disabled = mode === "add" && user.isMember;
+          const selected = selectedUserIds.some((userId) => userId === user._id);
+          const disabled = mode === 'add' && user.isMember;
 
           return (
             <Pressable
               key={user._id}
               className={`flex-row items-center px-4 py-3 ${
-                index !== users.length - 1 ? "border-b border-neutral-100" : ""
-              } ${disabled ? "opacity-50" : ""}`}
+                index !== users.length - 1 ? 'border-b border-neutral-100' : ''
+              } ${disabled ? 'opacity-50' : ''}`}
               disabled={disabled}
-              onPress={() => onToggleUser(user._id, disabled)}
-            >
+              onPress={() => onToggleUser(user._id, disabled)}>
               <View className="h-10 w-10 items-center justify-center rounded-full bg-orange-100">
                 <Text className="font-bold text-orange-600">
                   {user.name.slice(0, 1).toUpperCase()}
@@ -750,31 +703,20 @@ function MemberPicker({
               </View>
 
               <View className="ml-3 flex-1">
-                <Text className="font-semibold text-neutral-900">
-                  {user.name}
-                </Text>
+                <Text className="font-semibold text-neutral-900">{user.name}</Text>
                 {user.email ? (
-                  <Text className="mt-0.5 text-xs text-neutral-500">
-                    {user.email}
-                  </Text>
+                  <Text className="mt-0.5 text-xs text-neutral-500">{user.email}</Text>
                 ) : null}
               </View>
 
               {disabled ? (
-                <Text className="text-xs font-medium text-neutral-500">
-                  Added
-                </Text>
+                <Text className="text-xs font-medium text-neutral-500">Added</Text>
               ) : (
                 <View
                   className={`h-6 w-6 items-center justify-center rounded-full border ${
-                    selected
-                      ? "border-orange-500 bg-orange-500"
-                      : "border-neutral-300 bg-white"
-                  }`}
-                >
-                  {selected ? (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  ) : null}
+                    selected ? 'border-orange-500 bg-orange-500' : 'border-neutral-300 bg-white'
+                  }`}>
+                  {selected ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}
                 </View>
               )}
             </Pressable>
@@ -782,9 +724,7 @@ function MemberPicker({
         })}
 
         {users.length === 0 ? (
-          <Text className="px-4 py-8 text-center text-neutral-500">
-            No users found.
-          </Text>
+          <Text className="px-4 py-8 text-center text-neutral-500">No users found.</Text>
         ) : null}
       </View>
     </View>
@@ -804,17 +744,11 @@ function ModeButton({
 }) {
   return (
     <TouchableOpacity
-      className={`flex-1 items-center rounded-xl py-2.5 ${
-        active ? "bg-white" : "bg-transparent"
-      }`}
-      onPress={onPress}
-    >
-      <Ionicons name={icon} size={19} color={active ? "#EA580C" : "#737373"} />
+      className={`flex-1 items-center rounded-xl py-2.5 ${active ? 'bg-white' : 'bg-transparent'}`}
+      onPress={onPress}>
+      <Ionicons name={icon} size={19} color={active ? '#EA580C' : '#737373'} />
       <Text
-        className={`mt-1 text-xs font-semibold ${
-          active ? "text-orange-600" : "text-neutral-500"
-        }`}
-      >
+        className={`mt-1 text-xs font-semibold ${active ? 'text-orange-600' : 'text-neutral-500'}`}>
         {label}
       </Text>
     </TouchableOpacity>
