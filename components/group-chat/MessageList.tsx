@@ -394,26 +394,26 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
     }, [isLoadingMore]);
 
     /*
-     * Scroll to the newest message only once when the initial
-     * 20 messages are first loaded.
-     *
-     * This does not run when the count changes from 20 to 40.
+     * Wait until FlatList has measured the initial message rows before
+     * marking the initial scroll as complete. A timer can be cancelled
+     * when the live query updates, leaving the list stuck at the top.
      */
-    useEffect(() => {
+    const handleContentSizeChange = useCallback(() => {
       if (initialScrollDoneRef.current || isLoading || messages.length === 0) {
         return;
       }
 
-      initialScrollDoneRef.current = true;
+      requestAnimationFrame(() => {
+        internalListRef.current?.scrollToEnd({ animated: false });
 
-      const timer = setTimeout(() => {
-        scrollToLatest(false);
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    }, [isLoading, messages.length, scrollToLatest]);
+        requestAnimationFrame(() => {
+          internalListRef.current?.scrollToEnd({ animated: false });
+          initialScrollDoneRef.current = true;
+          updateNearBottom(true);
+          setNewMessageCount(0);
+        });
+      });
+    }, [isLoading, messages.length, updateNearBottom]);
 
     /*
      * Detect only messages appended after the current latest message.
@@ -613,6 +613,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
         <FlatList
           ref={internalListRef}
           data={rows}
+          initialNumToRender={rows.length}
           keyExtractor={(item) => item.id}
           renderItem={renderRow}
           showsVerticalScrollIndicator={false}
@@ -635,6 +636,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
             minIndexForVisible: 0,
           }}
           onScroll={handleScroll}
+          onContentSizeChange={handleContentSizeChange}
           scrollEventThrottle={16}
           onViewableItemsChanged={handleViewableItemsChanged}
           onScrollToIndexFailed={(info) => {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,7 +52,6 @@ export default function GroupChatScreen() {
    * bottom while reading older messages.
    */
   const isNearBottomRef = useRef(true);
-  const initialScrollDoneRef = useRef(false);
 
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
@@ -212,22 +211,6 @@ export default function GroupChatScreen() {
   const { androidKeyboardInset, scrollToLatest } = useChatKeyboard(listRef, {
     shouldScrollOnKeyboardOpen: shouldScrollForKeyboard,
   });
-
-  useEffect(() => {
-    if (initialScrollDoneRef.current || isLoading || isLoadingMore || messages.length === 0) {
-      return;
-    }
-
-    initialScrollDoneRef.current = true;
-
-    const timer = setTimeout(() => {
-      scrollToLatest(false);
-    }, 120);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [isLoading, isLoadingMore, messages.length, scrollToLatest]);
 
   const visibleMessages = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -484,6 +467,7 @@ export default function GroupChatScreen() {
 
           <View className="flex-1">
             <MessageList
+              key={groupId}
               ref={listRef}
               messages={visibleMessages}
               readOnly={!isMember}
