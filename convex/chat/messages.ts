@@ -200,10 +200,12 @@ export const listMessages = query({
           }
         }
 
-        const reactionDocuments = await ctx.db
-          .query('chatReactions')
-          .withIndex('by_message', (q) => q.eq('messageId', message._id))
-          .collect();
+        const reactionDocuments = message.deletedAt
+          ? []
+          : await ctx.db
+              .query('chatReactions')
+              .withIndex('by_message', (q) => q.eq('messageId', message._id))
+              .collect();
 
         const groupedReactions = new Map<
           string,
@@ -258,6 +260,8 @@ export const listMessages = query({
             Boolean(group.pinnedMessageId) && String(group.pinnedMessageId) === String(message._id),
 
           deliveryStatus: isMine ? ('sent' as const) : null,
+
+          isDeleted: Boolean(message.deletedAt),
 
           attachment,
           voiceUri,
@@ -894,6 +898,127 @@ export const getPinnedMessage = query({
 
         pinnedByName: pinnedByUser ? getSenderName(pinnedByUser) : 'Admin',
       },
+    };
+  },
+});
+
+export const deleteOwnMessage = mutation({
+  args: {
+    messageId: v.id('chatMessages'),
+  },
+
+  handler: async (ctx, args) => {
+    const currentUser = await requireCurrentUser(ctx);
+
+    const message = await ctx.db.get(args.messageId);
+
+    if (!message) {
+      throw new ConvexError('Message not found');
+    }
+
+    await requireGroupMember(ctx, message.groupId, currentUser._id);
+
+    if (String(message.senderId) !== String(currentUser._id)) {
+      throw new ConvexError('You can only delete your own messages');
+    }
+
+    if (message.deletedAt) {
+      return {
+        deleted: false,
+        alreadyDeleted: true,
+      };
+    }
+
+    const group = await ctx.db.get(message.groupId);
+
+    if (!group || !group.isActive) {
+      throw new ConvexError('Group not found');
+    }
+
+    /*
+     * Soft delete the message.
+     * The original database record remains,
+     * but its content is hidden from users.
+     */
+    await ctx.db.patch(message._id, {
+      deletedAt: Date.now(),
+
+      /*
+       * Remove private content from
+       * the message record.
+       */
+      text: undefined,
+      linkPreview: undefined,
+      mentions: undefined,
+      mentionedUserIds: [],
+    });
+
+    /*
+     * Remove all reactions from the
+     * deleted message.
+     */
+    const reactions = await ctx.db
+      .query('chatReactions')
+      .withIndex('by_message', (q) => q.eq('messageId', message._id))
+      .collect();
+
+    for (const reaction of reactions) {
+      await ctx.db.delete(reaction._id);
+    }
+
+    const wasLastMessage = String(group.lastMessageId) === String(message._id);
+
+    const wasPinned = String(group.pinnedMessageId) === String(message._id);
+
+    const groupPatch: {
+      lastMessageId?: Id<'chatMessages'>;
+
+      lastMessageAt?: number;
+
+      pinnedMessageId?: Id<'chatMessages'>;
+
+      pinnedBy?: Id<'users'>;
+
+      pinnedAt?: number;
+    } = {};
+
+    /*
+     * Find the previous visible message
+     * when the deleted message was the
+     * group's latest message.
+     */
+    if (wasLastMessage) {
+      const latestVisibleMessage = await ctx.db
+        .query('chatMessages')
+        .withIndex('by_group', (q) => q.eq('groupId', message.groupId))
+        .filter((q) => q.eq(q.field('deletedAt'), undefined))
+        .order('desc')
+        .first();
+
+      groupPatch.lastMessageId = latestVisibleMessage?._id;
+
+      groupPatch.lastMessageAt = latestVisibleMessage?._creationTime;
+    }
+
+    /*
+     * Automatically unpin the message
+     * when the deleted message was pinned.
+     */
+    if (wasPinned) {
+      groupPatch.pinnedMessageId = undefined;
+
+      groupPatch.pinnedBy = undefined;
+
+      groupPatch.pinnedAt = undefined;
+    }
+
+    if (wasLastMessage || wasPinned) {
+      await ctx.db.patch(group._id, groupPatch);
+    }
+
+    return {
+      deleted: true,
+      alreadyDeleted: false,
     };
   },
 });

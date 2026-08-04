@@ -89,6 +89,7 @@ export default function GroupChatScreen() {
     canPinMessages,
     pinMessage,
     unpinMessage,
+    deleteMessage,
   } = useChatMessages(groupId);
 
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
@@ -155,6 +156,33 @@ export default function GroupChatScreen() {
 
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
 
+  const handleDeleteMessage = useCallback(
+    (message: ChatMessage) => {
+      if (!message.isMine || message.isDeleted) {
+        return;
+      }
+
+      Alert.alert('Delete message?', 'This message will be deleted for everyone in the group.', [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+
+          onPress: () => {
+            if (replyingTo?.id === message.id) {
+              setReplyingTo(null);
+            }
+
+            void deleteMessage(message.id);
+          },
+        },
+      ]);
+    },
+    [deleteMessage, replyingTo?.id]
+  );
   const handleJoinGroup = useCallback(async () => {
     if (!typedGroupId || isJoiningGroup) {
       return;
@@ -484,6 +512,11 @@ export default function GroupChatScreen() {
               onMessageVisible={isMember ? markMessageRead : undefined}
               onNearBottomChange={(nearBottom) => {
                 isNearBottomRef.current = nearBottom;
+              }}
+              onDelete={(message) => {
+                if (isMember) {
+                  handleDeleteMessage(message);
+                }
               }}
             />
           </View>

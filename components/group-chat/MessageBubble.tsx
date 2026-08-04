@@ -22,7 +22,10 @@ type MessageBubbleProps = {
   onToggleVoice: () => void;
   onReply: () => void;
   onReact: (emoji: string) => void;
+
   onTogglePin: () => void;
+  onDelete: () => void;
+
   onPressReplyPreview: () => void;
 };
 const MAX_VISIBLE_SEEN_AVATARS = 3;
@@ -42,6 +45,7 @@ const MessageBubble = ({
   onReply,
   onReact,
   onTogglePin,
+  onDelete,
   onPressReplyPreview,
 }: MessageBubbleProps) => {
   const isMine = Boolean(message.isMine);
@@ -110,15 +114,18 @@ const MessageBubble = ({
           ) : null}
 
           <Pressable
-            onLongPress={readOnly ? undefined : onToggleActions}
+            onLongPress={readOnly || message.isDeleted ? undefined : onToggleActions}
             delayLongPress={250}
             accessibilityRole="button"
             accessibilityHint={
-              readOnly ? 'Read-only group message' : 'Long press for reactions and reply'
+              message.isDeleted
+                ? 'Deleted message'
+                : readOnly
+                  ? 'Read-only group message'
+                  : 'Long press for message actions'
             }
             style={[
               styles.messageBubble,
-
               isMine ? styles.myMessageBubble : styles.otherMessageBubble,
             ]}>
             <MessageContent
@@ -130,11 +137,12 @@ const MessageBubble = ({
           </Pressable>
 
           <MessageReactions
-            reactions={message.reactions}
+            reactions={message.isDeleted ? undefined : message.reactions}
             actionOpen={actionOpen}
-            readOnly={readOnly}
-            canShowSeen={!readOnly && isMine && seenMembers.length > 0}
-            canPin={!readOnly && canPin}
+            readOnly={readOnly || message.isDeleted}
+            canShowSeen={!readOnly && !message.isDeleted && isMine && seenMembers.length > 0}
+            canPin={!readOnly && !message.isDeleted && canPin}
+            canDelete={!readOnly && !message.isDeleted && isMine}
             isPinned={Boolean(message.isPinned)}
             seenCount={seenMembers.length}
             onCloseActions={onCloseActions}
@@ -145,6 +153,7 @@ const MessageBubble = ({
             onReact={onReact}
             onReply={onReply}
             onTogglePin={onTogglePin}
+            onDelete={onDelete}
           />
 
           {shouldShowSeenReceipt ? (

@@ -391,7 +391,20 @@ export const listAvailableGroups = query({
       })
     );
 
-    return results.sort((first, second) => second.sortAt - first.sortAt);
+    return results.sort((first, second) => {
+      /*
+       * Joined groups always appear first.
+       */
+      if (first.isMember !== second.isMember) {
+        return first.isMember ? -1 : 1;
+      }
+
+      /*
+       * Inside each section, show the group with
+       * the latest activity first.
+       */
+      return second.sortAt - first.sortAt;
+    });
   },
 });
 

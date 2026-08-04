@@ -136,6 +136,7 @@ export const useChatMessages = (groupId?: string) => {
       : 'skip'
   );
 
+  const deleteMessageMutation = useMutation(api.chat.messages.deleteOwnMessage);
   const pinMessageMutation = useMutation(api.chat.messages.pinMessage);
 
   const unpinMessageMutation = useMutation(api.chat.messages.unpinMessage);
@@ -175,6 +176,7 @@ export const useChatMessages = (groupId?: string) => {
       time: formatMessageTime(new Date(message.createdAt)),
       isMine: message.isMine,
       isPinned: message.isPinned,
+      isDeleted: message.isDeleted,
 
       ...(message.deliveryStatus
         ? {
@@ -251,6 +253,23 @@ export const useChatMessages = (groupId?: string) => {
       reactions: message.reactions,
     }));
   }, [results]);
+
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await deleteMessageMutation({
+          messageId: messageId as Id<'chatMessages'>,
+        });
+
+        return true;
+      } catch (error) {
+        showChatError(error);
+
+        return false;
+      }
+    },
+    [deleteMessageMutation]
+  );
 
   const sendTextMessage = useCallback(
     async ({ text, replyToMessageId }: SendTextMessageInput) => {
@@ -651,6 +670,7 @@ export const useChatMessages = (groupId?: string) => {
 
   return {
     messages,
+    deleteMessage,
 
     pinnedMessage: pinnedMessageResult?.message
       ? {

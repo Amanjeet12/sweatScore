@@ -1,4 +1,4 @@
-import { ArrowBendUpLeft, Eye, PushPin } from 'phosphor-react-native';
+import { ArrowBendUpLeft, Eye, PushPin, Trash } from 'phosphor-react-native';
 import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
@@ -13,12 +13,14 @@ type MessageReactionsProps = {
   isPinned?: boolean;
   seenCount?: number;
   readOnly?: boolean;
+  canDelete?: boolean;
 
   onReact: (emoji: string) => void;
   onReply: () => void;
   onShowSeen?: () => void;
   onTogglePin?: () => void;
   onCloseActions: () => void;
+  onDelete?: () => void;
 };
 
 const MessageReactions = ({
@@ -29,11 +31,13 @@ const MessageReactions = ({
   isPinned = false,
   seenCount = 0,
   readOnly = false,
+  canDelete = false,
 
   onReact,
   onReply,
   onShowSeen,
   onTogglePin,
+  onDelete,
   onCloseActions,
 }: MessageReactionsProps) => {
   const handleReaction = (emoji: string) => {
@@ -54,6 +58,11 @@ const MessageReactions = ({
   const handleTogglePin = () => {
     onCloseActions();
     onTogglePin?.();
+  };
+
+  const handleDelete = () => {
+    onCloseActions();
+    onDelete?.();
   };
 
   return (
@@ -158,6 +167,21 @@ const MessageReactions = ({
                 className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF1E8]">
                 <ArrowBendUpLeft size={18} color="#F35E16" weight="bold" />
               </TouchableOpacity>
+
+              {canDelete ? (
+                <>
+                  <View className="mx-1 h-7 w-px bg-[#E8E2DE]" />
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleDelete}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete message"
+                    className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF0F0]">
+                    <Trash size={18} color="#D14343" weight="bold" />
+                  </TouchableOpacity>
+                </>
+              ) : null}
             </View>
           </Pressable>
         </Pressable>

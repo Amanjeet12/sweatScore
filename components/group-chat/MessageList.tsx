@@ -40,6 +40,7 @@ type MessageListProps = {
   onTogglePin: (message: ChatMessage) => void;
   onMessageVisible?: (messageId: string) => void;
   onNearBottomChange?: (isNearBottom: boolean) => void;
+  onDelete: (message: ChatMessage) => void;
 };
 
 type MessageListRow =
@@ -156,6 +157,7 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
       onTogglePin,
       onMessageVisible,
       onNearBottomChange,
+      onDelete,
     },
     forwardedRef
   ) => {
@@ -555,6 +557,11 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
               });
               setActionMessageId(null);
             }}
+            onDelete={() => {
+              onDelete(message);
+
+              setActionMessageId(null);
+            }}
           />
         );
       },
@@ -563,10 +570,12 @@ const MessageList = forwardRef<FlatList<any>, MessageListProps>(
         canPinMessages,
         highlightedMessageId,
         latestOwnMessageId,
+        onDelete,
         onReact,
         onReply,
         onTogglePin,
         playingVoiceId,
+        readOnly,
       ]
     );
 

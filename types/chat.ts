@@ -56,6 +56,7 @@ export type ChatMessage = {
   seenBy?: ChatSeenMember[];
   mentions?: ChatMention[];
   isPinned?: boolean;
+  isDeleted?: boolean;
 };
 
 export type ChatTypingUser = {
