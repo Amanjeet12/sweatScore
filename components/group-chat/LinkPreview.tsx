@@ -153,7 +153,7 @@ const LinkPreview = ({ title: storedTitle, url }: LinkPreviewProps) => {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    minHeight: 65,
+    height: 92,
     flexDirection: 'row',
     overflow: 'hidden',
     borderRadius: 14,
@@ -164,14 +164,14 @@ const styles = StyleSheet.create({
 
   previewArea: {
     width: 86,
-    minHeight: 75,
+    height: 92,
     overflow: 'hidden',
     backgroundColor: '#FFF2E9',
   },
 
   previewImage: {
     width: '100%',
-    height: '100%',
+    height: 92,
   },
 
   iconArea: {

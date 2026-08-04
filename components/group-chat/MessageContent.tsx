@@ -100,7 +100,7 @@ const MessageContent = ({
 
       {message.attachment ? <MediaMessage attachment={message.attachment} /> : null}
 
-      {linkUrl ? <LinkPreview url={linkUrl} /> : null}
+      {linkUrl ? <LinkPreview title={message.linkTitle} url={linkUrl} /> : null}
 
       {message.type === 'voice' ? (
         <VoiceMessage

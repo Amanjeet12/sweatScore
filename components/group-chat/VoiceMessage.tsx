@@ -31,6 +31,10 @@ const VoiceMessage = ({
 
   const desiredPlayingRef = useRef(isPlaying);
 
+  const onTogglePlaybackRef = useRef(onTogglePlayback);
+
+  const loadingRef = useRef(false);
+
   const [loadState, setLoadState] = useState<LoadState>('idle');
 
   const [positionMillis, setPositionMillis] = useState(0);
@@ -41,43 +45,44 @@ const VoiceMessage = ({
     desiredPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  const handlePlaybackStatus = useCallback(
-    (status: AVPlaybackStatus) => {
-      if (!mountedRef.current) {
-        return;
-      }
+  useEffect(() => {
+    onTogglePlaybackRef.current = onTogglePlayback;
+  }, [onTogglePlayback]);
 
-      if (!status.isLoaded) {
-        if (status.error) {
-          setLoadState('error');
+  const handlePlaybackStatus = useCallback((status: AVPlaybackStatus) => {
+    if (!mountedRef.current) {
+      return;
+    }
 
-          if (desiredPlayingRef.current) {
-            desiredPlayingRef.current = false;
+    if (!status.isLoaded) {
+      if (status.error) {
+        setLoadState('error');
 
-            onTogglePlayback();
-          }
+        if (desiredPlayingRef.current) {
+          desiredPlayingRef.current = false;
+
+          onTogglePlaybackRef.current();
         }
-
-        return;
       }
 
-      setLoadState('ready');
+      return;
+    }
 
-      setPositionMillis(status.positionMillis);
+    setLoadState('ready');
 
-      if (status.durationMillis) {
-        setDurationMillis(status.durationMillis);
-      }
+    setPositionMillis(status.positionMillis);
 
-      if (status.didJustFinish && desiredPlayingRef.current) {
-        desiredPlayingRef.current = false;
+    if (status.durationMillis) {
+      setDurationMillis(status.durationMillis);
+    }
 
-        setPositionMillis(0);
-        onTogglePlayback();
-      }
-    },
-    [onTogglePlayback]
-  );
+    if (status.didJustFinish && desiredPlayingRef.current) {
+      desiredPlayingRef.current = false;
+
+      setPositionMillis(0);
+      onTogglePlaybackRef.current();
+    }
+  }, []);
 
   const loadAndPlay = useCallback(async () => {
     if (!uri) {
@@ -86,9 +91,13 @@ const VoiceMessage = ({
       if (desiredPlayingRef.current) {
         desiredPlayingRef.current = false;
 
-        onTogglePlayback();
+        onTogglePlaybackRef.current();
       }
 
+      return;
+    }
+
+    if (loadingRef.current) {
       return;
     }
 
@@ -112,6 +121,7 @@ const VoiceMessage = ({
       }
 
       setLoadState('loading');
+      loadingRef.current = true;
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -130,7 +140,7 @@ const VoiceMessage = ({
           progressUpdateIntervalMillis: 150,
         },
         handlePlaybackStatus,
-        false
+        true
       );
 
       if (!mountedRef.current) {
@@ -164,10 +174,12 @@ const VoiceMessage = ({
       if (desiredPlayingRef.current) {
         desiredPlayingRef.current = false;
 
-        onTogglePlayback();
+        onTogglePlaybackRef.current();
       }
+    } finally {
+      loadingRef.current = false;
     }
-  }, [handlePlaybackStatus, onTogglePlayback, uri]);
+  }, [handlePlaybackStatus, uri]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -187,6 +199,7 @@ const VoiceMessage = ({
 
     setLoadState('idle');
     setPositionMillis(0);
+    loadingRef.current = false;
 
     setDurationMillis(Math.max(duration, 0) * 1000);
 
