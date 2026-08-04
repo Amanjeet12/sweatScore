@@ -385,6 +385,10 @@ const ChatComposer = ({
      * same person is selected more than once.
      */
     setSelectedMentions((currentMentions) => {
+      if (member.userId === '@all') {
+        return currentMentions;
+      }
+
       const withoutDuplicate = currentMentions.filter(
         (mention) => mention.userId !== member.userId
       );

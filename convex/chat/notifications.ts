@@ -3,8 +3,7 @@ import { anyApi } from 'convex/server';
 import { v } from 'convex/values';
 
 import { components } from '../_generated/api';
-import { internal } from '../_generated/api';
-import type { Doc } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import { internalAction, internalMutation } from '../_generated/server';
 
 const MAX_NOTIFICATION_PREVIEW_LENGTH = 120;
@@ -18,6 +17,16 @@ const PUSH_RECIPIENT_BATCH_SIZE = 50;
 const PUSH_SEND_CONCURRENCY = 20;
 
 const chatNotificationsApi = anyApi['chat/notifications'];
+
+const chatEventValidator = v.union(
+  v.literal('newMessage'),
+  v.literal('mention'),
+  v.literal('reply'),
+  v.literal('allMention'),
+  v.literal('reaction')
+);
+
+type ChatNotificationEvent = 'newMessage' | 'mention' | 'reply' | 'allMention' | 'reaction';
 
 function sanitizeNotificationText(value: unknown, fallback: string, maximumLength: number) {
   if (typeof value !== 'string') {
@@ -165,7 +174,20 @@ export const queueChatMessagePush = internalMutation({
       )
       .collect();
 
-    const recipientIds = [];
+    const mentionedUserIds = new Set(message.mentionedUserIds.map(String));
+
+    const hasAllMention = /(^|\s)@all\b/i.test(message.text ?? '');
+
+    const repliedMessage = message.replyToMessageId
+      ? await ctx.db.get(message.replyToMessageId)
+      : null;
+
+    const replyRecipientId =
+      repliedMessage && String(repliedMessage.groupId) === String(args.groupId)
+        ? String(repliedMessage.senderId)
+        : null;
+
+    const recipients: { userId: Id<'users'>; eventType: ChatNotificationEvent }[] = [];
 
     for (const membership of memberships) {
       /*
@@ -220,10 +242,20 @@ export const queueChatMessagePush = internalMutation({
         continue;
       }
 
-      recipientIds.push(user._id);
+      const userId = String(user._id);
+
+      const eventType: ChatNotificationEvent = hasAllMention
+        ? 'allMention'
+        : mentionedUserIds.has(userId)
+          ? 'mention'
+          : replyRecipientId === userId
+            ? 'reply'
+            : 'newMessage';
+
+      recipients.push({ userId: user._id, eventType });
     }
 
-    if (recipientIds.length === 0) {
+    if (recipients.length === 0) {
       return {
         queued: 0,
       };
@@ -239,33 +271,131 @@ export const queueChatMessagePush = internalMutation({
 
     const preview = getMessagePreview(message);
 
-    const body = sanitizeNotificationText(
-      `${senderName}: ${preview}`,
-      'You have a new group message',
-      MAX_NOTIFICATION_BODY_LENGTH
-    );
+    const bodies: Record<Exclude<ChatNotificationEvent, 'reaction'>, string> = {
+      newMessage: `${senderName}: ${preview}`,
+      mention: `${senderName} mentioned you: ${preview}`,
+      reply: `${senderName} replied to your message: ${preview}`,
+      allMention: `${senderName} mentioned everyone: ${preview}`,
+    };
 
     /*
      * Split large groups into separate scheduled
      * jobs so one action does not receive a very
      * large argument payload.
      */
-    for (let index = 0; index < recipientIds.length; index += PUSH_RECIPIENT_BATCH_SIZE) {
-      const batch = recipientIds.slice(index, index + PUSH_RECIPIENT_BATCH_SIZE);
+    for (const eventType of ['newMessage', 'mention', 'reply', 'allMention'] as const) {
+      const recipientIds = recipients
+        .filter((recipient) => recipient.eventType === eventType)
+        .map((recipient) => recipient.userId);
 
-      await ctx.scheduler.runAfter(0, chatNotificationsApi.sendChatMessagePush, {
-        recipientIds: batch,
-        groupId: args.groupId,
-        messageId: args.messageId,
-        senderId: args.senderId,
-        title: groupName,
-        body,
-      });
+      for (let index = 0; index < recipientIds.length; index += PUSH_RECIPIENT_BATCH_SIZE) {
+        const batch = recipientIds.slice(index, index + PUSH_RECIPIENT_BATCH_SIZE);
+
+        await ctx.scheduler.runAfter(0, chatNotificationsApi.sendChatMessagePush, {
+          recipientIds: batch,
+          groupId: args.groupId,
+          messageId: args.messageId,
+          senderId: args.senderId,
+          title: groupName,
+          body: sanitizeNotificationText(
+            bodies[eventType],
+            'You have a new group notification',
+            MAX_NOTIFICATION_BODY_LENGTH
+          ),
+          eventType,
+        });
+      }
     }
 
     return {
-      queued: recipientIds.length,
+      queued: recipients.length,
     };
+  },
+});
+
+export const queueChatReactionPush = internalMutation({
+  args: {
+    groupId: v.id('chatGroups'),
+    messageId: v.id('chatMessages'),
+    reactorId: v.id('users'),
+    emoji: v.string(),
+  },
+
+  handler: async (ctx, args) => {
+    const [group, message, reactor] = await Promise.all([
+      ctx.db.get(args.groupId),
+      ctx.db.get(args.messageId),
+      ctx.db.get(args.reactorId),
+    ]);
+
+    if (
+      !group?.isActive ||
+      !message ||
+      message.deletedAt ||
+      !reactor ||
+      String(message.groupId) !== String(args.groupId) ||
+      String(message.senderId) === String(args.reactorId)
+    ) {
+      return { queued: 0 };
+    }
+
+    const activeReaction = await ctx.db
+      .query('chatReactions')
+      .withIndex('by_message_user_emoji', (queryBuilder) =>
+        queryBuilder
+          .eq('messageId', args.messageId)
+          .eq('userId', args.reactorId)
+          .eq('emoji', args.emoji)
+      )
+      .first();
+
+    if (!activeReaction) {
+      return { queued: 0 };
+    }
+
+    const membership = await ctx.db
+      .query('chatMembers')
+      .withIndex('by_group_user', (queryBuilder) =>
+        queryBuilder.eq('groupId', args.groupId).eq('userId', message.senderId)
+      )
+      .unique();
+
+    const recipient = await ctx.db.get(message.senderId);
+
+    if (
+      membership?.status !== 'active' ||
+      membership.notificationsMuted ||
+      !recipient ||
+      recipient.notificationEnabled === false ||
+      !recipient.expoPushToken
+    ) {
+      return { queued: 0 };
+    }
+
+    const groupName = sanitizeNotificationText(
+      group.name,
+      'Group Chat',
+      MAX_NOTIFICATION_TITLE_LENGTH
+    );
+    const reactorName = getSenderName(reactor);
+    const emoji = sanitizeNotificationText(args.emoji, '👍', 10);
+    const body = sanitizeNotificationText(
+      `${reactorName} reacted ${emoji} to your message`,
+      'Someone reacted to your message',
+      MAX_NOTIFICATION_BODY_LENGTH
+    );
+
+    await ctx.scheduler.runAfter(0, chatNotificationsApi.sendChatMessagePush, {
+      recipientIds: [recipient._id],
+      groupId: args.groupId,
+      messageId: args.messageId,
+      senderId: args.reactorId,
+      title: groupName,
+      body,
+      eventType: 'reaction',
+    });
+
+    return { queued: 1 };
   },
 });
 
@@ -287,6 +417,7 @@ export const sendChatMessagePush = internalAction({
 
     title: v.string(),
     body: v.string(),
+    eventType: v.optional(chatEventValidator),
   },
 
   handler: async (ctx, args) => {
@@ -311,6 +442,8 @@ export const sendChatMessagePush = internalAction({
 
               data: {
                 notificationType: 'newChatMessage',
+
+                chatEventType: args.eventType ?? 'newMessage',
 
                 groupId: String(args.groupId),
 

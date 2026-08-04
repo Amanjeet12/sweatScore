@@ -251,6 +251,10 @@ export const useChatMessages = (groupId?: string) => {
         : {}),
 
       reactions: message.reactions,
+      mentions: (message.mentions ?? []).map((mention) => ({
+        userId: String(mention.userId),
+        displayName: mention.displayName,
+      })),
     }));
   }, [results]);
 
@@ -272,7 +276,7 @@ export const useChatMessages = (groupId?: string) => {
   );
 
   const sendTextMessage = useCallback(
-    async ({ text, replyToMessageId }: SendTextMessageInput) => {
+    async ({ text, replyToMessageId, mentions }: SendTextMessageInput) => {
       if (!convexGroupId) {
         return false;
       }
@@ -288,6 +292,15 @@ export const useChatMessages = (groupId?: string) => {
           groupId: convexGroupId,
           text: cleanText,
           clientMessageId: createClientMessageId(),
+
+          ...(mentions?.length
+            ? {
+                mentions: mentions.map((mention) => ({
+                  userId: mention.userId as Id<'users'>,
+                  displayName: mention.displayName,
+                })),
+              }
+            : {}),
 
           ...(replyToMessageId
             ? {
@@ -494,7 +507,7 @@ export const useChatMessages = (groupId?: string) => {
   );
 
   const sendAttachment = useCallback(
-    async ({ attachment, text, replyToMessageId }: SendAttachmentInput) => {
+    async ({ attachment, text, replyToMessageId, mentions }: SendAttachmentInput) => {
       if (!convexGroupId) {
         return false;
       }
@@ -593,6 +606,15 @@ export const useChatMessages = (groupId?: string) => {
           fileName,
 
           clientMessageId: createClientMessageId(),
+
+          ...(mentions?.length
+            ? {
+                mentions: mentions.map((mention) => ({
+                  userId: mention.userId as Id<'users'>,
+                  displayName: mention.displayName,
+                })),
+              }
+            : {}),
 
           ...(cleanText
             ? {

@@ -32,7 +32,14 @@ const MentionSuggestions = ({
   const filteredMembers = useMemo(() => {
     const normalizedQuery = normalizeSearchValue(query);
 
-    return members
+    const allMention: ChatMentionMember = {
+      userId: '@all',
+      name: 'all',
+      initial: '@',
+      avatarColor: '#F76B1C',
+    };
+
+    const matchingMembers = members
       .filter((member) => {
         /*
          * Do not show the current user in the
@@ -49,6 +56,10 @@ const MentionSuggestions = ({
         return member.name.toLowerCase().includes(normalizedQuery);
       })
       .slice(0, MAX_VISIBLE_MEMBERS);
+
+    return 'all'.startsWith(normalizedQuery)
+      ? [allMention, ...matchingMembers].slice(0, MAX_VISIBLE_MEMBERS)
+      : matchingMembers;
   }, [currentUserId, members, query]);
 
   if (!visible) {
@@ -104,11 +115,11 @@ const MentionSuggestions = ({
 
               <View className="ml-3 flex-1">
                 <Text className="font-body text-sm font-bold text-[#2E2A27]" numberOfLines={1}>
-                  {item.name}
+                  {item.userId === '@all' ? '@all — notify everyone' : item.name}
                 </Text>
 
                 <Text className="mt-0.5 font-body text-[11px] text-[#8B837E]" numberOfLines={1}>
-                  Tap to mention
+                  {item.userId === '@all' ? 'All active group members' : 'Tap to mention'}
                 </Text>
               </View>
 

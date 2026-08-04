@@ -18,8 +18,52 @@ const MAX_AUDIO_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_VOICE_DURATION_SECONDS = 300;
 
 const MAX_ATTACHMENT_NAME_LENGTH = 180;
+const MAX_MENTIONS_PER_MESSAGE = 50;
 const CHAT_PUSH_DELAY_MS = 1500;
 const chatNotificationsApi = anyApi['chat/notifications'];
+
+const mentionValidator = v.object({
+  userId: v.id('users'),
+  displayName: v.string(),
+});
+
+async function validateMentions(
+  ctx: MutationCtx,
+  groupId: Id<'chatGroups'>,
+  text: string,
+  mentions: { userId: Id<'users'>; displayName: string }[] | undefined
+) {
+  if (!mentions?.length) {
+    return [];
+  }
+
+  if (mentions.length > MAX_MENTIONS_PER_MESSAGE) {
+    throw new ConvexError(`A message can mention at most ${MAX_MENTIONS_PER_MESSAGE} members`);
+  }
+
+  const uniqueMentions = new Map<string, { userId: Id<'users'>; displayName: string }>();
+
+  for (const mention of mentions) {
+    const displayName = mention.displayName.trim();
+
+    if (!displayName || !text.includes(`@${displayName}`)) {
+      continue;
+    }
+
+    const membership = await getGroupMembership(ctx, groupId, mention.userId);
+
+    if (membership?.status !== 'active') {
+      throw new ConvexError('One or more mentioned users are not active group members');
+    }
+
+    uniqueMentions.set(String(mention.userId), {
+      userId: mention.userId,
+      displayName,
+    });
+  }
+
+  return [...uniqueMentions.values()];
+}
 
 const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
 
@@ -270,6 +314,8 @@ export const listMessages = query({
 
           linkUrl: !message.deletedAt ? (message.linkPreview?.url ?? null) : null,
 
+          mentions: message.deletedAt ? [] : (message.mentions ?? []),
+
           replyTo,
           reactions: Array.from(groupedReactions.values()),
         };
@@ -288,6 +334,8 @@ export const sendMessage = mutation({
     groupId: v.id('chatGroups'),
     text: v.string(),
     clientMessageId: v.string(),
+
+    mentions: v.optional(v.array(mentionValidator)),
 
     replyToMessageId: v.optional(v.id('chatMessages')),
   },
@@ -342,6 +390,8 @@ export const sendMessage = mutation({
       }
     }
 
+    const mentions = await validateMentions(ctx, args.groupId, text, args.mentions);
+
     const messageId = await ctx.db.insert('chatMessages', {
       groupId: args.groupId,
 
@@ -351,7 +401,9 @@ export const sendMessage = mutation({
       type: 'text',
       text,
 
-      mentionedUserIds: [],
+      mentionedUserIds: mentions.map((mention) => mention.userId),
+
+      ...(mentions.length ? { mentions } : {}),
 
       ...(args.replyToMessageId
         ? {
@@ -424,6 +476,15 @@ export const toggleReaction = mutation({
 
       emoji: args.emoji,
     });
+
+    if (String(message.senderId) !== String(currentUser._id)) {
+      await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatReactionPush, {
+        groupId: message.groupId,
+        messageId: message._id,
+        reactorId: currentUser._id,
+        emoji: args.emoji,
+      });
+    }
 
     return {
       active: true,
@@ -498,6 +559,8 @@ export const sendAttachment = mutation({
     clientMessageId: v.string(),
 
     replyToMessageId: v.optional(v.id('chatMessages')),
+
+    mentions: v.optional(v.array(mentionValidator)),
   },
 
   handler: async (ctx, args) => {
@@ -574,6 +637,8 @@ export const sendAttachment = mutation({
       }
     }
 
+    const mentions = await validateMentions(ctx, args.groupId, cleanText, args.mentions);
+
     const messageId = await ctx.db.insert('chatMessages', {
       groupId: args.groupId,
 
@@ -582,7 +647,9 @@ export const sendAttachment = mutation({
       clientMessageId,
       type: args.type,
 
-      mentionedUserIds: [],
+      mentionedUserIds: mentions.map((mention) => mention.userId),
+
+      ...(mentions.length ? { mentions } : {}),
 
       ...(cleanText
         ? {
