@@ -35,6 +35,23 @@ type PlanCardProps = {
   onPress: () => void;
 };
 
+function formatCurrency(value: number, currencyCode?: string) {
+  const locale = Localization.getLocales()[0]?.languageTag ?? 'en-US';
+
+  if (!currencyCode) {
+    return value.toLocaleString(locale, {
+      maximumFractionDigits: 2,
+    });
+  }
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function PlanCard({
   title,
   price,
@@ -57,15 +74,15 @@ function PlanCard({
       accessibilityLabel={`${title} subscription plan`}
       className="flex-1"
       style={{
-        minHeight: 96,
         position: 'relative',
+        minHeight: 96,
         borderRadius: 18,
         borderWidth: selected ? 1.8 : 1.2,
         borderColor: selected ? '#FF6A2A' : '#D8D5D3',
         backgroundColor: selected ? '#FFF0EA' : '#FFFFFF',
         paddingHorizontal: 17,
-        paddingBottom: 18,
         paddingTop: 14,
+        paddingBottom: 18,
         opacity: disabled ? 0.55 : 1,
         overflow: 'visible',
       }}>
@@ -97,7 +114,7 @@ function PlanCard({
         className="mt-1 w-full text-[16px] text-[#262626]"
         numberOfLines={1}
         adjustsFontSizeToFit
-        minimumFontScale={0.65}>
+        minimumFontScale={0.6}>
         {price ? `${price}${billingSuffix}` : 'Loading...'}
       </Text>
 
@@ -129,7 +146,7 @@ function PlanCard({
             className="text-[12px] font-bold text-white"
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.75}>
+            minimumFontScale={0.65}>
             {offerLabel}
           </Text>
         </View>
@@ -157,7 +174,10 @@ export default function Paywall() {
   const syncToEnduranceZone = useAction(api.users.syncToEnduranceZone);
 
   if (__DEV__) {
-    console.log('Available packages from RevenueCat:', packages);
+    console.log(
+      'Available packages from RevenueCat:',
+      JSON.stringify(packages, null, 2)
+    );
   }
 
   const monthlyPackage = useMemo(
@@ -170,16 +190,8 @@ export default function Paywall() {
     [packages]
   );
 
-  /*
-   * The paywall only requires monthly and annual plans.
-   * Other RevenueCat packages are ignored.
-   */
   const isPackagesLoading = !monthlyPackage && !annualPackage;
 
-  /*
-   * Select annual by default because it is the
-   * recommended plan in the reference design.
-   */
   useEffect(() => {
     if (selectedPackage) {
       return;
@@ -199,10 +211,10 @@ export default function Paywall() {
   const isMonthlySelected = selectedPackage?.identifier === MONTHLY_PACKAGE_ID;
 
   /*
-   * Calculates the approximate number of free
-   * months compared with paying monthly for a year.
+   * Compare 12 monthly payments with
+   * the price of one annual subscription.
    */
-  const annualFreeMonths = useMemo(() => {
+  const annualSaving = useMemo(() => {
     if (!monthlyPackage || !annualPackage) {
       return 0;
     }
@@ -214,21 +226,35 @@ export default function Paywall() {
       return 0;
     }
 
-    const annualMonthlyEquivalent = annualPrice / monthlyPrice;
-    const savedMonths = 12 - annualMonthlyEquivalent;
+    const yearlyMonthlyCost = monthlyPrice * 12;
+    const saving = yearlyMonthlyCost - annualPrice;
 
-    return Math.max(0, Math.round(savedMonths));
+    return Math.max(0, saving);
   }, [annualPackage, monthlyPackage]);
 
-  const annualOfferLabel =
-    annualFreeMonths > 0
-      ? `${annualFreeMonths} ${annualFreeMonths === 1 ? 'month' : 'months'} free`
-      : 'Best value';
+  const annualSavingText = useMemo(() => {
+    if (annualSaving <= 0) {
+      return null;
+    }
+
+    const currencyCode =
+      annualPackage?.product.currencyCode ?? monthlyPackage?.product.currencyCode;
+
+    return formatCurrency(annualSaving, currencyCode);
+  }, [annualPackage, annualSaving, monthlyPackage]);
+
+  const annualOfferLabel = annualSavingText
+    ? `Save ${annualSavingText}`
+    : 'Best value';
 
   const hasTrial = Boolean(selectedPackage?.product?.introPrice);
 
   const isCtaDisabled =
-    !selectedPackage || !purchasePackage || isLoading || isLoggingOut || isPackagesLoading;
+    !selectedPackage ||
+    !purchasePackage ||
+    isLoading ||
+    isLoggingOut ||
+    isPackagesLoading;
 
   const paywallBullets = [
     "You've done the diets and plans, but nothing else ever sticks",
@@ -254,7 +280,10 @@ export default function Paywall() {
 
       setIsLoading(false);
 
-      Alert.alert('Purchase failed', 'Unable to complete the purchase. Please try again.');
+      Alert.alert(
+        'Purchase failed',
+        'Unable to complete the purchase. Please try again.'
+      );
 
       return;
     }
@@ -289,14 +318,18 @@ export default function Paywall() {
       }
 
       await signOut();
-      await setCurrentUser(null);
+
+      setCurrentUser(null);
 
       router.dismissAll();
       router.replace('/(auth)/email');
     } catch (error) {
       console.error('Logout failed:', error);
 
-      Alert.alert('Logout failed', 'Unable to return to login. Please try again.');
+      Alert.alert(
+        'Logout failed',
+        'Unable to return to login. Please try again.'
+      );
 
       setIsLoggingOut(false);
     }
@@ -345,8 +378,8 @@ export default function Paywall() {
         </Text>
 
         <Text className="mx-1 mt-4 text-center text-[15px] leading-5 text-[#252525]">
-          Losing weight was never the hard part. Keeping it going is. SweatScore is built for the
-          part everyone else abandons you at.
+          Losing weight was never the hard part. Keeping it going is. SweatScore is
+          built for the part everyone else abandons you at.
         </Text>
 
         <View className="mx-1 mt-7">
@@ -365,13 +398,15 @@ export default function Paywall() {
                   <Icon.CheckCircle size={21} color="#FFC4A8" weight="fill" />
                 </View>
 
-                <Text className="flex-1 text-[14px] leading-[18px] text-[#252525]">{item}</Text>
+                <Text className="flex-1 text-[14px] leading-[18px] text-[#252525]">
+                  {item}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Monthly and Annual plans */}
+        {/* Monthly and annual plans */}
         <View
           className="mt-9 flex-row items-stretch"
           style={{
@@ -442,7 +477,9 @@ export default function Paywall() {
             }}>
             {isLoading ? (
               <View className="flex-row items-center justify-center">
-                <Text className="mr-2 text-lg font-bold text-white">Processing...</Text>
+                <Text className="mr-2 text-lg font-bold text-white">
+                  Processing...
+                </Text>
 
                 <ActivityIndicator size={20} color="#FFFFFF" />
               </View>
@@ -468,10 +505,14 @@ export default function Paywall() {
               <View className="flex-row items-center">
                 <ActivityIndicator size="small" color="#FF5C1A" />
 
-                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">Signing out...</Text>
+                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">
+                  Signing out...
+                </Text>
               </View>
             ) : (
-              <Text className="text-sm font-semibold text-[#FF5C1A]">Back to login</Text>
+              <Text className="text-sm font-semibold text-[#FF5C1A]">
+                Back to login
+              </Text>
             )}
           </TouchableOpacity>
         ) : null}
