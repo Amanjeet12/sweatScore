@@ -21,6 +21,7 @@ const MAX_ATTACHMENT_NAME_LENGTH = 180;
 const MAX_MENTIONS_PER_MESSAGE = 50;
 const CHAT_PUSH_DELAY_MS = 1500;
 const chatNotificationsApi = anyApi['chat/notifications'];
+const ALL_MENTION_PATTERN = /(^|\s)@all\b/i;
 
 const mentionValidator = v.object({
   userId: v.id('users'),
@@ -63,6 +64,12 @@ async function validateMentions(
   }
 
   return [...uniqueMentions.values()];
+}
+
+function requireAllMentionPermission(text: string, isAdmin: boolean | undefined) {
+  if (ALL_MENTION_PATTERN.test(text) && isAdmin !== true) {
+    throw new ConvexError('Only admins can mention all group members');
+  }
 }
 
 const ALLOWED_REACTIONS = ['🔥', '❤️', '💪', '😂', '👏'];
@@ -361,6 +368,8 @@ export const sendMessage = mutation({
       throw new ConvexError(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
     }
 
+    requireAllMentionPermission(text, currentUser.isAdmin);
+
     const clientMessageId = args.clientMessageId.trim();
 
     if (!clientMessageId || clientMessageId.length > MAX_CLIENT_MESSAGE_ID_LENGTH) {
@@ -600,6 +609,8 @@ export const sendAttachment = mutation({
     if (cleanText.length > MAX_MESSAGE_LENGTH) {
       throw new ConvexError(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
     }
+
+    requireAllMentionPermission(cleanText, currentUser.isAdmin);
 
     const metadata = await ctx.db.system.get('_storage', args.storageId);
 

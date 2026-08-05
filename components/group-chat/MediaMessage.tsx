@@ -1,10 +1,21 @@
 import { useEvent } from 'expo';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ArrowClockwise, FileText, WarningCircle, X } from 'phosphor-react-native';
-import { useCallback, useState } from 'react';
+import {
+  ArrowClockwise,
+  FileText,
+  WarningCircle,
+  X,
+} from 'phosphor-react-native';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
+  Image as ReactNativeImage,
   Linking,
   StyleSheet,
   TouchableOpacity,
@@ -47,7 +58,6 @@ const useMediaSize = (): MediaSize => {
   const { width: screenWidth } = useWindowDimensions();
 
   const width = Math.min(screenWidth * 0.72, 290);
-
   const height = Math.min(width * 0.75, 218);
 
   return {
@@ -56,57 +66,104 @@ const useMediaSize = (): MediaSize => {
   };
 };
 
-const MediaLoadingOverlay = ({ label }: MediaLoadingOverlayProps) => {
+const MediaLoadingOverlay = ({
+  label,
+}: MediaLoadingOverlayProps) => {
   return (
-    <View pointerEvents="none" style={styles.loadingOverlay}>
-      <ActivityIndicator size="small" color="#F76B1C" />
+    <View
+      pointerEvents="none"
+      style={styles.loadingOverlay}
+    >
+      <ActivityIndicator
+        size="small"
+        color="#F76B1C"
+      />
 
-      <Text style={styles.loadingText}>{label}</Text>
+      <Text style={styles.loadingText}>
+        {label}
+      </Text>
     </View>
   );
 };
 
-const MediaErrorFallback = ({ title, message, onRetry }: MediaErrorFallbackProps) => {
+const MediaErrorFallback = ({
+  title,
+  message,
+  onRetry,
+}: MediaErrorFallbackProps) => {
   return (
     <View style={styles.errorOverlay}>
       <View style={styles.errorIcon}>
-        <WarningCircle size={25} color="#F76B1C" weight="fill" />
+        <WarningCircle
+          size={25}
+          color="#F76B1C"
+          weight="fill"
+        />
       </View>
 
-      <Text style={styles.errorTitle}>{title}</Text>
+      <Text style={styles.errorTitle}>
+        {title}
+      </Text>
 
-      <Text style={styles.errorMessage}>{message}</Text>
+      <Text style={styles.errorMessage}>
+        {message}
+      </Text>
 
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={`Retry loading ${title.toLowerCase()}`}
-        style={styles.retryButton}>
-        <ArrowClockwise size={15} color="#F76B1C" weight="bold" />
+        style={styles.retryButton}
+      >
+        <ArrowClockwise
+          size={15}
+          color="#F76B1C"
+          weight="bold"
+        />
 
-        <Text style={styles.retryText}>Try again</Text>
+        <Text style={styles.retryText}>
+          Try again
+        </Text>
       </TouchableOpacity>
     </View>
   );
 };
 
-const VideoPlayerSurface = ({ attachment, mediaSize, onRetry }: VideoPlayerSurfaceProps) => {
-  const player = useVideoPlayer(attachment.uri, (videoPlayer) => {
-    videoPlayer.loop = false;
-    videoPlayer.volume = 1;
-  });
+const VideoPlayerSurface = ({
+  attachment,
+  mediaSize,
+  onRetry,
+}: VideoPlayerSurfaceProps) => {
+  const player = useVideoPlayer(
+    attachment.uri,
+    (videoPlayer) => {
+      videoPlayer.loop = false;
+      videoPlayer.volume = 1;
+    }
+  );
 
-  const { status } = useEvent(player, 'statusChange', {
-    status: player.status,
-  });
+  const { status } = useEvent(
+    player,
+    'statusChange',
+    {
+      status: player.status,
+    }
+  );
 
-  const isLoading = status === 'idle' || status === 'loading';
+  const isLoading =
+    status === 'idle' ||
+    status === 'loading';
 
   const hasError = status === 'error';
 
   return (
-    <View style={[styles.videoContainer, mediaSize]}>
+    <View
+      style={[
+        styles.videoContainer,
+        mediaSize,
+      ]}
+    >
       <VideoView
         player={player}
         nativeControls={!hasError}
@@ -115,7 +172,9 @@ const VideoPlayerSurface = ({ attachment, mediaSize, onRetry }: VideoPlayerSurfa
         style={styles.video}
       />
 
-      {isLoading ? <MediaLoadingOverlay label="Loading video…" /> : null}
+      {isLoading ? (
+        <MediaLoadingOverlay label="Loading video…" />
+      ) : null}
 
       {hasError ? (
         <MediaErrorFallback
@@ -128,50 +187,172 @@ const VideoPlayerSurface = ({ attachment, mediaSize, onRetry }: VideoPlayerSurfa
   );
 };
 
-const VideoAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
+const VideoAttachment = ({
+  attachment,
+}: {
+  attachment: ChatAttachment;
+}) => {
   const mediaSize = useMediaSize();
 
-  const [retryKey, setRetryKey] = useState(0);
+  const [retryKey, setRetryKey] =
+    useState(0);
 
   return (
     <VideoPlayerSurface
       key={`${attachment.id}-${retryKey}`}
       attachment={attachment}
       mediaSize={mediaSize}
-      onRetry={() => setRetryKey((current) => current + 1)}
+      onRetry={() => {
+        setRetryKey(
+          (current) => current + 1
+        );
+      }}
     />
   );
 };
 
-const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
+const ImageAttachment = ({
+  attachment,
+}: {
+  attachment: ChatAttachment;
+}) => {
   const mediaSize = useMediaSize();
 
-  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerVisible, setViewerVisible] =
+    useState(false);
 
-  const [loadState, setLoadState] = useState<MediaLoadState>('loading');
+  const [loadState, setLoadState] =
+    useState<MediaLoadState>('loading');
 
-  const [retryKey, setRetryKey] = useState(0);
+  const [retryKey, setRetryKey] =
+    useState(0);
+
+  /**
+   * Keep the viewer image array stable.
+   *
+   * Without useMemo, a new images array is
+   * created every time this component renders.
+   */
+  const viewerImages = useMemo(
+    () => [
+      {
+        uri: attachment.uri,
+      },
+    ],
+    [attachment.uri]
+  );
+
+  /**
+   * The thumbnail uses Expo Image, but
+   * react-native-image-viewing internally uses
+   * React Native's image handling.
+   *
+   * Prefetch into React Native's cache so the
+   * fullscreen image is usually ready before
+   * the user taps it.
+   */
+  useEffect(() => {
+    void ReactNativeImage.prefetch(
+      attachment.uri
+    ).catch(() => {
+      /**
+       * Do not show an error here.
+       *
+       * Expo Image may still load successfully,
+       * and the fullscreen viewer can retry when
+       * it becomes visible.
+       */
+    });
+  }, [attachment.uri, retryKey]);
+
+  /**
+   * Close the viewer whenever the attachment
+   * changes while this component is reused.
+   */
+  useEffect(() => {
+    setViewerVisible(false);
+    setLoadState('loading');
+  }, [attachment.id]);
 
   const openViewer = useCallback(() => {
+    if (loadState !== 'loaded') {
+      return;
+    }
+
     setViewerVisible(true);
-  }, []);
+  }, [loadState]);
 
   const closeViewer = useCallback(() => {
     setViewerVisible(false);
   }, []);
 
-  const retryImage = () => {
+  const retryImage = useCallback(() => {
     setViewerVisible(false);
     setLoadState('loading');
 
-    setRetryKey((current) => current + 1);
-  };
+    setRetryKey(
+      (current) => current + 1
+    );
+  }, []);
 
-  const imageLoaded = loadState === 'loaded';
+  const handleImageLoaded =
+    useCallback(() => {
+      setLoadState('loaded');
+
+      /**
+       * Warm React Native's image cache again
+       * after Expo Image confirms that the
+       * remote image is available.
+       */
+      void ReactNativeImage.prefetch(
+        attachment.uri
+      ).catch(() => undefined);
+    }, [attachment.uri]);
+
+  /**
+   * Keep the header component stable.
+   *
+   * This prevents the image viewer from
+   * remounting its header unnecessarily.
+   */
+  const ViewerHeader = useCallback(
+    () => (
+      <View style={styles.viewerHeader}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Close image viewer"
+          hitSlop={{
+            top: 14,
+            right: 14,
+            bottom: 14,
+            left: 14,
+          }}
+          onPress={closeViewer}
+          style={styles.viewerCloseButton}
+        >
+          <X
+            size={24}
+            color="#FFFFFF"
+            weight="bold"
+          />
+        </TouchableOpacity>
+      </View>
+    ),
+    [closeViewer]
+  );
+
+  const imageLoaded =
+    loadState === 'loaded';
 
   return (
     <>
-      <View style={[styles.imageContainer, mediaSize]}>
+      <View
+        style={[
+          styles.imageContainer,
+          mediaSize,
+        ]}
+      >
         <Image
           key={`${attachment.id}-${retryKey}`}
           source={{
@@ -179,14 +360,21 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
           }}
           style={styles.image}
           contentFit="cover"
-          transition={200}
+          transition={100}
           cachePolicy="memory-disk"
-          onLoadStart={() => setLoadState('loading')}
-          onLoad={() => setLoadState('loaded')}
-          onError={() => setLoadState('error')}
+          recyclingKey={attachment.id}
+          onLoadStart={() => {
+            setLoadState('loading');
+          }}
+          onLoad={handleImageLoaded}
+          onError={() => {
+            setLoadState('error');
+          }}
         />
 
-        {loadState === 'loading' ? <MediaLoadingOverlay label="Loading photo…" /> : null}
+        {loadState === 'loading' ? (
+          <MediaLoadingOverlay label="Loading photo…" />
+        ) : null}
 
         {loadState === 'error' ? (
           <MediaErrorFallback
@@ -198,14 +386,25 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
 
         {imageLoaded ? (
           <TouchableOpacity
-            activeOpacity={0.92}
+            activeOpacity={0.9}
+            delayPressIn={0}
             accessibilityRole="imagebutton"
             accessibilityLabel="Open image preview"
-            onPressIn={openViewer}
-            style={styles.imageOpenButton}>
-            <View pointerEvents="none" style={styles.imageOverlay}>
+            onPress={openViewer}
+            style={styles.imageOpenButton}
+          >
+            <View
+              pointerEvents="none"
+              style={styles.imageOverlay}
+            >
               <View style={styles.openHint}>
-                <Text style={styles.openHintText}>Tap to view</Text>
+                <Text
+                  style={
+                    styles.openHintText
+                  }
+                >
+                  Tap to view
+                </Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -213,73 +412,100 @@ const ImageAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
       </View>
 
       <ImageViewing
-        images={[
-          {
-            uri: attachment.uri,
-          },
-        ]}
+        images={viewerImages}
         imageIndex={0}
         visible={viewerVisible}
         backgroundColor="#000000"
+        /**
+         * The library defaults to a fade animation.
+         * Removing it makes open and close visually
+         * immediate after the state changes.
+         */
+        animationType="none"
         swipeToCloseEnabled
         doubleTapToZoomEnabled
         onRequestClose={closeViewer}
-        HeaderComponent={() => (
-          <View style={styles.viewerHeader}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Close image viewer"
-              onPressIn={closeViewer}
-              style={styles.viewerCloseButton}>
-              <X size={24} color="#FFFFFF" weight="bold" />
-            </TouchableOpacity>
-          </View>
-        )}
+        HeaderComponent={ViewerHeader}
       />
     </>
   );
 };
 
-const FileAttachment = ({ attachment }: { attachment: ChatAttachment }) => {
+const FileAttachment = ({
+  attachment,
+}: {
+  attachment: ChatAttachment;
+}) => {
   const openFile = async () => {
-    const canOpen = await Linking.canOpenURL(attachment.uri);
+    const canOpen =
+      await Linking.canOpenURL(
+        attachment.uri
+      );
 
     if (canOpen) {
-      await Linking.openURL(attachment.uri);
+      await Linking.openURL(
+        attachment.uri
+      );
     }
   };
 
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      onPress={() => void openFile()}
-      className="min-w-[230px] flex-row items-center rounded-xl bg-[#FFF5EE] p-3">
+      onPress={() => {
+        void openFile();
+      }}
+      className="min-w-[230px] flex-row items-center rounded-xl bg-[#FFF5EE] p-3"
+    >
       <View className="h-11 w-11 items-center justify-center rounded-full bg-white">
-        <FileText size={22} color="#F35E16" weight="bold" />
+        <FileText
+          size={22}
+          color="#F35E16"
+          weight="bold"
+        />
       </View>
 
       <View className="ml-3 flex-1">
-        <Text className="font-body text-sm font-bold text-[#242424]" numberOfLines={1}>
-          {attachment.name || 'Shared file'}
+        <Text
+          className="font-body text-sm font-bold text-[#242424]"
+          numberOfLines={1}
+        >
+          {attachment.name ||
+            'Shared file'}
         </Text>
 
-        <Text className="mt-0.5 font-body text-xs text-[#737373]">Tap to open</Text>
+        <Text className="mt-0.5 font-body text-xs text-[#737373]">
+          Tap to open
+        </Text>
       </View>
     </TouchableOpacity>
   );
 };
 
-const MediaMessage = ({ attachment }: MediaMessageProps) => {
+const MediaMessage = ({
+  attachment,
+}: MediaMessageProps) => {
   if (attachment.type === 'video') {
-    return <VideoAttachment attachment={attachment} />;
+    return (
+      <VideoAttachment
+        attachment={attachment}
+      />
+    );
   }
 
   if (attachment.type === 'file') {
-    return <FileAttachment attachment={attachment} />;
+    return (
+      <FileAttachment
+        attachment={attachment}
+      />
+    );
   }
 
-  return <ImageAttachment attachment={attachment} />;
+  return (
+    <ImageAttachment
+      attachment={attachment}
+    />
+  );
 };
 
 const styles = StyleSheet.create({
@@ -308,7 +534,8 @@ const styles = StyleSheet.create({
 
   openHint: {
     borderRadius: 999,
-    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    backgroundColor:
+      'rgba(0, 0, 0, 0.52)',
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
@@ -335,7 +562,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(250, 248, 246, 0.94)',
+    backgroundColor:
+      'rgba(250, 248, 246, 0.94)',
   },
 
   loadingText: {
@@ -349,7 +577,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(250, 248, 246, 0.98)',
+    backgroundColor:
+      'rgba(250, 248, 246, 0.98)',
     paddingHorizontal: 20,
   },
 
@@ -410,7 +639,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 21,
-    backgroundColor: 'rgba(30, 30, 30, 0.75)',
+    backgroundColor:
+      'rgba(30, 30, 30, 0.75)',
   },
 });
 

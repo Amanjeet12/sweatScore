@@ -11,6 +11,7 @@ type MentionSuggestionsProps = {
   query: string;
   members: ChatMentionMember[];
   currentUserId?: string;
+  canMentionAll?: boolean;
   isLoading?: boolean;
   onSelect: (member: ChatMentionMember) => void;
 };
@@ -26,6 +27,7 @@ const MentionSuggestions = ({
   query,
   members,
   currentUserId,
+  canMentionAll = false,
   isLoading = false,
   onSelect,
 }: MentionSuggestionsProps) => {
@@ -57,10 +59,10 @@ const MentionSuggestions = ({
       })
       .slice(0, MAX_VISIBLE_MEMBERS);
 
-    return 'all'.startsWith(normalizedQuery)
+    return canMentionAll && 'all'.startsWith(normalizedQuery)
       ? [allMention, ...matchingMembers].slice(0, MAX_VISIBLE_MEMBERS)
       : matchingMembers;
-  }, [currentUserId, members, query]);
+  }, [canMentionAll, currentUserId, members, query]);
 
   if (!visible) {
     return null;

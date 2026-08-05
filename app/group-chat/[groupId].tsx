@@ -515,6 +515,7 @@ export default function GroupChatScreen() {
               replyingTo={replyingTo}
               mentionMembers={mentionMembers}
               currentUserId={currentUser?._id ? String(currentUser._id) : undefined}
+              canMentionAll={currentUser?.isAdmin === true}
               isMentionMembersLoading={mentionMembersResult === undefined}
               isUploadingAttachment={isUploadingAttachment}
               isUploadingVoice={isUploadingVoice}

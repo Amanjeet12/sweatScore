@@ -44,6 +44,8 @@ type ChatComposerProps = {
 
   currentUserId?: string;
 
+  canMentionAll?: boolean;
+
   isMentionMembersLoading?: boolean;
 
   isUploadingAttachment: boolean;
@@ -249,6 +251,7 @@ const ChatComposer = ({
 
   mentionMembers,
   currentUserId,
+  canMentionAll = false,
   isMentionMembersLoading = false,
 
   isUploadingAttachment,
@@ -759,6 +762,7 @@ const ChatComposer = ({
         query={mentionQuery ?? ''}
         members={mentionMembers}
         currentUserId={currentUserId}
+        canMentionAll={canMentionAll}
         isLoading={isMentionMembersLoading}
         onSelect={handleSelectMention}
       />

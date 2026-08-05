@@ -1,9 +1,11 @@
+import { useQuery } from 'convex/react';
 import { Tabs } from 'expo-router';
-import { CrownSimple, Fire, VideoCamera, ChatCircleDots, ChartBar, Trophy } from 'phosphor-react-native';
+import { ChartBar, ChatCircleDots, CrownSimple, Fire, Trophy } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 
 import UpdateAvailableBanner from '~/components/core/dashboard/UpdateAvailableBanner';
+import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useHealthSync } from '~/hooks/useHealthSync';
@@ -20,6 +22,10 @@ export default function TabLayout() {
   const [appStateVisible, setAppStateVisible] = useState(appState.current);
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const { activateUser } = useActivateUser();
+  const availableGroups = useQuery(api.chat.groups.listAvailableGroups, currentUser ? {} : 'skip');
+  const hasUnreadMessages = availableGroups?.some(
+    (group) => group.isMember && (group.hasUnread || group.unreadCount > 0)
+  );
 
   const { syncAllMissedDays } = useHealthSync(
     currentUser?._id as Id<'users'>,
@@ -146,11 +152,29 @@ export default function TabLayout() {
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
-              <ChatCircleDots
-                color={focused ? colors.primary : color}
-                weight={focused ? 'fill' : 'duotone'}
-                size={28}
-              />
+              <View>
+                <ChatCircleDots
+                  color={focused ? colors.primary : color}
+                  weight={focused ? 'fill' : 'duotone'}
+                  size={28}
+                />
+                {hasUnreadMessages ? (
+                  <View
+                    accessibilityLabel="Unread group messages"
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -5,
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      borderWidth: 2,
+                      borderColor: '#FFFFFF',
+                      backgroundColor: '#EF4444',
+                    }}
+                  />
+                ) : null}
+              </View>
             ),
             tabBarHideOnKeyboard: true,
           }}
