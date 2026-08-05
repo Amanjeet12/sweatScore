@@ -190,7 +190,7 @@ export const getPinnedPost = query({
       isLiked: !!isLiked,
       commentCount: await postCounter.count(ctx, `comments:${pinnedPost._id}`),
       user: {
-        name: user.isAdmin ? 'SweatScore' : formatUserName(user.name),
+        name: formatUserName(user.name),
         image: user.image,
         imageUrl: user.image ? ((await ctx.storage.getUrl(user.image)) ?? undefined) : undefined,
         isAuthor: user._id === userId,
@@ -1100,7 +1100,7 @@ export const getLatestPosts = query({
           commentCount: comments.length,
 
           user: {
-            name: author.user.isAdmin ? 'SweatScore' : formatUserName(author.user.name),
+            name: formatUserName(author.user.name),
 
             image: author.user.image,
 
@@ -1219,7 +1219,7 @@ export const getSinglePost = query({
       isPinned: !!post.isPinned,
       commentCount,
       user: {
-        name: user.isAdmin ? 'SweatScore' : formatUserName(user.name),
+        name: formatUserName(user.name),
         image: user.image,
         imageUrl: user.image ? ((await ctx.storage.getUrl(user.image)) ?? undefined) : undefined,
         isAuthor: user._id === currentUserId,
