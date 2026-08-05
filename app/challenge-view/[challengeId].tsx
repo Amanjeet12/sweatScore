@@ -1,5 +1,4 @@
 import { useQuery } from 'convex/react';
-import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -166,14 +165,17 @@ export default function ChallengeViewScreen() {
             ) : (
               <TouchableOpacity onPress={handlePlay} activeOpacity={0.9}>
                 <View className="relative overflow-hidden">
-                  <Image
-                    source={{ uri: challenge.coverImageUrl }}
+                  <VideoView
+                    player={player}
+                    pointerEvents="none"
                     style={{
                       width: '100%',
-                      height: undefined,
                       aspectRatio: 414 / 480,
                     }}
                     contentFit="cover"
+                    nativeControls={false}
+                    allowsFullscreen={false}
+                    allowsPictureInPicture={false}
                   />
 
                   <View
