@@ -21,6 +21,7 @@ import type { Id } from '~/convex/_generated/dataModel';
 import { useChatKeyboard } from '~/hooks/chat/useChatKeyboard';
 import { useChatMessages } from '~/hooks/chat/useChatMessages';
 import { useChatPresence } from '~/hooks/chat/useChatPresence';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import type {
   ChatAttachment,
@@ -37,6 +38,12 @@ export default function GroupChatScreen() {
   }>();
 
   const groupId = Array.isArray(params.groupId) ? params.groupId[0] : params.groupId;
+  const { requireSubscription } = useSubscriptionGuard();
+  const redirectTo = groupId ? `/group-chat/${groupId}` : '/group-chat';
+  const requireChatAction = useCallback(
+    (source: string) => requireSubscription({ redirectTo, source }),
+    [redirectTo, requireSubscription]
+  );
 
   const insets = useSafeAreaInsets();
 
@@ -186,6 +193,7 @@ export default function GroupChatScreen() {
     if (!typedGroupId || isJoiningGroup) {
       return;
     }
+    if (!requireChatAction('chat_join_group')) return;
 
     setIsJoiningGroup(true);
 
@@ -202,7 +210,7 @@ export default function GroupChatScreen() {
     } finally {
       setIsJoiningGroup(false);
     }
-  }, [isJoiningGroup, joinGroupMutation, typedGroupId]);
+  }, [isJoiningGroup, joinGroupMutation, requireChatAction, typedGroupId]);
 
   const shouldScrollForKeyboard = useCallback(() => {
     return isNearBottomRef.current;
@@ -479,7 +487,7 @@ export default function GroupChatScreen() {
               pinnedScrollRequest={pinnedScrollRequest}
               onLoadEarlier={loadEarlier}
               onReply={(message) => {
-                if (isMember) {
+                if (isMember && requireChatAction('chat_reply_message')) {
                   setReplyingTo(message);
                 }
               }}
@@ -522,6 +530,7 @@ export default function GroupChatScreen() {
               onCancelReply={() => setReplyingTo(null)}
               onFocus={handleComposerFocus}
               onTypingChange={setTyping}
+              requirePremiumAction={requireChatAction}
               onSendText={handleSendText}
               onSendVoice={handleSendVoice}
               onSendAttachment={handleSendAttachment}

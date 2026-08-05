@@ -19,10 +19,10 @@ import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import FeaturedRow from '~/components/core/posts/FeaturedRow';
 import PostRow, { stopCurrentVideo } from '~/components/core/posts/Row';
-import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { storage } from '~/utils/storage';
 
 const TabShare = () => {
@@ -34,7 +34,7 @@ const TabShare = () => {
 
   const [channel] = useState<number>(0);
 
-  const { isPro } = useRevenueCat();
+  const { isPro, requireSubscription } = useSubscriptionGuard();
 
   /*
    * Returns every active group.
@@ -67,11 +67,8 @@ const TabShare = () => {
   };
 
   const handleCreatePost = () => {
-    if (!isPro) {
-      router.push('/(tabs)/share/paywall');
-
+    if (!requireSubscription({ redirectTo: '/(tabs)/share', source: 'community_create_post' }))
       return;
-    }
 
     router.push('/posts/new');
   };

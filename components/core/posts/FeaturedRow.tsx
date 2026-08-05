@@ -24,6 +24,7 @@ import { stopCurrentVideo, setStopCurrentVideo } from '~/components/core/posts/R
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { cn } from '~/utils/cn';
@@ -189,6 +190,7 @@ function FeaturedChallengeVideoPlayer({
 
 export default function FeaturedRow({ post }: { post: PostWithUser }) {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { requireSubscription } = useSubscriptionGuard();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(true);
@@ -229,6 +231,7 @@ export default function FeaturedRow({ post }: { post: PostWithUser }) {
   ]);
 
   const handleReactionSelect = async (reaction: 'heart' | 'fire' | 'clap') => {
+    if (!requireSubscription({ source: 'community_react_post' })) return;
     setIsLoading(true);
     setShowReactionPicker(false);
 
@@ -266,6 +269,7 @@ export default function FeaturedRow({ post }: { post: PostWithUser }) {
   };
 
   const handleLongPress = async () => {
+    if (!requireSubscription({ source: 'community_react_post' })) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (optimisticIsLiked) {
@@ -300,6 +304,7 @@ export default function FeaturedRow({ post }: { post: PostWithUser }) {
   };
 
   const handleUnpinPost = async () => {
+    if (!requireSubscription({ source: 'community_unpin_post' })) return;
     setIsLoading(true);
     const [err] = await CatchPromise(unpinPost({ postId: post._id }));
     if (!err) Alert.alert('Success', 'Post has been unpinned successfully!');

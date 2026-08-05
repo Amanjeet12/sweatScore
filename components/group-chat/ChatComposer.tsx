@@ -52,6 +52,8 @@ type ChatComposerProps = {
 
   isUploadingVoice: boolean;
 
+  requirePremiumAction: (source: string) => boolean;
+
   onCancelReply: () => void;
 
   onFocus: () => void;
@@ -256,6 +258,7 @@ const ChatComposer = ({
 
   isUploadingAttachment,
   isUploadingVoice,
+  requirePremiumAction,
 
   onCancelReply,
   onFocus,
@@ -355,6 +358,7 @@ const ChatComposer = ({
     if (mentionStart === null || isBusy) {
       return;
     }
+    if (!requirePremiumAction('chat_mention_member')) return;
 
     const cursorPosition = Math.max(
       mentionStart,
@@ -527,6 +531,7 @@ const ChatComposer = ({
     closeMentionSuggestions();
 
     if (!isRecording) {
+      if (!requirePremiumAction('chat_record_voice')) return;
       setAttachmentMenuOpen(false);
 
       onTypingChange(false);
@@ -585,6 +590,7 @@ const ChatComposer = ({
     if (isBusy || isRecording) {
       return;
     }
+    if (!requirePremiumAction(`chat_select_${option.type}`)) return;
 
     setAttachmentMenuOpen(false);
 

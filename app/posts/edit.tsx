@@ -30,6 +30,7 @@ import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
@@ -40,6 +41,7 @@ export default function EditPost() {
   const convex = useConvex();
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { requireSubscription } = useSubscriptionGuard();
 
   const [pageLoading, setPageLoading] = useState(true);
   const [body, setBody] = useState('');
@@ -98,6 +100,13 @@ export default function EditPost() {
   };
 
   const selectImage = async () => {
+    if (
+      !requireSubscription({
+        redirectTo: `/posts/edit?postId=${String(postId)}`,
+        source: 'community_upload_image',
+      })
+    )
+      return;
     setError(null);
     setUploadProgress(0);
     setMediaLoading(true);
@@ -147,6 +156,13 @@ export default function EditPost() {
   };
 
   const selectVideo = async () => {
+    if (
+      !requireSubscription({
+        redirectTo: `/posts/edit?postId=${String(postId)}`,
+        source: 'community_upload_video',
+      })
+    )
+      return;
     setError(null);
     setUploadProgress(0);
     setMediaLoading(true);
@@ -198,6 +214,13 @@ export default function EditPost() {
   };
 
   const handleSubmit = async () => {
+    if (
+      !requireSubscription({
+        redirectTo: `/posts/edit?postId=${String(postId)}`,
+        source: 'community_edit_post',
+      })
+    )
+      return;
     Keyboard.dismiss();
     setError(null);
     setIsLoading(true);
@@ -319,7 +342,12 @@ export default function EditPost() {
           showsVerticalScrollIndicator={false}>
           {/* Avatar + input */}
           <View className="flex-row items-start gap-x-3 px-4 pt-4">
-            <Avatar uri={currentUser?.image ?? undefined} size={46} showGoldBorder name={currentUser?.name} />
+            <Avatar
+              uri={currentUser?.image ?? undefined}
+              size={46}
+              showGoldBorder
+              name={currentUser?.name}
+            />
             <View className="flex-1">
               <Input className="h-auto border-0 bg-transparent">
                 <InputField

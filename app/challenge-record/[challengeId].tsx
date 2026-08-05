@@ -29,6 +29,7 @@ import { Text } from '~/components/ui/text';
 import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { getErrorMessage } from '~/utils/error-message';
 
 const COUNTDOWN_SECONDS = 5;
@@ -143,6 +144,8 @@ export default function DuetRecordingScreen() {
   const { challengeId } = useLocalSearchParams<{
     challengeId: string;
   }>();
+  const { requireSubscription } = useSubscriptionGuard();
+  const challengeRedirectTo = `/challenge-view/${challengeId}`;
 
   const insets = useSafeAreaInsets();
 
@@ -897,6 +900,14 @@ export default function DuetRecordingScreen() {
   );
 
   const startCountdown = useCallback(() => {
+    if (
+      !requireSubscription({
+        redirectTo: challengeRedirectTo,
+        source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
+      })
+    )
+      return;
+
     if (dailyLimitReached) {
       Alert.alert(
         'Daily limit reached',
@@ -961,10 +972,13 @@ export default function DuetRecordingScreen() {
     }, 1000);
   }, [
     debugRecordingState,
+    challengeRedirectTo,
     dailyLimit,
     dailyLimitReached,
     existingUploadJob,
+    isCheckIn,
     playCountdownSound,
+    requireSubscription,
     startRecording,
   ]);
 
@@ -1031,6 +1045,13 @@ export default function DuetRecordingScreen() {
     if (!recordedVideoUri || !challenge || isSubmitting) {
       return;
     }
+    if (
+      !requireSubscription({
+        redirectTo: challengeRedirectTo,
+        source: isCheckIn ? 'challenge_submit_check_in' : 'challenge_submit_video',
+      })
+    )
+      return;
 
     const trimmedCaption = caption.trim();
 
@@ -1075,6 +1096,8 @@ export default function DuetRecordingScreen() {
     caption,
     debugRecordingState,
     isCheckIn,
+    challengeRedirectTo,
+    requireSubscription,
   ]);
 
   const handleCaptionFocus = useCallback(() => {
@@ -1138,7 +1161,7 @@ export default function DuetRecordingScreen() {
   const canStopRecording = state === 'recording' && elapsed >= MIN_STOP_RECORDING_SECONDS;
 
   const currentChallengeDay = progress?.nextAttemptNumber ?? 1;
-  
+
   if (isLiveState) {
     return (
       <View className="flex-1 bg-black">

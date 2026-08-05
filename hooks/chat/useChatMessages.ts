@@ -11,6 +11,7 @@ import type {
   SendTextMessageInput,
   SendVoiceMessageInput,
 } from '~/types/chat';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { formatMessageTime } from '~/utils/chat';
 
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
@@ -110,6 +111,8 @@ function getVoiceFileName(fileName?: string) {
 }
 
 export const useChatMessages = (groupId?: string) => {
+  const { requireSubscription } = useSubscriptionGuard();
+  const redirectTo = groupId ? `/group-chat/${groupId}` : '/group-chat';
   const convexGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
 
   const { results, status, loadMore } = usePaginatedQuery(
@@ -260,6 +263,7 @@ export const useChatMessages = (groupId?: string) => {
 
   const deleteMessage = useCallback(
     async (messageId: string) => {
+      if (!requireSubscription({ redirectTo, source: 'chat_delete_message' })) return false;
       try {
         await deleteMessageMutation({
           messageId: messageId as Id<'chatMessages'>,
@@ -272,7 +276,7 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       }
     },
-    [deleteMessageMutation]
+    [deleteMessageMutation, redirectTo, requireSubscription]
   );
 
   const sendTextMessage = useCallback(
@@ -280,6 +284,7 @@ export const useChatMessages = (groupId?: string) => {
       if (!convexGroupId) {
         return false;
       }
+      if (!requireSubscription({ redirectTo, source: 'chat_send_message' })) return false;
 
       const cleanText = text.trim();
 
@@ -315,17 +320,18 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       }
     },
-    [convexGroupId, sendMessageMutation]
+    [convexGroupId, redirectTo, requireSubscription, sendMessageMutation]
   );
 
   const reactToMessage = useCallback(
     (messageId: string, emoji: string) => {
+      if (!requireSubscription({ redirectTo, source: 'chat_react_message' })) return;
       void toggleReactionMutation({
         messageId: messageId as Id<'chatMessages'>,
         emoji,
       }).catch(showChatError);
     },
-    [toggleReactionMutation]
+    [redirectTo, requireSubscription, toggleReactionMutation]
   );
 
   const markMessageRead = useCallback(
@@ -369,6 +375,7 @@ export const useChatMessages = (groupId?: string) => {
       if (!convexGroupId) {
         return false;
       }
+      if (!requireSubscription({ redirectTo, source: 'chat_send_voice' })) return false;
 
       if (voiceUploadRef.current) {
         return false;
@@ -503,7 +510,13 @@ export const useChatMessages = (groupId?: string) => {
         setIsUploadingVoice(false);
       }
     },
-    [convexGroupId, generateUploadUrlMutation, sendVoiceMessageMutation]
+    [
+      convexGroupId,
+      generateUploadUrlMutation,
+      redirectTo,
+      requireSubscription,
+      sendVoiceMessageMutation,
+    ]
   );
 
   const sendAttachment = useCallback(
@@ -511,6 +524,7 @@ export const useChatMessages = (groupId?: string) => {
       if (!convexGroupId) {
         return false;
       }
+      if (!requireSubscription({ redirectTo, source: 'chat_send_attachment' })) return false;
 
       if (attachmentUploadRef.current) {
         return false;
@@ -639,7 +653,13 @@ export const useChatMessages = (groupId?: string) => {
         setIsUploadingAttachment(false);
       }
     },
-    [convexGroupId, generateUploadUrlMutation, sendAttachmentMutation]
+    [
+      convexGroupId,
+      generateUploadUrlMutation,
+      redirectTo,
+      requireSubscription,
+      sendAttachmentMutation,
+    ]
   );
 
   const pinMessage = useCallback(
@@ -647,6 +667,7 @@ export const useChatMessages = (groupId?: string) => {
       if (!convexGroupId) {
         return false;
       }
+      if (!requireSubscription({ redirectTo, source: 'chat_pin_message' })) return false;
 
       try {
         await pinMessageMutation({
@@ -661,7 +682,7 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       }
     },
-    [convexGroupId, pinMessageMutation]
+    [convexGroupId, pinMessageMutation, redirectTo, requireSubscription]
   );
 
   const unpinMessage = useCallback(
@@ -669,6 +690,7 @@ export const useChatMessages = (groupId?: string) => {
       if (!convexGroupId) {
         return false;
       }
+      if (!requireSubscription({ redirectTo, source: 'chat_unpin_message' })) return false;
 
       try {
         await unpinMessageMutation({
@@ -687,7 +709,7 @@ export const useChatMessages = (groupId?: string) => {
         return false;
       }
     },
-    [convexGroupId, unpinMessageMutation]
+    [convexGroupId, redirectTo, requireSubscription, unpinMessageMutation]
   );
 
   return {

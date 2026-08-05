@@ -28,6 +28,7 @@ import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Doc, Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
@@ -36,6 +37,8 @@ import { urlToImagePickerAsset } from '~/utils/helpers';
 
 export default function EditActivity() {
   const { activityId } = useLocalSearchParams();
+  const { requireSubscription } = useSubscriptionGuard();
+  const activityRedirectTo = `/activity/edit?activityId=${String(activityId)}`;
   const convex = useConvex();
   const [isLoading, setIsLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -88,6 +91,13 @@ export default function EditActivity() {
   };
 
   const selectImage = async () => {
+    if (
+      !requireSubscription({
+        redirectTo: activityRedirectTo,
+        source: 'activity_upload_proof',
+      })
+    )
+      return;
     // Dismiss keyboard first to ensure full screen visibility
     Keyboard.dismiss();
 
@@ -151,6 +161,7 @@ export default function EditActivity() {
 
   const handleDelete = async () => {
     if (!manualActivity) return;
+    if (!requireSubscription({ redirectTo: activityRedirectTo, source: 'activity_delete' })) return;
 
     setIsLoading(true);
     const [error, response] = await CatchPromise(
@@ -172,6 +183,7 @@ export default function EditActivity() {
 
   const handleSubmit = async () => {
     if (!manualActivity) return;
+    if (!requireSubscription({ redirectTo: activityRedirectTo, source: 'activity_edit' })) return;
 
     // Dismiss keyboard when submitting
     Keyboard.dismiss();

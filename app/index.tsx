@@ -10,7 +10,6 @@ import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
 import { getData, storeData } from '~/utils/storage';
-import { hasActiveSubscription } from '~/utils/subscription';
 
 export default function Home() {
   const convex = useConvex();
@@ -57,20 +56,8 @@ export default function Home() {
         return;
       }
 
-      // Onboarding is complete. Now enforce subscription.
-      const isSubscribed = await hasActiveSubscription(user);
-
-      if (isSubscribed) {
-        router.replace('/(tabs)/dashboard');
-      } else {
-        router.replace({
-          pathname: '/subscription',
-          params: {
-            redirectTo: '/(tabs)/dashboard',
-            showBackToLogin: 'true',
-          },
-        });
-      }
+      // Subscription gates premium actions, not access to the app itself.
+      router.replace('/(tabs)/dashboard');
     } catch (error) {
       console.error('Authentication check failed:', error);
     } finally {
@@ -110,7 +97,7 @@ export default function Home() {
                 <Text
                   className="text-center text-3xl text-white"
                   style={{ fontFamily: 'Inter_700Bold' }}>
-                 Your Comeback {'\n'}Starts Now.
+                  Your Comeback {'\n'}Starts Now.
                 </Text>
               </View>
 

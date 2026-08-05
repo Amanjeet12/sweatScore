@@ -24,7 +24,6 @@ import {
 } from '~/utils/apple-health-kit';
 import { healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
-import { hasActiveSubscription } from '~/utils/subscription';
 
 function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -171,24 +170,11 @@ export default function AskHealthPermission() {
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
 
-    const isSubscribed = await hasActiveSubscription(user);
-
     router.dismissAll();
-
-    if (isSubscribed) {
-      router.replace({
-        pathname: '/(tabs)/dashboard',
-        params: { showSuccess },
-      });
-    } else {
-      router.replace({
-        pathname: '/subscription',
-        params: {
-          redirectTo: '/(tabs)/dashboard',
-          showBackToLogin: 'true',
-        },
-      });
-    }
+    router.replace({
+      pathname: '/(tabs)/dashboard',
+      params: { showSuccess },
+    });
   };
 
   const handleSkip = async () => {
@@ -200,21 +186,8 @@ export default function AskHealthPermission() {
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
 
-    const isSubscribed = await hasActiveSubscription(user);
-
     router.dismissAll();
-
-    if (isSubscribed) {
-      router.replace('/(tabs)/dashboard');
-    } else {
-      router.replace({
-        pathname: '/subscription',
-        params: {
-          redirectTo: '/(tabs)/dashboard',
-          showBackToLogin: 'true',
-        },
-      });
-    }
+    router.replace('/(tabs)/dashboard');
   };
 
   useEffect(() => {

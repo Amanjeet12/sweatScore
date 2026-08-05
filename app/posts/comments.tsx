@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,10 +18,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
 import CommentRow from '~/components/core/posts/CommentRow';
-import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 
@@ -29,7 +29,7 @@ export default function PostComments() {
   const { postId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
-  const { isPro } = useRevenueCat();
+  const { requireSubscription } = useSubscriptionGuard();
 
   const [commentText, setCommentText] = useState('');
   const [inputHeight, setInputHeight] = useState(40);
@@ -50,10 +50,13 @@ export default function PostComments() {
   const handleSendComment = async () => {
     if (!commentText.trim() || isSubmitting) return;
 
-    if (!isPro) {
-      router.push('/(tabs)/share/paywall');
+    if (
+      !requireSubscription({
+        redirectTo: `/posts/comments?postId=${String(postId)}`,
+        source: editingCommentId ? 'community_edit_comment' : 'community_create_comment',
+      })
+    )
       return;
-    }
 
     setIsSubmitting(true);
 
@@ -90,6 +93,13 @@ export default function PostComments() {
   };
 
   const handleEditComment = (commentId: Id<'postComments'>, body: string) => {
+    if (
+      !requireSubscription({
+        redirectTo: `/posts/comments?postId=${String(postId)}`,
+        source: 'community_edit_comment',
+      })
+    )
+      return;
     setEditingCommentId(commentId);
     setCommentText(body);
     setInputHeight(40); // Reset height, will auto-adjust
@@ -152,7 +162,12 @@ export default function PostComments() {
           style={{ backgroundColor: 'white' }}>
           <View className="border-t border-background-100 bg-white px-4 py-3">
             <View className="flex-row items-center gap-x-3">
-              <Avatar uri={currentUser?.image ?? undefined} size={40} showGoldBorder name={currentUser?.name} />
+              <Avatar
+                uri={currentUser?.image ?? undefined}
+                size={40}
+                showGoldBorder
+                name={currentUser?.name}
+              />
               <View className="flex-1 flex-row items-center rounded-full bg-background-50 px-4 py-2">
                 <TextInput
                   ref={inputRef}

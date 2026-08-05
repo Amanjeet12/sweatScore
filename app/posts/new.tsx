@@ -29,6 +29,7 @@ import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
@@ -37,6 +38,7 @@ import { getErrorMessage } from '~/utils/error-message';
 export default function NewPost() {
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { requireSubscription } = useSubscriptionGuard();
 
   const [body, setBody] = useState('');
   const [media, setMedia] = useState<ImagePickerAsset | null>(null);
@@ -108,6 +110,8 @@ export default function NewPost() {
   };
 
   const selectImage = async () => {
+    if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_upload_image' }))
+      return;
     setError(null);
     setUploadProgress(0);
     setMediaLoading(true);
@@ -159,6 +163,8 @@ export default function NewPost() {
   };
 
   const selectVideo = async () => {
+    if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_upload_video' }))
+      return;
     setError(null);
     setUploadProgress(0);
     setMediaLoading(true);
@@ -217,6 +223,7 @@ export default function NewPost() {
   };
 
   const handlePost = async () => {
+    if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_create_post' })) return;
     Keyboard.dismiss();
     setError(null);
     setIsLoading(true);

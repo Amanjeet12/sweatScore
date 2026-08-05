@@ -16,7 +16,6 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { cn } from '~/utils/cn';
 import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
-import { hasActiveSubscription } from '~/utils/subscription';
 
 export default function Verify() {
   const convex = useConvex();
@@ -68,19 +67,7 @@ export default function Verify() {
         return;
       }
 
-      const isSubscribed = await hasActiveSubscription(user);
-
-      if (isSubscribed) {
-        router.replace('/(tabs)/dashboard');
-      } else {
-        router.replace({
-          pathname: '/subscription',
-          params: {
-            redirectTo: '/(tabs)/dashboard',
-            showBackToLogin: 'true',
-          },
-        });
-      }
+      router.replace('/(tabs)/dashboard');
     } catch (error) {
       setError('Invalid code');
     } finally {

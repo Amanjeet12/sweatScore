@@ -10,11 +10,11 @@ import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
-import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useTabStore } from '~/store/useTabStore';
 
 export default function ChallengeViewScreen() {
@@ -33,7 +33,7 @@ export default function ChallengeViewScreen() {
     challengeId: challengeId as Id<'challenges'>,
   });
 
-  const { isPro } = useRevenueCat();
+  const { isPro, requireSubscription } = useSubscriptionGuard();
   const currentTab = useTabStore((state) => state.currentTab);
 
   const { getJobForChallenge, retryChallengeUpload } = useChallengeUploadQueue();
@@ -188,6 +188,13 @@ export default function ChallengeViewScreen() {
                   className="h-14 w-full"
                   onPress={() => {
                     safePausePlayer();
+                    if (
+                      !requireSubscription({
+                        redirectTo: `/challenge-view/${challengeId}`,
+                        source: 'challenge_retry_upload',
+                      })
+                    )
+                      return;
                     retryChallengeUpload(challengeId);
                   }}>
                   <ButtonText className="text-lg font-bold text-white">Retry Upload</ButtonText>
@@ -221,8 +228,9 @@ export default function ChallengeViewScreen() {
                   className="h-14 w-full"
                   onPress={() => {
                     safePausePlayer();
-                    router.push({
-                      pathname: `/(tabs)/${currentTab}/paywall` as any,
+                    requireSubscription({
+                      redirectTo: `/challenge-view/${challengeId}`,
+                      source: 'challenge_locked',
                     });
                   }}>
                   <View className="flex-row items-center gap-x-2">
@@ -279,6 +287,13 @@ export default function ChallengeViewScreen() {
                   className="h-14 w-full"
                   onPress={() => {
                     safePausePlayer();
+                    if (
+                      !requireSubscription({
+                        redirectTo: `/challenge-view/${challengeId}`,
+                        source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
+                      })
+                    )
+                      return;
                     router.push({
                       pathname: '/challenge-record/[challengeId]',
                       params: { challengeId },

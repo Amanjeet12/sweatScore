@@ -8,6 +8,7 @@ import { Avatar } from '~/components/core/Avatar';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { CatchPromise } from '~/utils/catch-promise';
 import { formatDistanceToNow } from '~/utils/formatter';
 
@@ -32,11 +33,13 @@ interface CommentRowProps {
 
 export default function CommentRow({ comment, onEdit }: CommentRowProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { requireSubscription } = useSubscriptionGuard();
 
   const deleteComment = useMutation(api.posts.deleteComment);
   const reportComment = useMutation(api.posts.reportComment);
 
   const handleDeleteComment = () => {
+    if (!requireSubscription({ source: 'community_delete_comment' })) return;
     Alert.alert('Delete Comment', 'Are you sure you want to delete this comment?', [
       {
         text: 'Cancel',

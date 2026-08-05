@@ -28,12 +28,14 @@ import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 import { formatDateYYYYMMDD, getDateForTimezone } from '~/utils/timezone';
 
 export default function AddNewActivity() {
+  const { requireSubscription } = useSubscriptionGuard();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<string | null>(null);
@@ -95,6 +97,8 @@ export default function AddNewActivity() {
   };
 
   const selectImage = async () => {
+    if (!requireSubscription({ redirectTo: '/activity/new', source: 'activity_upload_proof' }))
+      return;
     // Dismiss keyboard first to ensure full screen visibility
     Keyboard.dismiss();
 
@@ -168,6 +172,7 @@ export default function AddNewActivity() {
   };
 
   const handleSubmit = async () => {
+    if (!requireSubscription({ redirectTo: '/activity/new', source: 'activity_create' })) return;
     // Dismiss keyboard when submitting
     Keyboard.dismiss();
 

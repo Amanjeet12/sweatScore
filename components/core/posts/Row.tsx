@@ -33,6 +33,7 @@ import { Button, ButtonText, LoadingButton } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { cn } from '~/utils/cn';
@@ -284,6 +285,7 @@ export default function PostRow({
   menuMarginTop?: number;
 }) {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { requireSubscription } = useSubscriptionGuard();
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(true);
@@ -331,6 +333,7 @@ export default function PostRow({
   ]);
 
   const handleReactionSelect = async (reaction: 'heart' | 'fire' | 'clap') => {
+    if (!requireSubscription({ source: 'community_react_post' })) return;
     setIsLoading(true);
     setShowReactionPicker(false);
 
@@ -368,6 +371,7 @@ export default function PostRow({
   };
 
   const handleLongPress = async () => {
+    if (!requireSubscription({ source: 'community_react_post' })) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (optimisticIsLiked) {
@@ -395,6 +399,7 @@ export default function PostRow({
   };
 
   const handleEditPost = () => {
+    if (!requireSubscription({ source: 'community_edit_post' })) return;
     router.push({
       pathname: '/posts/edit',
       params: { postId: post._id },
@@ -409,6 +414,7 @@ export default function PostRow({
   };
 
   const handleDeletePost = () => {
+    if (!requireSubscription({ source: 'community_delete_post' })) return;
     const isDuet = !!post.challengeId;
     const title = isDuet ? 'Delete Duet?' : 'Delete Post';
     const message = isDuet
@@ -432,6 +438,7 @@ export default function PostRow({
   };
 
   const handlePinPost = async () => {
+    if (!requireSubscription({ source: 'community_pin_post' })) return;
     setIsLoading(true);
     const [err] = await CatchPromise(pinPost({ postId: post._id }));
     if (!err) Alert.alert('Success', 'Post has been pinned successfully!');
