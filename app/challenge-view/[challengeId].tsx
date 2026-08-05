@@ -2,7 +2,17 @@ import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { LockSimple, Play } from 'phosphor-react-native';
+import {
+  AppleLogo,
+  Barbell,
+  Drop,
+  Footprints,
+  LockSimple,
+  PersonArmsSpread,
+  Play,
+  Pulse,
+  Tree,
+} from 'phosphor-react-native';
 import { useCallback, useState } from 'react';
 import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 
@@ -16,10 +26,38 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useTabStore } from '~/store/useTabStore';
+import { CHECK_IN_OPTIONS } from '~/utils/checkInOptions';
+import type { CheckInOptionKey } from '~/utils/checkInOptions';
+
+function CheckInOptionIcon({ option, selected }: { option: CheckInOptionKey; selected: boolean }) {
+  const props = {
+    size: 20,
+    color: selected ? '#FFFFFF' : '#4A4A4A',
+    weight: 'regular' as const,
+  };
+
+  switch (option) {
+    case 'hydration':
+      return <Drop {...props} />;
+    case 'healthy_meal':
+      return <AppleLogo {...props} />;
+    case 'gym_visit':
+      return <Barbell {...props} />;
+    case 'fresh_air':
+      return <Tree {...props} />;
+    case 'stretch':
+      return <PersonArmsSpread {...props} />;
+    case 'steps':
+      return <Footprints {...props} />;
+    case 'workout':
+      return <Pulse {...props} />;
+  }
+}
 
 export default function ChallengeViewScreen() {
   const { challengeId } = useLocalSearchParams<{ challengeId: string }>();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedCheckInOption, setSelectedCheckInOption] = useState<CheckInOptionKey>('workout');
 
   const challenge = useQuery(api.challengeCompletions.getPublishedChallenge, {
     challengeId: challengeId as Id<'challenges'>,
@@ -119,7 +157,7 @@ export default function ChallengeViewScreen() {
                 player={player}
                 style={{
                   width: '100%',
-                  aspectRatio: 414 / 555,
+                  aspectRatio: 414 / 480,
                 }}
                 contentFit="cover"
                 allowsFullscreen
@@ -133,7 +171,7 @@ export default function ChallengeViewScreen() {
                     style={{
                       width: '100%',
                       height: undefined,
-                      aspectRatio: 414 / 555,
+                      aspectRatio: 414 / 480,
                     }}
                     contentFit="cover"
                   />
@@ -163,11 +201,62 @@ export default function ChallengeViewScreen() {
             )}
           </View>
 
-          <View className="mt-6 px-8">
-            <Text className="text-center font-body text-base text-[#313131]">
-              {selectedDescription}
-            </Text>
-          </View>
+          {!isCheckIn ? (
+            <View className="mt-6 px-8">
+              <Text className="text-center font-body text-base text-[#313131]">
+                {selectedDescription}
+              </Text>
+            </View>
+          ) : null}
+
+          {isCheckIn ? (
+            <View className="mt-6 px-5">
+              <Text className="text-center font-heading text-lg font-bold text-[#1A1A1A]">
+                What are you checking in for?
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mt-3"
+                contentContainerStyle={{ gap: 10, paddingRight: 20 }}>
+                {CHECK_IN_OPTIONS.map((option) => {
+                  const selected = option.key === selectedCheckInOption;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      activeOpacity={0.8}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={option.label}
+                      onPress={() => setSelectedCheckInOption(option.key)}
+                      className="flex-row items-center rounded-full px-4 py-3"
+                      style={{
+                        borderWidth: 1.5,
+                        borderColor: selected ? '#FF5C35' : '#E3DEDA',
+                        backgroundColor: selected ? '#FF5C35' : '#FFFFFF',
+                      }}>
+                      <View className="mr-2">
+                        <CheckInOptionIcon option={option.key} selected={selected} />
+                      </View>
+                      <Text
+                        className="font-body text-sm font-bold"
+                        style={{ color: selected ? '#FFFFFF' : '#313131' }}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <View className="mt-4 px-4 py-2">
+                <Text className="text-center font-body text-sm leading-5 text-[#4F4F4F]">
+                  {
+                    CHECK_IN_OPTIONS.find((option) => option.key === selectedCheckInOption)
+                      ?.description
+                  }
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           {challenge.youtubeUrl && (
             <TouchableOpacity
@@ -296,7 +385,10 @@ export default function ChallengeViewScreen() {
                       return;
                     router.push({
                       pathname: '/challenge-record/[challengeId]',
-                      params: { challengeId },
+                      params: {
+                        challengeId,
+                        ...(isCheckIn ? { checkInOption: selectedCheckInOption } : {}),
+                      },
                     });
                   }}>
                   <ButtonText className="text-lg font-bold text-white">Let’s Go</ButtonText>
