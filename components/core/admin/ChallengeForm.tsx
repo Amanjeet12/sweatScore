@@ -372,7 +372,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
       allowsEditing: true,
       quality: 0.5,
       selectionLimit: 1,
-      videoMaxDuration: 300,
+      videoMaxDuration: 600,
       preferredAssetRepresentationMode:
         ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
     });
@@ -385,8 +385,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
     const localMedia = result.assets[0];
 
-    if (localMedia.duration && localMedia.duration > 300000) {
-      setError('Video must be 5 minutes or less');
+    if (localMedia.duration && localMedia.duration > 600000) {
+      setError('Video must be 10 minutes or less');
       setVideoMediaLoading(false);
       return;
     }
@@ -1032,7 +1032,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           <View className="mb-4">
             <Text className="mb-2 text-xl font-bold text-primary-500">Instructional Video</Text>
 
-            <Text className="mb-2 text-sm text-gray-500">Max 5 minutes</Text>
+            <Text className="mb-2 text-sm text-gray-500">Max 10 minutes</Text>
 
             {videoMediaLoading ? (
               <View className="h-[50px] w-full items-center justify-center">
@@ -1128,7 +1128,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
               Duration Limit (minutes)
             </Text>
 
-            <Text className="mb-2 text-sm text-gray-500">Max 5 minutes</Text>
+            <Text className="mb-2 text-sm text-gray-500">Max 10 minutes</Text>
 
             <Input size="xl" variant="rounded">
               <InputField

@@ -14,5 +14,5 @@ export const CHALLENGE_POINTS_MIN = 1;
 export const CHALLENGE_POINTS_MAX = 50;
 export const CHALLENGE_POINTS_DEFAULT = 5;
 export const CHALLENGE_DURATION_MIN = 60; // 1 minute in seconds
-export const CHALLENGE_DURATION_MAX = 300; // 5 minutes in seconds
+export const CHALLENGE_DURATION_MAX = 600; // 10 minutes in seconds
 export const CHALLENGE_DURATION_DEFAULT = 300;

@@ -174,10 +174,7 @@ export default function Paywall() {
   const syncToEnduranceZone = useAction(api.users.syncToEnduranceZone);
 
   if (__DEV__) {
-    console.log(
-      'Available packages from RevenueCat:',
-      JSON.stringify(packages, null, 2)
-    );
+    console.log('Available packages from RevenueCat:', JSON.stringify(packages, null, 2));
   }
 
   const monthlyPackage = useMemo(
@@ -243,25 +240,19 @@ export default function Paywall() {
     return formatCurrency(annualSaving, currencyCode);
   }, [annualPackage, annualSaving, monthlyPackage]);
 
-  const annualOfferLabel = annualSavingText
-    ? `Save ${annualSavingText}`
-    : 'Best value';
+  const annualOfferLabel = annualSavingText ? `Save ${annualSavingText}` : 'Best value';
 
   const hasTrial = Boolean(selectedPackage?.product?.introPrice);
 
   const isCtaDisabled =
-    !selectedPackage ||
-    !purchasePackage ||
-    isLoading ||
-    isLoggingOut ||
-    isPackagesLoading;
+    !selectedPackage || !purchasePackage || isLoading || isLoggingOut || isPackagesLoading;
 
   const paywallBullets = [
-    "You've done the diets and plans, but nothing else ever sticks",
-    'You stay consistent when other women are doing it with you',
-    'You want to make progress and keep it without feeling confused',
-    "You want clear weekly targets and a daily check-in, not a strict program you'll quit",
-    'You want to enjoy the process',
+    'Check in daily, keep your streak alive and stay accountable',
+    'Track your daily steps and workouts to earn points',
+    'Climb the leaderboard and stand a chance to win prizes',
+    'Join groups where your Sweat Sisters keep you motivated',
+    'Watch your progress build week after week',
   ];
 
   const handlePurchase = async () => {
@@ -280,10 +271,7 @@ export default function Paywall() {
 
       setIsLoading(false);
 
-      Alert.alert(
-        'Purchase failed',
-        'Unable to complete the purchase. Please try again.'
-      );
+      Alert.alert('Purchase failed', 'Unable to complete the purchase. Please try again.');
 
       return;
     }
@@ -326,10 +314,7 @@ export default function Paywall() {
     } catch (error) {
       console.error('Logout failed:', error);
 
-      Alert.alert(
-        'Logout failed',
-        'Unable to return to login. Please try again.'
-      );
+      Alert.alert('Logout failed', 'Unable to return to login. Please try again.');
 
       setIsLoggingOut(false);
     }
@@ -377,9 +362,9 @@ export default function Paywall() {
           You keep falling off. Let&apos;s make this the last time, sis.
         </Text>
 
-        <Text className="mx-1 mt-4 text-center text-[15px] leading-5 text-[#252525]">
-          Losing weight was never the hard part. Keeping it going is. SweatScore is
-          built for the part everyone else abandons you at.
+        <Text className="mx-1 mt-5 text-center text-[15px] leading-5 text-[#252525]">
+          Join the community where women are staying active, logging progress and building real
+          consistency.
         </Text>
 
         <View className="mx-1 mt-7">
@@ -398,9 +383,7 @@ export default function Paywall() {
                   <Icon.CheckCircle size={21} color="#FFC4A8" weight="fill" />
                 </View>
 
-                <Text className="flex-1 text-[14px] leading-[18px] text-[#252525]">
-                  {item}
-                </Text>
+                <Text className="flex-1 text-[14px] leading-[18px] text-[#252525]">{item}</Text>
               </View>
             ))}
           </View>
@@ -477,9 +460,7 @@ export default function Paywall() {
             }}>
             {isLoading ? (
               <View className="flex-row items-center justify-center">
-                <Text className="mr-2 text-lg font-bold text-white">
-                  Processing...
-                </Text>
+                <Text className="mr-2 text-lg font-bold text-white">Processing...</Text>
 
                 <ActivityIndicator size={20} color="#FFFFFF" />
               </View>
@@ -505,14 +486,10 @@ export default function Paywall() {
               <View className="flex-row items-center">
                 <ActivityIndicator size="small" color="#FF5C1A" />
 
-                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">
-                  Signing out...
-                </Text>
+                <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">Signing out...</Text>
               </View>
             ) : (
-              <Text className="text-sm font-semibold text-[#FF5C1A]">
-                Back to login
-              </Text>
+              <Text className="text-sm font-semibold text-[#FF5C1A]">Back to login</Text>
             )}
           </TouchableOpacity>
         ) : null}
