@@ -306,7 +306,7 @@ export default function ChallengeViewScreen() {
           {/* Normal challenge description */}
           {!isCheckIn ? (
             <View className="mt-6 px-8">
-              <View className="rounded-xl bg-white px-4 py-4 shadow-sm">
+              <View className="rounded-xl px-4 py-4 shadow-sm">
                 <Text className="text-center font-body text-base leading-6 text-[#313131]">
                   {selectedDescription}
                 </Text>

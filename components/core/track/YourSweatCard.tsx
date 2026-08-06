@@ -305,7 +305,7 @@ export default function YourSweatCard() {
         </View>
       )}
 
-      {!isPro && period === 'week' && category === 'points' && (
+      {/* {!isPro && period === 'week' && category === 'points' && (
         <TouchableOpacity
           onPress={() =>
             router.push({
@@ -326,7 +326,7 @@ export default function YourSweatCard() {
 
           <ArrowRight size={16} color="#F76B1C" weight="bold" />
         </TouchableOpacity>
-      )}
+      )} */}
     </View>
   );
 }

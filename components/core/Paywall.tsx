@@ -249,7 +249,7 @@ export default function Paywall() {
 
   const paywallBullets = [
     'Check in daily, keep your streak alive and stay accountable',
-    'Track your daily steps and workouts to earn points',
+    'Track your daily steps and workouts to earn unlimited points',
     'Climb the leaderboard and stand a chance to win prizes',
     'Join groups where your Sweat Sisters keep you motivated',
     'Watch your progress build week after week',

@@ -55,14 +55,12 @@ export default function PaywallOverlay({ totalUsers, children }: PaywallOverlayP
         onPress={handlePress}
         android_ripple={{ color: 'transparent' }}
         style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
-        <View
-          pointerEvents="none"
-          className="flex-1 items-center justify-center px-6">
+        <View pointerEvents="none" className="flex-1 items-center justify-center px-6">
           <View className="items-center justify-center rounded-full bg-[#1A1A1A] px-4 py-1.5">
             <Text className="font-body text-sm font-semibold text-white">Pro</Text>
           </View>
           <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
-            See how all {totalUsers} Sweat Sisters are progressing
+            See how your Sweat Sisters are progressing
           </Text>
           <View className="mt-3 flex-row items-center gap-x-1">
             <Text className="font-body text-base font-semibold text-[#F76B1C]">

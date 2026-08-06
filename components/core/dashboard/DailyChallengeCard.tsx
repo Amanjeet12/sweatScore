@@ -526,7 +526,7 @@ export default function DailyChallengeCard() {
                     }`}
                     style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
                     {isCompleted
-                      ? `${dailyChallenge.name} Completed!`
+                      ? `${dailyChallenge.name} Complete!`
                       : secondsRemaining <= 0
                         ? 'Challenge Ended'
                         : 'Check In Now'}

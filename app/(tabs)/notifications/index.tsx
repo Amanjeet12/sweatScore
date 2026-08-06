@@ -20,7 +20,7 @@ import { useHealthSync } from '~/hooks/useHealthSync';
 import { useAuthStore } from '~/store/useAuthStore';
 
 const FREE_VISIBLE_COUNT = 10;
-const HIDDEN_PREVIEW = 3;
+const HIDDEN_PREVIEW_COUNT = 3;
 const PREMIUM_PAGE_SIZE = 20;
 
 type Entry = {
@@ -33,56 +33,106 @@ type Entry = {
 
 export default function TabRank() {
   const insets = useSafeAreaInsets();
+
   const currentUser = useAuthStore((state) => state.currentUser);
   const { isPro } = useRevenueCat();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { syncAllMissedDays } = useHealthSync(
     currentUser?._id as Id<'users'>,
     undefined,
     currentUser?.birthdate
   );
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const yearMonth = useMemo(() => {
     const today = new Date();
     const month = String(today.getMonth() + 1).padStart(2, '0');
+
     return `${today.getFullYear()}-${month}`;
   }, []);
 
-  const header = useQuery(api.leaderboard.getMonthlyLeaderboardHeader, { yearMonth });
+  const header = useQuery(
+    api.leaderboard.getMonthlyLeaderboardHeader,
+    {
+      yearMonth,
+    }
+  );
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.leaderboard.listMonthlyLeaderboard,
-    { yearMonth },
-    { initialNumItems: isPro ? PREMIUM_PAGE_SIZE : FREE_VISIBLE_COUNT + HIDDEN_PREVIEW + 1 }
+    {
+      yearMonth,
+    },
+    {
+      initialNumItems: isPro
+        ? PREMIUM_PAGE_SIZE
+        : FREE_VISIBLE_COUNT + HIDDEN_PREVIEW_COUNT + 1,
+    }
   );
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) {
+      return;
+    }
+
     setIsRefreshing(true);
-    await syncAllMissedDays();
-    setIsRefreshing(false);
-  };
+
+    try {
+      await syncAllMissedDays();
+    } catch (error) {
+      console.error('Leaderboard refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, syncAllMissedDays]);
 
   const goToUser = useCallback(
     (userId: string) => {
-      if (!isPro && userId !== currentUser?._id) {
+      const isCurrentUser = userId === currentUser?._id;
+
+      if (!isPro && !isCurrentUser) {
         router.push({
           pathname: '/(tabs)/notifications/paywall' as any,
-          params: { redirectTo: '/(tabs)/notifications' },
+          params: {
+            redirectTo: '/(tabs)/notifications',
+          },
         });
+
         return;
       }
+
       router.push({
         pathname: '/(tabs)/notifications/user/[userId]' as any,
-        params: { userId },
+        params: {
+          userId,
+        },
       });
     },
-    [isPro, currentUser?._id]
+    [currentUser?._id, isPro]
   );
 
+  const handleEndReached = useCallback(() => {
+    if (!isPro || status !== 'CanLoadMore') {
+      return;
+    }
+
+    loadMore(PREMIUM_PAGE_SIZE);
+  }, [isPro, loadMore, status]);
+
+  /*
+   * Keep every hook above this conditional return.
+   */
   if (!header) {
     return (
       <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+        <Stack.Screen
+          options={{
+            headerShown: false,
+            headerShadowVisible: false,
+          }}
+        />
+
         <ScreenLoading />
       </SafeAreaView>
     );
@@ -90,61 +140,135 @@ export default function TabRank() {
 
   const allEntries = results as Entry[];
 
-  const meEntryFromList = allEntries.find((e) => e.userId === currentUser?._id);
+  const meEntryFromList = allEntries.find(
+    (entry) => entry.userId === currentUser?._id
+  );
 
-  const myRank = (header.me as { rank?: number } | null | undefined)?.rank ?? meEntryFromList?.rank;
+  const myRank =
+    (header.me as { rank?: number } | null | undefined)?.rank ??
+    meEntryFromList?.rank;
 
-  const entries = allEntries.filter((e) => e.userId !== currentUser?._id);
-  const visibleEntries = isPro ? entries : entries.slice(0, FREE_VISIBLE_COUNT);
-  const hiddenEntries = isPro
-    ? []
-    : entries.slice(FREE_VISIBLE_COUNT, FREE_VISIBLE_COUNT + HIDDEN_PREVIEW);
+  /*
+   * Pro users can see every loaded leaderboard entry,
+   * except their own entry because MeRow displays it separately.
+   */
+  const proEntries = allEntries.filter(
+    (entry) => entry.userId !== currentUser?._id
+  );
 
-  const handleEndReached = () => {
-    if (!isPro) return;
-    if (status === 'CanLoadMore') loadMore(PREMIUM_PAGE_SIZE);
-  };
+  /*
+   * Free users can only see actual leaderboard ranks #1 through #10.
+   *
+   * We filter using entry.rank instead of slicing after removing the
+   * current user. This prevents rank #11 from moving into the visible
+   * section when the current user is ranked in the top 10.
+   */
+  const freeVisibleEntries = allEntries.filter(
+    (entry) =>
+      entry.rank <= FREE_VISIBLE_COUNT &&
+      entry.userId !== currentUser?._id
+  );
 
-  const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
+  /*
+   * These entries appear behind the locked paywall preview.
+   */
+  const freeHiddenEntries = allEntries.filter(
+    (entry) =>
+      entry.rank > FREE_VISIBLE_COUNT &&
+      entry.rank <= FREE_VISIBLE_COUNT + HIDDEN_PREVIEW_COUNT &&
+      entry.userId !== currentUser?._id
+  );
+
+  const visibleEntries = isPro ? proEntries : freeVisibleEntries;
+  const hiddenEntries = isPro ? [] : freeHiddenEntries;
+
+  /*
+   * Show the paywall when users exist below rank #10.
+   */
+  const shouldShowPaywall =
+    !isPro &&
+    (hiddenEntries.length > 0 ||
+      header.totalUsers > FREE_VISIBLE_COUNT ||
+      status === 'CanLoadMore');
+
+  const userName =
+    currentUser?.name?.trim().split(' ')[0] || 'User';
 
   const ListHeader = (
     <View>
-      <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
+      <View
+        style={
+          Platform.OS === 'android'
+            ? {
+                paddingTop: insets.top,
+              }
+            : undefined
+        }>
         <LeaderboardHeader />
       </View>
-      <Podium podium={header.podium} onPressEntry={goToUser} />
-      <View className="overflow-hidden rounded-t-3xl bg-white">
-        <MeRow
-          rank={myRank}
-          avatarUri={currentUser?.image ?? undefined}
-          displayTotalPoints={header.me?.displayTotalPoints ?? 0}
-          targetPoints={header.targetPoints}
-          userName={userName}
-          onPress={currentUser?._id ? () => goToUser(currentUser._id) : undefined}
-        />
-      </View>
+
+      <Podium
+        podium={header.podium}
+        onPressEntry={goToUser}
+      />
+
+      {isPro ? (
+        <View className="overflow-hidden rounded-t-3xl bg-white">
+          <MeRow
+            rank={myRank}
+            avatarUri={currentUser?.image ?? undefined}
+            displayTotalPoints={
+              header.me?.displayTotalPoints ?? 0
+            }
+            targetPoints={header.targetPoints}
+            userName={userName}
+            onPress={
+              currentUser?._id
+                ? () => goToUser(currentUser._id)
+                : undefined
+            }
+          />
+        </View>
+      ) : (
+        /*
+         * Keep the rounded top of the white leaderboard section
+         * while hiding the current user's rank from free users.
+         */
+        <View className="h-6 rounded-t-3xl bg-white" />
+      )}
     </View>
   );
 
   const ListFooter = (() => {
-    if (hiddenEntries.length > 0) {
+    if (shouldShowPaywall) {
       return (
         <View className="bg-white pb-4">
           <PaywallOverlay totalUsers={header.totalUsers}>
-            {hiddenEntries.map((e) => (
-              <RankRow
-                key={e.userId}
-                rank={e.rank}
-                name={e.name}
-                avatarUri={e.image}
-                displayTotalPoints={e.displayTotalPoints}
-                targetPoints={header.targetPoints}
-              />
-            ))}
+            {hiddenEntries.length > 0 ? (
+              hiddenEntries.map((entry) => (
+                <RankRow
+                  key={entry.userId}
+                  rank={entry.rank}
+                  name={entry.name}
+                  avatarUri={entry.image}
+                  displayTotalPoints={
+                    entry.displayTotalPoints
+                  }
+                  targetPoints={header.targetPoints}
+                />
+              ))
+            ) : (
+              /*
+               * Provides height for PaywallOverlay when the preview
+               * entries have not loaded yet.
+               */
+              <View className="h-[216px] bg-white" />
+            )}
           </PaywallOverlay>
         </View>
       );
     }
+
     if (isPro && status === 'LoadingMore') {
       return (
         <View className="bg-white py-4">
@@ -152,12 +276,19 @@ export default function TabRank() {
         </View>
       );
     }
+
     return <View className="bg-white pb-4" />;
   })();
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+          headerShadowVisible: false,
+        }}
+      />
+
       <View className="flex-1">
         <LegendList
           data={visibleEntries}
@@ -168,7 +299,9 @@ export default function TabRank() {
                 rank={item.rank}
                 name={item.name}
                 avatarUri={item.image}
-                displayTotalPoints={item.displayTotalPoints}
+                displayTotalPoints={
+                  item.displayTotalPoints
+                }
                 targetPoints={header.targetPoints}
                 onPress={() => goToUser(item.userId)}
               />
@@ -179,19 +312,22 @@ export default function TabRank() {
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           estimatedItemSize={72}
-          contentContainerStyle={{ paddingBottom: 0 }}
+          contentContainerStyle={{
+            paddingBottom: 0,
+          }}
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
         />
-        {header.completedCount > 0 && (
+
+        {isPro && header.completedCount > 0 ? (
           <View className="border-t border-[#EFEAE4] bg-white">
             <CompletionFooter
               completedCount={header.completedCount}
               targetPoints={header.targetPoints}
             />
           </View>
-        )}
+        ) : null}
       </View>
     </SafeAreaView>
   );
