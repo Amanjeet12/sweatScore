@@ -368,13 +368,6 @@ export default function Paywall() {
         </Text>
 
         <View className="mx-1 mt-7">
-          <Text
-            className="mb-4 text-[17px] text-[#171717]"
-            style={{
-              fontFamily: 'Inter_700Bold',
-            }}>
-            This is for you if...
-          </Text>
 
           <View className="gap-y-3">
             {paywallBullets.map((item) => (

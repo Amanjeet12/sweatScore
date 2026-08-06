@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import {
@@ -30,6 +31,11 @@ export const FirstTimeOnboardingModal = ({
   missionTarget?: number;
 }) => {
   const progressPct = missionTarget > 0 ? Math.min(100, (currentPoints / missionTarget) * 100) : 0;
+
+  const handleGoToGroup = () => {
+    handleClose();
+    router.push('/share');
+  };
 
   return (
     <AlertDialog isOpen={showAlertDialog} onClose={handleClose} size="md" useRNModal>
@@ -91,8 +97,8 @@ export const FirstTimeOnboardingModal = ({
             size="xl"
             action="primary"
             className="h-16 w-full rounded-2xl"
-            onPress={handleClose}>
-            <ButtonText className="text-xl font-bold text-white">say hello to the group</ButtonText>
+            onPress={handleGoToGroup}>
+            <ButtonText className="text-xl font-bold text-white">Say hello to the group</ButtonText>
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
