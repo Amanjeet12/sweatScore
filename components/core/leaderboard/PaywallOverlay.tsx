@@ -60,9 +60,9 @@ export default function PaywallOverlay({ totalUsers, children }: PaywallOverlayP
             <Text className="font-body text-sm font-semibold text-white">Pro</Text>
           </View>
           <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
-            See how your Sweat Sisters are progressing
+            See where you rank on this month's leaderboard
           </Text>
-          <View className="mt-3 flex-row items-center gap-x-1">
+          <View className="mt-3 mb-5 flex-row items-center gap-x-1">
             <Text className="font-body text-base font-semibold text-[#F76B1C]">
               See everyone&apos;s progress
             </Text>
