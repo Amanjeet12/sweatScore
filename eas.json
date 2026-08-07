@@ -30,10 +30,12 @@
       "channel": "preview",
       "environment": "preview",
       "ios": {
-        "image": "latest"
+        "image": "macos-sequoia-15.6-xcode-26.2",
+        "buildConfiguration": "Release"
       }
     },
     "production": {
+      "distribution": "store",
       "channel": "production",
       "environment": "production",
       "autoIncrement": true,
@@ -41,7 +43,8 @@
         "buildType": "app-bundle"
       },
       "ios": {
-        "image": "latest"
+        "image": "macos-sequoia-15.6-xcode-26.2",
+        "buildConfiguration": "Release"
       }
     }
   },
