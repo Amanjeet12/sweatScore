@@ -313,7 +313,7 @@ export default function Layout() {
                       />
                     </Stack>
                   </View>
-                  {/* <ForceUpdateGate /> */}
+                  <ForceUpdateGate />
                 </ChallengeUploadProvider>
               </RevenueCatProvider>
             </GluestackUIProvider>
