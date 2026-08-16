@@ -63,42 +63,50 @@ function CheckInOptionIcon({ option, selected }: { option: CheckInOptionKey; sel
   }
 }
 
-function CheckItOutLink({ url }: { url?: string | null }) {
+type CheckItOutLinkProps = {
+  url?: string | null;
+  isPro: boolean;
+  onOpen: (url: string) => Promise<void>;
+};
+
+function CheckItOutLink({ url, isPro, onOpen }: CheckItOutLinkProps) {
   if (!url?.trim()) {
     return null;
   }
 
-  const handleOpenLink = async () => {
-    try {
-      await Linking.openURL(url);
-    } catch (error) {
-      console.error('Unable to open challenge link:', error);
-    }
-  };
-
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      accessibilityRole="link"
-      accessibilityLabel="Open related challenge video"
-      accessibilityHint="Opens the related video in your browser"
+      accessibilityRole="button"
+      accessibilityLabel={isPro ? 'Open bonus content' : 'Unlock bonus content'}
+      accessibilityHint={
+        isPro ? 'Opens the bonus content' : 'Opens the subscription screen to unlock bonus content'
+      }
       onPress={() => {
-        void handleOpenLink();
+        void onOpen(url);
       }}
       className="mt-5 flex-row items-center rounded-xl border border-[#FFC7B0] bg-[#FFF0E9] px-4 py-3">
       <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-[#FF5C35]">
-        <Lightbulb size={18} color="#FFFFFF" weight="fill" />
+        {isPro ? (
+          <Lightbulb size={18} color="#FFFFFF" weight="fill" />
+        ) : (
+          <LockSimple size={17} color="#FFFFFF" weight="bold" />
+        )}
       </View>
 
       <View className="min-w-0 flex-1">
         <Text className="font-heading text-sm font-bold text-[#FF5C35]">Bonus Content</Text>
 
         <Text className="mt-0.5 font-body text-xs leading-4 text-[#6B625E]">
-          Tap here to get it now
+          {isPro ? 'Tap here to get it now' : 'Premium members only • Tap to unlock'}
         </Text>
       </View>
 
-      <ArrowSquareOut size={20} color="#FF5C35" weight="bold" />
+      {isPro ? (
+        <ArrowSquareOut size={20} color="#FF5C35" weight="bold" />
+      ) : (
+        <LockSimple size={19} color="#FF5C35" weight="bold" />
+      )}
     </TouchableOpacity>
   );
 }
@@ -186,6 +194,36 @@ export default function ChallengeViewScreen() {
         safePausePlayer();
       };
     }, [safePausePlayer])
+  );
+
+  /*
+   * Premium Bonus Content
+   *
+   * Free user:
+   * - Does NOT open the external link
+   * - Opens subscription/paywall instead
+   *
+   * Paid/trial user:
+   * - Opens the external link normally
+   */
+  const handleOpenBonusContent = useCallback(
+    async (url: string) => {
+      const allowed = requireSubscription({
+        redirectTo: `/challenge-view/${challengeId}`,
+        source: 'challenge_bonus_content',
+      });
+
+      if (!allowed) {
+        return;
+      }
+
+      try {
+        await Linking.openURL(url);
+      } catch (error) {
+        console.error('Unable to open challenge bonus content:', error);
+      }
+    },
+    [challengeId, requireSubscription]
   );
 
   const handleStartChallenge = () => {
@@ -312,7 +350,11 @@ export default function ChallengeViewScreen() {
                 </Text>
               </View>
 
-              <CheckItOutLink url={challenge.youtubeUrl} />
+              <CheckItOutLink
+                url={challenge.youtubeUrl}
+                isPro={isPro}
+                onOpen={handleOpenBonusContent}
+              />
             </View>
           ) : null}
 
@@ -376,7 +418,11 @@ export default function ChallengeViewScreen() {
                 </Text>
               </View>
 
-              <CheckItOutLink url={challenge.youtubeUrl} />
+              <CheckItOutLink
+                url={challenge.youtubeUrl}
+                isPro={isPro}
+                onOpen={handleOpenBonusContent}
+              />
             </View>
           ) : null}
 

@@ -570,7 +570,7 @@ export const processScheduledCheckInNotification = internalMutation({
        * completed this exact daily check-in window.
        */
       if (args.notificationType === 'dailyCheckInReminder') {
-        const existingCompletion = await ctx.db
+        const exactWindowCompletion = await ctx.db
           .query('challengeCompletions')
           .withIndex('by_user_challenge_window', (q) =>
             q
@@ -578,10 +578,32 @@ export const processScheduledCheckInNotification = internalMutation({
               .eq('challengeId', challenge._id)
               .eq('dailyWindowStartAt', args.expectedStartAt)
           )
-          .filter((q) => q.neq(q.field('removed'), true))
           .first();
 
-        if (existingCompletion) {
+        if (exactWindowCompletion) {
+          continue;
+        }
+
+        /*
+         * Older completion rows do not have dailyWindowStartAt. A video
+         * submitted while this check-in was active still counts for reminder
+         * eligibility, even if its feed post was subsequently removed.
+         */
+        const userChallengeCompletions = await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_challenge_date', (q) =>
+            q.eq('userId', user._id).eq('challengeId', challenge._id)
+          )
+          .collect();
+
+        const legacyWindowCompletion = userChallengeCompletions.some(
+          (completion) =>
+            completion.dailyWindowStartAt === undefined &&
+            completion._creationTime >= args.expectedStartAt &&
+            completion._creationTime < args.expectedEndAt
+        );
+
+        if (legacyWindowCompletion) {
           continue;
         }
       }
