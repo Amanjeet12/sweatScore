@@ -1,165 +1,253 @@
-import { useMutation, useConvex } from 'convex/react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useConvex, useMutation } from 'convex/react';
+import {
+  PropsWithChildren,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Platform } from 'react-native';
-import Purchases, { CustomerInfo, LOG_LEVEL, PurchasesPackage } from 'react-native-purchases';
+import Purchases, {
+  CustomerInfo,
+  LOG_LEVEL,
+  PurchasesPackage,
+  WebPurchaseRedemptionResultType,
+} from 'react-native-purchases';
+
 import { api } from '~/convex/_generated/api';
+import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromiseWithType } from '~/utils/catch-promise';
 
-// Use keys from you RevenueCat API Keys
 const APIKeys = {
-  apple: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY!,
-  google: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY!,
+  apple: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY,
+  google: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
 };
+
+export type RedemptionResult =
+  | { status: 'success' }
+  | { status: 'expired'; email?: string }
+  | { status: 'belongs_to_other_user' }
+  | { status: 'invalid' }
+  | { status: 'login_required' }
+  | { status: 'not_ready' }
+  | { status: 'error'; error?: unknown };
 
 interface RevenueCatProps {
   purchasePackage?: (pack: PurchasesPackage) => Promise<void>;
   restorePermissions?: () => Promise<CustomerInfo>;
   packages: PurchasesPackage[];
   isPro: boolean;
+  redeemWebPurchaseUrl: (url: string) => Promise<RedemptionResult>;
 }
 
 const RevenueCatContext = createContext<Partial<RevenueCatProps>>({});
 
-// Provide RevenueCat functions to our app
-export const RevenueCatProvider = ({ children }: any) => {
+const isUserCancelledError = (error: unknown) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'userCancelled' in error &&
+  error.userCancelled === true;
+
+export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const convex = useConvex();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [isReady, setIsReady] = useState(false);
+  const [isConfigured, setIsConfigured] = useState(false);
   const [isPro, setIsPro] = useState(false);
 
   const updateUserIsPremium = useMutation(api.users.updateUserIsPremium);
 
-  // Load all offerings a user can (currently) purchase
-  const loadOfferings = async () => {
+  const loadOfferings = useCallback(async () => {
     try {
       const offerings = await Purchases.getOfferings();
       if (offerings.current) {
         setPackages(offerings.current.availablePackages);
       }
-    } catch (e) {
-      // Store may be unavailable (dev/preview builds on Android). Swallow so
-      // the rest of the app still works.
-      console.warn('[RevenueCat] loadOfferings failed', e);
+    } catch (error) {
+      console.warn('[RevenueCat] loadOfferings failed', error);
     }
-  };
+  }, []);
 
-  // Admin check runs independently of the store so it works even when
-  // Google Play Billing is unreachable (dev/preview builds).
-  const syncAdminAsPro = async () => {
+  const syncAdminAsPro = useCallback(async () => {
     const [error, result] = await CatchPromiseWithType(convex.query(api.users.current));
+
     if (error) return false;
+
     if (result?.isAdmin) {
       setIsPro(true);
       return true;
     }
+
     return false;
-  };
+  }, [convex]);
 
-  // Update user state based on previous purchases
-  const updateCustomerInformation = async (customerInfo: CustomerInfo) => {
-    const isAdmin = await syncAdminAsPro();
-    if (isAdmin) return;
+  const updateCustomerInformation = useCallback(
+    async (customerInfo: CustomerInfo) => {
+      if (await syncAdminAsPro()) return;
 
-    const hasActivePremium = customerInfo?.entitlements.active['Premium'] !== undefined;
+      const hasActivePremium = customerInfo.entitlements.active['Premium'] !== undefined;
 
-    // Update local state
-    setIsPro(hasActivePremium);
+      if (__DEV__) {
+        console.log('[RevenueCat] Premium active', hasActivePremium);
+      }
 
-    // Update database - this will trigger a re-fetch of currentUser
-    await updateUserIsPremium({
-      isPremium: hasActivePremium,
-    });
-  };
+      setIsPro(hasActivePremium);
+      await updateUserIsPremium({ isPremium: hasActivePremium });
+    },
+    [syncAdminAsPro, updateUserIsPremium]
+  );
 
-  // Purchase a package
   const purchasePackage = useCallback(async (pack: PurchasesPackage) => {
     try {
       await Purchases.purchasePackage(pack);
-    } catch (e: any) {
-      if (!e.userCancelled) {
-        alert(e);
-      }
-      throw e; // Re-throw so the caller can handle it
+    } catch (error) {
+      if (!isUserCancelledError(error)) alert(error);
+      throw error;
     }
   }, []);
 
-  // // Restore previous purchases
-  const restorePermissions = useCallback(async () => {
-    const customer = await Purchases.restorePurchases();
-    return customer;
-  }, []);
+  const restorePermissions = useCallback(async () => Purchases.restorePurchases(), []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const init = async () => {
       try {
-        // Use more logging during debug if want!
         Purchases.setLogLevel(LOG_LEVEL.ERROR);
+        const apiKey = Platform.OS === 'android' ? APIKeys.google : APIKeys.apple;
 
-        // Skip if API keys are not configured
-        const hasValidKeys =
-          (Platform.OS === 'android' && APIKeys.google) ||
-          (Platform.OS === 'ios' && APIKeys.apple);
-
-        if (!hasValidKeys) {
-          console.warn('[RevenueCat] API keys not configured, skipping initialization');
-          setIsReady(true);
+        if (!apiKey) {
+          console.warn('[RevenueCat] API key not configured, skipping initialization');
           return;
         }
 
-        if (Platform.OS === 'android') {
-          await Purchases.configure({ apiKey: APIKeys.google });
-        } else {
-          await Purchases.configure({ apiKey: APIKeys.apple });
-        }
-
-        // Admin bypass runs first and does not depend on the store.
-        const isAdmin = await syncAdminAsPro();
-
-        // Listen for customer updates
-        Purchases.addCustomerInfoUpdateListener(async (info) => {
-          updateCustomerInformation(info);
-        });
-
-        // Load all offerings and the user object with entitlements
+        await Purchases.configure({ apiKey });
+        if (!cancelled) setIsConfigured(true);
         await loadOfferings();
-
-        // Explicitly fetch customer info so isPro is resolved even when the
-        // update listener doesn't fire at launch. Skip for admins — already set.
-        if (!isAdmin) {
-          try {
-            const info = await Purchases.getCustomerInfo();
-            await updateCustomerInformation(info);
-          } catch (e) {
-            console.warn('[RevenueCat] getCustomerInfo failed', e);
-          }
-        }
-      } catch (e) {
-        console.warn('[RevenueCat] initialization failed', e);
+      } catch (error) {
+        console.warn('[RevenueCat] initialization failed', error);
       } finally {
-        setIsReady(true);
+        if (!cancelled) setIsReady(true);
       }
     };
 
-    init();
-  }, []);
+    init().catch((error) => console.warn('[RevenueCat] initialization failed', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [loadOfferings]);
 
-  const value = useMemo(
-    () => ({
-      restorePermissions,
-      packages,
-      purchasePackage,
-      isPro,
-    }),
-    [restorePermissions, packages, purchasePackage, isPro]
+  useEffect(() => {
+    if (!isConfigured) return;
+
+    const listener = (info: CustomerInfo) => {
+      updateCustomerInformation(info).catch((error) =>
+        console.warn('[RevenueCat] Customer info sync failed', error)
+      );
+    };
+
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }, [isConfigured, updateCustomerInformation]);
+
+  useEffect(() => {
+    if (!isConfigured || !currentUser?._id) return;
+
+    let cancelled = false;
+
+    const identifyAndSync = async () => {
+      try {
+        await Purchases.logIn(currentUser._id.toString());
+        const info = await Purchases.getCustomerInfo();
+        if (!cancelled) await updateCustomerInformation(info);
+      } catch (error) {
+        console.warn('[RevenueCat] User identification failed', error);
+      }
+    };
+
+    identifyAndSync().catch((error) =>
+      console.warn('[RevenueCat] User identification failed', error)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?._id, isConfigured, updateCustomerInformation]);
+
+  const redeemWebPurchaseUrl = useCallback(
+    async (url: string): Promise<RedemptionResult> => {
+      try {
+        if (!isConfigured) return { status: 'not_ready' };
+
+        const trimmedUrl = url?.trim();
+        if (!trimmedUrl) return { status: 'invalid' };
+
+        const [userError, authenticatedUser] = await CatchPromiseWithType(
+          convex.query(api.users.current)
+        );
+
+        if (userError || !authenticatedUser?._id) return { status: 'login_required' };
+
+        await Purchases.logIn(authenticatedUser._id.toString());
+
+        if (__DEV__) {
+          console.log(
+            '[RevenueCatRedemption] RevenueCat user identified',
+            await Purchases.getAppUserID()
+          );
+        }
+
+        const redemption = await Purchases.parseAsWebPurchaseRedemption(trimmedUrl);
+        if (!redemption) return { status: 'invalid' };
+
+        const result = await Purchases.redeemWebPurchase(redemption);
+
+        if (__DEV__) console.log('[RevenueCatRedemption] Result', result.result);
+
+        switch (result.result) {
+          case WebPurchaseRedemptionResultType.SUCCESS:
+            await updateCustomerInformation(result.customerInfo);
+
+            if (result.customerInfo.entitlements.active['Premium'] === undefined) {
+              return {
+                status: 'error',
+                error: new Error(
+                  'Redemption succeeded but the Premium entitlement is not active. Check RevenueCat product configuration.'
+                ),
+              };
+            }
+
+            return { status: 'success' };
+
+          case WebPurchaseRedemptionResultType.EXPIRED:
+            return { status: 'expired', email: result.obfuscatedEmail };
+          case WebPurchaseRedemptionResultType.PURCHASE_BELONGS_TO_OTHER_USER:
+            return { status: 'belongs_to_other_user' };
+          case WebPurchaseRedemptionResultType.INVALID_TOKEN:
+            return { status: 'invalid' };
+          case WebPurchaseRedemptionResultType.ERROR:
+            return { status: 'error', error: result.error };
+        }
+      } catch (error) {
+        console.error('[RevenueCat] Web purchase redemption failed', error);
+        return { status: 'error', error };
+      }
+    },
+    [convex, isConfigured, updateCustomerInformation]
   );
 
-  // Return empty fragment if provider is not ready (Purchase not yet initialised)
-  if (!isReady) return <></>;
+  const value = useMemo(
+    () => ({ restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl }),
+    [restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl]
+  );
+
+  if (!isReady) return null;
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;
 };
 
-// Export context for easy usage
-export const useRevenueCat = () => {
-  return useContext(RevenueCatContext) as RevenueCatProps;
-};
+export const useRevenueCat = () => useContext(RevenueCatContext) as RevenueCatProps;

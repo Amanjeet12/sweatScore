@@ -2,7 +2,7 @@ import { useAuthActions } from '@convex-dev/auth/react';
 import { Feather } from '@expo/vector-icons';
 import { useConvex } from 'convex/react';
 import { Image } from 'expo-image';
-import { Link, router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
@@ -16,6 +16,7 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { cn } from '~/utils/cn';
 import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
+import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
 
 export default function Verify() {
   const convex = useConvex();
@@ -67,8 +68,12 @@ export default function Verify() {
         return;
       }
 
+      if (hasPendingRevenueCatRedemption()) {
+        return;
+      }
+
       router.replace('/(tabs)/dashboard');
-    } catch (error) {
+    } catch {
       setError('Invalid code');
     } finally {
       setIsLoading(false);

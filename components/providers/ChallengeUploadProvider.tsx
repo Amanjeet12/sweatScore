@@ -13,6 +13,7 @@ import {
 import { AppState, AppStateStatus } from 'react-native';
 
 import { ToastMessage } from '~/components/core/Toast';
+import { useCelebration } from '~/components/providers/CelebrationProvider';
 import { useToast } from '~/components/ui/toast';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -146,6 +147,7 @@ async function generateVideoThumbnail(videoUri: string): Promise<string> {
 
 export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
+  const { celebrateCompletion, showMilestone } = useCelebration();
 
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const completeChallenge = useMutation(api.challengeCompletions.completeChallenge);
@@ -393,6 +395,17 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
           caption: job.caption || undefined,
         });
 
+        if (result.celebration.type === 'check_in_complete') {
+          celebrateCompletion({
+            type: 'check_in',
+            pointsEarned: result.pointsEarned,
+          });
+        }
+
+        for (const milestone of result.celebration.milestones) {
+          showMilestone(milestone);
+        }
+
         // ---------------------------------------------------------
         // 6. Remove queue item and local temporary files
         // ---------------------------------------------------------
@@ -468,9 +481,17 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         setRetryWakeTick((current) => current + 1);
       }
     },
-    [completeChallenge, generateUploadUrl, patchJob, removeJob, showToast]
+    [
+      celebrateCompletion,
+      completeChallenge,
+      generateUploadUrl,
+      patchJob,
+      removeJob,
+      showMilestone,
+      showToast,
+    ]
   );
-  
+
   useEffect(() => {
     if (!isHydrated || appState !== 'active' || processingJobIdRef.current) {
       return;

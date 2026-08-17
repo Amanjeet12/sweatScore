@@ -3,6 +3,7 @@ import { MutationCtx, QueryCtx } from '../_generated/server';
 
 const DAILY_STEP_TARGET = 5000;
 const DAILY_ACTIVE_MINUTES_TARGET = 50;
+export const WEEKLY_STREAK_TARGET_DAYS = 5;
 
 /**
  * Returns dates where the user completed at least one

@@ -36,6 +36,7 @@ export default function WeeklyStreakCard() {
 
   const weeklyStreaks = streakData?.weeklyStreaks ?? 0;
   const currentWeekDays = streakData?.currentWeekDays ?? 0;
+  const currentWeekTarget = streakData?.currentWeekTarget ?? 5;
 
   const weekLabel = weeklyStreaks === 1 ? 'Week' : 'Weeks';
 
@@ -65,7 +66,7 @@ export default function WeeklyStreakCard() {
           </View>
 
           <Text className="mt-0.5 font-body text-[10px] text-[#313131]">
-            {currentWeekDays}/5 days
+            {currentWeekDays}/{currentWeekTarget} days
           </Text>
         </View>
       </View>

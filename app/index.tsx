@@ -9,6 +9,7 @@ import ScreenLoading from '~/components/core/ScreenLoading';
 import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
+import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
 import { getData, storeData } from '~/utils/storage';
 
 export default function Home() {
@@ -23,7 +24,12 @@ export default function Home() {
     try {
       const user = await convex.query(api.users.current);
 
-      if (!user) return;
+      if (!user) {
+        if (hasPendingRevenueCatRedemption()) {
+          router.replace('/(auth)/email');
+        }
+        return;
+      }
 
       await activateUser();
 
@@ -53,6 +59,10 @@ export default function Home() {
 
       if (!user.onboarded) {
         router.replace('/(auth)/ask-health-permission');
+        return;
+      }
+
+      if (hasPendingRevenueCatRedemption()) {
         return;
       }
 

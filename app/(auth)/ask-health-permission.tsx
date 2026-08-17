@@ -23,6 +23,7 @@ import {
   isAppleHealthAvailable,
 } from '~/utils/apple-health-kit';
 import { healthPermissionsAndroid } from '~/utils/constants';
+import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
 import { storeData } from '~/utils/storage';
 
 function getHealthConnect() {
@@ -170,6 +171,10 @@ export default function AskHealthPermission() {
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
 
+    if (hasPendingRevenueCatRedemption()) {
+      return;
+    }
+
     router.dismissAll();
     router.replace({
       pathname: '/(tabs)/dashboard',
@@ -185,6 +190,10 @@ export default function AskHealthPermission() {
 
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
+
+    if (hasPendingRevenueCatRedemption()) {
+      return;
+    }
 
     router.dismissAll();
     router.replace('/(tabs)/dashboard');

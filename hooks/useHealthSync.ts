@@ -1,11 +1,12 @@
 import { useConvex, useMutation } from 'convex/react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { getHealthDataForDate } from './useHealthData';
 import { api } from '../convex/_generated/api';
 
 import { formatDateYYYYMMDD } from '@/utils/timezone';
 import { Id } from '~/convex/_generated/dataModel';
+import { useCelebration } from '~/components/providers/CelebrationProvider';
 
 export const useHealthSync = (
   userId: Id<'users'>,
@@ -15,11 +16,12 @@ export const useHealthSync = (
   const convex = useConvex();
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showMilestone } = useCelebration();
 
   const syncHealthData = useMutation(api.activities.syncHealthData);
 
   // Calculate user age from birthdate
-  const getUserAge = () => {
+  const getUserAge = useCallback(() => {
     if (!userBirthdate) return undefined;
 
     const birthDate = new Date(userBirthdate);
@@ -30,10 +32,10 @@ export const useHealthSync = (
       age--;
     }
     return age;
-  };
+  }, [userBirthdate]);
 
   // Function to sync all missed days
-  const syncAllMissedDays = async () => {
+  const syncAllMissedDays = useCallback(async () => {
     setIsSyncing(true);
     setError(null);
 
@@ -82,14 +84,17 @@ export const useHealthSync = (
 
       // Send batch to server
       if (healthDataBatch.length > 0) {
-        await syncHealthData({ userId, healthData: healthDataBatch });
+        const result = await syncHealthData({ userId, healthData: healthDataBatch });
+        for (const milestone of result.milestones) {
+          showMilestone(milestone);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sync health data');
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [convex, getUserAge, showMilestone, syncHealthData, timeZone, userId]);
 
   return {
     isSyncing,

@@ -4,6 +4,7 @@ import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
+import { evaluateUserMilestones } from './utils/milestones';
 import { Id, Doc } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import { appVersions } from './appVersions';
@@ -310,14 +311,13 @@ export const syncHealthData = mutation({
       })
     ),
   },
-  returns: v.boolean(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return true;
+    if (!userId) return { milestones: [] };
 
     const user = await ctx.db.get(userId);
-    if (!user) return true;
-    if (!user.autoSyncEnabled) return true;
+    if (!user) return { milestones: [] };
+    if (!user.autoSyncEnabled) return { milestones: [] };
 
     // Update each daily activity
     for (const data of args.healthData) {
@@ -336,7 +336,11 @@ export const syncHealthData = mutation({
       lastSyncDate: Date.now(),
     });
 
-    return true;
+    const dates = args.healthData.map((item) => item.date).sort();
+    const latestDate = dates[dates.length - 1];
+    const milestones = latestDate ? await evaluateUserMilestones(ctx, userId, latestDate) : [];
+
+    return { milestones };
   },
 });
 

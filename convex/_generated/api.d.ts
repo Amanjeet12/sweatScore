@@ -44,6 +44,7 @@ import type * as track_yourMoves from "../track/yourMoves.js";
 import type * as triggerMerge from "../triggerMerge.js";
 import type * as upload from "../upload.js";
 import type * as users from "../users.js";
+import type * as utils_milestones from "../utils/milestones.js";
 import type * as utils_streak from "../utils/streak.js";
 import type * as utils_timezone from "../utils/timezone.js";
 
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   triggerMerge: typeof triggerMerge;
   upload: typeof upload;
   users: typeof users;
+  "utils/milestones": typeof utils_milestones;
   "utils/streak": typeof utils_streak;
   "utils/timezone": typeof utils_timezone;
 }>;

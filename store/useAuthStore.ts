@@ -1,4 +1,3 @@
-import Purchases from 'react-native-purchases';
 import { create } from 'zustand';
 
 import { Doc } from '~/convex/_generated/dataModel';
@@ -15,11 +14,8 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   currentUser: null,
-  setCurrentUser: async (user) => {
+  setCurrentUser: (user) => {
     set({ currentUser: user });
-    if (user?._id) {
-      await Purchases.logIn(user?._id);
-    }
   },
   setCurrentUserImage: (image) => {
     const user = get().currentUser;

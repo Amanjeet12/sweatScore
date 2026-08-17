@@ -6,7 +6,8 @@ import { components, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, QueryCtx, MutationCtx } from './_generated/server';
 import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timezone';
-import { getStreakEarnedDatesInRange } from './utils/streak';
+import { evaluateUserMilestones } from './utils/milestones';
+import { getStreakEarnedDatesInRange, WEEKLY_STREAK_TARGET_DAYS } from './utils/streak';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 3;
@@ -468,6 +469,10 @@ export const completeChallenge = mutation({
       }
     }
 
+    const milestones = await evaluateUserMilestones(ctx, userId, todayStr, {
+      completedCheckIn: isCheckIn,
+    });
+
     return {
       success: true,
       pointsEarned: totalPoints,
@@ -475,6 +480,10 @@ export const completeChallenge = mutation({
       attemptNumber,
       isDay1Baseline: attemptNumber === 1,
       dailyWindowStartAt: dailyWindowStartAt ?? null,
+      celebration: {
+        type: isCheckIn ? ('check_in_complete' as const) : ('challenge_complete' as const),
+        milestones,
+      },
     };
   },
 });
@@ -535,7 +544,11 @@ export const getUserStreaksForMonth = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return { weeklyStreaks: 0, currentWeekDays: 0, currentWeekTarget: 5 };
+      return {
+        weeklyStreaks: 0,
+        currentWeekDays: 0,
+        currentWeekTarget: WEEKLY_STREAK_TARGET_DAYS,
+      };
     }
 
     const user = await ctx.db.get(userId);
@@ -569,14 +582,14 @@ export const getUserStreaksForMonth = query({
     );
 
     let weeklyStreaks = 0;
-    if (currentWeekDays >= 5) weeklyStreaks++;
+    if (currentWeekDays >= WEEKLY_STREAK_TARGET_DAYS) weeklyStreaks++;
     let cursor = addDaysUTC(currentMonday, -7);
     for (let w = 0; w < LOOKBACK_WEEKS; w++) {
       let daysActive = 0;
       for (let i = 0; i < 7; i++) {
         if (historicalEarnedDates.has(ymdUTC(addDaysUTC(cursor, i)))) daysActive++;
       }
-      if (daysActive >= 5) {
+      if (daysActive >= WEEKLY_STREAK_TARGET_DAYS) {
         weeklyStreaks++;
         cursor = addDaysUTC(cursor, -7);
       } else {
@@ -584,7 +597,7 @@ export const getUserStreaksForMonth = query({
       }
     }
 
-    return { weeklyStreaks, currentWeekDays, currentWeekTarget: 5 };
+    return { weeklyStreaks, currentWeekDays, currentWeekTarget: WEEKLY_STREAK_TARGET_DAYS };
   },
 });
 

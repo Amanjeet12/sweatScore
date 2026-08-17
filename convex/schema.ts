@@ -257,6 +257,13 @@ const schema = defineSchema({
     .index('by_user_challenge_window', ['userId', 'challengeId', 'dailyWindowStartAt'])
     .index('by_user', ['userId']),
 
+  userMilestones: defineTable({
+    userId: v.id('users'),
+    type: v.union(v.literal('weekly_target'), v.literal('first_check_in')),
+    key: v.string(),
+    achievedAt: v.number(),
+  }).index('by_user_type_key', ['userId', 'type', 'key']),
+
   appConfig: defineTable({
     key: v.string(),
     value: v.string(),

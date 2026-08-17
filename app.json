@@ -79,6 +79,14 @@
     "bundleIdentifier": "com.sweatscore.sweatscoreapp",
     "infoPlist": {
       "ITSAppUsesNonExemptEncryption": false,
+      "CFBundleURLTypes": [
+        {
+          "CFBundleURLSchemes": ["sweatscore-app"]
+        },
+        {
+          "CFBundleURLSchemes": ["rc-c34e14f570"]
+        }
+      ],
       "LSApplicationQueriesSchemes": [
         "fb",
         "instagram",
@@ -100,6 +108,17 @@
     "userInterfaceStyle": "light"
   },
   "android": {
+    "intentFilters": [
+      {
+        "action": "VIEW",
+        "data": [
+          {
+            "scheme": "rc-c34e14f570"
+          }
+        ],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }
+    ],
     "adaptiveIcon": {
       "foregroundImage": "./assets/adaptive-icon.png",
       "backgroundColor": "#FFEEE1"
