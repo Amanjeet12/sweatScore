@@ -111,6 +111,7 @@ export const completeChallenge = mutation({
   args: {
     challengeId: v.id('challenges'),
     videoStorageId: v.optional(v.id('_storage')),
+    mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
 
@@ -187,6 +188,16 @@ export const completeChallenge = mutation({
     }
 
     const isCheckIn = challenge.type === 'check_in';
+    const mediaType: 'image' | 'video' =
+      isCheckIn && args.mediaType === 'image' ? 'image' : 'video';
+
+    if (!args.videoStorageId) {
+      throw new ConvexError(isCheckIn ? 'A photo or video is required' : 'A video is required');
+    }
+
+    if (!isCheckIn && mediaType !== 'video') {
+      throw new ConvexError('Challenges require a video');
+    }
     /*
      * Daily challenges are checked using their
      * exact scheduled window.
@@ -287,6 +298,7 @@ export const completeChallenge = mutation({
       ...(args.videoStorageId
         ? {
             videoStorageId: args.videoStorageId,
+            mediaType,
           }
         : {}),
 
@@ -385,13 +397,13 @@ export const completeChallenge = mutation({
 
           mediaWidth: 1080,
           mediaHeight: 1350,
-          mediaType: 'video',
+          mediaType,
 
           challengeId: args.challengeId,
           challengeCompletionId: completionId,
         });
 
-        console.log('Single check-in video posted:', {
+        console.log('Check-in media posted:', {
           postId,
           completionId,
           challengeId: args.challengeId,

@@ -31,6 +31,8 @@ export interface ChallengeUploadJob {
   id: string;
   challengeId: string;
   videoUri: string;
+  mediaType: 'image' | 'video';
+  mimeType: string;
   caption?: string;
   allowRepost: boolean;
   createdAt: number;
@@ -47,6 +49,8 @@ export interface ChallengeUploadJob {
 interface EnqueueChallengeUploadInput {
   challengeId: string;
   videoUri: string;
+  mediaType?: 'image' | 'video';
+  mimeType?: string;
   caption?: string;
   allowRepost: boolean;
 }
@@ -101,6 +105,8 @@ function normalizeStoredJobs(raw: unknown): ChallengeUploadJob[] {
         id: candidate.id,
         challengeId: candidate.challengeId,
         videoUri: candidate.videoUri,
+        mediaType: candidate.mediaType === 'image' ? 'image' : 'video',
+        mimeType: typeof candidate.mimeType === 'string' ? candidate.mimeType : 'video/mp4',
         caption: candidate.caption?.trim() || undefined,
         allowRepost: Boolean(candidate.allowRepost),
         createdAt,
@@ -250,7 +256,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         if (!fileInfo.exists) {
           removeJob(jobId);
 
-          showToast('Saved recording could not be found. Please record again.', 'error');
+          showToast('Saved media could not be found. Please add it again.', 'error');
 
           return;
         }
@@ -266,7 +272,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        if (!thumbnailUri) {
+        if (job.mediaType === 'video' && !thumbnailUri) {
           thumbnailUri = await generateVideoThumbnail(job.videoUri);
 
           patchJob(jobId, {
@@ -296,18 +302,20 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
             httpMethod: 'POST',
             uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
             headers: {
-              'Content-Type': 'video/mp4',
+              'Content-Type': job.mimeType,
             },
           });
 
           const uploadResult = await uploadTask.uploadAsync();
 
           if (!uploadResult?.body) {
-            throw new Error('Could not upload your video. Please try again.');
+            throw new Error(`Could not upload your ${job.mediaType}. Please try again.`);
           }
 
           if (uploadResult.status < 200 || uploadResult.status >= 300) {
-            throw new Error('Video upload failed. Please try again.');
+            throw new Error(
+              `${job.mediaType === 'video' ? 'Video' : 'Photo'} upload failed. Please try again.`
+            );
           }
 
           const uploadBody = JSON.parse(uploadResult.body) as {
@@ -389,6 +397,8 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
           videoStorageId: uploadedStorageId,
 
+          mediaType: job.mediaType,
+
           thumbnailStorageId: uploadedThumbnailStorageId,
 
           allowRepost: job.allowRepost,
@@ -423,16 +433,16 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
             showToast(
-              `+${result.pointsEarned} pts added successfully. Your video will be live soon.`,
+              `+${result.pointsEarned} pts added successfully. Your post will be live soon.`,
               'success'
             );
           } else {
             showToast('Progress saved successfully.', 'success');
           }
         } else if (result?.pointsEarned > 0) {
-          showToast(`+${result.pointsEarned} pts added. Your video will be live soon.`, 'success');
+          showToast(`+${result.pointsEarned} pts added. Your post will be live soon.`, 'success');
         } else {
-          showToast('Progress submitted successfully. Your video will be live soon.', 'success');
+          showToast('Progress submitted successfully. Your post will be live soon.', 'success');
         }
       } catch (error) {
         const latestJob = jobsRef.current.find((candidate) => candidate.id === jobId);
@@ -522,7 +532,14 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
   }, [appState, isHydrated, jobs, processJob, retryWakeTick]);
 
   const enqueueChallengeUpload = useCallback(
-    async ({ challengeId, videoUri, caption, allowRepost }: EnqueueChallengeUploadInput) => {
+    async ({
+      challengeId,
+      videoUri,
+      mediaType = 'video',
+      mimeType = mediaType === 'image' ? 'image/jpeg' : 'video/mp4',
+      caption,
+      allowRepost,
+    }: EnqueueChallengeUploadInput) => {
       if (!isHydrated) {
         throw new Error('Upload queue is still loading. Please try again.');
       }
@@ -543,6 +560,8 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         id: `challenge-upload-${now}-${Math.random().toString(36).slice(2, 8)}`,
         challengeId,
         videoUri,
+        mediaType,
+        mimeType,
         caption: caption?.trim() || undefined,
         allowRepost,
         createdAt: now,
@@ -554,7 +573,10 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
       saveJobs((current) => [...current, nextJob]);
 
-      showToast('Uploading your video. Please keep the app open until it finishes.', 'warning');
+      showToast(
+        `Uploading your ${mediaType === 'image' ? 'photo' : 'video'}. Please keep the app open until it finishes.`,
+        'warning'
+      );
     },
     [isHydrated, saveJobs, showToast]
   );

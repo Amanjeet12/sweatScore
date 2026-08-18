@@ -3,10 +3,19 @@ import { Audio } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { CameraRotate, Record, X } from 'phosphor-react-native';
+import {
+  Camera,
+  CameraRotate,
+  ImageSquare,
+  Record,
+  UploadSimple,
+  VideoCamera,
+  X,
+} from 'phosphor-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -156,6 +165,9 @@ export default function DuetRecordingScreen() {
   const [elapsed, setElapsed] = useState(0);
 
   const [recordedVideoUri, setRecordedVideoUri] = useState<string | null>(null);
+  const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video'>('video');
+  const [selectedMimeType, setSelectedMimeType] = useState('video/mp4');
+  const [isVideoRecorderOpen, setIsVideoRecorderOpen] = useState(false);
 
   const [caption, setCaption] = useState('');
 
@@ -392,6 +404,10 @@ export default function DuetRecordingScreen() {
   );
 
   useEffect(() => {
+    if (challenge?.type === 'check_in' && !isVideoRecorderOpen) {
+      return;
+    }
+
     if (!cameraPermission?.granted) {
       requestCameraPermission();
     }
@@ -404,6 +420,8 @@ export default function DuetRecordingScreen() {
     micPermission?.granted,
     requestCameraPermission,
     requestMicPermission,
+    challenge?.type,
+    isVideoRecorderOpen,
   ]);
 
   useEffect(() => {
@@ -805,6 +823,8 @@ export default function DuetRecordingScreen() {
         recordedVideoUriRef.current = persistentUri;
 
         setRecordedVideoUri(persistentUri);
+        setSelectedMediaType('video');
+        setSelectedMimeType('video/mp4');
 
         setCaption(
           isCheckIn
@@ -990,6 +1010,69 @@ export default function DuetRecordingScreen() {
     setCameraFacing((current) => (current === 'front' ? 'back' : 'front'));
   }, []);
 
+  const handlePickCheckInMedia = useCallback(
+    async (source: 'camera' | 'library', mediaType: 'image' | 'video') => {
+      if (!isCheckIn || isSubmitting) return;
+
+      if (
+        !requireSubscription({
+          redirectTo: challengeRedirectTo,
+          source: 'challenge_check_in_media',
+        })
+      )
+        return;
+
+      if (dailyLimitReached) {
+        Alert.alert('Daily limit reached', 'You have reached your check-in limit for today.');
+        return;
+      }
+
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: mediaType === 'image' ? ['images'] : ['videos'],
+        allowsEditing: false,
+        quality: 1,
+        videoMaxDuration: MAX_RECORDING_SECONDS,
+      };
+
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync(options)
+          : await ImagePicker.launchImageLibraryAsync(options);
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      if (
+        mediaType === 'video' &&
+        asset.duration &&
+        asset.duration > MAX_RECORDING_SECONDS * 1000
+      ) {
+        Alert.alert(
+          'Video too long',
+          `Please choose a video up to ${MAX_RECORDING_SECONDS} seconds.`
+        );
+        return;
+      }
+
+      const fallbackExtension = mediaType === 'image' ? 'jpg' : 'mp4';
+      const sourceExtension = asset.fileName?.split('.').pop()?.toLowerCase() || fallbackExtension;
+      const persistentUri = `${FileSystem.documentDirectory}check-in-${Date.now()}.${sourceExtension}`;
+
+      try {
+        await FileSystem.copyAsync({ from: asset.uri, to: persistentUri });
+        recordedVideoUriRef.current = persistentUri;
+        setRecordedVideoUri(persistentUri);
+        setSelectedMediaType(mediaType);
+        setSelectedMimeType(asset.mimeType || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4'));
+        setCaption(getCheckInCaption());
+        setState('post-record');
+      } catch {
+        Alert.alert('Media unavailable', 'Could not prepare that file. Please choose another one.');
+      }
+    },
+    [challengeRedirectTo, dailyLimitReached, isCheckIn, isSubmitting, requireSubscription]
+  );
+
   const handleCancel = useCallback(() => {
     debugRecordingState('handleCancel called');
 
@@ -1026,6 +1109,9 @@ export default function DuetRecordingScreen() {
     elapsedRef.current = 0;
 
     setRecordedVideoUri(null);
+    setSelectedMediaType('video');
+    setSelectedMimeType('video/mp4');
+    setIsVideoRecorderOpen(false);
     setCaption('');
 
     setAllowRepost(!isCheckIn);
@@ -1055,7 +1141,7 @@ export default function DuetRecordingScreen() {
 
     const trimmedCaption = caption.trim();
 
-    if (!trimmedCaption) {
+    if (!isCheckIn && !trimmedCaption) {
       Alert.alert('Caption required', 'Please add a caption before submitting your video.');
 
       return;
@@ -1069,9 +1155,12 @@ export default function DuetRecordingScreen() {
 
         videoUri: recordedVideoUri,
 
+        mediaType: selectedMediaType,
+        mimeType: selectedMimeType,
+
         allowRepost: isCheckIn ? false : allowRepost,
 
-        caption: trimmedCaption,
+        caption: trimmedCaption || undefined,
       });
 
       preserveRecordedVideoOnUnmountRef.current = true;
@@ -1098,6 +1187,8 @@ export default function DuetRecordingScreen() {
     isCheckIn,
     challengeRedirectTo,
     requireSubscription,
+    selectedMediaType,
+    selectedMimeType,
   ]);
 
   const handleCaptionFocus = useCallback(() => {
@@ -1120,7 +1211,10 @@ export default function DuetRecordingScreen() {
     );
   }
 
-  if (!cameraPermission?.granted || !micPermission?.granted) {
+  if (
+    (!isCheckIn || isVideoRecorderOpen) &&
+    (!cameraPermission?.granted || !micPermission?.granted)
+  ) {
     return (
       <View
         className="flex-1 items-center justify-center bg-[#F9F9F9] px-8"
@@ -1153,7 +1247,7 @@ export default function DuetRecordingScreen() {
 
   const isLiveState = state === 'pre-record' || state === 'countdown' || state === 'recording';
 
-  const isCaptionMissing = !caption.trim();
+  const isCaptionMissing = !isCheckIn && !caption.trim();
 
   const progressPercent =
     state === 'recording' ? Math.min(100, (elapsed / MAX_RECORDING_SECONDS) * 100) : 0;
@@ -1161,6 +1255,67 @@ export default function DuetRecordingScreen() {
   const canStopRecording = state === 'recording' && elapsed >= MIN_STOP_RECORDING_SECONDS;
 
   const currentChallengeDay = progress?.nextAttemptNumber ?? 1;
+
+  if (isCheckIn && state === 'pre-record' && !isVideoRecorderOpen) {
+    const MediaChoice = ({
+      label,
+      icon,
+      onPress,
+    }: {
+      label: string;
+      icon: React.ReactNode;
+      onPress: () => void;
+    }) => (
+      <TouchableOpacity
+        className="mb-3 flex-row items-center rounded-2xl border border-[#E7E7E7] bg-white px-4 py-4"
+        disabled={dailyLimitReached}
+        onPress={onPress}>
+        <View className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-[#FFF1EA]">
+          {icon}
+        </View>
+        <Text className="font-body text-base font-bold text-[#1F1F1F]">{label}</Text>
+      </TouchableOpacity>
+    );
+
+    return (
+      <View className="flex-1 bg-[#F6F6F6] px-5" style={{ paddingTop: insets.top + 18 }}>
+        <TouchableOpacity
+          onPress={handleCancel}
+          className="mb-8 h-10 w-10 items-center justify-center rounded-full bg-white">
+          <X size={22} color="#222" weight="bold" />
+        </TouchableOpacity>
+        <Text className="font-heading text-3xl font-extrabold text-black">Add your check-in</Text>
+        <Text className="mb-7 mt-2 font-body text-base text-[#686868]">
+          Add one photo or video - whichever feels easiest today.
+        </Text>
+        <MediaChoice
+          label="Take Photo"
+          icon={<Camera size={23} color="#FF5C1A" />}
+          onPress={() => handlePickCheckInMedia('camera', 'image')}
+        />
+        <MediaChoice
+          label="Upload Photo"
+          icon={<ImageSquare size={23} color="#FF5C1A" />}
+          onPress={() => handlePickCheckInMedia('library', 'image')}
+        />
+        <MediaChoice
+          label="Record Video"
+          icon={<VideoCamera size={23} color="#FF5C1A" />}
+          onPress={() => setIsVideoRecorderOpen(true)}
+        />
+        <MediaChoice
+          label="Upload Video"
+          icon={<UploadSimple size={23} color="#FF5C1A" />}
+          onPress={() => handlePickCheckInMedia('library', 'video')}
+        />
+        {dailyLimitReached && (
+          <Text className="mt-2 text-center font-body text-sm font-semibold text-[#E5484D]">
+            You reached your check-in limit for today.
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   if (isLiveState) {
     return (
@@ -1401,14 +1556,20 @@ export default function DuetRecordingScreen() {
               </Text>
 
               <Text className="mt-1 text-center font-body text-sm text-[#686868]">
-                Review your video then submit
+                Review your {selectedMediaType === 'image' ? 'photo' : 'video'} then submit
               </Text>
             </View>
           </View>
 
           {recordedVideoUri && (
             <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-black">
-              {isCheckIn ? (
+              {isCheckIn && selectedMediaType === 'image' ? (
+                <Image
+                  source={{ uri: recordedVideoUri }}
+                  style={{ width: '100%', aspectRatio: 4 / 5 }}
+                  contentFit="contain"
+                />
+              ) : isCheckIn ? (
                 <SingleVideoPreview videoUrl={recordedVideoUri} />
               ) : currentChallengeDay === 1 ? (
                 <CompositeVideoPlayer
@@ -1452,7 +1613,9 @@ export default function DuetRecordingScreen() {
               shadowRadius: 12,
             }}>
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-body text-sm font-bold text-[#1F1F1F]">Caption *</Text>
+              <Text className="font-body text-sm font-bold text-[#1F1F1F]">
+                Caption{isCheckIn ? ' (optional)' : ' *'}
+              </Text>
 
               <Text className="font-body text-xs text-[#838383]">
                 {caption.trim().length}
@@ -1519,7 +1682,8 @@ export default function DuetRecordingScreen() {
             </LoadingButton>
 
             <Text className="mt-1 text-center font-body text-sm font-semibold text-[#6F6F6F]">
-              Keep the app open while your video uploads
+              Keep the app open while your {selectedMediaType === 'image' ? 'photo' : 'video'}{' '}
+              uploads
             </Text>
           </View>
 
@@ -1527,7 +1691,9 @@ export default function DuetRecordingScreen() {
             className="mt-5 items-center"
             disabled={isSubmitting}
             onPress={handleStartOver}>
-            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">Start over</Text>
+            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">
+              Remove or replace media
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -247,8 +247,9 @@ const schema = defineSchema({
     date: v.string(),
     pointsEarned: v.number(),
 
-    // User's personal uploaded video
+    // User's uploaded media (legacy field name retained for compatibility)
     videoStorageId: v.optional(v.id('_storage')),
+    mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
 
     // Generated transformation/composite video
     compositeVideoStorageId: v.optional(v.id('_storage')),
