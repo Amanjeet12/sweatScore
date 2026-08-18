@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 import {
   createContext,
   ReactNode,
@@ -33,6 +34,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   const milestoneQueue = useRef<MilestoneData[]>([]);
   const milestoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeMilestoneRef = useRef<MilestoneData | null>(null);
+  const completionSoundRef = useRef<Audio.Sound | null>(null);
 
   const presentNextMilestone = useCallback(() => {
     if (activeMilestoneRef.current || milestoneTimer.current || milestoneQueue.current.length === 0)
@@ -53,13 +55,34 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   useEffect(
     () => () => {
       if (milestoneTimer.current) clearTimeout(milestoneTimer.current);
+      void completionSoundRef.current?.unloadAsync().catch(() => undefined);
     },
     []
   );
 
-  const celebrateCompletion = useCallback((_completion: CompletionCelebration) => {
+  const celebrateCompletion = useCallback(async (_completion: CompletionCelebration) => {
     setConfettiKey(Date.now());
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+
+    try {
+      if (completionSoundRef.current) {
+        await completionSoundRef.current.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync(require('../../assets/enjoy.mp3'), {
+        shouldPlay: true,
+        volume: 1,
+      });
+      completionSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          completionSoundRef.current = null;
+          void sound.unloadAsync().catch(() => undefined);
+        }
+      });
+    } catch (error) {
+      console.warn('Unable to play check-in celebration sound:', error);
+    }
   }, []);
 
   const showMilestone = useCallback(

@@ -1023,7 +1023,7 @@ export const getTodayDailyChallenge = query({
     let userCompletedToday = false;
 
     if (userId) {
-      const completion = await ctx.db
+      const scheduledCompletion = await ctx.db
         .query('challengeCompletions')
         .withIndex('by_user_challenge_window', (q) =>
           q
@@ -1034,7 +1034,30 @@ export const getTodayDailyChallenge = query({
         .filter((q) => q.neq(q.field('removed'), true))
         .first();
 
-      userCompletedToday = Boolean(completion);
+      userCompletedToday = Boolean(scheduledCompletion);
+
+      /*
+       * The featured card opens a set of check-in categories. Completing any
+       * one of those check-ins should finish the card for the day, even when
+       * the selected category uses a different challenge record.
+       */
+      if (!userCompletedToday && challenge.type === 'check_in') {
+        const user = await ctx.db.get(userId);
+        const todayStr = formatDateInTZ(new Date(now), user?.timezone);
+        const todaysCompletions = await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+          .filter((q) => q.neq(q.field('removed'), true))
+          .collect();
+
+        for (const completion of todaysCompletions) {
+          const completedChallenge = await ctx.db.get(completion.challengeId);
+          if (completedChallenge?.type === 'check_in') {
+            userCompletedToday = true;
+            break;
+          }
+        }
+      }
     }
 
     /*

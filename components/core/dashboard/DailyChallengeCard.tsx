@@ -309,7 +309,7 @@ export default function DailyChallengeCard() {
   }
 
   const handleAcceptChallenge = () => {
-    if (secondsRemaining <= 0) {
+    if (isCompleted || secondsRemaining <= 0) {
       return;
     }
 
@@ -328,7 +328,7 @@ export default function DailyChallengeCard() {
       ? dailyChallenge.checkInDescription?.trim() || dailyChallenge.description
       : dailyChallenge.description);
 
-  const isButtonDisabled = secondsRemaining <= 0;
+  const isButtonDisabled = isCompleted || secondsRemaining <= 0;
 
   return (
     <View
@@ -508,10 +508,10 @@ export default function DailyChallengeCard() {
                 disabled={isButtonDisabled}
                 onPress={handleAcceptChallenge}
                 style={{
-                  opacity: secondsRemaining <= 0 ? 0.55 : 1,
+                  opacity: isButtonDisabled ? 0.55 : 1,
                 }}
                 className={`h-[39px] w-full items-center justify-center rounded-[22px] ${
-                  secondsRemaining <= 0 ? 'bg-gray-200' : 'bg-white'
+                  isButtonDisabled ? 'bg-gray-200' : 'bg-white'
                 }`}>
                 <View className="flex-row items-center justify-center">
                   {isCompleted && <Check size={16} color="#16A34A" weight="bold" />}

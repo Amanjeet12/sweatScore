@@ -1,4 +1,5 @@
 import { useIsFocused } from '@react-navigation/native';
+import { Audio } from 'expo-av';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
@@ -6,10 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
-import {
-  AchievementPopupContent,
-  getAchievementPopupDecisions,
-} from '~/utils/achievement-popups';
+import { AchievementPopupContent, getAchievementPopupDecisions } from '~/utils/achievement-popups';
 
 type AchievementPopupManagerProps = {
   userId: string;
@@ -37,9 +35,7 @@ function getStorageKey(userId: string) {
 
 async function getShownKeys(userId: string): Promise<Set<string>> {
   try {
-    const storedValue = await SecureStore.getItemAsync(
-      getStorageKey(userId)
-    );
+    const storedValue = await SecureStore.getItemAsync(getStorageKey(userId));
 
     if (!storedValue) {
       return new Set();
@@ -51,37 +47,21 @@ async function getShownKeys(userId: string): Promise<Set<string>> {
       return new Set();
     }
 
-    return new Set(
-      parsedValue.filter(
-        (value): value is string => typeof value === 'string'
-      )
-    );
+    return new Set(parsedValue.filter((value): value is string => typeof value === 'string'));
   } catch (error) {
-    console.warn(
-      'Unable to read achievement popup history:',
-      error
-    );
+    console.warn('Unable to read achievement popup history:', error);
 
     return new Set();
   }
 }
 
-async function saveShownKeys(
-  userId: string,
-  shownKeys: ReadonlySet<string>
-) {
+async function saveShownKeys(userId: string, shownKeys: ReadonlySet<string>) {
   try {
-    await SecureStore.setItemAsync(
-      getStorageKey(userId),
-      JSON.stringify(Array.from(shownKeys))
-    );
+    await SecureStore.setItemAsync(getStorageKey(userId), JSON.stringify(Array.from(shownKeys)));
 
     return true;
   } catch (error) {
-    console.warn(
-      'Unable to save achievement popup history:',
-      error
-    );
+    console.warn('Unable to save achievement popup history:', error);
 
     return false;
   }
@@ -100,17 +80,51 @@ export default function AchievementPopupManager({
 
   const checkingRef = useRef(false);
   const pendingConsumedKeysRef = useRef<string[]>([]);
+  const celebrationSoundRef = useRef<Audio.Sound | null>(null);
 
-  const [activePopup, setActivePopup] =
-    useState<AchievementPopupContent | null>(null);
+  const [activePopup, setActivePopup] = useState<AchievementPopupContent | null>(null);
 
   useEffect(() => {
-    if (
-      !enabled ||
-      !isFocused ||
-      activePopup ||
-      checkingRef.current
-    ) {
+    if (!activePopup) return;
+
+    let cancelled = false;
+
+    const playCelebrationSound = async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(require('../../../assets/enjoy.mp3'), {
+          shouldPlay: true,
+          volume: 1,
+        });
+
+        if (cancelled) {
+          await sound.unloadAsync();
+          return;
+        }
+
+        celebrationSoundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            celebrationSoundRef.current = null;
+            void sound.unloadAsync().catch(() => undefined);
+          }
+        });
+      } catch (error) {
+        console.warn('Unable to play achievement celebration sound:', error);
+      }
+    };
+
+    void playCelebrationSound();
+
+    return () => {
+      cancelled = true;
+      const sound = celebrationSoundRef.current;
+      celebrationSoundRef.current = null;
+      void sound?.unloadAsync().catch(() => undefined);
+    };
+  }, [activePopup]);
+
+  useEffect(() => {
+    if (!enabled || !isFocused || activePopup || checkingRef.current) {
       return;
     }
 
@@ -155,18 +169,14 @@ export default function AchievementPopupManager({
          * Keep the keys in memory.
          * Do not save them yet.
          */
-        pendingConsumedKeysRef.current =
-          decision.consumedKeys;
+        pendingConsumedKeysRef.current = decision.consumedKeys;
 
         /*
          * Display the popup immediately.
          */
         setActivePopup(decision.popup);
       } catch (error) {
-        console.warn(
-          'Achievement popup check failed:',
-          error
-        );
+        console.warn('Achievement popup check failed:', error);
       } finally {
         checkingRef.current = false;
       }
@@ -247,16 +257,10 @@ export default function AchievementPopupManager({
               void closePopup();
             }}
             className="absolute right-4 top-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-[#DEDEDE]">
-            <Icon.X
-              size={28}
-              weight="bold"
-              color="white"
-            />
+            <Icon.X size={28} weight="bold" color="white" />
           </TouchableOpacity>
 
-          <Text className="text-center text-[52px] leading-[62px]">
-            {activePopup.icon}
-          </Text>
+          <Text className="text-center text-[52px] leading-[62px]">{activePopup.icon}</Text>
 
           <Text className="mt-1 text-center font-heading text-2xl font-bold text-[#202020]">
             {activePopup.title}
