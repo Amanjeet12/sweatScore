@@ -49,7 +49,7 @@ const challengeSchema = z.object({
 
   description: z.string().min(1, 'Challenge description is required'),
 
-  checkInDescription: z.string().min(1, 'Check-in description is required'),
+  checkInDescription: z.string(),
 
   type: z.enum(['challenge', 'check_in']),
 
@@ -86,6 +86,9 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
   const [challengeType, setChallengeType] = useState<ChallengeType>(
     initialData?.type ?? 'challenge'
+  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<Id<'checkInCategories'> | undefined>(
+    initialData?.checkInCategoryId ?? initialData?.checkInCategoryIds?.[0]
   );
 
   const [createdBy, setCreatedBy] = useState(initialData?.createdBy ?? '');
@@ -173,6 +176,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
    * Convex queries and mutations
    */
   const dailySchedule = useQuery(api.admin.getDailyChallengeSchedule, {});
+  const checkInCategories = useQuery(api.checkInCategories.listForAdmin, {});
 
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
 
@@ -643,7 +647,15 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
       }
 
       if (!videoMediaKey) {
-        setError('Please upload an instructional video');
+        setError(
+          challengeType === 'check_in'
+            ? 'Please upload a Check-In video'
+            : 'Please upload an instructional video'
+        );
+        return;
+      }
+      if (challengeType === 'check_in' && !selectedCategoryId) {
+        setError('Select a Check-In category.');
         return;
       }
 
@@ -698,7 +710,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
             coverImage: coverMediaKey as Id<'_storage'>,
 
-            instructionalVideo: videoMediaKey as Id<'_storage'>,
+            instructionalVideo: videoMediaKey as Id<'_storage'> | undefined,
+            checkInCategoryId: result.data.type === 'check_in' ? selectedCategoryId : undefined,
 
             videoDuration,
 
@@ -752,6 +765,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         if (result.data.type !== existingType) {
           updates.type = result.data.type;
         }
+        updates.checkInCategoryId =
+          result.data.type === 'check_in' ? selectedCategoryId : undefined;
 
         if (result.data.createdBy !== initialData.createdBy) {
           updates.createdBy = result.data.createdBy;
@@ -846,6 +861,52 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             </Input>
           </View>
 
+          {challengeType === 'check_in' ? (
+            <View className="mb-5">
+              <Text className="mb-2 text-xl font-bold text-primary-500">Check-In Categories</Text>
+              <Text className="mb-3 text-sm text-gray-500">
+                Select the category linked to this Check-In video.
+              </Text>
+              {checkInCategories === undefined ? (
+                <ActivityIndicator />
+              ) : checkInCategories.length === 0 ? (
+                <Text className="rounded-xl bg-gray-50 p-4 text-gray-600">
+                  No Check-In Categories available. Create categories from Admin View → Check-In
+                  Categories.
+                </Text>
+              ) : (
+                <View className="gap-y-2">
+                  {checkInCategories.map((category) => {
+                    const selected = selectedCategoryId === category._id;
+                    return (
+                      <TouchableOpacity
+                        key={category._id}
+                        disabled={!category.isActive && !selected}
+                        onPress={() => setSelectedCategoryId(category._id)}
+                        className={`rounded-xl border p-4 ${selected ? 'border-primary-500 bg-orange-50' : 'border-gray-200 bg-white'}`}>
+                        <View className="flex-row items-center gap-x-2">
+                          <Text className="font-bold text-gray-800">{selected ? '✓' : '○'}</Text>
+                          {category.iconUrl ? (
+                            <Image source={{ uri: category.iconUrl }} className="h-6 w-6 rounded" />
+                          ) : category.emoji ? (
+                            <Text>{category.emoji}</Text>
+                          ) : null}
+                          <Text className="font-bold text-gray-800">
+                            {category.name}
+                            {!category.isActive ? ' — Inactive' : ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <Text className="text-sm text-gray-500">
+                    {selectedCategoryId ? '1 category selected' : 'Select one category'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+
           <View className="mb-4">
             <Text className="mb-2 text-xl font-bold text-primary-500">Challenge Description</Text>
 
@@ -866,26 +927,28 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             </Textarea>
           </View>
 
-          <View className="mb-4">
-            <Text className="mb-2 text-xl font-bold text-primary-500">Check-In Description</Text>
+          {challengeType === 'check_in' && initialData?.checkInDescription ? (
+            <View className="mb-4">
+              <Text className="mb-2 text-xl font-bold text-primary-500">Check-In Description</Text>
 
-            <Text className="mb-2 text-sm text-gray-500">
-              Used when the recording type is Check-In.
-            </Text>
+              <Text className="mb-2 text-sm text-gray-500">
+                Used when the recording type is Check-In.
+              </Text>
 
-            <Textarea size="xl" isInvalid={Boolean(error)} className="rounded-lg">
-              <TextareaInput
-                placeholder="Check-in overview and instructions"
-                multiline
-                value={checkInDescription}
-                onChangeText={(text) => {
-                  clearMessages();
+              <Textarea size="xl" isInvalid={Boolean(error)} className="rounded-lg">
+                <TextareaInput
+                  placeholder="Check-in overview and instructions"
+                  multiline
+                  value={checkInDescription}
+                  onChangeText={(text) => {
+                    clearMessages();
 
-                  setCheckInDescription(text);
-                }}
-              />
-            </Textarea>
-          </View>
+                    setCheckInDescription(text);
+                  }}
+                />
+              </Textarea>
+            </View>
+          ) : null}
 
           <View className="mb-5">
             <Text className="mb-2 text-xl font-bold text-primary-500">Recording Type</Text>
@@ -1030,7 +1093,9 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           </View>
 
           <View className="mb-4">
-            <Text className="mb-2 text-xl font-bold text-primary-500">Instructional Video</Text>
+            <Text className="mb-2 text-xl font-bold text-primary-500">
+              {challengeType === 'check_in' ? 'Check-In Video' : 'Instructional Video'}
+            </Text>
 
             <Text className="mb-2 text-sm text-gray-500">Max 10 minutes</Text>
 
@@ -1082,7 +1147,11 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     onPress={selectVideo}>
                     <VideoCamera size={32} weight="duotone" color={colors.primary} />
 
-                    <Text className="font-semibold text-gray-500">Upload instructional video</Text>
+                    <Text className="font-semibold text-gray-500">
+                      {challengeType === 'check_in'
+                        ? 'Upload Check-In video'
+                        : 'Upload instructional video'}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1090,7 +1159,9 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           </View>
 
           <View className="mb-4">
-            <Text className="mb-2 text-xl font-bold text-primary-500">Resource Link (Optional)</Text>
+            <Text className="mb-2 text-xl font-bold text-primary-500">
+              Resource Link (Optional)
+            </Text>
 
             <Input size="xl" variant="rounded">
               <InputField
@@ -1297,9 +1368,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     onPress={handleSetCurrentDay}
                     loading={scheduleAction === 'current'}
                     disabled={isScheduling || isCurrentChallenge || !initialData.isPublished}>
-                    <ButtonText>
-                      {isCurrentChallenge ? 'Current Day' : 'Set Today'}
-                    </ButtonText>
+                    <ButtonText>{isCurrentChallenge ? 'Current Day' : 'Set Today'}</ButtonText>
                   </LoadingButton>
                 </View>
 

@@ -3,7 +3,8 @@ import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { mutation, query, internalMutation } from './_generated/server';
+import { mutation, query, internalMutation, MutationCtx } from './_generated/server';
+import { Id } from './_generated/dataModel';
 import {
   CHALLENGE_TAGS,
   CHALLENGE_POINTS_MIN,
@@ -17,6 +18,17 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const DAILY_CHECK_IN_LIVE_DELAY_MS = 7 * ONE_HOUR_MS;
 const DAILY_CHECK_IN_REMINDER_BEFORE_END_MS = 5 * ONE_HOUR_MS;
+
+async function validateCheckInCategoryId(
+  ctx: MutationCtx,
+  id: Id<'checkInCategories'> | undefined
+) {
+  if (!id) throw new ConvexError('Select a Check-In category.');
+  const category = await ctx.db.get(id);
+  if (!category || !category.isActive) {
+    throw new ConvexError('The selected Check-In category must be active');
+  }
+}
 
 export const users = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -537,7 +549,7 @@ export const createChallenge = mutation({
     description: v.string(),
     createdBy: v.string(),
     coverImage: v.id('_storage'),
-    instructionalVideo: v.id('_storage'),
+    instructionalVideo: v.optional(v.id('_storage')),
     videoDuration: v.optional(v.number()),
     youtubeUrl: v.optional(v.string()),
     points: v.number(),
@@ -546,7 +558,8 @@ export const createChallenge = mutation({
     isLocked: v.boolean(),
     endDate: v.optional(v.string()),
     type: v.union(v.literal('challenge'), v.literal('check_in')),
-    checkInDescription: v.string(),
+    checkInDescription: v.optional(v.string()),
+    checkInCategoryId: v.optional(v.id('checkInCategories')),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -584,6 +597,14 @@ export const createChallenge = mutation({
     if (!CHALLENGE_TAGS.includes(args.tag as any)) {
       throw new ConvexError('Invalid tag');
     }
+    if (args.type === 'check_in') await validateCheckInCategoryId(ctx, args.checkInCategoryId);
+    if (!args.instructionalVideo) {
+      throw new ConvexError(
+        args.type === 'check_in'
+          ? 'Check-In video is required'
+          : 'Instructional video is required for a normal challenge'
+      );
+    }
 
     const challengeId = await ctx.db.insert('challenges', {
       name: args.name.trim(),
@@ -601,7 +622,8 @@ export const createChallenge = mutation({
       isPublished: true,
       createdByUserId: userId,
       type: args.type,
-      checkInDescription: args.checkInDescription.trim(),
+      checkInDescription: args.checkInDescription?.trim() || undefined,
+      checkInCategoryId: args.type === 'check_in' ? args.checkInCategoryId : undefined,
     });
 
     return { success: true, challengeId };
@@ -628,6 +650,7 @@ export const updateChallenge = mutation({
     removeEndDate: v.optional(v.boolean()),
     type: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
     checkInDescription: v.optional(v.string()),
+    checkInCategoryId: v.optional(v.id('checkInCategories')),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -664,6 +687,16 @@ export const updateChallenge = mutation({
     if (args.tag !== undefined && !CHALLENGE_TAGS.includes(args.tag as any)) {
       throw new ConvexError('Invalid tag');
     }
+    const nextType = args.type ?? challenge.type ?? 'challenge';
+    const nextCategoryId = args.checkInCategoryId ?? challenge.checkInCategoryId;
+    if (nextType === 'check_in') await validateCheckInCategoryId(ctx, nextCategoryId);
+    if (!(args.instructionalVideo ?? challenge.instructionalVideo)) {
+      throw new ConvexError(
+        nextType === 'check_in'
+          ? 'Check-In video is required'
+          : 'Instructional video is required for a normal challenge'
+      );
+    }
 
     // Clean up old media if replaced
     if (args.coverImage && args.oldCoverImage) {
@@ -688,6 +721,8 @@ export const updateChallenge = mutation({
       endDate: args.removeEndDate ? undefined : (args.endDate ?? challenge.endDate),
       type: args.type ?? challenge.type,
       checkInDescription: args.checkInDescription?.trim() ?? challenge.checkInDescription,
+      checkInCategoryId: nextType === 'check_in' ? nextCategoryId : undefined,
+      checkInCategoryIds: undefined,
     });
 
     return { success: true, challengeId: args.challengeId };
@@ -777,7 +812,7 @@ export const deleteChallenge = mutation({
 
     // Clean up storage files
     await ctx.storage.delete(challenge.coverImage);
-    await ctx.storage.delete(challenge.instructionalVideo);
+    if (challenge.instructionalVideo) await ctx.storage.delete(challenge.instructionalVideo);
     await ctx.db.delete(args.challengeId);
 
     return { success: true };
@@ -837,7 +872,9 @@ export const getChallenge = query({
     }
 
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
-    const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+    const instructionalVideoUrl = challenge.instructionalVideo
+      ? await ctx.storage.getUrl(challenge.instructionalVideo)
+      : null;
 
     return {
       ...challenge,

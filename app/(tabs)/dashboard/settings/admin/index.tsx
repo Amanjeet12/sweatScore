@@ -28,6 +28,14 @@ export default function AdminView() {
       />
       <View className="mx-8 mt-4 flex-col gap-y-8">
         <TouchableOpacity
+          onPress={() => router.push('/dashboard/settings/admin/check-in-categories' as any)}
+          disabled={loading}>
+          <View className="flex-row items-center gap-x-4">
+            <Ionicons size={25} name="checkbox-outline" />
+            <Text className="font-lsBold text-2xl">Check-In Categories</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={() => {
             router.push('/dashboard/settings/admin/users');
           }}

@@ -1,21 +1,9 @@
 import { useQuery } from 'convex/react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import {
-  AppleLogo,
-  ArrowSquareOut,
-  Barbell,
-  Drop,
-  Footprints,
-  Lightbulb,
-  LockSimple,
-  PersonArmsSpread,
-  Play,
-  Pulse,
-  Tree,
-} from 'phosphor-react-native';
-import { useCallback, useState } from 'react';
-import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ArrowSquareOut, Lightbulb, LockSimple, Play, Pulse } from 'phosphor-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
@@ -27,41 +15,6 @@ import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useTabStore } from '~/store/useTabStore';
-import { CHECK_IN_OPTIONS, type CheckInOptionKey } from '~/utils/checkInOptions';
-
-function CheckInOptionIcon({ option, selected }: { option: CheckInOptionKey; selected: boolean }) {
-  const props = {
-    size: 20,
-    color: selected ? '#FFFFFF' : '#4A4A4A',
-    weight: 'regular' as const,
-  };
-
-  switch (option) {
-    case 'hydration':
-      return <Drop {...props} />;
-
-    case 'healthy_meal':
-      return <AppleLogo {...props} />;
-
-    case 'gym_visit':
-      return <Barbell {...props} />;
-
-    case 'fresh_air':
-      return <Tree {...props} />;
-
-    case 'stretch':
-      return <PersonArmsSpread {...props} />;
-
-    case 'steps':
-      return <Footprints {...props} />;
-
-    case 'workout':
-      return <Pulse {...props} />;
-
-    default:
-      return <Pulse {...props} />;
-  }
-}
 
 type CheckItOutLinkProps = {
   url?: string | null;
@@ -118,18 +71,34 @@ export default function ChallengeViewScreen() {
 
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const [selectedCheckInOption, setSelectedCheckInOption] = useState<CheckInOptionKey>('workout');
+  const [selectedCheckInId, setSelectedCheckInId] = useState<Id<'challenges'> | null>(null);
 
   const challenge = useQuery(api.challengeCompletions.getPublishedChallenge, {
     challengeId: challengeId as Id<'challenges'>,
   });
 
+  const availableCheckIns = useQuery(
+    api.challengeCompletions.getAvailableCheckIns,
+    challenge?.type === 'check_in' ? { openedChallengeId: challengeId as Id<'challenges'> } : 'skip'
+  );
+
+  const selectedCheckIn = useMemo(() => {
+    if (!availableCheckIns?.length) return undefined;
+    return (
+      availableCheckIns.find((item) => item.challengeId === selectedCheckInId) ??
+      availableCheckIns.find((item) => item.challengeId === challengeId) ??
+      availableCheckIns[0]
+    );
+  }, [availableCheckIns, challengeId, selectedCheckInId]);
+
+  const activeChallengeId = selectedCheckIn?.challengeId ?? (challengeId as Id<'challenges'>);
+
   const cooldown = useQuery(api.challengeCompletions.getChallengeCooldown, {
-    challengeId: challengeId as Id<'challenges'>,
+    challengeId: activeChallengeId,
   });
 
   const progress = useQuery(api.challengeCompletions.getChallengeProgress, {
-    challengeId: challengeId as Id<'challenges'>,
+    challengeId: activeChallengeId,
   });
 
   const { isPro, requireSubscription } = useSubscriptionGuard();
@@ -138,7 +107,7 @@ export default function ChallengeViewScreen() {
 
   const { getJobForChallenge, retryChallengeUpload } = useChallengeUploadQueue();
 
-  const uploadJob = getJobForChallenge(challengeId ?? '');
+  const uploadJob = getJobForChallenge(activeChallengeId);
 
   const hasFailedUpload = uploadJob?.status === 'failed';
 
@@ -147,9 +116,29 @@ export default function ChallengeViewScreen() {
     uploadJob?.status === 'uploading' ||
     uploadJob?.status === 'finalizing';
 
-  const player = useVideoPlayer(challenge?.instructionalVideoUrl ?? null, (videoPlayer) => {
+  const selectedVideoUrl =
+    selectedCheckIn?.instructionalVideoUrl ?? challenge?.instructionalVideoUrl ?? null;
+
+  const player = useVideoPlayer(selectedVideoUrl, (videoPlayer) => {
     videoPlayer.loop = false;
   });
+
+  useEffect(() => {
+    if (!availableCheckIns?.length) {
+      setSelectedCheckInId(null);
+      return;
+    }
+    if (!availableCheckIns.some((item) => item.challengeId === selectedCheckInId)) {
+      const opened = availableCheckIns.find((item) => item.challengeId === challengeId);
+      setSelectedCheckInId(opened?.challengeId ?? availableCheckIns[0].challengeId);
+    }
+  }, [availableCheckIns, challengeId, selectedCheckInId]);
+
+  useEffect(() => {
+    player.pause();
+    setIsPlaying(false);
+    player.replace(selectedVideoUrl);
+  }, [player, selectedVideoUrl]);
 
   const dailyLimitReached = progress?.dailyLimitReached === true;
 
@@ -162,10 +151,6 @@ export default function ChallengeViewScreen() {
   const isCheckIn = challengeType === 'check_in';
 
   const selectedDescription = challenge?.description ?? '';
-
-  const selectedCheckInDetails = CHECK_IN_OPTIONS.find(
-    (option) => option.key === selectedCheckInOption
-  );
 
   const handlePlay = useCallback(() => {
     if (!player) {
@@ -242,13 +227,7 @@ export default function ChallengeViewScreen() {
       pathname: '/challenge-record/[challengeId]',
 
       params: {
-        challengeId,
-
-        ...(isCheckIn
-          ? {
-              checkInOption: selectedCheckInOption,
-            }
-          : {}),
+        challengeId: activeChallengeId,
       },
     });
   };
@@ -263,7 +242,7 @@ export default function ChallengeViewScreen() {
           headerTitle: () =>
             challenge ? (
               <Text className="text-center font-heading text-lg font-bold text-[#1A1A1A]">
-                {challenge.name}
+                {selectedCheckIn?.name ?? challenge.name}
               </Text>
             ) : null,
           headerShadowVisible: false,
@@ -274,7 +253,10 @@ export default function ChallengeViewScreen() {
         }}
       />
 
-      {challenge === undefined || cooldown === undefined || progress === undefined ? (
+      {challenge === undefined ||
+      cooldown === undefined ||
+      progress === undefined ||
+      (challenge?.type === 'check_in' && availableCheckIns === undefined) ? (
         <ScreenLoading />
       ) : challenge === null ? (
         <View className="flex-1 items-center justify-center">
@@ -288,58 +270,60 @@ export default function ChallengeViewScreen() {
             paddingBottom: 40,
           }}>
           {/* Challenge video */}
-          <View className="mt-4">
-            {isPlaying ? (
-              <VideoView
-                player={player}
-                style={{
-                  width: '100%',
-                  aspectRatio: 414 / 480,
-                }}
-                contentFit="cover"
-                allowsFullscreen
-                allowsPictureInPicture={false}
-              />
-            ) : (
-              <TouchableOpacity onPress={handlePlay} activeOpacity={0.9}>
-                <View className="relative overflow-hidden">
-                  <VideoView
-                    player={player}
-                    pointerEvents="none"
-                    style={{
-                      width: '100%',
-                      aspectRatio: 414 / 480,
-                    }}
-                    contentFit="cover"
-                    nativeControls={false}
-                    allowsFullscreen={false}
-                    allowsPictureInPicture={false}
-                  />
-
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      right: 0,
-                      bottom: 0,
-                      left: 0,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <View
-                      className="items-center justify-center rounded-full"
+          {selectedVideoUrl ? (
+            <View className="mt-4">
+              {isPlaying ? (
+                <VideoView
+                  player={player}
+                  style={{
+                    width: '100%',
+                    aspectRatio: 414 / 480,
+                  }}
+                  contentFit="cover"
+                  allowsFullscreen
+                  allowsPictureInPicture={false}
+                />
+              ) : (
+                <TouchableOpacity onPress={handlePlay} activeOpacity={0.9}>
+                  <View className="relative overflow-hidden">
+                    <VideoView
+                      player={player}
+                      pointerEvents="none"
                       style={{
-                        width: 64,
-                        height: 64,
-                        backgroundColor: 'rgba(26, 26, 26, 0.6)',
+                        width: '100%',
+                        aspectRatio: 414 / 480,
+                      }}
+                      contentFit="cover"
+                      nativeControls={false}
+                      allowsFullscreen={false}
+                      allowsPictureInPicture={false}
+                    />
+
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        left: 0,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}>
-                      <Play size={28} color="#FFFFFF" weight="fill" />
+                      <View
+                        className="items-center justify-center rounded-full"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          backgroundColor: 'rgba(26, 26, 26, 0.6)',
+                        }}>
+                        <Play size={28} color="#FFFFFF" weight="fill" />
+                      </View>
                     </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
 
           {/* Normal challenge description */}
           {!isCheckIn ? (
@@ -373,20 +357,21 @@ export default function ChallengeViewScreen() {
                   gap: 10,
                   paddingRight: 20,
                 }}>
-                {CHECK_IN_OPTIONS.map((option) => {
-                  const selected = option.key === selectedCheckInOption;
+                {(availableCheckIns ?? []).map((item) => {
+                  const selected = item.challengeId === selectedCheckIn?.challengeId;
 
                   return (
                     <TouchableOpacity
-                      key={option.key}
+                      key={item.categoryId}
                       activeOpacity={0.8}
                       accessibilityRole="radio"
                       accessibilityState={{
                         selected,
                       }}
-                      accessibilityLabel={option.label}
+                      accessibilityLabel={item.categoryName}
                       onPress={() => {
-                        setSelectedCheckInOption(option.key);
+                        safePausePlayer();
+                        setSelectedCheckInId(item.challengeId);
                       }}
                       className="flex-row items-center rounded-full px-4 py-3"
                       style={{
@@ -395,7 +380,16 @@ export default function ChallengeViewScreen() {
                         backgroundColor: selected ? '#FF5C35' : '#FFFFFF',
                       }}>
                       <View className="mr-2">
-                        <CheckInOptionIcon option={option.key} selected={selected} />
+                        {item.categoryIconUrl ? (
+                          <Image
+                            source={{ uri: item.categoryIconUrl }}
+                            className="h-6 w-6 rounded"
+                          />
+                        ) : item.categoryEmoji ? (
+                          <Text className="text-lg">{item.categoryEmoji}</Text>
+                        ) : (
+                          <Pulse size={20} color={selected ? '#FFFFFF' : '#4A4A4A'} />
+                        )}
                       </View>
 
                       <Text
@@ -403,7 +397,7 @@ export default function ChallengeViewScreen() {
                         style={{
                           color: selected ? '#FFFFFF' : '#313131',
                         }}>
-                        {option.label}
+                        {item.categoryName}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -412,14 +406,14 @@ export default function ChallengeViewScreen() {
 
               <View className="mt-4 rounded-xl bg-white px-4 py-4 shadow-sm">
                 <Text className="text-center font-body text-sm leading-5 text-[#4F4F4F]">
-                  {selectedCheckInDetails?.description ??
+                  {selectedCheckIn?.categoryDescription ??
                     challenge.checkInDescription?.trim() ??
                     challenge.description}
                 </Text>
               </View>
 
               <CheckItOutLink
-                url={challenge.youtubeUrl}
+                url={selectedCheckIn ? selectedCheckIn.youtubeUrl : challenge.youtubeUrl}
                 isPro={isPro}
                 onOpen={handleOpenBonusContent}
               />
@@ -447,7 +441,7 @@ export default function ChallengeViewScreen() {
                       return;
                     }
 
-                    retryChallengeUpload(challengeId);
+                    retryChallengeUpload(activeChallengeId);
                   }}>
                   <ButtonText className="text-lg font-bold text-white">Retry Upload</ButtonText>
                 </LoadingButton>
@@ -471,7 +465,7 @@ export default function ChallengeViewScreen() {
                   Please keep the app open while your video uploads.
                 </Text>
               </>
-            ) : challenge.isLocked && !isPro ? (
+            ) : (selectedCheckIn?.isLocked ?? challenge.isLocked) && !isPro ? (
               <>
                 <LoadingButton
                   variant="solid"

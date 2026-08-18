@@ -141,7 +141,9 @@ export const getPinnedPost = query({
       ? await (async () => {
           const ch = await ctx.db.get(pinnedPost.challengeId!);
           if (!ch) return undefined;
-          const instructionalVideoUrl = await ctx.storage.getUrl(ch.instructionalVideo);
+          const instructionalVideoUrl = ch.instructionalVideo
+            ? await ctx.storage.getUrl(ch.instructionalVideo)
+            : null;
           let compositeVideoUrl: string | undefined;
           let thumbnailUrl: string | undefined;
           let allowRepost = false;
@@ -1004,9 +1006,11 @@ export const getLatestPosts = query({
               }
 
               const [instructionalVideoUrl, completion] = await Promise.all([
-                ctx.storage
-                  .getUrl(challengeDocument.instructionalVideo)
-                  .then((url) => url ?? undefined),
+                challengeDocument.instructionalVideo
+                  ? ctx.storage
+                      .getUrl(challengeDocument.instructionalVideo)
+                      .then((url) => url ?? undefined)
+                  : Promise.resolve(undefined),
 
                 post.challengeCompletionId
                   ? ctx.db.get(post.challengeCompletionId)
@@ -1241,7 +1245,9 @@ export const getSinglePost = query({
         ? await (async () => {
             const challenge = await ctx.db.get(post.challengeId!);
             if (!challenge) return undefined;
-            const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+            const instructionalVideoUrl = challenge.instructionalVideo
+              ? await ctx.storage.getUrl(challenge.instructionalVideo)
+              : null;
             let compositeVideoUrl: string | undefined;
             let thumbnailUrl: string | undefined;
             let allowRepost = false;

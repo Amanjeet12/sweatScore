@@ -416,7 +416,9 @@ export const completeChallenge = mutation({
 
         const firstAttemptVideoUrl =
           (await ctx.storage.getUrl(FIRST_ATTEMPT_VIDEO_STORAGE_ID)) ??
-          (await ctx.storage.getUrl(challenge.instructionalVideo));
+          (challenge.instructionalVideo
+            ? await ctx.storage.getUrl(challenge.instructionalVideo)
+            : null);
 
         const adminVideoUrl = day1VideoUrl || firstAttemptVideoUrl;
 
@@ -747,13 +749,81 @@ export const getPublishedChallenge = query({
     }
 
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
-    const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+    const instructionalVideoUrl = challenge.instructionalVideo
+      ? await ctx.storage.getUrl(challenge.instructionalVideo)
+      : null;
 
     return {
       ...challenge,
       coverImageUrl,
       instructionalVideoUrl,
     };
+  },
+});
+
+export const getAvailableCheckIns = query({
+  args: { openedChallengeId: v.id('challenges') },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
+    const checkIns = (
+      await ctx.db
+        .query('challenges')
+        .withIndex('by_published', (q) => q.eq('isPublished', true))
+        .collect()
+    ).filter(
+      (challenge) =>
+        challenge.type === 'check_in' &&
+        challenge.checkInCategoryId &&
+        challenge.instructionalVideo &&
+        (!challenge.endDate || challenge.endDate > today) &&
+        (!challenge.isDailyChallenge ||
+          challenge._id === args.openedChallengeId ||
+          (challenge.dailyStartAt !== undefined &&
+            challenge.dailyEndAt !== undefined &&
+            now >= challenge.dailyStartAt &&
+            now < challenge.dailyEndAt))
+    );
+
+    // One deterministic option per category: prefer the record the user opened,
+    // otherwise use the most recently created published Check-In.
+    const byCategory = new Map<string, (typeof checkIns)[number]>();
+    for (const checkIn of checkIns) {
+      const key = String(checkIn.checkInCategoryId);
+      const existing = byCategory.get(key);
+      if (
+        !existing ||
+        checkIn._id === args.openedChallengeId ||
+        (existing._id !== args.openedChallengeId && checkIn._creationTime > existing._creationTime)
+      ) {
+        byCategory.set(key, checkIn);
+      }
+    }
+
+    const resolved = [];
+    for (const checkIn of byCategory.values()) {
+      const category = await ctx.db.get(checkIn.checkInCategoryId!);
+      if (!category?.isActive || !checkIn.instructionalVideo) continue;
+      resolved.push({
+        challengeId: checkIn._id,
+        name: checkIn.name,
+        categoryId: category._id,
+        categoryName: category.name,
+        categoryDescription: category.description,
+        categoryEmoji: category.emoji,
+        categoryIconUrl: category.iconStorageId
+          ? await ctx.storage.getUrl(category.iconStorageId)
+          : null,
+        sortOrder: category.sortOrder,
+        instructionalVideoUrl: await ctx.storage.getUrl(checkIn.instructionalVideo),
+        videoDuration: checkIn.videoDuration,
+        isLocked: checkIn.isLocked,
+        points: checkIn.points,
+        durationLimit: checkIn.durationLimit,
+        youtubeUrl: checkIn.youtubeUrl,
+      });
+    }
+    return resolved.sort((a, b) => a.sortOrder - b.sortOrder);
   },
 });
 
@@ -926,7 +996,9 @@ export const getTodayDailyChallenge = query({
 
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
 
-    const instructionalVideoUrl = await ctx.storage.getUrl(challenge.instructionalVideo);
+    const instructionalVideoUrl = challenge.instructionalVideo
+      ? await ctx.storage.getUrl(challenge.instructionalVideo)
+      : null;
 
     /*
      * Community completion count is connected

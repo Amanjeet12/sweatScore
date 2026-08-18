@@ -204,7 +204,7 @@ const schema = defineSchema({
     description: v.string(),
     createdBy: v.string(),
     coverImage: v.id('_storage'),
-    instructionalVideo: v.id('_storage'),
+    instructionalVideo: v.optional(v.id('_storage')),
     videoDuration: v.optional(v.number()), // Actual video runtime in seconds
     youtubeUrl: v.optional(v.string()),
     points: v.number(),
@@ -221,12 +221,26 @@ const schema = defineSchema({
     shortDescription: v.optional(v.string()),
     type: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
     checkInDescription: v.optional(v.string()),
+    checkInCategoryId: v.optional(v.id('checkInCategories')),
+    // Deprecated compatibility field; new writes use checkInCategoryId only.
+    checkInCategoryIds: v.optional(v.array(v.id('checkInCategories'))),
     dailyChallengeType: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
   })
     .index('by_daily_challenge', ['isDailyChallenge'])
     .index('by_published', ['isPublished'])
     .index('by_tag', ['tag'])
     .index('by_endDate', ['endDate']),
+  checkInCategories: defineTable({
+    name: v.string(),
+    description: v.string(),
+    emoji: v.optional(v.string()),
+    iconStorageId: v.optional(v.id('_storage')),
+    sortOrder: v.number(),
+    isActive: v.boolean(),
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_active_sort_order', ['isActive', 'sortOrder']),
   challengeCompletions: defineTable({
     userId: v.id('users'),
     challengeId: v.id('challenges'),
