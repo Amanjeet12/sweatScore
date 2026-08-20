@@ -115,6 +115,8 @@ export const completeChallenge = mutation({
     checkInSubmissionType: v.optional(
       v.union(v.literal('live_video'), v.literal('uploaded_video'), v.literal('photo'))
     ),
+    mediaWidth: v.optional(v.number()),
+    mediaHeight: v.optional(v.number()),
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
 
@@ -262,13 +264,13 @@ export const completeChallenge = mutation({
      */
     const repostBonus = !isCheckIn && args.allowRepost ? 3 : 0;
 
-    const checkInPoints =
+    const checkInBonusPoints =
       checkInSubmissionType === 'live_video'
         ? 5
         : checkInSubmissionType === 'uploaded_video'
           ? 2
           : 1;
-    const rawPoints = (isCheckIn ? checkInPoints : challenge.points) + repostBonus;
+    const rawPoints = challenge.points + (isCheckIn ? checkInBonusPoints : repostBonus);
 
     const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
 
@@ -412,8 +414,8 @@ export const completeChallenge = mutation({
               }
             : {}),
 
-          mediaWidth: 1080,
-          mediaHeight: 1350,
+          mediaWidth: args.mediaWidth && args.mediaWidth > 0 ? args.mediaWidth : 1080,
+          mediaHeight: args.mediaHeight && args.mediaHeight > 0 ? args.mediaHeight : 1350,
           mediaType,
 
           challengeId: args.challengeId,

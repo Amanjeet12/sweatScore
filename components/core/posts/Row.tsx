@@ -289,9 +289,14 @@ export default function PostRow({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(true);
+  const [loadedImageAspectRatio, setLoadedImageAspectRatio] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+
+  useEffect(() => {
+    setLoadedImageAspectRatio(null);
+  }, [post.mediaUrl]);
   const mediaBusy = isLoading || downloading || sharing;
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
     writeOnly: true,
@@ -700,14 +705,20 @@ export default function PostRow({
                 source={{ uri: post.mediaUrl }}
                 contentFit="contain"
                 onLoadStart={() => setImageLoading(true)}
-                onLoad={() => setImageLoading(false)}
+                onLoad={(event) => {
+                  setImageLoading(false);
+                  if (event.source.width > 0 && event.source.height > 0) {
+                    setLoadedImageAspectRatio(event.source.width / event.source.height);
+                  }
+                }}
                 cachePolicy="memory-disk"
                 transition={200}
                 style={{
                   width: '100%',
                   height: undefined,
                   resizeMode: 'contain',
-                  aspectRatio: (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
+                  aspectRatio:
+                    loadedImageAspectRatio ?? (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
                 }}
               />
             </View>

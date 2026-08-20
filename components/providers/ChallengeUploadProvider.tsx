@@ -33,6 +33,8 @@ export interface ChallengeUploadJob {
   videoUri: string;
   mediaType: 'image' | 'video';
   checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
+  mediaWidth?: number;
+  mediaHeight?: number;
   mimeType: string;
   caption?: string;
   allowRepost: boolean;
@@ -52,6 +54,8 @@ interface EnqueueChallengeUploadInput {
   videoUri: string;
   mediaType?: 'image' | 'video';
   checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
+  mediaWidth?: number;
+  mediaHeight?: number;
   mimeType?: string;
   caption?: string;
   allowRepost: boolean;
@@ -113,6 +117,14 @@ function normalizeStoredJobs(raw: unknown): ChallengeUploadJob[] {
           candidate.checkInSubmissionType === 'uploaded_video' ||
           candidate.checkInSubmissionType === 'photo'
             ? candidate.checkInSubmissionType
+            : undefined,
+        mediaWidth:
+          typeof candidate.mediaWidth === 'number' && candidate.mediaWidth > 0
+            ? candidate.mediaWidth
+            : undefined,
+        mediaHeight:
+          typeof candidate.mediaHeight === 'number' && candidate.mediaHeight > 0
+            ? candidate.mediaHeight
             : undefined,
         mimeType: typeof candidate.mimeType === 'string' ? candidate.mimeType : 'video/mp4',
         caption: candidate.caption?.trim() || undefined,
@@ -407,6 +419,8 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
           mediaType: job.mediaType,
           checkInSubmissionType: job.checkInSubmissionType,
+          mediaWidth: job.mediaWidth,
+          mediaHeight: job.mediaHeight,
 
           thumbnailStorageId: uploadedThumbnailStorageId,
 
@@ -546,6 +560,8 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
       videoUri,
       mediaType = 'video',
       checkInSubmissionType,
+      mediaWidth,
+      mediaHeight,
       mimeType = mediaType === 'image' ? 'image/jpeg' : 'video/mp4',
       caption,
       allowRepost,
@@ -572,6 +588,8 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         videoUri,
         mediaType,
         checkInSubmissionType,
+        mediaWidth,
+        mediaHeight,
         mimeType,
         caption: caption?.trim() || undefined,
         allowRepost,

@@ -169,6 +169,10 @@ export default function DuetRecordingScreen() {
   const [checkInSubmissionType, setCheckInSubmissionType] = useState<
     'live_video' | 'uploaded_video' | 'photo'
   >('live_video');
+  const [selectedMediaDimensions, setSelectedMediaDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState('video/mp4');
   const [isVideoRecorderOpen, setIsVideoRecorderOpen] = useState(false);
 
@@ -828,6 +832,7 @@ export default function DuetRecordingScreen() {
         setRecordedVideoUri(persistentUri);
         setSelectedMediaType('video');
         setCheckInSubmissionType('live_video');
+        setSelectedMediaDimensions(null);
         setSelectedMimeType('video/mp4');
 
         setCaption(
@@ -1068,6 +1073,9 @@ export default function DuetRecordingScreen() {
         setRecordedVideoUri(persistentUri);
         setSelectedMediaType(mediaType);
         setCheckInSubmissionType(mediaType === 'image' ? 'photo' : 'uploaded_video');
+        setSelectedMediaDimensions(
+          asset.width > 0 && asset.height > 0 ? { width: asset.width, height: asset.height } : null
+        );
         setSelectedMimeType(asset.mimeType || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4'));
         setCaption(getCheckInCaption());
         setState('post-record');
@@ -1116,6 +1124,7 @@ export default function DuetRecordingScreen() {
     setRecordedVideoUri(null);
     setSelectedMediaType('video');
     setCheckInSubmissionType('live_video');
+    setSelectedMediaDimensions(null);
     setSelectedMimeType('video/mp4');
     setIsVideoRecorderOpen(false);
     setCaption('');
@@ -1163,6 +1172,8 @@ export default function DuetRecordingScreen() {
 
         mediaType: selectedMediaType,
         checkInSubmissionType: isCheckIn ? checkInSubmissionType : undefined,
+        mediaWidth: isCheckIn ? selectedMediaDimensions?.width : undefined,
+        mediaHeight: isCheckIn ? selectedMediaDimensions?.height : undefined,
         mimeType: selectedMimeType,
 
         allowRepost: isCheckIn ? false : allowRepost,
@@ -1196,6 +1207,7 @@ export default function DuetRecordingScreen() {
     requireSubscription,
     selectedMediaType,
     checkInSubmissionType,
+    selectedMediaDimensions,
     selectedMimeType,
   ]);
 
@@ -1251,9 +1263,10 @@ export default function DuetRecordingScreen() {
     );
   }
 
-  const selectedCheckInPoints =
+  const selectedCheckInBonusPoints =
     checkInSubmissionType === 'live_video' ? 5 : checkInSubmissionType === 'uploaded_video' ? 2 : 1;
-  const totalPoints = isCheckIn ? selectedCheckInPoints : challenge.points + (allowRepost ? 3 : 0);
+  const totalPoints =
+    challenge.points + (isCheckIn ? selectedCheckInBonusPoints : allowRepost ? 3 : 0);
 
   const isLiveState = state === 'pre-record' || state === 'countdown' || state === 'recording';
 
@@ -1722,9 +1735,7 @@ export default function DuetRecordingScreen() {
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
                 {isCheckIn
-                  ? `Submit Check-In for ${selectedCheckInPoints} ${
-                      selectedCheckInPoints === 1 ? 'pt' : 'pts'
-                    }`
+                  ? `Submit Check-In for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`
                   : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
               </ButtonText>
             </LoadingButton>
