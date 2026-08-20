@@ -375,9 +375,9 @@ export default function ChallengeViewScreen() {
                       }}
                       className="flex-row items-center rounded-full px-4 py-3"
                       style={{
-                        borderWidth: 1.5,
+                        borderWidth: 2,
                         borderColor: selected ? '#FF5C35' : '#E3DEDA',
-                        backgroundColor: selected ? '#FF5C35' : '#FFFFFF',
+                        // backgroundColor: selected ? '#FF5C35' : '#FFFFFF',
                       }}>
                       <View className="mr-2">
                         {item.categoryIconUrl ? (
@@ -395,7 +395,7 @@ export default function ChallengeViewScreen() {
                       <Text
                         className="font-body text-sm font-bold"
                         style={{
-                          color: selected ? '#FFFFFF' : '#313131',
+                          color: '#313131',
                         }}>
                         {item.categoryName}
                       </Text>
@@ -533,7 +533,9 @@ export default function ChallengeViewScreen() {
                 action="primary"
                 className="h-14 w-full"
                 onPress={handleStartChallenge}>
-                <ButtonText className="text-lg font-bold text-white">Let&apos;s Go</ButtonText>
+                <ButtonText className="text-lg font-bold text-white">
+                  {isCheckIn ? 'Check In Now' : `Let's Go`}
+                </ButtonText>
               </LoadingButton>
             )}
           </View>

@@ -508,7 +508,7 @@ export default function DailyChallengeCard() {
                 disabled={isButtonDisabled}
                 onPress={handleAcceptChallenge}
                 style={{
-                  opacity: isButtonDisabled ? 0.55 : 1,
+                  opacity: 1,
                 }}
                 className={`h-[39px] w-full items-center justify-center rounded-[22px] ${
                   isButtonDisabled ? 'bg-gray-200' : 'bg-white'
@@ -529,7 +529,7 @@ export default function DailyChallengeCard() {
                       ? `${dailyChallenge.name} Complete!`
                       : secondsRemaining <= 0
                         ? 'Challenge Ended'
-                        : 'Check In Now'}
+                        : `Let's Go`}
                   </Text>
                 </View>
               </TouchableOpacity>

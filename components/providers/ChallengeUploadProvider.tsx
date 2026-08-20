@@ -32,6 +32,7 @@ export interface ChallengeUploadJob {
   challengeId: string;
   videoUri: string;
   mediaType: 'image' | 'video';
+  checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
   mimeType: string;
   caption?: string;
   allowRepost: boolean;
@@ -50,6 +51,7 @@ interface EnqueueChallengeUploadInput {
   challengeId: string;
   videoUri: string;
   mediaType?: 'image' | 'video';
+  checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
   mimeType?: string;
   caption?: string;
   allowRepost: boolean;
@@ -106,6 +108,12 @@ function normalizeStoredJobs(raw: unknown): ChallengeUploadJob[] {
         challengeId: candidate.challengeId,
         videoUri: candidate.videoUri,
         mediaType: candidate.mediaType === 'image' ? 'image' : 'video',
+        checkInSubmissionType:
+          candidate.checkInSubmissionType === 'live_video' ||
+          candidate.checkInSubmissionType === 'uploaded_video' ||
+          candidate.checkInSubmissionType === 'photo'
+            ? candidate.checkInSubmissionType
+            : undefined,
         mimeType: typeof candidate.mimeType === 'string' ? candidate.mimeType : 'video/mp4',
         caption: candidate.caption?.trim() || undefined,
         allowRepost: Boolean(candidate.allowRepost),
@@ -398,6 +406,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
           videoStorageId: uploadedStorageId,
 
           mediaType: job.mediaType,
+          checkInSubmissionType: job.checkInSubmissionType,
 
           thumbnailStorageId: uploadedThumbnailStorageId,
 
@@ -536,6 +545,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
       challengeId,
       videoUri,
       mediaType = 'video',
+      checkInSubmissionType,
       mimeType = mediaType === 'image' ? 'image/jpeg' : 'video/mp4',
       caption,
       allowRepost,
@@ -561,6 +571,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         challengeId,
         videoUri,
         mediaType,
+        checkInSubmissionType,
         mimeType,
         caption: caption?.trim() || undefined,
         allowRepost,

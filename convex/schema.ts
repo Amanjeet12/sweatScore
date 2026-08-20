@@ -250,6 +250,9 @@ const schema = defineSchema({
     // User's uploaded media (legacy field name retained for compatibility)
     videoStorageId: v.optional(v.id('_storage')),
     mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
+    checkInSubmissionType: v.optional(
+      v.union(v.literal('live_video'), v.literal('uploaded_video'), v.literal('photo'))
+    ),
 
     // Generated transformation/composite video
     compositeVideoStorageId: v.optional(v.id('_storage')),

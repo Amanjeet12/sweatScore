@@ -166,6 +166,9 @@ export default function DuetRecordingScreen() {
 
   const [recordedVideoUri, setRecordedVideoUri] = useState<string | null>(null);
   const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'video'>('video');
+  const [checkInSubmissionType, setCheckInSubmissionType] = useState<
+    'live_video' | 'uploaded_video' | 'photo'
+  >('live_video');
   const [selectedMimeType, setSelectedMimeType] = useState('video/mp4');
   const [isVideoRecorderOpen, setIsVideoRecorderOpen] = useState(false);
 
@@ -824,6 +827,7 @@ export default function DuetRecordingScreen() {
 
         setRecordedVideoUri(persistentUri);
         setSelectedMediaType('video');
+        setCheckInSubmissionType('live_video');
         setSelectedMimeType('video/mp4');
 
         setCaption(
@@ -1063,6 +1067,7 @@ export default function DuetRecordingScreen() {
         recordedVideoUriRef.current = persistentUri;
         setRecordedVideoUri(persistentUri);
         setSelectedMediaType(mediaType);
+        setCheckInSubmissionType(mediaType === 'image' ? 'photo' : 'uploaded_video');
         setSelectedMimeType(asset.mimeType || (mediaType === 'image' ? 'image/jpeg' : 'video/mp4'));
         setCaption(getCheckInCaption());
         setState('post-record');
@@ -1110,6 +1115,7 @@ export default function DuetRecordingScreen() {
 
     setRecordedVideoUri(null);
     setSelectedMediaType('video');
+    setCheckInSubmissionType('live_video');
     setSelectedMimeType('video/mp4');
     setIsVideoRecorderOpen(false);
     setCaption('');
@@ -1156,6 +1162,7 @@ export default function DuetRecordingScreen() {
         videoUri: recordedVideoUri,
 
         mediaType: selectedMediaType,
+        checkInSubmissionType: isCheckIn ? checkInSubmissionType : undefined,
         mimeType: selectedMimeType,
 
         allowRepost: isCheckIn ? false : allowRepost,
@@ -1188,6 +1195,7 @@ export default function DuetRecordingScreen() {
     challengeRedirectTo,
     requireSubscription,
     selectedMediaType,
+    checkInSubmissionType,
     selectedMimeType,
   ]);
 
@@ -1243,7 +1251,9 @@ export default function DuetRecordingScreen() {
     );
   }
 
-  const totalPoints = challenge.points + (!isCheckIn && allowRepost ? 3 : 0);
+  const selectedCheckInPoints =
+    checkInSubmissionType === 'live_video' ? 5 : checkInSubmissionType === 'uploaded_video' ? 2 : 1;
+  const totalPoints = isCheckIn ? selectedCheckInPoints : challenge.points + (allowRepost ? 3 : 0);
 
   const isLiveState = state === 'pre-record' || state === 'countdown' || state === 'recording';
 
@@ -1259,21 +1269,44 @@ export default function DuetRecordingScreen() {
   if (isCheckIn && state === 'pre-record' && !isVideoRecorderOpen) {
     const MediaChoice = ({
       label,
+      description,
+      points,
+      featured = false,
       icon,
       onPress,
     }: {
       label: string;
+      description: string;
+      points: number;
+      featured?: boolean;
       icon: React.ReactNode;
       onPress: () => void;
     }) => (
       <TouchableOpacity
-        className="mb-3 flex-row items-center rounded-2xl border border-[#E7E7E7] bg-white px-4 py-4"
+        activeOpacity={0.72}
+        className={`mb-3 flex-row items-center rounded-2xl border bg-white px-4 py-4 ${
+          featured ? 'border-[#FFB99C]' : 'border-[#E7E7E7]'
+        }`}
         disabled={dailyLimitReached}
         onPress={onPress}>
-        <View className="mr-3 h-11 w-11 items-center justify-center rounded-full bg-[#FFF1EA]">
+        <View className="mr-3.5 h-12 w-12 items-center justify-center rounded-full bg-[#FFF1EA]">
           {icon}
         </View>
-        <Text className="font-body text-base font-bold text-[#1F1F1F]">{label}</Text>
+        <View className="min-w-0 flex-1 pr-3">
+          <Text className="font-body text-base font-bold text-[#1F1F1F]">{label}</Text>
+          <Text className="mt-0.5 font-body text-xs text-[#777777]">{description}</Text>
+        </View>
+        <View
+          className={`min-w-[58px] items-center rounded-full px-3 py-2 ${
+            featured ? 'bg-[#FF5C1A]' : 'bg-[#FFF1EA]'
+          }`}>
+          <Text
+            className={`font-body text-sm font-extrabold ${
+              featured ? 'text-white' : 'text-[#E94F12]'
+            }`}>
+            +{points} {points === 1 ? 'pt' : 'pts'}
+          </Text>
+        </View>
       </TouchableOpacity>
     );
 
@@ -1290,21 +1323,33 @@ export default function DuetRecordingScreen() {
         </Text>
         <MediaChoice
           label="Take Photo"
+          description="Snap a photo now"
+          points={1}
           icon={<Camera size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('camera', 'image')}
         />
         <MediaChoice
           label="Upload Photo"
+          description="Choose from your library"
+          points={1}
           icon={<ImageSquare size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('library', 'image')}
         />
         <MediaChoice
           label="Record Video"
+          description="Record live in the app"
+          points={5}
+          featured
           icon={<VideoCamera size={23} color="#FF5C1A" />}
-          onPress={() => setIsVideoRecorderOpen(true)}
+          onPress={() => {
+            setCheckInSubmissionType('live_video');
+            setIsVideoRecorderOpen(true);
+          }}
         />
         <MediaChoice
           label="Upload Video"
+          description="Choose a saved video"
+          points={2}
           icon={<UploadSimple size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('library', 'video')}
         />
@@ -1567,7 +1612,8 @@ export default function DuetRecordingScreen() {
                 <Image
                   source={{ uri: recordedVideoUri }}
                   style={{ width: '100%', aspectRatio: 4 / 5 }}
-                  contentFit="contain"
+                  contentFit="cover"
+                  contentPosition="center"
                 />
               ) : isCheckIn ? (
                 <SingleVideoPreview videoUrl={recordedVideoUri} />
@@ -1676,7 +1722,9 @@ export default function DuetRecordingScreen() {
               onPress={handleSubmit}>
               <ButtonText className="text-lg font-bold text-white">
                 {isCheckIn
-                  ? `Submit Check-In for ${totalPoints} pts`
+                  ? `Submit Check-In for ${selectedCheckInPoints} ${
+                      selectedCheckInPoints === 1 ? 'pt' : 'pts'
+                    }`
                   : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
               </ButtonText>
             </LoadingButton>

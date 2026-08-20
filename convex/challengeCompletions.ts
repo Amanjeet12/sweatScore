@@ -112,6 +112,9 @@ export const completeChallenge = mutation({
     challengeId: v.id('challenges'),
     videoStorageId: v.optional(v.id('_storage')),
     mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
+    checkInSubmissionType: v.optional(
+      v.union(v.literal('live_video'), v.literal('uploaded_video'), v.literal('photo'))
+    ),
     allowRepost: v.optional(v.boolean()),
     caption: v.optional(v.string()),
 
@@ -190,6 +193,13 @@ export const completeChallenge = mutation({
     const isCheckIn = challenge.type === 'check_in';
     const mediaType: 'image' | 'video' =
       isCheckIn && args.mediaType === 'image' ? 'image' : 'video';
+    const checkInSubmissionType = isCheckIn
+      ? mediaType === 'image'
+        ? ('photo' as const)
+        : args.checkInSubmissionType === 'live_video'
+          ? ('live_video' as const)
+          : ('uploaded_video' as const)
+      : undefined;
 
     if (!args.videoStorageId) {
       throw new ConvexError(isCheckIn ? 'A photo or video is required' : 'A video is required');
@@ -252,7 +262,13 @@ export const completeChallenge = mutation({
      */
     const repostBonus = !isCheckIn && args.allowRepost ? 3 : 0;
 
-    const rawPoints = challenge.points + repostBonus;
+    const checkInPoints =
+      checkInSubmissionType === 'live_video'
+        ? 5
+        : checkInSubmissionType === 'uploaded_video'
+          ? 2
+          : 1;
+    const rawPoints = (isCheckIn ? checkInPoints : challenge.points) + repostBonus;
 
     const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
 
@@ -299,6 +315,7 @@ export const completeChallenge = mutation({
         ? {
             videoStorageId: args.videoStorageId,
             mediaType,
+            ...(checkInSubmissionType ? { checkInSubmissionType } : {}),
           }
         : {}),
 
