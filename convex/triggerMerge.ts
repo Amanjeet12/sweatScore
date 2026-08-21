@@ -6,7 +6,7 @@ import { internalAction } from './_generated/server';
 
 export const triggerVideoMerge = internalAction({
   args: {
-    adminVideoUrl: v.string(),
+    adminVideoUrl: v.optional(v.string()),
     userVideoUrl: v.string(),
 
     challengeCompletionId: v.id('challengeCompletions'),
@@ -17,6 +17,16 @@ export const triggerVideoMerge = internalAction({
 
     leftLabel: v.optional(v.string()),
     rightLabel: v.optional(v.string()),
+    musicTrackId: v.optional(
+      v.union(
+        v.literal('audio_1'),
+        v.literal('audio_2'),
+        v.literal('audio_3'),
+        v.literal('audio_4'),
+        v.literal('audio_5')
+      )
+    ),
+    checkInMusicOnly: v.optional(v.boolean()),
   },
 
   handler: async (_ctx, args) => {
@@ -42,7 +52,7 @@ export const triggerVideoMerge = internalAction({
 
       body: JSON.stringify({
         payload: {
-          adminVideoUrl: args.adminVideoUrl,
+          ...(args.adminVideoUrl ? { adminVideoUrl: args.adminVideoUrl } : {}),
 
           userVideoUrl: args.userVideoUrl,
 
@@ -63,6 +73,9 @@ export const triggerVideoMerge = internalAction({
                 rightLabel: args.rightLabel,
               }
             : {}),
+
+          ...(args.musicTrackId ? { musicTrackId: args.musicTrackId } : {}),
+          ...(args.checkInMusicOnly ? { checkInMusicOnly: true } : {}),
 
           convexSiteUrl,
           triggerSecret,

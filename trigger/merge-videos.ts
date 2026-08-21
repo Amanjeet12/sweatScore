@@ -16,7 +16,7 @@ if (process.env.FFPROBE_PATH) {
 }
 
 type MergeVideosPayload = {
-  adminVideoUrl: string;
+  adminVideoUrl?: string;
   userVideoUrl: string;
 
   challengeCompletionId: string;
@@ -39,23 +39,67 @@ type MergeVideosPayload = {
    * Day 1, Day 2, Day 3, etc.
    */
   rightLabel?: string;
+  musicTrackId?: 'audio_1' | 'audio_2' | 'audio_3' | 'audio_4' | 'audio_5';
+  checkInMusicOnly?: boolean;
 
   convexSiteUrl: string;
   triggerSecret: string;
 };
+
+const FINAL_MUSIC_VOLUME = 0.65;
+
+const SERVER_MUSIC_TRACKS = {
+  audio_1: 'audio1.mp3',
+  audio_2: 'audio2.mp3',
+  audio_3: 'audio3.mp3',
+  audio_4: 'audio4.mp3',
+  audio_5: 'audio5.mp3',
+} as const;
+
+/**
+ * Trigger.dev runs local tasks from a generated `.trigger/tmp/build-*`
+ * directory, while deployed `additionalFiles` live under the task cwd.
+ * Check the cwd first, then its ancestors so both layouts resolve the same
+ * repository-owned asset without accepting a path or URL from the client.
+ */
+function resolveBundledAsset(...relativeSegments: string[]): string {
+  const attemptedPaths: string[] = [];
+  let currentDirectory = path.resolve(process.cwd());
+
+  while (true) {
+    const candidate = path.join(currentDirectory, ...relativeSegments);
+    attemptedPaths.push(candidate);
+
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parentDirectory = path.dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) break;
+    currentDirectory = parentDirectory;
+  }
+
+  throw new Error(`Bundled asset was not found. Checked: ${attemptedPaths.join(', ')}`);
+}
+
+function resolveMusicFile(trackId: keyof typeof SERVER_MUSIC_TRACKS): string {
+  try {
+    return resolveBundledAsset('assets', 'audio', SERVER_MUSIC_TRACKS[trackId]);
+  } catch (error) {
+    throw new Error(
+      `Background music asset was not found for ${trackId}. ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
 
 /**
  * Resolve a font that works in local Windows development
  * and in the Trigger.dev Linux environment.
  */
 function resolveFontFile(): string {
-  const fontFile = path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Medium.ttf');
-
-  if (!fs.existsSync(fontFile)) {
-    throw new Error(`Video label font was not found at: ${fontFile}`);
-  }
-
-  return fontFile;
+  return resolveBundledAsset('assets', 'fonts', 'Roboto-Medium.ttf');
 }
 
 /**
@@ -233,7 +277,10 @@ export const mergeVideosTask = task({
         videoFontFile,
       });
 
-      await downloadFile(payload.adminVideoUrl, adminVideoPath, 'left challenge video');
+      if (!payload.checkInMusicOnly) {
+        if (!payload.adminVideoUrl) throw new Error('Left challenge video URL is required');
+        await downloadFile(payload.adminVideoUrl, adminVideoPath, 'left challenge video');
+      }
 
       await downloadFile(payload.userVideoUrl, userVideoPath, 'right user video');
 
@@ -256,29 +303,38 @@ export const mergeVideosTask = task({
        * Each side is 540 × 960.
        * Final video is 1080 × 960.
        */
+      const musicFile = payload.musicTrackId ? resolveMusicFile(payload.musicTrackId) : undefined;
+
       await new Promise<void>((resolve, reject) => {
-        ffmpeg()
-          .input(adminVideoPath)
-          .input(userVideoPath)
+        const command = ffmpeg();
+        if (!payload.checkInMusicOnly) command.input(adminVideoPath);
+        command.input(userVideoPath);
+        if (musicFile) command.input(musicFile).inputOptions(['-stream_loop', '-1']);
 
-          .complexFilter([
+        if (payload.checkInMusicOnly) {
+          command.complexFilter(musicFile ? [`[1:a]volume=${FINAL_MUSIC_VOLUME}[music]`] : []);
+        } else {
+          const musicInputIndex = 2;
+          command.complexFilter([
             `[0:v]${leftVideoFilter}[left]`,
-
             `[1:v]${rightVideoFilter}[right]`,
-
             '[left][right]hstack=inputs=2:shortest=1[v]',
-          ])
+            ...(musicFile ? [`[${musicInputIndex}:a]volume=${FINAL_MUSIC_VOLUME}[music]`] : []),
+          ]);
+        }
+
+        command
 
           .outputOptions([
             '-map',
-            '[v]',
+            payload.checkInMusicOnly ? '0:v' : '[v]',
 
             /**
              * Keep audio from the left video when present.
              * The question mark makes the audio stream optional.
              */
             '-map',
-            '0:a?',
+            musicFile ? '[music]' : payload.checkInMusicOnly ? '0:a?' : '0:a?',
 
             '-c:v',
             'libx264',

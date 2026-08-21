@@ -115,6 +115,15 @@ export const completeChallenge = mutation({
     checkInSubmissionType: v.optional(
       v.union(v.literal('live_video'), v.literal('uploaded_video'), v.literal('photo'))
     ),
+    musicTrackId: v.optional(
+      v.union(
+        v.literal('audio_1'),
+        v.literal('audio_2'),
+        v.literal('audio_3'),
+        v.literal('audio_4'),
+        v.literal('audio_5')
+      )
+    ),
     mediaWidth: v.optional(v.number()),
     mediaHeight: v.optional(v.number()),
     allowRepost: v.optional(v.boolean()),
@@ -202,6 +211,10 @@ export const completeChallenge = mutation({
           ? ('live_video' as const)
           : ('uploaded_video' as const)
       : undefined;
+    const musicTrackId =
+      args.musicTrackId && (!isCheckIn || checkInSubmissionType === 'live_video')
+        ? args.musicTrackId
+        : undefined;
 
     if (!args.videoStorageId) {
       throw new ConvexError(isCheckIn ? 'A photo or video is required' : 'A video is required');
@@ -318,6 +331,7 @@ export const completeChallenge = mutation({
             videoStorageId: args.videoStorageId,
             mediaType,
             ...(checkInSubmissionType ? { checkInSubmissionType } : {}),
+            ...(musicTrackId ? { musicTrackId } : {}),
           }
         : {}),
 
@@ -399,7 +413,7 @@ export const completeChallenge = mutation({
        * CHECK-IN:
        * Post the original user video directly.
        */
-      if (isCheckIn) {
+      if (isCheckIn && !musicTrackId) {
         const postId = await ctx.db.insert('posts', {
           userId,
           createdAt: Date.now(),
@@ -434,7 +448,7 @@ export const completeChallenge = mutation({
           userId,
           postId,
         });
-      } else {
+      } else if (!isCheckIn) {
         /*
          * NORMAL CHALLENGE:
          * Keep the Trigger.dev transformation video flow.
@@ -497,6 +511,20 @@ export const completeChallenge = mutation({
               : {}),
 
             rightLabel,
+            ...(musicTrackId ? { musicTrackId } : {}),
+          });
+        }
+      } else {
+        const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
+        if (userVideoUrl) {
+          await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
+            userVideoUrl,
+            challengeCompletionId: completionId,
+            userId,
+            caption: args.caption?.trim() || '',
+            challengeId: args.challengeId,
+            musicTrackId,
+            checkInMusicOnly: true,
           });
         }
       }

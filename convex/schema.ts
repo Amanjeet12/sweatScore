@@ -253,6 +253,15 @@ const schema = defineSchema({
     checkInSubmissionType: v.optional(
       v.union(v.literal('live_video'), v.literal('uploaded_video'), v.literal('photo'))
     ),
+    musicTrackId: v.optional(
+      v.union(
+        v.literal('audio_1'),
+        v.literal('audio_2'),
+        v.literal('audio_3'),
+        v.literal('audio_4'),
+        v.literal('audio_5')
+      )
+    ),
 
     // Generated transformation/composite video
     compositeVideoStorageId: v.optional(v.id('_storage')),

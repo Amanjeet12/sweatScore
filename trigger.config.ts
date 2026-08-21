@@ -1,7 +1,4 @@
-import {
-  additionalFiles,
-  aptGet,
-} from '@trigger.dev/build/extensions/core';
+import { additionalFiles, aptGet } from '@trigger.dev/build/extensions/core';
 
 import { defineConfig } from '@trigger.dev/sdk/v3';
 
@@ -36,6 +33,11 @@ export default defineConfig({
       additionalFiles({
         files: [
           './assets/fonts/Roboto-Medium.ttf',
+          './assets/audio/audio1.mp3',
+          './assets/audio/audio2.mp3',
+          './assets/audio/audio3.mp3',
+          './assets/audio/audio4.mp3',
+          './assets/audio/audio5.mp3',
         ],
       }),
     ],
