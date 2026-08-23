@@ -24,6 +24,7 @@ import type * as chat_helpers from "../chat/helpers.js";
 import type * as chat_messages from "../chat/messages.js";
 import type * as chat_notifications from "../chat/notifications.js";
 import type * as chat_presence from "../chat/presence.js";
+import type * as chat_userPresentation from "../chat/userPresentation.js";
 import type * as checkInCategories from "../checkInCategories.js";
 import type * as claimedRewards from "../claimedRewards.js";
 import type * as crons from "../crons.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   "chat/messages": typeof chat_messages;
   "chat/notifications": typeof chat_notifications;
   "chat/presence": typeof chat_presence;
+  "chat/userPresentation": typeof chat_userPresentation;
   checkInCategories: typeof checkInCategories;
   claimedRewards: typeof claimedRewards;
   crons: typeof crons;

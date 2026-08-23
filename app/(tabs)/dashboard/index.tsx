@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '~/components/core/Avatar';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import AchievementPopupManager from '~/components/core/dashboard/AchievementPopupManager';
+import CommunityGroupPreviewCard from '~/components/core/dashboard/CommunityGroupPreviewCard';
 import Confetti from '~/components/core/dashboard/Confetti';
 import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 import { FirstTimeOnboardingModal } from '~/components/core/dashboard/FirstTimeOnboardingModal';
@@ -225,6 +226,9 @@ export default function TabDashboard() {
             </View>
             <View className="bg-[#F9F9F9]">
               <DailyChallengeCard />
+            </View>
+            <View className="mt-4 bg-[#F9F9F9]">
+              <CommunityGroupPreviewCard />
             </View>
             <View className=" pv-5 mt-5 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />

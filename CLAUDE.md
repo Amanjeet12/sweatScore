@@ -30,6 +30,29 @@ bunx convex dev
 # Database operations
 bunx convex import --table tableName data.jsonl
 bunx convex run functionName
+
+
+Local development
+npx trigger.dev@4.5.6 dev
+
+        ↓
+
+Test tasks locally
+
+        ↓
+
+Production deploy
+npx trigger.dev@4.5.6 deploy
+
+        ↓
+
+Trigger.dev builds task image
+        ↓
+installs FFmpeg from trigger.config.ts
+        ↓
+includes additional assets
+        ↓
+deploys tasks to PROD
 ```
 
 ## Architecture Overview

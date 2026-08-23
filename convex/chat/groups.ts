@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values';
 import type { Doc } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
 import { getGroupMembership, requireCurrentUser, requireGroupMember } from './helpers';
+import { getAvatarColor, getSafeMemberName, getSafeUserImageUrl } from './userPresentation';
 const DEFAULT_GROUP_SLUG = 'sweat-sisters';
 
 /**
@@ -306,6 +307,119 @@ export const listMyGroups = query({
     }
 
     return groups.sort((firstGroup, secondGroup) => secondGroup.sortAt - firstGroup.sortAt);
+  },
+});
+
+/**
+ * Returns the most relevant joined group for the dashboard without exposing
+ * the full member list. Unread groups win, followed by latest activity.
+ */
+export const getHomeGroupPreview = query({
+  args: {},
+
+  handler: async (ctx) => {
+    const currentUser = await requireCurrentUser(ctx);
+    const memberships = await ctx.db
+      .query('chatMembers')
+      .withIndex('by_user_status', (q) => q.eq('userId', currentUser._id).eq('status', 'active'))
+      .collect();
+
+    const candidates = [];
+
+    for (const membership of memberships) {
+      const group = await ctx.db.get(membership.groupId);
+
+      if (!group?.isActive) {
+        continue;
+      }
+
+      const unreadFrom = membership.lastReadAt ?? membership.joinedAt;
+      const messagesAfterLastRead = await ctx.db
+        .query('chatMessages')
+        .withIndex('by_group', (q) => q.eq('groupId', group._id).gt('_creationTime', unreadFrom))
+        .collect();
+      const unreadCount = messagesAfterLastRead.filter(
+        (message) =>
+          String(message.senderId) !== String(currentUser._id) && !message.deletedAt
+      ).length;
+
+      candidates.push({
+        group,
+        unreadCount,
+        sortAt: group.lastMessageAt ?? group._creationTime,
+      });
+    }
+
+    candidates.sort((first, second) => {
+      const unreadDifference = Number(second.unreadCount > 0) - Number(first.unreadCount > 0);
+
+      if (unreadDifference !== 0) {
+        return unreadDifference;
+      }
+
+      const activityDifference = second.sortAt - first.sortAt;
+
+      if (activityDifference !== 0) {
+        return activityDifference;
+      }
+
+      return String(first.group._id).localeCompare(String(second.group._id));
+    });
+
+    const selected = candidates[0];
+
+    if (!selected) {
+      return null;
+    }
+
+    const activeMemberships = await ctx.db
+      .query('chatMembers')
+      .withIndex('by_group_status', (q) =>
+        q.eq('groupId', selected.group._id).eq('status', 'active')
+      )
+      .collect();
+    const previewMembers = await Promise.all(
+      activeMemberships.slice(0, 3).map(async (membership) => {
+        const user = await ctx.db.get(membership.userId);
+        const name = getSafeMemberName(user);
+
+        return {
+          userId: membership.userId,
+          name,
+          imageUrl: await getSafeUserImageUrl(ctx, user?.image),
+          initial: Array.from(name)[0]?.toUpperCase() ?? '?',
+          avatarColor: getAvatarColor(String(membership.userId)),
+        };
+      })
+    );
+    const lastMessage = selected.group.lastMessageId
+      ? await ctx.db.get(selected.group.lastMessageId)
+      : null;
+    const sender = lastMessage ? await ctx.db.get(lastMessage.senderId) : null;
+    const senderName = getSafeMemberName(sender);
+
+    return {
+      groupId: selected.group._id,
+      name: selected.group.name,
+      imageUrl: await getSafeUserImageUrl(ctx, selected.group.imageStorageId),
+      memberCount: activeMemberships.length,
+      previewMembers,
+      lastMessage: lastMessage
+        ? {
+            messageId: lastMessage._id,
+            text: getMessagePreview(lastMessage),
+            type: lastMessage.type,
+            senderId: lastMessage.senderId,
+            senderName,
+            senderImageUrl: await getSafeUserImageUrl(ctx, sender?.image),
+            senderInitial: Array.from(senderName)[0]?.toUpperCase() ?? '?',
+            senderAvatarColor: getAvatarColor(String(lastMessage.senderId)),
+            createdAt: lastMessage._creationTime,
+          }
+        : null,
+      unreadCount: selected.unreadCount,
+      hasUnread: selected.unreadCount > 0,
+    };
   },
 });
 

@@ -4,6 +4,7 @@ import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import { mutation, query } from '../_generated/server';
 import { requireCurrentUser, requireGroupMember } from './helpers';
+import { getAvatarColor, getSafeMemberName, getSafeUserImageUrl } from './userPresentation';
 
 const DEFAULT_GROUP_SLUG = 'sweat-sisters';
 const MAX_GROUP_NAME_LENGTH = 60;
@@ -15,18 +16,6 @@ type DatabaseCtx = QueryCtx | MutationCtx;
 
 function normalizeGroupName(value: string) {
   return value.trim().replace(/\s+/g, ' ');
-}
-
-function getAvatarColor(userId: string) {
-  const colors = ['#F76B1C', '#7C3AED', '#2563EB', '#047857', '#C2410C', '#9F1239', '#D97706'];
-
-  let hash = 0;
-
-  for (let index = 0; index < userId.length; index += 1) {
-    hash = (hash * 31 + userId.charCodeAt(index)) >>> 0;
-  }
-
-  return colors[hash % colors.length];
 }
 
 async function getActiveGroup(ctx: DatabaseCtx, groupId: Id<'chatGroups'>) {
@@ -162,50 +151,10 @@ function sanitizeUnicodeString(value: unknown, fallback = '', maximumLength = 50
   return truncated || fallback;
 }
 
-function getSafeMemberName(user: Doc<'users'> | null) {
-  const safeName = sanitizeUnicodeString(user?.name, '', 120);
-
-  if (safeName) {
-    return safeName;
-  }
-
-  const safeEmail = sanitizeUnicodeString(user?.email, '', 320);
-
-  if (safeEmail) {
-    return safeEmail.split('@')[0] || 'Member';
-  }
-
-  return 'Member';
-}
-
 function getSafeEmail(value: unknown) {
   const email = sanitizeUnicodeString(value, '', 320);
 
   return email || null;
-}
-
-async function getSafeUserImageUrl(ctx: QueryCtx, imageStorageId: Id<'_storage'> | undefined) {
-  if (!imageStorageId) {
-    return null;
-  }
-
-  try {
-    const imageUrl = await ctx.storage.getUrl(imageStorageId);
-
-    if (!imageUrl) {
-      return null;
-    }
-
-    const safeUrl = sanitizeUnicodeString(imageUrl, '', 2048);
-
-    return safeUrl || null;
-  } catch {
-    /*
-     * A missing or invalid image should not
-     * break the complete member query.
-     */
-    return null;
-  }
 }
 
 export const getGroupInfo = query({

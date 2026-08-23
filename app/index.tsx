@@ -107,7 +107,7 @@ export default function Home() {
                 <Text
                   className="text-center text-3xl text-white"
                   style={{ fontFamily: 'Inter_700Bold' }}>
-                  Your Comeback {'\n'}Starts Now.
+                  Movement That  {'\n'}Hits Different.
                 </Text>
               </View>
 
