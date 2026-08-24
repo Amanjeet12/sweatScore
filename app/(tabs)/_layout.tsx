@@ -148,7 +148,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Groups
+                Feed
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
