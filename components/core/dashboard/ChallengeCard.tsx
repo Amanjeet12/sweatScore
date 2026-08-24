@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Dimensions, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -54,6 +55,8 @@ export default function ChallengeCard({
   onPress,
   fullWidth = false,
 }: ChallengeCardProps) {
+  const { requireSubscription } = useSubscriptionGuard();
+
   const cooldownHours = completedToday
     ? (() => {
         const now = new Date();
@@ -62,10 +65,7 @@ export default function ChallengeCard({
         midnight.setDate(midnight.getDate() + 1);
         midnight.setHours(0, 0, 0, 0);
 
-        return Math.max(
-          1,
-          Math.ceil((midnight.getTime() - now.getTime()) / (60 * 60 * 1000))
-        );
+        return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (60 * 60 * 1000)));
       })()
     : 0;
 
@@ -79,14 +79,21 @@ export default function ChallengeCard({
   // Prevent showing values such as 61/60.
   const milestoneCompleted = Math.min(totalCompletions, milestoneTarget);
 
-  const milestoneProgress = Math.min(
-    100,
-    (milestoneCompleted / milestoneTarget) * 100
-  );
+  const milestoneProgress = Math.min(100, (milestoneCompleted / milestoneTarget) * 100);
+
+  const handlePress = () => {
+    const redirectTo = `/challenge-view/${challenge._id}`;
+
+    if (!requireSubscription({ redirectTo, source: 'challenge_video_card' })) {
+      return;
+    }
+
+    onPress();
+  };
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.9}
       style={{
         width: fullWidth ? '100%' : SCREEN_WIDTH * 0.7,
@@ -116,9 +123,7 @@ export default function ChallengeCard({
       />
 
       <View className="absolute right-3 top-3 rounded-full bg-primary-500 px-3 py-1">
-        <Text className="font-body text-xs font-semibold text-white">
-          +{challenge.points} pts
-        </Text>
+        <Text className="font-body text-xs font-semibold text-white">+{challenge.points} pts</Text>
       </View>
 
       {isLocked && (
@@ -127,9 +132,7 @@ export default function ChallengeCard({
           style={{
             backgroundColor: 'rgba(0,0,0,0.55)',
           }}>
-          <Text className="font-body text-xs font-bold text-white">
-            Pro
-          </Text>
+          <Text className="font-body text-xs font-bold text-white">Pro</Text>
         </View>
       )}
 
@@ -154,16 +157,12 @@ export default function ChallengeCard({
       <View className="absolute bottom-0 left-0 right-0 px-4 pb-4">
         <View className="flex-row items-end justify-between">
           <View style={{ flex: 1, marginRight: 12 }}>
-            <Text
-              className="font-heading text-lg font-bold text-white"
-              numberOfLines={1}>
+            <Text className="font-heading text-lg font-bold text-white" numberOfLines={1}>
               {challenge.name}
             </Text>
 
             {!!challenge.tag && (
-              <Text className="font-body text-sm text-white">
-                {challenge.tag}
-              </Text>
+              <Text className="font-body text-sm text-white">{challenge.tag}</Text>
             )}
           </View>
 
@@ -173,9 +172,7 @@ export default function ChallengeCard({
             </Text>
 
             {lastDoneText && (
-              <Text className="mt-0.5 font-body text-xs text-white/80">
-                {lastDoneText}
-              </Text>
+              <Text className="mt-0.5 font-body text-xs text-white/80">{lastDoneText}</Text>
             )}
           </View>
         </View>

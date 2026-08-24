@@ -339,15 +339,37 @@ export const getHomeGroupPreview = query({
         .withIndex('by_group', (q) => q.eq('groupId', group._id).gt('_creationTime', unreadFrom))
         .collect();
       const unreadCount = messagesAfterLastRead.filter(
-        (message) =>
-          String(message.senderId) !== String(currentUser._id) && !message.deletedAt
+        (message) => String(message.senderId) !== String(currentUser._id) && !message.deletedAt
       ).length;
 
       candidates.push({
         group,
         unreadCount,
+        isMember: true,
         sortAt: group.lastMessageAt ?? group._creationTime,
       });
+    }
+
+    if (candidates.length === 0) {
+      const defaultGroup = await ctx.db
+        .query('chatGroups')
+        .withIndex('by_slug', (q) => q.eq('slug', DEFAULT_GROUP_SLUG))
+        .unique();
+      const fallbackGroup =
+        defaultGroup?.isActive === true
+          ? defaultGroup
+          : (await ctx.db.query('chatGroups').order('desc').collect()).find(
+              (group) => group.isActive
+            );
+
+      if (fallbackGroup) {
+        candidates.push({
+          group: fallbackGroup,
+          unreadCount: 0,
+          isMember: false,
+          sortAt: fallbackGroup.lastMessageAt ?? fallbackGroup._creationTime,
+        });
+      }
     }
 
     candidates.sort((first, second) => {
@@ -400,6 +422,7 @@ export const getHomeGroupPreview = query({
 
     return {
       groupId: selected.group._id,
+      isMember: selected.isMember,
       name: selected.group.name,
       imageUrl: await getSafeUserImageUrl(ctx, selected.group.imageStorageId),
       memberCount: activeMemberships.length,

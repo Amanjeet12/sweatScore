@@ -111,7 +111,7 @@ function getVoiceFileName(fileName?: string) {
 }
 
 export const useChatMessages = (groupId?: string) => {
-  const { requireSubscription } = useSubscriptionGuard();
+  const { isPro, requireSubscription } = useSubscriptionGuard();
   const redirectTo = groupId ? `/group-chat/${groupId}` : '/group-chat';
   const convexGroupId = groupId ? (groupId as Id<'chatGroups'>) : undefined;
 
@@ -125,7 +125,7 @@ export const useChatMessages = (groupId?: string) => {
       : 'skip',
 
     {
-      initialNumItems: 20,
+      initialNumItems: isPro ? 20 : 10,
     }
   );
 
@@ -358,10 +358,10 @@ export const useChatMessages = (groupId?: string) => {
   );
 
   const loadEarlier = useCallback(() => {
-    if (status === 'CanLoadMore') {
+    if (isPro && status === 'CanLoadMore') {
       loadMore(30);
     }
-  }, [loadMore, status]);
+  }, [isPro, loadMore, status]);
 
   const sendVoiceMessage = useCallback(
     async ({
@@ -743,7 +743,7 @@ export const useChatMessages = (groupId?: string) => {
 
     isLoadingMore: status === 'LoadingMore',
 
-    canLoadEarlier: status === 'CanLoadMore',
+    canLoadEarlier: isPro && status === 'CanLoadMore',
 
     isUploadingAttachment,
     isUploadingVoice,

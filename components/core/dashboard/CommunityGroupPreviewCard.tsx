@@ -66,16 +66,26 @@ function formatRelativeTime(timestamp: number) {
 }
 
 export default function CommunityGroupPreviewCard() {
-  const group = useQuery(api.chat.groups.getHomeGroupPreview);
+  const groupPreview = useQuery(api.chat.groups.getHomeGroupPreview);
+  const availableGroups = useQuery(api.chat.groups.listAvailableGroups);
+  const fallbackGroup = availableGroups?.[0];
 
-  if (!group) {
+  if (!groupPreview && !fallbackGroup) {
     return null;
   }
+
+  const groupId = groupPreview?.groupId ?? fallbackGroup!._id;
+  const groupName = groupPreview?.name ?? fallbackGroup!.name;
+  const isMember = groupPreview?.isMember ?? fallbackGroup!.isMember;
+  const memberCount = groupPreview?.memberCount ?? fallbackGroup!.memberCount;
+  const hasUnread = groupPreview?.hasUnread ?? fallbackGroup!.hasUnread;
+  const previewMembers = groupPreview?.previewMembers ?? [];
+  const lastMessage = groupPreview?.lastMessage ?? null;
 
   const openGroup = () => {
     router.push({
       pathname: '/group-chat/[groupId]',
-      params: { groupId: String(group.groupId) },
+      params: { groupId: String(groupId) },
     });
   };
 
@@ -86,14 +96,14 @@ export default function CommunityGroupPreviewCard() {
           <Text
             className="font-heading text-[10px] font-extrabold uppercase tracking-wide"
             style={{ color: PRIMARY }}>
-            Your community
+            {isMember ? 'Your community' : 'Community group'}
           </Text>
           <Text numberOfLines={1} className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">
-            {group.name}
+            {groupName}
           </Text>
         </View>
 
-        {group.hasUnread ? (
+        {hasUnread ? (
           <View className="relative flex-row items-center rounded-full bg-[#EAF8EF] px-3 py-2">
             <View className="mr-1.5 h-2 w-2 rounded-full bg-[#2F9D70]" />
             <Text className="font-heading text-xs font-bold text-[#27855E]">New Message</Text>
@@ -104,7 +114,7 @@ export default function CommunityGroupPreviewCard() {
 
       <View className="mt-4 flex-row items-center">
         <View className="flex-row">
-          {group.previewMembers.map((member, index) => (
+          {previewMembers.map((member, index) => (
             <View key={String(member.userId)} style={{ marginLeft: index === 0 ? 0 : -10 }}>
               <PreviewAvatar
                 imageUrl={member.imageUrl}
@@ -116,22 +126,22 @@ export default function CommunityGroupPreviewCard() {
           ))}
         </View>
         <Text className="ml-3 font-body text-[13px] text-[#77716D]">
-          {group.memberCount} {group.memberCount === 1 ? 'member' : 'members'}
+          {memberCount} {memberCount === 1 ? 'member' : 'members'}
         </Text>
       </View>
 
       <TouchableOpacity
         activeOpacity={0.78}
         accessibilityRole="button"
-        accessibilityLabel={`Open latest message in ${group.name}`}
+        accessibilityLabel={`Open latest message in ${groupName}`}
         onPress={openGroup}
         className="mt-4 flex-row items-center rounded-[22px] bg-[#F8F8F8] p-4">
-        {group.lastMessage ? (
+        {lastMessage ? (
           <>
             <PreviewAvatar
-              imageUrl={group.lastMessage.senderImageUrl}
-              initial={group.lastMessage.senderInitial}
-              color={group.lastMessage.senderAvatarColor}
+              imageUrl={lastMessage.senderImageUrl}
+              initial={lastMessage.senderInitial}
+              color={lastMessage.senderAvatarColor}
               size={46}
             />
             <View className="ml-3 min-w-0 flex-1">
@@ -139,14 +149,14 @@ export default function CommunityGroupPreviewCard() {
                 <Text
                   numberOfLines={1}
                   className="min-w-0 flex-shrink font-heading text-sm font-bold text-[#1A1A1A]">
-                  {group.lastMessage.senderName}
+                  {lastMessage.senderName}
                 </Text>
                 <Text className="ml-2 font-body text-xs text-[#AAA39E]">
-                  {formatRelativeTime(group.lastMessage.createdAt)}
+                  {formatRelativeTime(lastMessage.createdAt)}
                 </Text>
               </View>
               <Text numberOfLines={1} className="mt-1 font-body text-[13px] text-[#77716D]">
-                {group.lastMessage.text}
+                {lastMessage.text}
               </Text>
             </View>
           </>
@@ -161,11 +171,11 @@ export default function CommunityGroupPreviewCard() {
       <TouchableOpacity
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel={`Reply to ${group.name}`}
+        accessibilityLabel={isMember ? `Reply to ${groupName}` : `View and join ${groupName}`}
         onPress={openGroup}
         className="mt-4 h-12 flex-row items-center rounded-[20px] bg-[#E8E8E9] px-4">
         <Text numberOfLines={1} className="min-w-0 flex-1 font-body text-[13px] text-[#77716D]">
-          Reply to {group.name}...
+          {isMember ? `Reply to ${groupName}...` : `Join ${groupName}`}
         </Text>
         <ArrowRight size={19} color="#716A65" weight="bold" />
       </TouchableOpacity>

@@ -17,6 +17,7 @@ import {
 
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { colors } from '~/utils/constants';
 
 function formatRemainingTime(seconds: number) {
@@ -36,6 +37,8 @@ function formatRemainingTime(seconds: number) {
 }
 
 export default function DailyChallengeCard() {
+  const { requireSubscription } = useSubscriptionGuard();
+
   /*
    * Changing refreshToken forces Convex
    * to rerun the time-based query.
@@ -310,6 +313,12 @@ export default function DailyChallengeCard() {
 
   const handleAcceptChallenge = () => {
     if (isCompleted || secondsRemaining <= 0) {
+      return;
+    }
+
+    const redirectTo = `/challenge-view/${dailyChallenge._id}`;
+
+    if (!requireSubscription({ redirectTo, source: 'daily_challenge_lets_go' })) {
       return;
     }
 

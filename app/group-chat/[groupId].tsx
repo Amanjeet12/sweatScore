@@ -431,7 +431,7 @@ export default function GroupChatScreen() {
         style={{
           paddingTop: Platform.OS === 'android' ? insets.top + 8 : 8,
         }}>
-          <KeyboardAvoidingView
+        <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
