@@ -260,13 +260,13 @@ export default function GroupChatScreen() {
       return;
     }
 
-    // router.push({
-    //   pathname: '/group-chat/[groupId]/info',
+    router.push({
+      pathname: '/group-chat/[groupId]/info',
 
-    //   params: {
-    //     groupId,
-    //   },
-    // });
+      params: {
+        groupId,
+      },
+    });
   }, [groupId]);
 
   const handleComposerFocus = useCallback(() => {

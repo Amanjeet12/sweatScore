@@ -128,8 +128,9 @@ export default function Verify() {
 
           {/* Form panel */}
           <View className="bg-white">
-            <View className="px-8 pt-8">
-              <Text className="mb-6 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
+            <View className={`px-8 ${keyboardVisible ? 'pt-4' : 'pt-8'}`}>
+              <Text
+                className={`${keyboardVisible ? 'mb-2' : 'mb-6'} text-center font-heading text-3xl font-bold text-[#1A1A1A]`}>
                 We just emailed you{'\n'}a code
               </Text>
               <Text className="text-center font-body text-base text-[#5A5A5A]">
@@ -139,7 +140,7 @@ export default function Verify() {
                 {email}
               </Text>
 
-              <View className="mt-6 items-center">
+              <View className={`${keyboardVisible ? 'mt-2' : 'mt-6'} items-center`}>
                 <OtpInput
                   numberOfDigits={4}
                   autoFocus={false}
@@ -149,21 +150,25 @@ export default function Verify() {
                   }}
                   focusColor={colors.primary}
                 />
-                <View className="mt-3 items-center">
-                  <ErrorMessage error={error} />
-                </View>
-                <Text className="mt-4 text-center font-body text-sm text-[#5A5A5A]">
-                  Didn&apos;t get the code?{' '}
-                  <Text
-                    className={cn('font-bold', {
-                      'text-primary-500': resendActive,
-                      'text-[#5A5A5A]': !resendActive,
-                    })}
-                    onPress={handleResend}>
-                    Resend
-                  </Text>{' '}
-                  in {seconds} sec.
-                </Text>
+                {!keyboardVisible && (
+                  <>
+                    <View className="mt-3 items-center">
+                      <ErrorMessage error={error} />
+                    </View>
+                    <Text className="mt-4 text-center font-body text-sm text-[#5A5A5A]">
+                      Didn&apos;t get the code?{' '}
+                      <Text
+                        className={cn('font-bold', {
+                          'text-primary-500': resendActive,
+                          'text-[#5A5A5A]': !resendActive,
+                        })}
+                        onPress={handleResend}>
+                        Resend
+                      </Text>{' '}
+                      in {seconds} sec.
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -171,26 +176,28 @@ export default function Verify() {
           {/* Middle spacer pushes button to bottom when keyboard closed */}
           {!keyboardVisible && <View className="flex-1 bg-white" />}
 
-          <SafeAreaView edges={['bottom']} className="bg-white">
-            <View className="bg-white px-8 pb-8 pt-2">
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleSubmit}
-                disabled={isLoading}
-                style={{
-                  backgroundColor: '#F76B1C',
-                  borderRadius: 9999,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                }}>
-                {isLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-2xl font-bold text-white">Next</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
+          {!keyboardVisible && (
+            <SafeAreaView edges={['bottom']} className="bg-white">
+              <View className="bg-white px-8 pb-8 pt-2">
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleSubmit}
+                  disabled={isLoading}
+                  style={{
+                    backgroundColor: '#F76B1C',
+                    borderRadius: 9999,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                  }}>
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-2xl font-bold text-white">Next</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          )}
         </View>
       </KeyboardStickyView>
 

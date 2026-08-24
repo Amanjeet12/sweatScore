@@ -89,12 +89,12 @@ export default function Email() {
           {/* Invisible spacer matching image height — reserves space so form sits below image */}
           <View style={{ width: '100%', aspectRatio: 4044 / 3938 }} />
 
-          {/* Top spacer pushes form down when keyboard is open */}
+          {/* Keep the compact prompt anchored immediately above the keyboard. */}
           {keyboardVisible && <View className="flex-1" />}
 
           {/* Form panel */}
           <View className="bg-white">
-            <View className="px-8 pt-8">
+            <View className={`px-8 ${keyboardVisible ? 'pt-4' : 'pt-8'}`}>
               <Text className="mb-4 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
                 What&apos;s your email?
               </Text>
@@ -113,46 +113,50 @@ export default function Email() {
               <View className="mt-2 items-center">
                 <ErrorMessage error={error} />
               </View>
-              <Text className="mt-3 text-center font-body text-base text-[#5A5A5A]">
-                We&apos;ll email you a code to verify it&apos;s you. Takes 5 seconds.
-              </Text>
+              {!keyboardVisible && (
+                <Text className="mt-3 text-center font-body text-base text-[#5A5A5A]">
+                  We&apos;ll email you a code to verify it&apos;s you. Takes 5 seconds.
+                </Text>
+              )}
             </View>
           </View>
 
           {/* Middle spacer pushes button to bottom when keyboard closed */}
           {!keyboardVisible && <View className="flex-1 bg-white" />}
 
-          <SafeAreaView edges={['bottom']} className="bg-white">
-            <View className="bg-white px-8 pb-8 pt-2">
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleSubmit}
-                disabled={isLoading}
-                style={{
-                  backgroundColor: '#F76B1C',
-                  borderRadius: 9999,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                }}>
-                {isLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-2xl font-bold text-white">Next</Text>
-                )}
-              </TouchableOpacity>
+          {!keyboardVisible && (
+            <SafeAreaView edges={['bottom']} className="bg-white">
+              <View className="bg-white px-8 pb-8 pt-2">
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleSubmit}
+                  disabled={isLoading}
+                  style={{
+                    backgroundColor: '#F76B1C',
+                    borderRadius: 9999,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                  }}>
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-2xl font-bold text-white">Next</Text>
+                  )}
+                </TouchableOpacity>
 
-              <Text className="mt-3 text-center font-body text-sm text-[#1A1A1A]">
-                By clicking next, you agree to our{' '}
-                <Link href="/legals/terms">
-                  <Text className="text-sm font-bold text-primary-500">Terms of Use</Text>
-                </Link>{' '}
-                and{' '}
-                <Link href="/legals/privacy-policy">
-                  <Text className="text-sm font-bold text-primary-500">Privacy Policy</Text>
-                </Link>
-              </Text>
-            </View>
-          </SafeAreaView>
+                <Text className="mt-3 text-center font-body text-sm text-[#1A1A1A]">
+                  By clicking next, you agree to our{' '}
+                  <Link href="/legals/terms">
+                    <Text className="text-sm font-bold text-primary-500">Terms of Use</Text>
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/legals/privacy-policy">
+                    <Text className="text-sm font-bold text-primary-500">Privacy Policy</Text>
+                  </Link>
+                </Text>
+              </View>
+            </SafeAreaView>
+          )}
         </View>
       </KeyboardStickyView>
 
