@@ -5,9 +5,10 @@ import { ConvexError, v } from 'convex/values';
 import { components, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, QueryCtx, MutationCtx } from './_generated/server';
-import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timezone';
+import { getSafeMemberName, getSafeUserImageUrl } from './chat/userPresentation';
 import { evaluateUserMilestones } from './utils/milestones';
 import { getStreakEarnedDatesInRange, WEEKLY_STREAK_TARGET_DAYS } from './utils/streak';
+import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timezone';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 3;
@@ -1006,11 +1007,7 @@ export const getTodayDailyChallenge = query({
     refreshToken: v.optional(v.number()),
   },
 
-  handler: async (ctx, args) => {
-    // The value is intentionally not used in the query logic.
-    // Changing it causes Convex to rerun this query.
-    void args.refreshToken;
-
+  handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
 
@@ -1053,6 +1050,9 @@ export const getTodayDailyChallenge = query({
       return null;
     }
 
+    const windowStartAt = challenge.dailyStartAt;
+    const windowEndAt = challenge.dailyEndAt;
+
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
 
     const instructionalVideoUrl = challenge.instructionalVideo
@@ -1066,6 +1066,53 @@ export const getTodayDailyChallenge = query({
     const counterKey = getChallengeCounterKey(challenge._id, challenge.dailyStartAt, '');
 
     const communityDoneToday = await challengeCounter.count(ctx, counterKey);
+
+    const windowCompletions = await ctx.db
+      .query('challengeCompletions')
+      .order('desc')
+      .filter((q) =>
+        q.and(
+          q.gte(q.field('_creationTime'), windowStartAt),
+          q.lt(q.field('_creationTime'), windowEndAt),
+          q.neq(q.field('removed'), true)
+        )
+      )
+      .collect();
+
+    const challengeTypes = new Map<string, string | undefined>();
+    const checkInCompletions: typeof windowCompletions = [];
+
+    for (const completion of windowCompletions) {
+      const challengeId = String(completion.challengeId);
+      let challengeType = challengeTypes.get(challengeId);
+
+      if (!challengeTypes.has(challengeId)) {
+        challengeType = (await ctx.db.get(completion.challengeId))?.type;
+        challengeTypes.set(challengeId, challengeType);
+      }
+
+      if (challengeType === 'check_in') {
+        checkInCompletions.push(completion);
+      }
+    }
+
+    const uniqueCompletions = checkInCompletions.filter(
+      (completion, index, completions) =>
+        completions.findIndex((item) => String(item.userId) === String(completion.userId)) === index
+    );
+    const actualCheckInCount = uniqueCompletions.length;
+    const recentCheckInUsers = await Promise.all(
+      uniqueCompletions.slice(0, 4).map(async (completion) => {
+        const user = await ctx.db.get(completion.userId);
+        const name = getSafeMemberName(user);
+
+        return {
+          userId: completion.userId,
+          imageUrl: await getSafeUserImageUrl(ctx, user?.image),
+          initial: Array.from(name)[0]?.toUpperCase() ?? '?',
+        };
+      })
+    );
 
     let userCompletedToday = false;
 
@@ -1152,6 +1199,8 @@ export const getTodayDailyChallenge = query({
 
       secondsRemaining,
       communityDoneToday,
+      actualCheckInCount,
+      recentCheckInUsers,
       userCompletedToday,
     };
   },

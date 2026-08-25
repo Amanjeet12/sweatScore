@@ -5,7 +5,7 @@ import SafeAreaView from '~/components/core/SafeAreaView';
 
 export default function SubscriptionScreen() {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView className="flex-1 bg-white">
       <Stack.Screen
         options={{
           headerShown: false,

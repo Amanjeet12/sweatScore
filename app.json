@@ -41,10 +41,10 @@
       "expo-splash-screen",
       {
         "backgroundColor": "#FFFFFF",
-        "image": "./assets/splash-icon-dark.png",
+        "image": "./assets/icon.png",
         "dark": {
-          "image": "./assets/splash-icon-light.png",
-          "backgroundColor": "#000000"
+          "image": "./assets/icon.png",
+          "backgroundColor": "#FFFFFF"
         },
         "imageWidth": 200
       }
@@ -72,6 +72,7 @@
     "tsconfigPaths": true
   },
   "orientation": "portrait",
+  "icon": "./assets/icon.png",
   "userInterfaceStyle": "light",
   "assetBundlePatterns": ["**/*"],
   "ios": {
@@ -100,11 +101,7 @@
         "tiktoksharesdk"
       ]
     },
-    "icon": {
-      "dark": "./assets/ios-dark.png",
-      "light": "./assets/ios-light.png",
-      "tinted": "./assets/ios-tinted.png"
-    },
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light"
   },
   "android": {
@@ -120,7 +117,7 @@
       }
     ],
     "adaptiveIcon": {
-      "foregroundImage": "./assets/adaptive-icon.png",
+      "foregroundImage": "./assets/icon.png",
       "backgroundColor": "#FFEEE1"
     },
     "package": "com.sweatscore.sweatscoreapp",

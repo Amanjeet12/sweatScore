@@ -2,14 +2,23 @@ import { convexQuery } from '@convex-dev/react-query';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useQuery } from '@tanstack/react-query';
-import { useMutation, useConvex } from 'convex/react';
+import { useConvex, useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
 import { router, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Plus } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
@@ -17,8 +26,9 @@ import { z } from 'zod';
 import { Avatar } from '~/components/core/Avatar';
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
 import { Button, ButtonText } from '~/components/ui/button';
-import { Input, InputField } from '~/components/ui/input';
+import { Input, InputField, InputSlot } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -41,7 +51,9 @@ export default function SetupProfile() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { isVisible: keyboardVisible } = useKeyboardState();
+  const heroHeight = Math.min(Math.max(windowHeight * 0.53, 360), 465);
 
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const setCurrentUserImage = useAuthStore((state) => state.setCurrentUserImage);
@@ -158,14 +170,21 @@ export default function SetupProfile() {
 
   const avatarUri = photo?.uri ?? currentUser?.image ?? undefined;
   const hasAvatar = !!avatarUri;
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'SS';
 
   return (
     <View className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" />
 
-      {/* Image fixed at top — does NOT move with keyboard */}
       <Image
-        source={require('~/assets/onboarding/setupprofilescree.png')}
+        source={require('~/assets/onboarding/setupprofilescreen-clean-v2.png')}
         contentFit="cover"
         style={{
           position: 'absolute',
@@ -173,126 +192,176 @@ export default function SetupProfile() {
           left: 0,
           right: 0,
           width: '100%',
-          aspectRatio: 4044 / 3938,
+          height: heroHeight,
         }}
       />
 
       <KeyboardStickyView style={{ flex: 1 }}>
         <View className="flex-1">
-          {/* Invisible spacer matching image height */}
-          <View style={{ width: '100%', aspectRatio: 4044 / 3938 }} />
+          <View style={{ width: '100%', height: heroHeight }} />
 
-          {/* Top spacer pushes form down when keyboard is open */}
           {keyboardVisible && <View className="flex-1" />}
 
-          {/* Form panel */}
-          <View className="bg-white">
-            <View className="px-8 pt-8">
-              <Text className="mb-6 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
-                Personalise your profile
-              </Text>
+          <View
+            className="bg-white"
+            style={{
+              marginTop: -30,
+              borderTopLeftRadius: 32,
+              borderTopRightRadius: 32,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: -5 },
+              shadowOpacity: 0.05,
+              shadowRadius: 12,
+            }}>
+            <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
+              {!keyboardVisible && (
+                <>
+                  <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
+                    Make it yours
+                  </Text>
+                  <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+                    Personalise your profile
+                  </Text>
+                  <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+                    Help your Sweat Sisters recognise you.
+                  </Text>
+                </>
+              )}
 
-              {/* Profile pic picker */}
-              <View className="items-center">
-                <TouchableOpacity onPress={selectImage} activeOpacity={0.7}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.75}
+                onPress={selectImage}
+                className={`${keyboardVisible ? 'mt-0' : 'mt-3'} h-[68px] flex-row items-center rounded-2xl border border-[#E8DDD6] bg-[#FFF9F6] px-3`}>
+                <View>
                   {hasAvatar ? (
-                    <Avatar uri={avatarUri} size={88} name={name} />
+                    <Avatar uri={avatarUri} size={48} name={name} />
                   ) : (
-                    <View
-                      style={{
-                        width: 88,
-                        height: 88,
-                        borderRadius: 44,
-                        borderWidth: 1.5,
-                        borderColor: '#9CA3AF',
-                        borderStyle: 'dashed',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                      <Plus size={28} color="#F76B1C" weight="bold" />
+                    <View className="h-12 w-12 items-center justify-center rounded-full bg-[#FFF0E8]">
+                      <Text className="font-heading text-sm font-bold text-primary-500">
+                        {initials}
+                      </Text>
                     </View>
                   )}
-                </TouchableOpacity>
-                <Text className="mt-2 text-center font-body text-base text-[#5A5A5A]">
-                  {hasAvatar ? 'Change profile pic' : 'Add a profile pic'}
-                </Text>
-              </View>
+                  <View className="absolute -bottom-0.5 -right-0.5 h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-primary-500">
+                    <Plus size={11} color="#FFFFFF" weight="bold" />
+                  </View>
+                </View>
 
-              {/* Name */}
-              <View className="mt-6">
-                <Input size="xl" variant="rounded">
+                <View className="ml-4 flex-1">
+                  <Text className="font-body text-sm font-bold text-[#1A1A1A]">
+                    {hasAvatar ? 'Change profile photo' : 'Add a profile photo'}
+                  </Text>
+                  <Text className="mt-1 font-body text-xs text-[#838383]">
+                    Optional · JPG or PNG
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <Text className="mb-2 mt-3 font-body text-xs font-bold text-[#4A4745]">
+                Your name
+              </Text>
+              <Input
+                size="xl"
+                variant="outline"
+                className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+                <InputField
+                  className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
+                  placeholder="How should we call you?"
+                  autoComplete="name"
+                  returnKeyType="next"
+                  value={name}
+                  onChangeText={(text) => {
+                    setError(null);
+                    setName(text);
+                  }}
+                />
+              </Input>
+
+              <Text className="mb-2 mt-3 font-body text-xs font-bold text-[#4A4745]">
+                Date of birth
+              </Text>
+              {Platform.OS === 'ios' ? (
+                <Input
+                  size="xl"
+                  variant="outline"
+                  className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
                   <InputField
-                    placeholder="Your name here"
-                    autoComplete="name"
-                    value={name}
-                    onChangeText={(text) => {
-                      setError(null);
-                      setName(text);
-                    }}
+                    className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
+                    placeholder="DD / MM / YYYY"
+                    value={formatDateToLocaleString(birthdate)}
+                    editable={false}
+                    onPressIn={() => setShowDatePicker(true)}
                   />
+                  <InputSlot className="pr-4" onPress={() => setShowDatePicker(true)}>
+                    <Feather name="calendar" size={19} color="#FF5C1A" />
+                  </InputSlot>
                 </Input>
-              </View>
-
-              {/* Date of birth */}
-              <View className="mt-3">
-                {Platform.OS === 'ios' ? (
-                  <Input size="xl" variant="rounded">
+              ) : (
+                <Input
+                  size="xl"
+                  variant="outline"
+                  className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+                  <TouchableOpacity
+                    className="flex-1"
+                    onPress={() =>
+                      DateTimePickerAndroid.open({
+                        value: date,
+                        onChange,
+                        mode: 'date',
+                        display: 'spinner',
+                        maximumDate: tenYearsAgo,
+                        minimumDate: new Date(1900, 0, 1),
+                      })
+                    }>
                     <InputField
-                      placeholder="Date of birth"
+                      className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
+                      placeholder="DD / MM / YYYY"
                       value={formatDateToLocaleString(birthdate)}
                       editable={false}
-                      onPressIn={() => setShowDatePicker(true)}
                     />
-                  </Input>
-                ) : (
-                  <Input size="xl" variant="rounded">
-                    <TouchableOpacity
-                      className="w-full"
-                      onPress={() =>
-                        DateTimePickerAndroid.open({
-                          value: date,
-                          onChange,
-                          mode: 'date',
-                          display: 'spinner',
-                          maximumDate: tenYearsAgo,
-                          minimumDate: new Date(1900, 0, 1),
-                        })
-                      }>
-                      <InputField
-                        placeholder="Date of birth"
-                        value={formatDateToLocaleString(birthdate)}
-                        editable={false}
-                      />
-                    </TouchableOpacity>
-                  </Input>
-                )}
-              </View>
+                  </TouchableOpacity>
+                  <InputSlot className="pr-4">
+                    <Feather name="calendar" size={19} color="#FF5C1A" />
+                  </InputSlot>
+                </Input>
+              )}
 
-              <View className="mt-3 items-center">
+              <View className="mt-2 items-center">
                 <ErrorMessage error={error} />
               </View>
             </View>
           </View>
 
-          {/* Middle spacer pushes button to bottom when keyboard closed */}
           {!keyboardVisible && <View className="flex-1 bg-white" />}
 
           <SafeAreaView edges={['bottom']} className="bg-white">
-            <View className="bg-white px-8 pb-8 pt-2">
+            <View className="bg-white px-6 pb-4 pt-2">
               <TouchableOpacity
+                accessibilityRole="button"
                 activeOpacity={0.8}
                 onPress={handleSubmit}
                 disabled={isLoading}
                 style={{
-                  backgroundColor: '#F76B1C',
-                  borderRadius: 9999,
-                  paddingVertical: 14,
+                  height: 56,
+                  backgroundColor: '#FF5C1A',
+                  borderRadius: 17,
+                  paddingHorizontal: 22,
+                  flexDirection: 'row',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#FF5C1A',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 14,
                 }}>
                 {isLoading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color="white" style={{ flex: 1 }} />
                 ) : (
-                  <Text className="text-2xl font-bold text-white">Next</Text>
+                  <>
+                    <Text className="font-heading text-base font-bold text-white">Continue</Text>
+                    <Feather name="arrow-right" size={23} color="#FFFFFF" />
+                  </>
                 )}
               </TouchableOpacity>
             </View>
@@ -300,7 +369,6 @@ export default function SetupProfile() {
         </View>
       </KeyboardStickyView>
 
-      {/* iOS date picker modal — always visible regardless of layout */}
       {Platform.OS === 'ios' && (
         <Modal
           transparent
@@ -345,20 +413,7 @@ export default function SetupProfile() {
         </Modal>
       )}
 
-      {/* Plain back button overlay */}
-      <TouchableOpacity
-        onPress={router.back}
-        style={{
-          position: 'absolute',
-          top: insets.top + 8,
-          left: 16,
-          zIndex: 10,
-        }}>
-        <View className="flex-row items-center">
-          <Feather name="chevron-left" size={32} color="#FFFFFF" />
-          <Text className="ml-1 text-xl font-bold text-white">Back</Text>
-        </View>
-      </TouchableOpacity>
+      <OnboardingHeroChrome activeStep={3} onBack={router.back} />
     </View>
   );
 }

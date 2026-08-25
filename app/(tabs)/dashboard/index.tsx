@@ -17,7 +17,7 @@ import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 import { FirstTimeOnboardingModal } from '~/components/core/dashboard/FirstTimeOnboardingModal';
 import { MyCardAlertDialog } from '~/components/core/dashboard/MyCard';
 import TodaysSweat from '~/components/core/dashboard/TodaysSweat';
-import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
+// import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -86,6 +86,12 @@ export default function TabDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { status: appVersionStatus } = useAppVersionStatus();
   const showUpdateBanner = appVersionStatus === 'update_available';
+  const now = new Date();
+  const greeting =
+    now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const formattedDate = now
+    .toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })
+    .toUpperCase();
 
   const updatePushToken = async () => {
     let token;
@@ -202,40 +208,58 @@ export default function TabDashboard() {
           <View
             className="flex-1 flex-col bg-[#F9F9F9]"
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-            <View className="flex-row items-center justify-between px-12 py-6">
-              <View>
-                <Text className="font-body text-base text-[#1A1A1A]">
-                  {new Date().getHours() < 12
-                    ? 'Good morning'
-                    : new Date().getHours() < 17
-                      ? 'Good afternoon'
-                      : 'Good evening'}
-                </Text>
-                <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">
-                  {currentUser?.name?.split(' ')[0]}
-                </Text>
-              </View>
-              <View>
+            <View className="px-5 pb-3 pt-3">
+              <View className="flex-row items-start justify-between">
+                <View className="min-w-0 flex-1 pr-4">
+                  <Text className="font-heading text-[10px] font-extrabold tracking-[1.1px] text-[#FF4B1F]">
+                    TODAY · {formattedDate}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                    className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
+                    {greeting}, {currentUser?.name?.split(' ')[0] ?? 'there'}
+                  </Text>
+                </View>
                 <Avatar
                   uri={currentUser?.image ?? undefined}
-                  size={56}
+                  size={44}
                   goToSettings
                   name={currentUser?.name}
                 />
+              </View>
+
+              <View className="mt-4 flex-row items-end justify-between">
+                <View className="min-w-0 flex-1 pr-3">
+                  <Text className="font-heading text-[12px] font-bold tracking-[1px] text-[#706C69]">
+                    YOUR DAILY FOCUS
+                  </Text>
+                  <Text className="mt-1 max-w-[210px] font-body text-[13px] leading-[18px] text-[#77716D]">
+                    One small action keeps your momentum going.
+                  </Text>
+                </View>
+
+                <View className="mb-0.5 flex-row items-center rounded-full bg-white px-3.5 py-2.5">
+                  <Icon.Fire size={15} color="#E34500" weight="fill" />
+                  <Text className="ml-2 font-heading text-[11px] font-bold text-[#E34500]">
+                    {streakData?.currentWeekDays ?? 0} day streak
+                  </Text>
+                </View>
               </View>
             </View>
             <View className="bg-[#F9F9F9]">
               <DailyChallengeCard />
             </View>
-            <View className="mt-4 bg-[#F9F9F9]">
+            <View className="mt-3 bg-[#F9F9F9]">
               <CommunityGroupPreviewCard />
             </View>
-            <View className=" pv-5 mt-5 bg-[#F9F9F9]">
+            <View className="mt-3 bg-[#F9F9F9]">
               <TodaysSweat refreshKey={refreshKey} />
             </View>
-            <View className="mb-10 mt-4 bg-[#F9F9F9]">
+            {/* <View className="mb-10 mt-4 bg-[#F9F9F9]">
               <WeeklyStreakCard />
-            </View>
+            </View> */}
             {/* <View className="mt-4 bg-[#F9F9F9] px-5">
               <TouchableOpacity
                 activeOpacity={0.85}

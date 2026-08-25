@@ -39,12 +39,12 @@ import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
-import { getErrorMessage } from '~/utils/error-message';
 import {
   BACKGROUND_MUSIC_VOLUME,
   BackgroundMusicTrack,
   getRandomBackgroundMusicTrack,
 } from '~/utils/backgroundMusic';
+import { getErrorMessage } from '~/utils/error-message';
 
 const COUNTDOWN_SECONDS = 5;
 const MIN_STOP_RECORDING_SECONDS = 1;
@@ -107,6 +107,7 @@ const FIRST_ATTEMPT_VIDEO_URL =
   'https://beloved-stoat-88.convex.cloud/api/storage/31a427be-72ed-4d4b-9974-ceb32e41ed02';
 
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
+type CheckInMode = 'take_photo' | 'upload_photo' | 'record_video' | 'upload_video';
 
 function getDefaultCaption(round?: number, exerciseName?: string) {
   const currentRound = round ?? 1;
@@ -197,8 +198,9 @@ function SingleVideoPreview({
 export default function DuetRecordingScreen() {
   useKeepAwake();
 
-  const { challengeId } = useLocalSearchParams<{
+  const { challengeId, checkInMode } = useLocalSearchParams<{
     challengeId: string;
+    checkInMode?: CheckInMode;
   }>();
   const { requireSubscription } = useSubscriptionGuard();
   const challengeRedirectTo = `/challenge-view/${challengeId}`;
@@ -262,6 +264,7 @@ export default function DuetRecordingScreen() {
   const countdownSoundLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
 
   const countdownSoundPlaybackTokenRef = useRef(0);
+  const handledCheckInModeRef = useRef(false);
   const [selectedMusicTrack, setSelectedMusicTrack] = useState<BackgroundMusicTrack | null>(null);
   const selectedMusicTrackRef = useRef<BackgroundMusicTrack | null>(null);
   const backgroundMusicRef = useRef<Audio.Sound | null>(null);
@@ -937,7 +940,7 @@ export default function DuetRecordingScreen() {
       }
 
       try {
-        const persistentUri = `${FileSystem.documentDirectory}` + `challenge-${Date.now()}.mp4`;
+        const persistentUri = `${FileSystem.documentDirectory}challenge-${Date.now()}.mp4`;
 
         await FileSystem.copyAsync({
           from: video.uri,
@@ -1155,7 +1158,11 @@ export default function DuetRecordingScreen() {
   }, []);
 
   const handlePickCheckInMedia = useCallback(
-    async (source: 'camera' | 'library', mediaType: 'image' | 'video') => {
+    async (
+      source: 'camera' | 'library',
+      mediaType: 'image' | 'video',
+      returnToPrevious = false
+    ) => {
       if (!isCheckIn || isSubmitting) return;
 
       if (
@@ -1168,6 +1175,7 @@ export default function DuetRecordingScreen() {
 
       if (dailyLimitReached) {
         Alert.alert('Daily limit reached', 'You have reached your check-in limit for today.');
+        if (returnToPrevious) router.back();
         return;
       }
 
@@ -1183,7 +1191,10 @@ export default function DuetRecordingScreen() {
           ? await ImagePicker.launchCameraAsync(options)
           : await ImagePicker.launchImageLibraryAsync(options);
 
-      if (result.canceled || !result.assets[0]) return;
+      if (result.canceled || !result.assets[0]) {
+        if (returnToPrevious) router.back();
+        return;
+      }
 
       const asset = result.assets[0];
       if (
@@ -1195,6 +1206,7 @@ export default function DuetRecordingScreen() {
           'Video too long',
           `Please choose a video up to ${MAX_RECORDING_SECONDS} seconds.`
         );
+        if (returnToPrevious) router.back();
         return;
       }
 
@@ -1216,10 +1228,43 @@ export default function DuetRecordingScreen() {
         setState('post-record');
       } catch {
         Alert.alert('Media unavailable', 'Could not prepare that file. Please choose another one.');
+        if (returnToPrevious) router.back();
       }
     },
     [challengeRedirectTo, dailyLimitReached, isCheckIn, isSubmitting, requireSubscription]
   );
+
+  useEffect(() => {
+    if (!isCheckIn || !checkInMode || handledCheckInModeRef.current) return;
+
+    handledCheckInModeRef.current = true;
+
+    if (checkInMode === 'record_video') {
+      setCheckInSubmissionType('live_video');
+      selectMusicTrackForSession();
+      ensureBackgroundMusicLoaded().catch(() => {});
+      setIsVideoRecorderOpen(true);
+      return;
+    }
+
+    if (checkInMode === 'take_photo') {
+      handlePickCheckInMedia('camera', 'image', true);
+      return;
+    }
+
+    if (checkInMode === 'upload_photo') {
+      handlePickCheckInMedia('library', 'image', true);
+      return;
+    }
+
+    handlePickCheckInMedia('library', 'video', true);
+  }, [
+    checkInMode,
+    ensureBackgroundMusicLoaded,
+    handlePickCheckInMedia,
+    isCheckIn,
+    selectMusicTrackForSession,
+  ]);
 
   const handleCancel = useCallback(() => {
     debugRecordingState('handleCancel called');
@@ -1369,6 +1414,10 @@ export default function DuetRecordingScreen() {
         <Text className="text-base text-gray-500">Challenge not available</Text>
       </View>
     );
+  }
+
+  if (isCheckIn && checkInMode && state === 'pre-record' && !isVideoRecorderOpen) {
+    return <ScreenLoading />;
   }
 
   if (

@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { useConvex, useMutation } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -9,11 +10,14 @@ import {
   AppState,
   Linking,
   Platform,
+  ScrollView,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -55,10 +59,12 @@ function withTimeout<T>(
 export default function AskHealthPermission() {
   const appState = useRef(AppState.currentState);
   const convex = useConvex();
-  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [, setHasPermission] = useState(false);
   const [, setSdkStatus] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const healthProviderName = Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
+  const heroHeight = Math.min(Math.max(windowHeight * 0.53, 390), 475);
   const updateOnboarded = useMutation(api.users.updateOnboarded);
   const updateUserAutoSyncEnabled = useMutation(api.users.updateUserAutoSyncEnabled);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
@@ -231,100 +237,119 @@ export default function AskHealthPermission() {
   return (
     <View className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" />
 
-      {/* Image fixed at top — does NOT move */}
       <Image
-        source={require('~/assets/onboarding/healthscreen.png')}
+        source={require('~/assets/onboarding/healthscreen-clean-v2.png')}
         contentFit="cover"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          aspectRatio: 4044 / 3938,
-        }}
+        style={{ position: 'absolute', top: 0, right: 0, left: 0, height: heroHeight }}
       />
 
-      <View className="flex-1">
-        {/* Invisible spacer matching image height */}
-        <View style={{ width: '100%', aspectRatio: 4044 / 3938 }} />
+      <OnboardingHeroChrome activeStep={6} onBack={router.back} />
 
-        {/* Content panel */}
-        <View className="flex-1 bg-white">
-          <View className="px-8 pt-8">
-            <Text className="mb-4 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
-              Let&apos;s track your sweat
-            </Text>
-            <Text className="mb-5 text-center font-body text-base text-[#5A5A5A]">
-              You earn points for daily activity. Connect your health data so your steps and active
-              minutes count.{' '}
-            </Text>
+      <View style={{ height: heroHeight }} />
 
-            {/* <View className="mb-2 flex-row">
-              <Text className="font-body text-base text-[#1A1A1A]">• </Text>
-              <View className="flex-1">
-                <Text className="font-body text-base text-[#1A1A1A]">
-                  <Text className="font-bold">Steps</Text> — 1 point per 1,000 steps
-                </Text>
-              </View>
-            </View>
-            <View className="mb-2 flex-row">
-              <Text className="font-body text-base text-[#1A1A1A]">• </Text>
-              <View className="flex-1">
-                <Text className="font-body text-base text-[#1A1A1A]">
-                  <Text className="font-bold">Heart rate</Text> — to calculate Active Minutes (1
-                  point per 5 min in your personal cardio zone). Required for the points on the Earn
-                  and Track screens.
-                </Text>
-              </View>
-            </View> */}
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleAllow}
-              disabled={isConnecting}
-              className="mt-6"
-              style={{
-                backgroundColor: '#F76B1C',
-                borderRadius: 9999,
-                paddingVertical: 14,
-                alignItems: 'center',
-                opacity: isConnecting ? 0.7 : 1,
-              }}>
-              {isConnecting ? (
-                <View className="flex-row items-center gap-x-3">
-                  <ActivityIndicator color="#FFFFFF" />
-                  <Text className="text-2xl font-bold text-white">Connecting</Text>
-                </View>
-              ) : (
-                <Text className="text-2xl font-bold text-white">Connect</Text>
-              )}
-            </TouchableOpacity>
+      <View
+        className="flex-1 bg-white"
+        style={{
+          marginTop: -30,
+          borderTopLeftRadius: 32,
+          borderTopRightRadius: 32,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: -5 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+        }}>
+        <ScrollView
+          className="flex-1"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 22, paddingBottom: 8 }}>
+          <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
+            <Feather name="heart" size={20} color="#FF5C1A" />
           </View>
 
-          <View className="flex-1" />
+          <Text className="mt-3 font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
+            Every move deserves credit
+          </Text>
+          <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+            Let&apos;s track your sweat
+          </Text>
+          <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+            Connect your health data so your steps and active minutes count toward your points.
+          </Text>
 
-          <SafeAreaView edges={['bottom']}>
-            <View className="pb-2" />
-          </SafeAreaView>
-        </View>
+          <View className="mt-3 h-[62px] flex-row items-center rounded-2xl border border-[#E8DDD6] bg-[#FFF9F6] px-3">
+            <View className="h-10 w-10 items-center justify-center rounded-xl bg-primary-500">
+              <Feather name="heart" size={20} color="#FFFFFF" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="font-body text-sm font-bold text-[#1A1A1A]">
+                {healthProviderName}
+              </Text>
+              <Text className="mt-0.5 font-body text-xs text-[#838383]">
+                Steps · Active minutes
+              </Text>
+            </View>
+            <View className="rounded-full bg-[#EAF7EC] px-2.5 py-1">
+              <Text className="font-body text-[10px] font-bold uppercase text-[#4D8B59]">
+                Secure
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-3 flex-row items-center px-1">
+            <Feather name="shield" size={16} color="#FF5C1A" />
+            <Text className="ml-2 flex-1 font-body text-xs leading-4 text-[#838383]">
+              Your health data is private and only used to calculate activity.
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.82}
+            disabled={isConnecting}
+            onPress={handleAllow}
+            className="mt-4 h-[52px] flex-row items-center justify-center rounded-2xl bg-primary-500 px-5"
+            style={{
+              opacity: isConnecting ? 0.72 : 1,
+              shadowColor: '#FF5C1A',
+              shadowOpacity: 0.22,
+              shadowRadius: 10,
+            }}>
+            {isConnecting ? (
+              <View className="flex-row items-center gap-x-3">
+                <ActivityIndicator color="#FFFFFF" />
+                <Text className="font-body text-base font-bold text-white">Connecting</Text>
+              </View>
+            ) : (
+              <>
+                <Text className="font-body text-base font-bold text-white">
+                  Connect {healthProviderName}
+                </Text>
+                <Feather
+                  name="arrow-right"
+                  size={22}
+                  color="#FFFFFF"
+                  style={{ position: 'absolute', right: 20 }}
+                />
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            disabled={isConnecting}
+            onPress={handleSkip}
+            className="h-[42px] items-center justify-center">
+            <Text className="font-body text-sm font-bold text-[#5F5F5F]">
+              I&apos;ll do this later
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <SafeAreaView edges={['bottom']} />
       </View>
-
-      {/* Plain back button overlay */}
-      <TouchableOpacity
-        onPress={router.back}
-        style={{
-          position: 'absolute',
-          top: insets.top + 8,
-          left: 16,
-          zIndex: 10,
-        }}>
-        <View className="flex-row items-center">
-          <Feather name="chevron-left" size={32} color="#FFFFFF" />
-          <Text className="ml-1 text-xl font-bold text-white">Back</Text>
-        </View>
-      </TouchableOpacity>
     </View>
   );
 }

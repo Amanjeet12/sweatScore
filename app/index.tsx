@@ -1,4 +1,5 @@
 import { useConvex } from 'convex/react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ImageBackground, Platform, Pressable, View } from 'react-native';
@@ -100,6 +101,24 @@ export default function Home() {
           source={require('~/assets/backgrounds/signupscreen.png')}
           className="flex-1"
           resizeMode="cover">
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              'rgba(20,10,5,0)',
+              'rgba(20,10,5,0.12)',
+              'rgba(20,10,5,0.58)',
+              'rgba(20,10,5,0.84)',
+            ]}
+            locations={[0, 0.34, 0.72, 1]}
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              left: 0,
+              height: '68%',
+            }}
+          />
+
           <SafeAreaView className="flex-1">
             <View className="flex-1 justify-end px-6 pb-6">
               {/* Heading */}
@@ -107,7 +126,7 @@ export default function Home() {
                 <Text
                   className="text-center text-3xl text-white"
                   style={{ fontFamily: 'Inter_700Bold' }}>
-                  Movement That  {'\n'}Hits Different.
+                  Movement That {'\n'}Hits Different.
                 </Text>
               </View>
 

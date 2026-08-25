@@ -9,7 +9,7 @@ export default function HubPaywallScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FFF7F6]">
+    <SafeAreaView className="flex-1 bg-white">
       <Stack.Screen
         options={{
           headerShown: false,

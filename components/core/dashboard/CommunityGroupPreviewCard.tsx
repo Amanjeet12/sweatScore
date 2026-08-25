@@ -90,7 +90,14 @@ export default function CommunityGroupPreviewCard() {
   };
 
   return (
-    <View className="mx-5 rounded-[26px] bg-white px-6 py-6">
+    <View
+      className="mx-5 rounded-[26px] bg-white px-5 py-5"
+      style={{
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+      }}>
       <View className="flex-row items-start justify-between">
         <View className="min-w-0 flex-1 pr-3">
           <Text
@@ -112,7 +119,7 @@ export default function CommunityGroupPreviewCard() {
         ) : null}
       </View>
 
-      <View className="mt-4 flex-row items-center">
+      <View className="mt-3 flex-row items-center">
         <View className="flex-row">
           {previewMembers.map((member, index) => (
             <View key={String(member.userId)} style={{ marginLeft: index === 0 ? 0 : -10 }}>
@@ -120,7 +127,7 @@ export default function CommunityGroupPreviewCard() {
                 imageUrl={member.imageUrl}
                 initial={member.initial}
                 color={member.avatarColor}
-                size={40}
+                size={32}
               />
             </View>
           ))}
@@ -135,14 +142,14 @@ export default function CommunityGroupPreviewCard() {
         accessibilityRole="button"
         accessibilityLabel={`Open latest message in ${groupName}`}
         onPress={openGroup}
-        className="mt-4 flex-row items-center rounded-[22px] bg-[#F8F8F8] p-4">
+        className="mt-3 min-h-[62px] flex-row items-center rounded-[18px] bg-[#F8F8F8] px-3 py-2.5">
         {lastMessage ? (
           <>
             <PreviewAvatar
               imageUrl={lastMessage.senderImageUrl}
               initial={lastMessage.senderInitial}
               color={lastMessage.senderAvatarColor}
-              size={46}
+              size={38}
             />
             <View className="ml-3 min-w-0 flex-1">
               <View className="flex-row items-center">
@@ -173,7 +180,7 @@ export default function CommunityGroupPreviewCard() {
         accessibilityRole="button"
         accessibilityLabel={isMember ? `Reply to ${groupName}` : `View and join ${groupName}`}
         onPress={openGroup}
-        className="mt-4 h-12 flex-row items-center rounded-[20px] bg-[#E8E8E9] px-4">
+        className="mt-2.5 h-10 flex-row items-center rounded-[16px] bg-[#E8E8E9] px-4">
         <Text numberOfLines={1} className="min-w-0 flex-1 font-body text-[13px] text-[#77716D]">
           {isMember ? `Reply to ${groupName}...` : `Join ${groupName}`}
         </Text>
