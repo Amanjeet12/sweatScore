@@ -11,7 +11,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Plus } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -27,6 +26,7 @@ import { Avatar } from '~/components/core/Avatar';
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Button, ButtonText } from '~/components/ui/button';
 import { Input, InputField, InputSlot } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
@@ -222,7 +222,7 @@ export default function SetupProfile() {
                   <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
                     Personalise your profile
                   </Text>
-                  <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+                  <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
                     Help your Sweat Sisters recognise you.
                   </Text>
                 </>
@@ -337,33 +337,11 @@ export default function SetupProfile() {
 
           <SafeAreaView edges={['bottom']} className="bg-white">
             <View className="bg-white px-6 pb-4 pt-2">
-              <TouchableOpacity
-                accessibilityRole="button"
-                activeOpacity={0.8}
+              <OnboardingPrimaryButton
+                label="Continue"
                 onPress={handleSubmit}
-                disabled={isLoading}
-                style={{
-                  height: 56,
-                  backgroundColor: '#FF5C1A',
-                  borderRadius: 17,
-                  paddingHorizontal: 22,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  shadowColor: '#FF5C1A',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 14,
-                }}>
-                {isLoading ? (
-                  <ActivityIndicator color="white" style={{ flex: 1 }} />
-                ) : (
-                  <>
-                    <Text className="font-heading text-base font-bold text-white">Continue</Text>
-                    <Feather name="arrow-right" size={23} color="#FFFFFF" />
-                  </>
-                )}
-              </TouchableOpacity>
+                isLoading={isLoading}
+              />
             </View>
           </SafeAreaView>
         </View>
@@ -401,12 +379,14 @@ export default function SetupProfile() {
                 variant="solid"
                 action="primary"
                 size="xl"
-                className="h-14 rounded-3xl"
+                className="h-14 rounded-[17px]"
                 onPress={() => {
                   setBirthdate(date);
                   setShowDatePicker(false);
                 }}>
-                <ButtonText className="text-lg font-bold text-white">Confirm</ButtonText>
+                <ButtonText className="font-heading text-base font-bold text-white">
+                  Confirm
+                </ButtonText>
               </Button>
             </Pressable>
           </Pressable>

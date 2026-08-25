@@ -6,18 +6,13 @@ import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -115,14 +110,14 @@ export default function SetupActivityGoal() {
         <ScrollView
           className="flex-1"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 25, paddingBottom: 8 }}>
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 }}>
           <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
             Your reason, your rhythm
           </Text>
           <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
             What brings you here?
           </Text>
-          <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+          <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
             Choose the one that feels most important today.
           </Text>
 
@@ -170,27 +165,12 @@ export default function SetupActivityGoal() {
 
           <ErrorMessage error={error} />
 
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.82}
-            disabled={isLoading}
+          <OnboardingPrimaryButton
+            label="Continue"
             onPress={handleSubmit}
-            className="mt-2 h-[54px] flex-row items-center justify-center rounded-2xl bg-primary-500 px-5"
-            style={{ shadowColor: '#FF5C1A', shadowOpacity: 0.22, shadowRadius: 10 }}>
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Text className="font-body text-base font-bold text-white">Continue</Text>
-                <Feather
-                  name="arrow-right"
-                  size={22}
-                  color="#FFFFFF"
-                  style={{ position: 'absolute', right: 20 }}
-                />
-              </>
-            )}
-          </TouchableOpacity>
+            isLoading={isLoading}
+            className="mt-3"
+          />
         </ScrollView>
 
         <SafeAreaView edges={['bottom']} />

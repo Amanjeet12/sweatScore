@@ -7,17 +7,11 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -126,7 +120,7 @@ export default function AskPushPermission() {
         <ScrollView
           className="flex-1"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 22, paddingBottom: 8 }}>
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 }}>
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
             <Feather name="bell" size={20} color="#FF5C1A" />
           </View>
@@ -137,7 +131,7 @@ export default function AskPushPermission() {
           <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
             Turn on notifications
           </Text>
-          <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+          <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
             Get check-in reminders, group replies and a little hype when it matters.
           </Text>
 
@@ -171,29 +165,20 @@ export default function AskPushPermission() {
             </View>
           </View>
 
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.82}
-            disabled={isLoading}
+          <OnboardingPrimaryButton
+            label="Turn on notifications"
             onPress={handleAllow}
-            className="mt-4 h-[52px] flex-row items-center justify-center rounded-2xl bg-primary-500 px-5"
-            style={{ shadowColor: '#FF5C1A', shadowOpacity: 0.22, shadowRadius: 10 }}>
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="font-body text-base font-bold text-white">
-                Turn on notifications
-              </Text>
-            )}
-          </TouchableOpacity>
+            isLoading={isLoading}
+            className="mt-4"
+          />
 
           <TouchableOpacity
             accessibilityRole="button"
             activeOpacity={0.78}
             disabled={isLoading}
             onPress={handleSkip}
-            className="mt-2 h-[46px] items-center justify-center rounded-2xl border border-[#E8DDD6] bg-white">
-            <Text className="font-body text-base font-bold text-[#1A1A1A]">Maybe later</Text>
+            className="mt-2 h-14 items-center justify-center rounded-[17px] border border-[#E8DDD6] bg-white px-[22px]">
+            <Text className="font-heading text-base font-bold text-[#1A1A1A]">Maybe later</Text>
           </TouchableOpacity>
 
           <Text className="mt-2 text-center font-body text-[11px] text-[#9A9A9A]">

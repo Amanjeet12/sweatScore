@@ -147,8 +147,6 @@ export default function ChallengeViewScreen() {
 
   const selectedVideoUrl =
     selectedCheckIn?.instructionalVideoUrl ?? challenge?.instructionalVideoUrl ?? null;
-  const routineDuration =
-    selectedCheckIn?.videoDuration ?? challenge?.videoDuration ?? challenge?.durationLimit;
 
   const player = useVideoPlayer(selectedVideoUrl, (videoPlayer) => {
     videoPlayer.loop = false;
@@ -287,20 +285,20 @@ export default function ChallengeViewScreen() {
       points: 5,
       icon: <VideoCamera size={21} color="#FF5C1A" />,
     },
-    {
-      mode: 'take_photo' as const,
-      label: 'Take photo',
-      description: 'Use your camera',
-      points: 1,
-      icon: <Camera size={21} color="#FF5C1A" />,
-    },
-    {
-      mode: 'upload_photo' as const,
-      label: 'Upload photo',
-      description: 'Choose a saved photo',
-      points: 1,
-      icon: <ImageSquare size={21} color="#FF5C1A" />,
-    },
+    // {
+    //   mode: 'take_photo' as const,
+    //   label: 'Take photo',
+    //   description: 'Use your camera',
+    //   points: 1,
+    //   icon: <Camera size={21} color="#FF5C1A" />,
+    // },
+    // {
+    //   mode: 'upload_photo' as const,
+    //   label: 'Upload photo',
+    //   description: 'Choose a saved photo',
+    //   points: 1,
+    //   icon: <ImageSquare size={21} color="#FF5C1A" />,
+    // },
     {
       mode: 'upload_video' as const,
       label: 'Upload video',
@@ -528,14 +526,6 @@ export default function ChallengeViewScreen() {
                         <Play size={28} color={isCheckIn ? '#FF5C35' : '#FFFFFF'} weight="fill" />
                       </View>
                     </View>
-
-                    {isCheckIn && routineDuration ? (
-                      <View className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1.5">
-                        <Text className="font-heading text-[10px] font-bold text-white">
-                          {Math.round(routineDuration)} sec routine
-                        </Text>
-                      </View>
-                    ) : null}
                   </View>
                 </TouchableOpacity>
               )}
@@ -597,11 +587,7 @@ export default function ChallengeViewScreen() {
                   </View>
                 </View>
 
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="mt-3"
-                  contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+                <View className="mt-3 flex-row flex-wrap justify-between gap-y-2">
                   {(availableCheckIns ?? []).map((item) => {
                     const selected = item.challengeId === selectedCheckIn?.challengeId;
 
@@ -616,12 +602,14 @@ export default function ChallengeViewScreen() {
                           safePausePlayer();
                           setSelectedCheckInId(item.challengeId);
                         }}
-                        className="flex-row items-center rounded-full px-4 py-2.5"
+                        className="h-[74px] items-center justify-center rounded-2xl px-2 py-2"
                         style={{
-                          borderWidth: 2,
+                          width: '31.5%',
+                          borderWidth: selected ? 1.5 : 1,
                           borderColor: selected ? '#FF5C35' : '#E3DEDA',
+                          backgroundColor: selected ? '#FFF9F6' : '#FFFFFF',
                         }}>
-                        <View className="mr-2">
+                        <View className="h-7 items-center justify-center">
                           {item.categoryIconUrl ? (
                             <Image
                               source={{ uri: item.categoryIconUrl }}
@@ -634,13 +622,15 @@ export default function ChallengeViewScreen() {
                           )}
                         </View>
 
-                        <Text className="font-body text-sm font-bold text-[#313131]">
+                        <Text
+                          className="mt-1.5 text-center font-body text-[11px] font-bold leading-4 text-[#313131]"
+                          numberOfLines={2}>
                           {item.categoryName}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </ScrollView>
+                </View>
               </View>
             </View>
           ) : null}

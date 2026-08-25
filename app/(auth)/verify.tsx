@@ -1,17 +1,17 @@
 import { useAuthActions } from '@convex-dev/auth/react';
-import { Feather } from '@expo/vector-icons';
 import { useConvex } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { OtpInput } from 'react-native-otp-entry';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -215,35 +215,11 @@ export default function Verify() {
           {!keyboardVisible && (
             <SafeAreaView edges={['bottom']} className="bg-white">
               <View className="bg-white px-6 pb-4 pt-2">
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  activeOpacity={0.8}
+                <OnboardingPrimaryButton
+                  label="Verify email"
                   onPress={() => handleSubmit()}
-                  disabled={isLoading}
-                  style={{
-                    height: 56,
-                    backgroundColor: '#FF5C1A',
-                    borderRadius: 17,
-                    paddingHorizontal: 22,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    shadowColor: '#FF5C1A',
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 14,
-                  }}>
-                  {isLoading ? (
-                    <ActivityIndicator color="white" style={{ flex: 1 }} />
-                  ) : (
-                    <>
-                      <Text className="font-heading text-base font-bold text-white">
-                        Verify email
-                      </Text>
-                      <Feather name="arrow-right" size={23} color="#FFFFFF" />
-                    </>
-                  )}
-                </TouchableOpacity>
+                  isLoading={isLoading}
+                />
 
                 <TouchableOpacity
                   accessibilityRole="button"

@@ -5,7 +5,6 @@ import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   AppState,
   Linking,
@@ -18,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -263,7 +263,7 @@ export default function AskHealthPermission() {
         <ScrollView
           className="flex-1"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 22, paddingBottom: 8 }}>
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 }}>
           <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
             <Feather name="heart" size={20} color="#FF5C1A" />
           </View>
@@ -274,7 +274,7 @@ export default function AskHealthPermission() {
           <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
             Let&apos;s track your sweat
           </Text>
-          <Text className="mt-1 font-body text-sm leading-5 text-[#838383]">
+          <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
             Connect your health data so your steps and active minutes count toward your points.
           </Text>
 
@@ -304,45 +304,20 @@ export default function AskHealthPermission() {
             </Text>
           </View>
 
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.82}
-            disabled={isConnecting}
+          <OnboardingPrimaryButton
+            label={`Connect ${healthProviderName}`}
             onPress={handleAllow}
-            className="mt-4 h-[52px] flex-row items-center justify-center rounded-2xl bg-primary-500 px-5"
-            style={{
-              opacity: isConnecting ? 0.72 : 1,
-              shadowColor: '#FF5C1A',
-              shadowOpacity: 0.22,
-              shadowRadius: 10,
-            }}>
-            {isConnecting ? (
-              <View className="flex-row items-center gap-x-3">
-                <ActivityIndicator color="#FFFFFF" />
-                <Text className="font-body text-base font-bold text-white">Connecting</Text>
-              </View>
-            ) : (
-              <>
-                <Text className="font-body text-base font-bold text-white">
-                  Connect {healthProviderName}
-                </Text>
-                <Feather
-                  name="arrow-right"
-                  size={22}
-                  color="#FFFFFF"
-                  style={{ position: 'absolute', right: 20 }}
-                />
-              </>
-            )}
-          </TouchableOpacity>
+            isLoading={isConnecting}
+            className="mt-4"
+          />
 
           <TouchableOpacity
             accessibilityRole="button"
             activeOpacity={0.7}
             disabled={isConnecting}
             onPress={handleSkip}
-            className="h-[42px] items-center justify-center">
-            <Text className="font-body text-sm font-bold text-[#5F5F5F]">
+            className="mt-2 h-14 items-center justify-center rounded-[17px] border border-[#E8DDD6] bg-white px-[22px]">
+            <Text className="font-heading text-base font-bold text-[#1A1A1A]">
               I&apos;ll do this later
             </Text>
           </TouchableOpacity>

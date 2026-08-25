@@ -2,11 +2,12 @@ import { useConvex } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ImageBackground, Platform, Pressable, View } from 'react-native';
+import { ImageBackground, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -123,63 +124,36 @@ export default function Home() {
             <View className="flex-1 justify-end px-6 pb-6">
               {/* Heading */}
               <View className="mb-6 items-center">
-                <Text
-                  className="text-center text-3xl text-white"
-                  style={{ fontFamily: 'Inter_700Bold' }}>
+                <Text className="text-center font-heading text-3xl font-bold leading-9 text-white">
                   Movement That {'\n'}Hits Different.
                 </Text>
               </View>
 
               {/* Start button */}
-              <Pressable
-                onPress={() => router.push('/email')}
-                style={{
-                  backgroundColor: '#F76B1C',
-                  borderRadius: 9999,
-                  paddingVertical: 18,
-                  alignItems: 'center',
-                  ...(Platform.OS === 'ios'
-                    ? {
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 6,
-                      }
-                    : { elevation: 4 }),
-                }}>
-                <Text className="text-2xl text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-                  Get Started
-                </Text>
-              </Pressable>
+              <OnboardingPrimaryButton label="Get Started" onPress={() => router.push('/email')} />
 
               {/* Legal */}
               <View className="mt-4">
-                <Text className="text-center text-sm text-white">
+                <Text className="text-center font-body text-[11px] text-white">
                   By signing up, you agree to our{' '}
                   <Link href="/legals/terms">
-                    <Text className="text-sm text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-                      Terms of Use
-                    </Text>
+                    <Text className="text-[11px] font-bold text-white">Terms of Use</Text>
                   </Link>
                 </Text>
-                <Text className="text-center text-sm text-white">
+                <Text className="text-center font-body text-[11px] text-white">
                   and{' '}
                   <Link href="/legals/privacy-policy">
-                    <Text className="text-sm text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-                      Privacy Policy
-                    </Text>
+                    <Text className="text-[11px] font-bold text-white">Privacy Policy</Text>
                   </Link>
                 </Text>
               </View>
 
               {/* Login link */}
-              <View className="mt-6 items-center">
-                <Text className="text-lg text-white">
+              <View className="mt-4 items-center">
+                <Text className="font-body text-sm text-white">
                   Back for more?{' '}
                   <Link href="/(auth)/email">
-                    <Text className="text-lg text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-                      Log in here.
-                    </Text>
+                    <Text className="text-sm font-bold text-white">Log in here.</Text>
                   </Link>
                 </Text>
               </View>

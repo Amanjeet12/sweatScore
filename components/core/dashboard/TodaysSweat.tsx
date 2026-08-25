@@ -256,7 +256,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
         </TouchableOpacity>
       </View>
 
-      {communityPreview && communityPreview.previewMembers.length > 0 ? (
+      {/* {communityPreview && communityPreview.previewMembers.length > 0 ? (
         <View className="mt-3 flex-row items-center rounded-[16px] bg-[#FFF1EA] px-3 py-2.5">
           <View className="flex-row">
             {communityPreview.previewMembers.map((user, index) => (
@@ -273,7 +273,7 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
             {communityPreview.memberCount === 1 ? 'sister' : 'sisters'} in your community
           </Text>
         </View>
-      ) : null}
+      ) : null} */}
 
       <View className="mt-3 flex-row items-center">
         <View className="h-10 flex-1 flex-row rounded-full bg-[#EEEEEE] p-1">

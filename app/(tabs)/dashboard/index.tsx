@@ -214,12 +214,8 @@ export default function TabDashboard() {
                   <Text className="font-heading text-[10px] font-extrabold tracking-[1.1px] text-[#FF4B1F]">
                     TODAY · {formattedDate}
                   </Text>
-                  <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.82}
-                    className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
-                    {greeting}, {currentUser?.name?.split(' ')[0] ?? 'there'}
+                  <Text className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
+                    {greeting},
                   </Text>
                 </View>
                 <Avatar
@@ -230,17 +226,14 @@ export default function TabDashboard() {
                 />
               </View>
 
-              <View className="mt-4 flex-row items-end justify-between">
-                <View className="min-w-0 flex-1 pr-3">
-                  <Text className="font-heading text-[12px] font-bold tracking-[1px] text-[#706C69]">
-                    YOUR DAILY FOCUS
-                  </Text>
-                  <Text className="mt-1 max-w-[210px] font-body text-[13px] leading-[18px] text-[#77716D]">
-                    One small action keeps your momentum going.
-                  </Text>
-                </View>
+              <View className="mt-1 flex-row items-center justify-between">
+                <Text
+                  numberOfLines={1}
+                  className="min-w-0 flex-1 pr-3 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
+                  {currentUser?.name?.split(' ')[0] ?? 'there'}
+                </Text>
 
-                <View className="mb-0.5 flex-row items-center rounded-full bg-white px-3.5 py-2.5">
+                <View className="flex-row items-center rounded-full bg-white px-3.5 py-2.5">
                   <Icon.Fire size={15} color="#E34500" weight="fill" />
                   <Text className="ml-2 font-heading text-[11px] font-bold text-[#E34500]">
                     {streakData?.currentWeekDays ?? 0} day streak

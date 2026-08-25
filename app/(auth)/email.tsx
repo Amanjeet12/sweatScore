@@ -4,13 +4,14 @@ import { Image } from 'expo-image';
 import { Link, router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { ActivityIndicator, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { z } from 'zod';
 
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Input, InputField, InputSlot } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { CatchPromise } from '~/utils/catch-promise';
@@ -150,33 +151,11 @@ export default function Email() {
           {!keyboardVisible && (
             <SafeAreaView edges={['bottom']} className="bg-white">
               <View className="bg-white px-6 pb-4 pt-2">
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  activeOpacity={0.8}
+                <OnboardingPrimaryButton
+                  label="Continue"
                   onPress={handleSubmit}
-                  disabled={isLoading}
-                  style={{
-                    height: 56,
-                    backgroundColor: '#FF5C1A',
-                    borderRadius: 17,
-                    paddingHorizontal: 22,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    shadowColor: '#FF5C1A',
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 14,
-                  }}>
-                  {isLoading ? (
-                    <ActivityIndicator color="white" style={{ flex: 1 }} />
-                  ) : (
-                    <>
-                      <Text className="font-heading text-base font-bold text-white">Continue</Text>
-                      <Feather name="arrow-right" size={23} color="#FFFFFF" />
-                    </>
-                  )}
-                </TouchableOpacity>
+                  isLoading={isLoading}
+                />
 
                 <Text className="mt-4 text-center font-body text-[11px] text-[#838383]">
                   By continuing, you agree to our{' '}
