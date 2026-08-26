@@ -1,7 +1,7 @@
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ArrowRight, CheckCircle } from 'phosphor-react-native';
+import { ArrowRight } from 'phosphor-react-native';
 import { TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
@@ -110,23 +110,13 @@ export default function CommunityGroupPreviewCard() {
           </Text>
         </View>
 
-        <View
-          className="relative flex-row items-center rounded-full px-3 py-2"
-          style={{ backgroundColor: hasUnread ? '#EAF8EF' : '#FFF1EA' }}>
-          {hasUnread ? (
+        {hasUnread ? (
+          <View className="relative flex-row items-center rounded-full bg-[#EAF8EF] px-3 py-2">
             <View className="mr-1.5 h-2 w-2 rounded-full bg-[#2F9D70]" />
-          ) : (
-            <CheckCircle size={14} color="#D85B2B" weight="fill" style={{ marginRight: 5 }} />
-          )}
-          <Text
-            className="font-heading text-xs font-bold"
-            style={{ color: hasUnread ? '#27855E' : '#A84C2B' }}>
-            {hasUnread ? 'New Message' : 'All caught up'}
-          </Text>
-          {hasUnread ? (
+            <Text className="font-heading text-xs font-bold text-[#27855E]">New Message</Text>
             <View className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-[#E8525B]" />
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
 
       <View className="mt-3 flex-row items-center">

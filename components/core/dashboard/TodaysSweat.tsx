@@ -3,11 +3,13 @@ import { useQuery as useTanstackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Check, LockSimple, X } from 'phosphor-react-native';
+import { Check, Fire, LockSimple, X } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
+import type { RefObject } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
 import { DailyLimitReachedModal, SKIP_DAILY_LIMIT_POPUP_KEY } from './DailyLimitReachedModal';
+import LogActivityButton from './LogActivityButton';
 
 import {
   AlertDialog,
@@ -18,7 +20,6 @@ import {
   AlertDialogHeader,
 } from '@/components/ui/alert-dialog';
 import { Button, ButtonText } from '@/components/ui/button';
-import { Avatar } from '~/components/core/Avatar';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -101,7 +102,15 @@ const getWeekStats = (overview: any): SweatStats => {
   );
 };
 
-export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
+export default function TodaysSweat({
+  refreshKey,
+  streakDays = 0,
+  activityLogTourRef,
+}: {
+  refreshKey: number;
+  streakDays?: number;
+  activityLogTourRef?: RefObject<View | null>;
+}) {
   const [period, setPeriod] = useState<Period>('today');
 
   const [showTooltip, setShowTooltip] = useState(false);
@@ -136,11 +145,6 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
   const pointsToday = useQuery(
     api.challengeCompletions.getPointsEarnedToday,
 
-    canLoadUserData ? {} : 'skip'
-  );
-
-  const communityPreview = useQuery(
-    api.chat.groups.getHomeGroupPreview,
     canLoadUserData ? {} : 'skip'
   );
 
@@ -243,17 +247,26 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
           <Text className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">Your movement</Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => setShowTooltip(true)}
-          className="h-9 flex-row items-center justify-center rounded-full bg-[#FFECE4] px-3">
-          {isDailyCapped ? (
-            <LockSimple size={13} color="#FF4B1F" weight="bold" style={{ marginRight: 4 }} />
-          ) : null}
-          <Text className="font-heading text-[11px] font-extrabold text-[#FF4B1F]">
-            {pointsBadgeText}
-          </Text>
-        </TouchableOpacity>
+        {period === 'week' ? (
+          <View className="h-9 flex-row items-center justify-center rounded-full bg-[#FFECE4] px-3">
+            <Fire size={14} color="#E34500" weight="fill" />
+            <Text className="ml-1.5 font-heading text-[11px] font-extrabold text-[#E34500]">
+              {streakDays} day streak
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setShowTooltip(true)}
+            className="h-9 flex-row items-center justify-center rounded-full bg-[#FFECE4] px-3">
+            {isDailyCapped ? (
+              <LockSimple size={13} color="#FF4B1F" weight="bold" style={{ marginRight: 4 }} />
+            ) : null}
+            <Text className="font-heading text-[11px] font-extrabold text-[#FF4B1F]">
+              {pointsBadgeText}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* {communityPreview && communityPreview.previewMembers.length > 0 ? (
@@ -369,6 +382,8 @@ export default function TodaysSweat({ refreshKey }: { refreshKey: number }) {
           icon={require('~/assets/icons/Check.png')}
         />
       </View>
+
+      <LogActivityButton tourTargetRef={activityLogTourRef} />
 
       {isDailyCapped && (
         <View className="mt-5 flex-row flex-wrap items-center justify-center">

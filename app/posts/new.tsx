@@ -3,10 +3,17 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { ImageSquare, PlayCircle, VideoCamera, X } from 'phosphor-react-native';
-import { useState } from 'react';
+import {
+  ArrowsClockwise,
+  ArrowRight,
+  ImageSquare,
+  PlayCircle,
+  VideoCamera,
+  X,
+} from 'phosphor-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image as RNImage,
@@ -24,12 +31,21 @@ import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
 import { ErrorMessage } from '~/components/core/ErrorMessage';
 import SafeAreaView from '~/components/core/SafeAreaView';
+import { ToastMessage } from '~/components/core/Toast';
+import { useCelebration } from '~/components/providers/CelebrationProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
+import { useToast } from '~/components/ui/toast';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
+import {
+  getActivitySubmissionOption,
+  getLoggedActivity,
+  getLoggedActivityPoints,
+  getRandomActivityCaption,
+} from '~/shared/loggedActivities';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
@@ -37,10 +53,38 @@ import { getErrorMessage } from '~/utils/error-message';
 
 export default function NewPost() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    activityKey?: string;
+    activityMode?: string;
+    activityCaption?: string;
+    activityMediaUri?: string;
+    activityMediaType?: string;
+    activityMediaWidth?: string;
+    activityMediaHeight?: string;
+    activityMediaDuration?: string;
+    activityMediaMimeType?: string;
+    activityMediaFileName?: string;
+  }>();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { requireSubscription } = useSubscriptionGuard();
+  const { celebrateCompletion } = useCelebration();
+  const toast = useToast();
 
-  const [body, setBody] = useState('');
+  const loggedActivity = useMemo(() => getLoggedActivity(params.activityKey), [params.activityKey]);
+  const activitySubmission = useMemo(
+    () => getActivitySubmissionOption(params.activityMode),
+    [params.activityMode]
+  );
+  const activityPoints =
+    loggedActivity && activitySubmission
+      ? (getLoggedActivityPoints(loggedActivity.key, activitySubmission.mode) ?? 0)
+      : 0;
+  const isActivityPost = Boolean(loggedActivity && activitySubmission);
+  const hasPreparedActivityMedia = useRef(false);
+
+  const [body, setBody] = useState(
+    params.activityCaption || (loggedActivity ? getRandomActivityCaption(loggedActivity.key) : '')
+  );
   const [media, setMedia] = useState<ImagePickerAsset | null>(null);
   const [mediaUri, setMediaUri] = useState<string | undefined>(undefined);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -75,39 +119,119 @@ export default function NewPost() {
     setMediaLoading(false);
   };
 
-  const uploadFile = async (uri: string, contentType: string) => {
-    setUploadingMedia(true);
+  const uploadFile = useCallback(
+    async (uri: string, contentType: string) => {
+      setUploadingMedia(true);
+      setMediaKey(undefined);
 
-    const [err, uploadUrl] = await CatchPromise(generateUploadUrl());
-
-    if (err || !uploadUrl) {
-      setError(getErrorMessage(err));
-      setUploadingMedia(false);
-      return;
-    }
-
-    setMediaKey(undefined);
-
-    const uploadTask = FileSystem.createUploadTask(
-      uploadUrl,
-      uri,
-      {
-        fieldName: 'file',
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: { 'Content-Type': contentType },
-      },
-      ({ totalBytesSent, totalBytesExpectedToSend }) => {
-        setUploadProgress(
-          parseFloat((totalBytesSent / (totalBytesExpectedToSend || 1)).toFixed(2))
+      try {
+        const uploadUrl = await generateUploadUrl();
+        const uploadTask = FileSystem.createUploadTask(
+          uploadUrl,
+          uri,
+          {
+            fieldName: 'file',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: { 'Content-Type': contentType },
+          },
+          ({ totalBytesSent, totalBytesExpectedToSend }) => {
+            setUploadProgress(
+              parseFloat((totalBytesSent / (totalBytesExpectedToSend || 1)).toFixed(2))
+            );
+          }
         );
-      }
-    );
 
-    const uploadResult = await uploadTask.uploadAsync();
-    setMediaKey(JSON.parse(uploadResult?.body ?? '{}').storageId);
-    setUploadingMedia(false);
-  };
+        const uploadResult = await uploadTask.uploadAsync();
+        const storageId = JSON.parse(uploadResult?.body ?? '{}').storageId as string | undefined;
+        if (!storageId) throw new Error('Media upload did not return a storage id.');
+
+        setMediaKey(storageId);
+        return true;
+      } catch (uploadError) {
+        setError(getErrorMessage(uploadError));
+        return false;
+      } finally {
+        setUploadingMedia(false);
+      }
+    },
+    [generateUploadUrl]
+  );
+
+  const prepareImage = useCallback(
+    async (localMedia: ImagePickerAsset) => {
+      setMedia(localMedia);
+      setMediaUri(localMedia.uri);
+
+      try {
+        const maxWidth = 1080;
+        const sourceWidth = localMedia.width > 0 ? localMedia.width : maxWidth;
+        const sourceHeight = localMedia.height > 0 ? localMedia.height : maxWidth;
+        const scale = Math.min(1, maxWidth / sourceWidth);
+        const resizedImage = await ImageManipulator.manipulateAsync(
+          localMedia.uri,
+          [
+            {
+              resize: {
+                width: Math.round(sourceWidth * scale),
+                height: Math.round(sourceHeight * scale),
+              },
+            },
+          ],
+          { compress: 0.7 }
+        );
+
+        setMedia({
+          ...localMedia,
+          uri: resizedImage.uri,
+          width: resizedImage.width,
+          height: resizedImage.height,
+        });
+        setMediaUri(resizedImage.uri);
+        setMediaLoading(false);
+        await uploadFile(resizedImage.uri, 'image/jpeg');
+      } catch (prepareError) {
+        setError(getErrorMessage(prepareError));
+        setMediaLoading(false);
+      }
+    },
+    [uploadFile]
+  );
+
+  const prepareVideo = useCallback(
+    async (localMedia: ImagePickerAsset) => {
+      if (localMedia.duration && localMedia.duration > videoMaxDurationMs) {
+        setError(videoLimitError);
+        setMediaLoading(false);
+        return;
+      }
+
+      setMedia(localMedia);
+
+      try {
+        const thumb = await VideoThumbnails.getThumbnailAsync(localMedia.uri, { time: 0 });
+        setMediaUri(thumb.uri);
+
+        const [thumbErr, thumbUploadUrl] = await CatchPromise(generateUploadUrl());
+        if (!thumbErr && thumbUploadUrl) {
+          const thumbTask = FileSystem.createUploadTask(thumbUploadUrl, thumb.uri, {
+            fieldName: 'file',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: { 'Content-Type': 'image/jpeg' },
+          });
+          const thumbResult = await thumbTask.uploadAsync();
+          setThumbnailKey(JSON.parse(thumbResult?.body ?? '{}').storageId);
+        }
+      } catch {
+        setMediaUri(localMedia.uri);
+      }
+
+      setMediaLoading(false);
+      await uploadFile(localMedia.uri, localMedia.mimeType ?? 'video/mp4');
+    },
+    [generateUploadUrl, uploadFile, videoLimitError, videoMaxDurationMs]
+  );
 
   const selectImage = async () => {
     if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_upload_image' }))
@@ -130,36 +254,7 @@ export default function NewPost() {
       return;
     }
 
-    const localmedia = result.assets[0];
-    setMedia(localmedia);
-    setMediaUri(localmedia.uri);
-
-    const maxWidth = 1080;
-    const scale = Math.min(1, maxWidth / (localmedia.width ?? maxWidth));
-
-    const resizedImage = await ImageManipulator.manipulateAsync(
-      localmedia.uri,
-      [
-        {
-          resize: {
-            width: Math.round((localmedia.width ?? maxWidth) * scale),
-            height: Math.round((localmedia.height ?? maxWidth) * scale),
-          },
-        },
-      ],
-      { compress: 0.7 }
-    );
-
-    setMedia({
-      ...localmedia,
-      uri: resizedImage.uri,
-      width: resizedImage.width,
-      height: resizedImage.height,
-    });
-    setMediaUri(resizedImage.uri);
-    setMediaLoading(false);
-
-    await uploadFile(resizedImage.uri, 'image/jpeg');
+    await prepareImage(result.assets[0]);
   };
 
   const selectVideo = async () => {
@@ -184,43 +279,54 @@ export default function NewPost() {
       return;
     }
 
-    const localmedia = result.assets[0];
+    await prepareVideo(result.assets[0]);
+  };
 
-    if (localmedia.duration && localmedia.duration > videoMaxDurationMs) {
-      setError(videoLimitError);
-      setMediaLoading(false);
+  useEffect(() => {
+    if (
+      hasPreparedActivityMedia.current ||
+      !isActivityPost ||
+      !params.activityMediaUri ||
+      !params.activityMediaType
+    ) {
       return;
     }
 
-    setMedia(localmedia);
-    setMediaLoading(false);
+    hasPreparedActivityMedia.current = true;
+    setError(null);
+    setUploadProgress(0);
+    setMediaLoading(true);
 
-    try {
-      const thumb = await VideoThumbnails.getThumbnailAsync(localmedia.uri, {
-        time: 0,
-      });
+    const width = Number(params.activityMediaWidth);
+    const height = Number(params.activityMediaHeight);
+    const duration = Number(params.activityMediaDuration);
+    const activityMedia: ImagePickerAsset = {
+      uri: params.activityMediaUri,
+      type: params.activityMediaType === 'video' ? 'video' : 'image',
+      width: Number.isFinite(width) && width > 0 ? width : 1080,
+      height: Number.isFinite(height) && height > 0 ? height : 1080,
+      duration: Number.isFinite(duration) ? duration : null,
+      mimeType: params.activityMediaMimeType,
+      fileName: params.activityMediaFileName || null,
+    };
 
-      setMediaUri(thumb.uri);
-
-      const [thumbErr, thumbUploadUrl] = await CatchPromise(generateUploadUrl());
-
-      if (!thumbErr && thumbUploadUrl) {
-        const thumbTask = FileSystem.createUploadTask(thumbUploadUrl, thumb.uri, {
-          fieldName: 'file',
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-          headers: { 'Content-Type': 'image/jpeg' },
-        });
-
-        const thumbResult = await thumbTask.uploadAsync();
-        setThumbnailKey(JSON.parse(thumbResult?.body ?? '{}').storageId);
-      }
-    } catch {
-      setMediaUri(localmedia.uri);
+    if (activityMedia.type === 'video') {
+      prepareVideo(activityMedia).catch((prepareError) => setError(getErrorMessage(prepareError)));
+    } else {
+      prepareImage(activityMedia).catch((prepareError) => setError(getErrorMessage(prepareError)));
     }
-
-    await uploadFile(localmedia.uri, localmedia.mimeType ?? 'video/mp4');
-  };
+  }, [
+    isActivityPost,
+    params.activityMediaDuration,
+    params.activityMediaFileName,
+    params.activityMediaHeight,
+    params.activityMediaMimeType,
+    params.activityMediaType,
+    params.activityMediaUri,
+    params.activityMediaWidth,
+    prepareImage,
+    prepareVideo,
+  ]);
 
   const handlePost = async () => {
     if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_create_post' })) return;
@@ -234,6 +340,14 @@ export default function NewPost() {
       return;
     }
 
+    if (isActivityPost && !mediaKey) {
+      setError(
+        isUploading ? 'Please wait for your proof to finish uploading.' : 'Add activity proof.'
+      );
+      setIsLoading(false);
+      return;
+    }
+
     const [err, response] = await CatchPromise(
       createPost({
         body: body.trim(),
@@ -242,6 +356,8 @@ export default function NewPost() {
         mediaHeight: media?.height,
         mediaType: media?.type === 'video' ? 'video' : 'image',
         mediaThumbnail: thumbnailKey ? (thumbnailKey as Id<'_storage'>) : undefined,
+        activityKey: isActivityPost ? loggedActivity?.key : undefined,
+        activitySubmissionType: isActivityPost ? activitySubmission?.mode : undefined,
       })
     );
 
@@ -251,7 +367,26 @@ export default function NewPost() {
       return;
     }
 
-    if (response) {
+    if (response?.success) {
+      if (isActivityPost) {
+        if (response.pointsEarned > 0) {
+          celebrateCompletion({ type: 'activity', pointsEarned: response.pointsEarned });
+        }
+        toast.show({
+          placement: 'top',
+          duration: 3500,
+          render: () => (
+            <ToastMessage
+              message={
+                response.pointsEarned > 0
+                  ? `+${response.pointsEarned} pts added. Your activity post is live.`
+                  : 'Activity posted. You reached today’s points cap.'
+              }
+              action="success"
+            />
+          ),
+        });
+      }
       router.back();
     }
 
@@ -259,6 +394,8 @@ export default function NewPost() {
   };
 
   const mediaAspectRatio = media?.width && media?.height ? media.width / media.height : 16 / 9;
+  const canSubmit =
+    Boolean(body.trim()) && !isUploading && !isLoading && (!isActivityPost || Boolean(mediaKey));
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
@@ -269,9 +406,16 @@ export default function NewPost() {
           headerStyle: { backgroundColor: '#F9F9F9' },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
+          headerLeft: () => (
+            <BackButton
+              fallbackHref={isActivityPost ? '/(tabs)/dashboard' : '/(tabs)/share'}
+              text=""
+            />
+          ),
           headerTitle: () => (
-            <Text className="font-heading text-xl font-bold text-[#1A1A1A]">New Post</Text>
+            <Text className="font-heading text-xl font-bold text-[#1A1A1A]">
+              {isActivityPost ? 'Log Activity' : 'New Post'}
+            </Text>
           ),
         }}
       />
@@ -285,7 +429,33 @@ export default function NewPost() {
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
+          {loggedActivity && activitySubmission ? (
+            <View className="mx-4 mt-4 rounded-3xl border border-[#F3D8CB] bg-[#FFF8F4] p-4">
+              <View className="flex-row items-center justify-between">
+                <View className="min-w-0 flex-1 pr-3">
+                  <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                    Daily activity
+                  </Text>
+                  <Text className="mt-1 font-heading text-lg font-extrabold text-[#1A1A1A]">
+                    {loggedActivity.title}
+                  </Text>
+                  <Text className="mt-0.5 font-body text-xs text-[#817873]">
+                    {loggedActivity.goal}
+                  </Text>
+                </View>
+                <View className="items-end rounded-2xl bg-white px-3 py-2">
+                  <Text className="font-heading text-base font-extrabold text-[#E94F12]">
+                    +{activityPoints} pts
+                  </Text>
+                  <Text className="font-body text-[9px] text-[#8A827D]">Photo proof</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
+          <View
+            className="mx-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4"
+            style={{ marginTop: isActivityPost ? 12 : 16 }}>
             <View className="flex-row items-start gap-x-3">
               <Avatar
                 uri={currentUser?.image ?? undefined}
@@ -302,7 +472,7 @@ export default function NewPost() {
                 <Input className="mt-1 h-auto border-0 bg-transparent">
                   <InputField
                     multiline
-                    autoFocus
+                    autoFocus={!isActivityPost}
                     className="border-0 bg-transparent px-0 text-base"
                     placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
                     value={body}
@@ -317,10 +487,27 @@ export default function NewPost() {
                     }}
                   />
                 </Input>
+
+                {isActivityPost && loggedActivity ? (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Use another suggested caption"
+                    onPress={() => {
+                      setError(null);
+                      setBody(getRandomActivityCaption(loggedActivity.key, body));
+                    }}
+                    className="mt-2 flex-row items-center self-start rounded-[14px] bg-[#FFF0E8] px-3 py-2">
+                    <ArrowsClockwise size={14} color="#E94F12" weight="bold" />
+                    <Text className="ml-1.5 font-heading text-[11px] font-bold text-[#E94F12]">
+                      Try another caption
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
 
-            {!media && (
+            {!media && !isActivityPost && (
               <View className="mt-4 flex-row gap-x-3">
                 <TouchableOpacity
                   activeOpacity={0.85}
@@ -424,7 +611,7 @@ export default function NewPost() {
 
                   {!isUploading && (
                     <TouchableOpacity
-                      onPress={resetMedia}
+                      onPress={isActivityPost ? () => router.back() : resetMedia}
                       className="absolute right-3 top-3 rounded-full bg-[rgba(0,0,0,0.75)] p-2">
                       <X color="#fff" size={18} />
                     </TouchableOpacity>
@@ -472,16 +659,19 @@ export default function NewPost() {
             variant="solid"
             size="xl"
             action="primary"
-            className="h-14 w-full rounded-full"
+            className="h-14 w-full rounded-[17px] px-[22px]"
             style={{
-              backgroundColor: !body.trim() || isUploading || isLoading ? '#F5D5C8' : '#FF5C1A',
+              backgroundColor: canSubmit ? '#FF5C1A' : '#F5D5C8',
             }}
             loading={isLoading}
-            disabled={!body.trim() || isUploading || isLoading}
+            disabled={!canSubmit}
             onPress={handlePost}>
-            <ButtonText className="text-lg text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-              Post
+            <ButtonText
+              className="flex-1 text-left text-base text-white"
+              style={{ fontFamily: 'Inter_700Bold' }}>
+              {isActivityPost ? 'Log activity' : 'Post'}
             </ButtonText>
+            <ArrowRight size={23} color="#FFFFFF" weight="bold" />
           </LoadingButton>
         </View>
       </KeyboardAvoidingView>

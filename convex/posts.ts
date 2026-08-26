@@ -2,15 +2,34 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ShardedCounter } from '@convex-dev/sharded-counter';
 import { compare } from 'compare-versions';
 import { paginationOptsValidator } from 'convex/server';
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import { components, internal } from './_generated/api';
-import { internalMutation, mutation, query } from './_generated/server';
+import { Id } from './_generated/dataModel';
+import { internalMutation, mutation, MutationCtx, query } from './_generated/server';
 import { appVersions } from './appVersions';
+import { applyFreeDailyCap } from './challengeCompletions';
+import { formatDateInTZ } from './utils/timezone';
+import { getLoggedActivityPoints } from '../shared/loggedActivities';
 
 const BADGE_POINTS_THRESHOLD = 500;
 
 const postCounter = new ShardedCounter(components.shardedCounter);
+
+async function revokeLoggedActivity(ctx: MutationCtx, activityId: Id<'dailyActivities'>) {
+  const activity = await ctx.db.get(activityId);
+  if (!activity) return;
+
+  await ctx.db.delete(activityId);
+  await ctx.scheduler.runAfter(0, internal.leaderboard.updateMonthlyLeaderboard, {
+    userId: activity.userId,
+    yearMonth: activity.date.substring(0, 7),
+  });
+  await ctx.runMutation(internal.track.recompute.recomputeTrackForDate, {
+    userId: activity.userId,
+    date: activity.date,
+  });
+}
 
 // Helper function to format user name (First name + first initial of surname)
 function formatUserName(fullName: string | null | undefined): string {
@@ -439,14 +458,90 @@ export const createPost = mutation({
     mediaHeight: v.optional(v.number()),
     mediaType: v.optional(v.string()),
     mediaThumbnail: v.optional(v.id('_storage')),
+    activityKey: v.optional(
+      v.union(
+        v.literal('hydration'),
+        v.literal('steps'),
+        v.literal('walk'),
+        v.literal('workout'),
+        v.literal('healthy_meal'),
+        v.literal('stretch'),
+        v.literal('sleep'),
+        v.literal('post_workout_selfie'),
+        v.literal('workout_fit'),
+        v.literal('progress_pic')
+      )
+    ),
+    activitySubmissionType: v.optional(
+      v.union(
+        v.literal('record_video'),
+        v.literal('take_photo'),
+        v.literal('upload_photo'),
+        v.literal('upload_video')
+      )
+    ),
   },
-  returns: v.boolean(),
+  returns: v.object({ success: v.boolean(), pointsEarned: v.number() }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return true;
+    if (!userId) return { success: false, pointsEarned: 0 };
 
     const user = await ctx.db.get(userId);
-    if (!user) return true;
+    if (!user) return { success: false, pointsEarned: 0 };
+
+    const isActivityPost =
+      args.activityKey !== undefined || args.activitySubmissionType !== undefined;
+    let activityId: Id<'dailyActivities'> | undefined;
+    let pointsEarned = 0;
+
+    if (isActivityPost) {
+      if (!args.activityKey || !args.activitySubmissionType || !args.media || !args.mediaType) {
+        throw new ConvexError('Activity proof is incomplete. Please try again.');
+      }
+
+      const expectedMediaType =
+        args.activitySubmissionType === 'record_video' ||
+        args.activitySubmissionType === 'upload_video'
+          ? 'video'
+          : 'image';
+
+      if (args.mediaType !== expectedMediaType) {
+        throw new ConvexError('The selected proof does not match this activity option.');
+      }
+
+      const rawPoints = getLoggedActivityPoints(args.activityKey, args.activitySubmissionType);
+      if (rawPoints === null) {
+        throw new ConvexError('This activity is no longer available.');
+      }
+
+      const date = formatDateInTZ(new Date(), user.timezone);
+      const activitiesForDate = await ctx.db
+        .query('dailyActivities')
+        .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
+        .collect();
+      const alreadyLogged = activitiesForDate.some(
+        (activity) => activity.loggedActivityKey === args.activityKey
+      );
+
+      if (alreadyLogged) {
+        throw new ConvexError(`You already logged ${args.activityKey.replace('_', ' ')} today.`);
+      }
+
+      pointsEarned = await applyFreeDailyCap(ctx, userId, date, rawPoints, 'activity_log');
+      activityId = await ctx.db.insert('dailyActivities', {
+        userId,
+        date,
+        steps: 0,
+        zone2Minutes: 0,
+        points: rawPoints,
+        displayTotalPoints: pointsEarned,
+        missionPoints: 0,
+        synced: false,
+        reviewStatus: 'approved',
+        loggedActivityKey: args.activityKey,
+        activitySubmissionType: args.activitySubmissionType,
+      });
+    }
 
     const postId = await ctx.db.insert('posts', {
       userId,
@@ -457,7 +552,22 @@ export const createPost = mutation({
       mediaHeight: args.mediaHeight,
       mediaType: args.mediaType,
       mediaThumbnail: args.mediaThumbnail,
+      activityId,
     });
+
+    if (activityId) {
+      const activity = await ctx.db.get(activityId);
+      if (activity) {
+        await ctx.scheduler.runAfter(0, internal.leaderboard.updateMonthlyLeaderboard, {
+          userId,
+          yearMonth: activity.date.substring(0, 7),
+        });
+        await ctx.runMutation(internal.track.recompute.recomputeTrackForDate, {
+          userId,
+          date: activity.date,
+        });
+      }
+    }
 
     // Send notification to all eligible users if admin created the post
     if (user.isAdmin) {
@@ -467,7 +577,7 @@ export const createPost = mutation({
       });
     }
 
-    return true;
+    return { success: true, pointsEarned };
   },
 });
 
@@ -494,6 +604,10 @@ export const updatePost = mutation({
     // If media is removed, clear type and thumbnail too
     const mediaRemoved = args.media === null;
 
+    if (mediaRemoved && post.activityId) {
+      await revokeLoggedActivity(ctx, post.activityId);
+    }
+
     await ctx.db.patch(args.postId, {
       body: args.body ?? post.body,
       media: args.media !== undefined ? args.media : post.media,
@@ -509,6 +623,7 @@ export const updatePost = mutation({
         : args.mediaThumbnail !== undefined
           ? args.mediaThumbnail
           : post.mediaThumbnail,
+      activityId: mediaRemoved ? undefined : post.activityId,
     });
 
     return true;
@@ -576,6 +691,10 @@ export const deletePost = mutation({
           date: completion.date,
         });
       }
+    }
+
+    if (post.activityId) {
+      await revokeLoggedActivity(ctx, post.activityId);
     }
 
     await ctx.db.delete(args.postId);

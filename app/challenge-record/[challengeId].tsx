@@ -136,7 +136,7 @@ function SingleVideoPreview({
 }) {
   const player = useVideoPlayer(videoUrl, (videoPlayer) => {
     videoPlayer.loop = false;
-    videoPlayer.volume = 0;
+    videoPlayer.volume = musicTrack ? 0 : 1;
   });
 
   useEffect(() => {
@@ -819,7 +819,9 @@ export default function DuetRecordingScreen() {
     }, MAX_RECORDING_SECONDS * 1000);
 
     try {
-      await startBackgroundMusic();
+      if (!isCheckIn) {
+        await startBackgroundMusic();
+      }
       const video = await cameraRef.current.recordAsync({
         maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
       });
@@ -1241,8 +1243,6 @@ export default function DuetRecordingScreen() {
 
     if (checkInMode === 'record_video') {
       setCheckInSubmissionType('live_video');
-      selectMusicTrackForSession();
-      ensureBackgroundMusicLoaded().catch(() => {});
       setIsVideoRecorderOpen(true);
       return;
     }
@@ -1258,13 +1258,7 @@ export default function DuetRecordingScreen() {
     }
 
     handlePickCheckInMedia('library', 'video', true);
-  }, [
-    checkInMode,
-    ensureBackgroundMusicLoaded,
-    handlePickCheckInMedia,
-    isCheckIn,
-    selectMusicTrackForSession,
-  ]);
+  }, [checkInMode, handlePickCheckInMedia, isCheckIn]);
 
   const handleCancel = useCallback(() => {
     debugRecordingState('handleCancel called');
@@ -1353,9 +1347,7 @@ export default function DuetRecordingScreen() {
         mediaType: selectedMediaType,
         checkInSubmissionType: isCheckIn ? checkInSubmissionType : undefined,
         musicTrackId:
-          selectedMediaType === 'video' && (!isCheckIn || checkInSubmissionType === 'live_video')
-            ? selectedMusicTrack?.id
-            : undefined,
+          selectedMediaType === 'video' && !isCheckIn ? selectedMusicTrack?.id : undefined,
         mediaWidth: isCheckIn ? selectedMediaDimensions?.width : undefined,
         mediaHeight: isCheckIn ? selectedMediaDimensions?.height : undefined,
         mimeType: selectedMimeType,
@@ -1545,8 +1537,6 @@ export default function DuetRecordingScreen() {
           icon={<VideoCamera size={23} color="#FF5C1A" />}
           onPress={() => {
             setCheckInSubmissionType('live_video');
-            selectMusicTrackForSession();
-            ensureBackgroundMusicLoaded().catch(() => {});
             setIsVideoRecorderOpen(true);
           }}
         />
@@ -1576,7 +1566,7 @@ export default function DuetRecordingScreen() {
           mode="video"
           videoQuality={RECORDING_VIDEO_QUALITY}
           videoBitrate={RECORDING_VIDEO_BITRATE}
-          mute
+          mute={!isCheckIn}
         />
 
         <View
@@ -1820,14 +1810,7 @@ export default function DuetRecordingScreen() {
                   contentPosition="center"
                 />
               ) : isCheckIn ? (
-                <SingleVideoPreview
-                  videoUrl={recordedVideoUri}
-                  musicTrack={
-                    checkInSubmissionType === 'live_video'
-                      ? (selectedMusicTrack ?? undefined)
-                      : undefined
-                  }
-                />
+                <SingleVideoPreview videoUrl={recordedVideoUri} />
               ) : currentChallengeDay === 1 ? (
                 <CompositeVideoPlayer
                   leftVideoUrl={FIRST_ATTEMPT_VIDEO_URL}

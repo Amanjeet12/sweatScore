@@ -268,7 +268,7 @@ export default function DailyChallengeCard() {
                 : undefined
             }>
             <Text className="font-heading text-[11px] font-extrabold tracking-[1px] text-white">
-              TODAY&apos;S CHECK-IN
+              TODAY&apos;S MOVE
             </Text>
 
             <View className="flex-1" />
@@ -393,7 +393,7 @@ export default function DailyChallengeCard() {
           }>
           <View className="flex-row items-start justify-between">
             <Text className="font-heading text-[11px] font-extrabold tracking-[1px] text-white">
-              TODAY&apos;S CHECK-IN
+              TODAY&apos;S MOVE
             </Text>
 
             <View className="rounded-full bg-black/65 px-3 py-1.5">
@@ -420,7 +420,7 @@ export default function DailyChallengeCard() {
                 numberOfLines={1}
                 className="mt-1 text-[14px] font-medium text-white/90"
                 style={Platform.OS === 'ios' ? { fontFamily: 'Inter_500Medium' } : undefined}>
-                Follow along with this routine.
+                {dailyChallenge.shortDescription}
               </Text>
             </View>
 

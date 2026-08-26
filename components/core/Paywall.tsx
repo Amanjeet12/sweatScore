@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -253,11 +254,11 @@ export default function Paywall() {
     isPackagesLoading;
 
   const paywallBullets = [
-    'Make workouts feel fun and effective',
-    'Stay consistent without forcing it',
-    'See your progress clearly over time',
-    'Feel supported by people on the same path',
-    "Keep things fresh so you don't get bored",
+    'Jump rope and sculpt workout challenges',
+    'A simple daily plan to build your streak',
+    'Daily checklist to track and maintain habits',
+    'Auto-tracked steps and workout targets',
+    'A community to keep you motivated',
   ];
 
   const handlePurchase = async () => {
@@ -380,7 +381,7 @@ export default function Paywall() {
           Choose your plan
         </Text>
         <Text className="mt-2 max-w-[330px] text-center font-body text-lg font-semibold leading-7 text-[#5F6270]">
-          Get the full program and keep your momentum going.
+          Everything you need to stay consistent and see results
         </Text>
       </View>
 
@@ -426,34 +427,13 @@ export default function Paywall() {
         />
       </View>
 
-      <TouchableOpacity
-        accessibilityRole="button"
+      <OnboardingPrimaryButton
+        className="mt-3"
+        label={isPackagesLoading ? 'Loading plans...' : 'Start Premium'}
         onPress={handlePurchase}
         disabled={isCtaDisabled}
-        activeOpacity={0.88}
-        className="mt-3 h-[58px] items-center justify-center rounded-full bg-primary-500"
-        style={{
-          opacity: isCtaDisabled ? 0.6 : 1,
-          ...(Platform.OS === 'ios'
-            ? {
-                shadowColor: '#FF5C1A',
-                shadowOffset: { width: 0, height: 7 },
-                shadowOpacity: 0.2,
-                shadowRadius: 12,
-              }
-            : { elevation: 4 }),
-        }}>
-        {isLoading ? (
-          <View className="flex-row items-center justify-center">
-            <ActivityIndicator size={20} color="#FFFFFF" />
-            <Text className="ml-2 font-heading text-xl font-bold text-white">Processing...</Text>
-          </View>
-        ) : (
-          <Text className="font-heading text-xl font-bold text-white">
-            {isPackagesLoading ? 'Loading plans...' : 'Start Premium'}
-          </Text>
-        )}
-      </TouchableOpacity>
+        isLoading={isLoading}
+      />
 
       <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">
         {hasTrial

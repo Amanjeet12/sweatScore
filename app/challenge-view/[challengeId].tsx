@@ -3,8 +3,6 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ArrowRight,
-  Camera,
-  ImageSquare,
   LockSimple,
   Play,
   Pulse,
@@ -556,7 +554,7 @@ export default function ChallengeViewScreen() {
                 Today&apos;s check-in
               </Text>
               <Text className="mt-1 font-heading text-[22px] font-extrabold leading-7 text-[#1A1A1A]">
-                {selectedCheckIn?.name ?? challenge.name} routine
+                {selectedCheckIn?.name ?? challenge.name}
               </Text>
               <Text className="mt-1 font-body text-[13px] leading-[19px] text-[#77716D]">
                 {selectedCheckIn?.categoryDescription ??

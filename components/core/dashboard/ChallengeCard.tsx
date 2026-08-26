@@ -122,7 +122,7 @@ export default function ChallengeCard({
         }}
       />
 
-      <View className="absolute right-3 top-3 rounded-full bg-primary-500 px-3 py-1">
+      <View className="absolute right-3 top-3 rounded-full bg-black/75 px-3 py-1">
         <Text className="font-body text-xs font-semibold text-white">+{challenge.points} pts</Text>
       </View>
 

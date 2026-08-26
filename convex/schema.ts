@@ -57,6 +57,28 @@ const schema = defineSchema({
     reviewedAt: v.optional(v.number()), // The timestamp when the activity was approved
     reviewStatus: v.optional(v.union(v.literal('approved'), v.literal('rejected'))), // The status of the approval
     image: v.optional(v.id('_storage')),
+    loggedActivityKey: v.optional(
+      v.union(
+        v.literal('hydration'),
+        v.literal('steps'),
+        v.literal('walk'),
+        v.literal('workout'),
+        v.literal('healthy_meal'),
+        v.literal('stretch'),
+        v.literal('sleep'),
+        v.literal('post_workout_selfie'),
+        v.literal('workout_fit'),
+        v.literal('progress_pic')
+      )
+    ),
+    activitySubmissionType: v.optional(
+      v.union(
+        v.literal('record_video'),
+        v.literal('take_photo'),
+        v.literal('upload_photo'),
+        v.literal('upload_video')
+      )
+    ),
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user', ['userId'])
@@ -139,6 +161,7 @@ const schema = defineSchema({
     isPinned: v.optional(v.boolean()),
     challengeId: v.optional(v.id('challenges')),
     challengeCompletionId: v.optional(v.id('challengeCompletions')),
+    activityId: v.optional(v.id('dailyActivities')),
     feedLiveNotificationSentAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])

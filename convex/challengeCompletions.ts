@@ -64,7 +64,7 @@ export async function getDailyPointsCap(ctx: QueryCtx | MutationCtx): Promise<nu
   return cfg ? parseInt(cfg.value, 10) : 10;
 }
 
-type PointSource = 'challenge' | 'activity' | 'checkin';
+type PointSource = 'challenge' | 'activity' | 'activity_log' | 'checkin';
 
 export async function applyFreeDailyCap(
   ctx: QueryCtx | MutationCtx,
@@ -89,13 +89,21 @@ export async function applyFreeDailyCap(
     .filter((q) => q.neq(q.field('removed'), true))
     .collect();
   otherSources += completions.reduce((s, c) => s + c.pointsEarned, 0);
+  const activities = await ctx.db
+    .query('dailyActivities')
+    .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
+    .filter((q) => q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved')))
+    .collect();
   if (source !== 'activity') {
-    const activities = await ctx.db
-      .query('dailyActivities')
-      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
-      .filter((q) => q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved')))
-      .collect();
     otherSources += activities.reduce((s, a) => s + (a.displayTotalPoints ?? 0), 0);
+  } else {
+    // Health sync replaces its own daily row, but hardcoded activity logs are
+    // separate awards and must still count toward the user's daily cap.
+    otherSources += activities.reduce(
+      (sum, activity) =>
+        activity.loggedActivityKey ? sum + (activity.displayTotalPoints ?? 0) : sum,
+      0
+    );
   }
   if (source !== 'checkin') {
     const checkIns = await ctx.db
@@ -212,10 +220,7 @@ export const completeChallenge = mutation({
           ? ('live_video' as const)
           : ('uploaded_video' as const)
       : undefined;
-    const musicTrackId =
-      args.musicTrackId && (!isCheckIn || checkInSubmissionType === 'live_video')
-        ? args.musicTrackId
-        : undefined;
+    const musicTrackId = !isCheckIn ? args.musicTrackId : undefined;
 
     if (!args.videoStorageId) {
       throw new ConvexError(isCheckIn ? 'A photo or video is required' : 'A video is required');

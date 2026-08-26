@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useMutation, useQuery } from 'convex/react';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -5,7 +6,15 @@ import * as Notifications from 'expo-notifications';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Linking, Platform, RefreshControl, ScrollView, View } from 'react-native';
+import {
+  AppState,
+  Dimensions,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
@@ -16,6 +25,7 @@ import Confetti from '~/components/core/dashboard/Confetti';
 import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 import { FirstTimeOnboardingModal } from '~/components/core/dashboard/FirstTimeOnboardingModal';
 import { MyCardAlertDialog } from '~/components/core/dashboard/MyCard';
+import TodayFeatureTour, { TodayTourTarget } from '~/components/core/dashboard/TodayFeatureTour';
 import TodaysSweat from '~/components/core/dashboard/TodaysSweat';
 // import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
 import { Text } from '~/components/ui/text';
@@ -32,6 +42,9 @@ function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require('react-native-health-connect') as typeof import('react-native-health-connect');
 }
+
+const TODAY_FEATURE_TOUR_STORAGE_VERSION = 'today_feature_tour_v1';
+const TODAY_FEATURE_TOUR_STEP_COUNT = 3;
 
 function getCurrentWeekMondayStr(): string {
   const now = new Date();
@@ -58,10 +71,19 @@ export default function TabDashboard() {
   const appState = useRef(AppState.currentState);
   const { showSuccess } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+  const dashboardScrollRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
+  const checkInTourRef = useRef<View>(null);
+  const communityTourRef = useRef<View>(null);
+  const activityLogTourRef = useRef<View>(null);
+  const sectionOffsetsRef = useRef({ community: 0 });
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const refreshKey = useRefreshStore((state) => state.refreshKey);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [todayTourStep, setTodayTourStep] = useState<number | null>(null);
+  const [todayTourTarget, setTodayTourTarget] = useState<TodayTourTarget | null>(null);
   const currentUser = useQuery(api.users.current);
   const rewardsBanner = useQuery(api.admin.getRewardsBanner);
   const yearMonth = useMemo(() => {
@@ -106,7 +128,8 @@ export default function TabDashboard() {
         projectId: Constants.expoConfig?.extra?.eas.projectId,
       });
     } else {
-      alert('Must be using a physical device for Push notifications');
+      // Push tokens are unavailable in simulators; skip silently so local QA is uninterrupted.
+      return;
     }
 
     if (token && token.data) {
@@ -191,6 +214,115 @@ export default function TabDashboard() {
     setConfettiTrigger((t) => t + 1);
   }, [streakData?.currentWeekDays, streakData?.currentWeekTarget]);
 
+  useEffect(() => {
+    if (
+      !isFocused ||
+      !currentUser?._id ||
+      showSuccess ||
+      showFirstTimeModal ||
+      showInstallDialog ||
+      todayTourStep !== null
+    ) {
+      return;
+    }
+
+    const storageKey = `${TODAY_FEATURE_TOUR_STORAGE_VERSION}_${currentUser._id}`;
+    if (storage.getBoolean(storageKey)) return;
+
+    const timer = setTimeout(() => setTodayTourStep(0), 900);
+    return () => clearTimeout(timer);
+  }, [
+    currentUser?._id,
+    isFocused,
+    showFirstTimeModal,
+    showInstallDialog,
+    showSuccess,
+    todayTourStep,
+  ]);
+
+  useEffect(() => {
+    if (!isFocused || todayTourStep === null) {
+      setTodayTourTarget(null);
+      return;
+    }
+
+    let cancelled = false;
+    let measureTimer: ReturnType<typeof setTimeout> | undefined;
+    const targetRefs = [checkInTourRef, communityTourRef, activityLogTourRef];
+    const targetRef = targetRefs[todayTourStep];
+
+    setTodayTourTarget(null);
+
+    if (todayTourStep === 0) {
+      dashboardScrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else if (todayTourStep === 1) {
+      dashboardScrollRef.current?.scrollTo({
+        y: Math.max(0, sectionOffsetsRef.current.community - 110),
+        animated: true,
+      });
+    } else {
+      dashboardScrollRef.current?.scrollToEnd({ animated: true });
+    }
+
+    const measureTarget = (attempt: number) => {
+      measureTimer = setTimeout(
+        () => {
+          if (cancelled || !targetRef.current) return;
+
+          targetRef.current.measureInWindow((x, y, width, height) => {
+            if (cancelled) return;
+
+            if ((width < 40 || height < 40) && attempt < 8) {
+              measureTarget(attempt + 1);
+              return;
+            }
+
+            const screenHeight = Dimensions.get('window').height;
+            const desiredTop = Math.max(insets.top + 84, 120);
+            const isOutsideViewport =
+              y < insets.top + 8 || y + height > screenHeight - insets.bottom - 24;
+
+            if (isOutsideViewport && attempt < 8) {
+              dashboardScrollRef.current?.scrollTo({
+                y: Math.max(0, scrollOffsetRef.current + y - desiredTop),
+                animated: true,
+              });
+              measureTarget(attempt + 1);
+              return;
+            }
+
+            setTodayTourTarget({ x, y, width, height });
+          });
+        },
+        attempt === 0 ? 480 : 240
+      );
+    };
+
+    measureTarget(0);
+
+    return () => {
+      cancelled = true;
+      if (measureTimer) clearTimeout(measureTimer);
+    };
+  }, [insets.bottom, insets.top, isFocused, todayTourStep]);
+
+  const finishTodayTour = () => {
+    if (currentUser?._id) {
+      storage.set(`${TODAY_FEATURE_TOUR_STORAGE_VERSION}_${currentUser._id}`, true);
+    }
+    setTodayTourStep(null);
+    setTodayTourTarget(null);
+  };
+
+  const advanceTodayTour = () => {
+    if (todayTourStep === null || todayTourStep >= TODAY_FEATURE_TOUR_STEP_COUNT - 1) {
+      finishTodayTour();
+      return;
+    }
+
+    setTodayTourStep(todayTourStep + 1);
+  };
+
   return (
     <>
       <SafeAreaView className="flex-1 bg-white">
@@ -201,21 +333,28 @@ export default function TabDashboard() {
           }}
         />
         <ScrollView
+          ref={dashboardScrollRef}
           className="flex-1"
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+          }}
           contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}>
           <View
             className="flex-1 flex-col bg-[#F9F9F9]"
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
             <View className="px-5 pb-3 pt-3">
-              <View className="flex-row items-start justify-between">
+              <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-4">
                   <Text className="font-heading text-[10px] font-extrabold tracking-[1.1px] text-[#FF4B1F]">
                     TODAY · {formattedDate}
                   </Text>
-                  <Text className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
-                    {greeting},
+                  <Text
+                    numberOfLines={1}
+                    className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
+                    {greeting}, {currentUser?.name?.split(' ')[0] ?? 'there'}
                   </Text>
                 </View>
                 <Avatar
@@ -225,30 +364,25 @@ export default function TabDashboard() {
                   name={currentUser?.name}
                 />
               </View>
-
-              <View className="mt-1 flex-row items-center justify-between">
-                <Text
-                  numberOfLines={1}
-                  className="min-w-0 flex-1 pr-3 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
-                  {currentUser?.name?.split(' ')[0] ?? 'there'}
-                </Text>
-
-                <View className="flex-row items-center rounded-full bg-white px-3.5 py-2.5">
-                  <Icon.Fire size={15} color="#E34500" weight="fill" />
-                  <Text className="ml-2 font-heading text-[11px] font-bold text-[#E34500]">
-                    {streakData?.currentWeekDays ?? 0} day streak
-                  </Text>
-                </View>
-              </View>
             </View>
-            <View className="bg-[#F9F9F9]">
+            <View ref={checkInTourRef} collapsable={false} className="bg-[#F9F9F9]">
               <DailyChallengeCard />
             </View>
-            <View className="mt-3 bg-[#F9F9F9]">
+            <View
+              ref={communityTourRef}
+              collapsable={false}
+              className="mt-3 bg-[#F9F9F9]"
+              onLayout={(event) => {
+                sectionOffsetsRef.current.community = event.nativeEvent.layout.y;
+              }}>
               <CommunityGroupPreviewCard />
             </View>
             <View className="mt-3 bg-[#F9F9F9]">
-              <TodaysSweat refreshKey={refreshKey} />
+              <TodaysSweat
+                refreshKey={refreshKey}
+                streakDays={streakData?.currentWeekDays ?? 0}
+                activityLogTourRef={activityLogTourRef}
+              />
             </View>
             {/* <View className="mb-10 mt-4 bg-[#F9F9F9]">
               <WeeklyStreakCard />
@@ -290,10 +424,17 @@ export default function TabDashboard() {
               <MoveWithUs />
             </View> */}
 
-            {showUpdateBanner ? <View style={{ height: 64 }} /> : null}
+            <View style={{ height: showUpdateBanner ? 96 : 52 }} />
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <TodayFeatureTour
+        step={todayTourStep}
+        target={todayTourTarget}
+        onNext={advanceTodayTour}
+        onSkip={finishTodayTour}
+      />
       {/* Floating Action Button */}
       {/* <TouchableOpacity
         onPress={() => {
@@ -363,7 +504,8 @@ export default function TabDashboard() {
             showSuccess !== 'yes' &&
             showSuccess !== 'install' &&
             !showFirstTimeModal &&
-            !showInstallDialog
+            !showInstallDialog &&
+            todayTourStep === null
           }
         />
       ) : null}

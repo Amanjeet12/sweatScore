@@ -1,9 +1,9 @@
 import { ConvexError, v } from 'convex/values';
 
-import type { Doc } from '../_generated/dataModel';
-import { mutation, query } from '../_generated/server';
 import { getGroupMembership, requireCurrentUser, requireGroupMember } from './helpers';
 import { getAvatarColor, getSafeMemberName, getSafeUserImageUrl } from './userPresentation';
+import type { Doc } from '../_generated/dataModel';
+import { mutation, query } from '../_generated/server';
 const DEFAULT_GROUP_SLUG = 'sweat-sisters';
 
 /**
@@ -400,8 +400,41 @@ export const getHomeGroupPreview = query({
         q.eq('groupId', selected.group._id).eq('status', 'active')
       )
       .collect();
+    const recentMessages = await ctx.db
+      .query('chatMessages')
+      .withIndex('by_group', (q) => q.eq('groupId', selected.group._id))
+      .order('desc')
+      .take(100);
+    const activeMembershipByUserId = new Map(
+      activeMemberships.map((membership) => [String(membership.userId), membership])
+    );
+    const recentActiveMemberships = recentMessages.reduce<typeof activeMemberships>(
+      (memberships, message) => {
+        const membership = activeMembershipByUserId.get(String(message.senderId));
+
+        if (
+          membership &&
+          !memberships.some((candidate) => candidate.userId === membership.userId)
+        ) {
+          memberships.push(membership);
+        }
+
+        return memberships;
+      },
+      []
+    );
+    const remainingMemberships = activeMemberships
+      .filter(
+        (membership) =>
+          !recentActiveMemberships.some((candidate) => candidate.userId === membership.userId)
+      )
+      .sort(
+        (first, second) =>
+          (second.lastReadAt ?? second.joinedAt) - (first.lastReadAt ?? first.joinedAt)
+      );
+    const previewMemberships = [...recentActiveMemberships, ...remainingMemberships].slice(0, 3);
     const previewMembers = await Promise.all(
-      activeMemberships.slice(0, 3).map(async (membership) => {
+      previewMemberships.map(async (membership) => {
         const user = await ctx.db.get(membership.userId);
         const name = getSafeMemberName(user);
 

@@ -1,5 +1,5 @@
-import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import {
   createContext,
   ReactNode,
@@ -16,7 +16,7 @@ import { ConfettiBurst } from '~/components/celebration/ConfettiBurst';
 import { MilestoneData, MilestoneModal } from '~/components/celebration/MilestoneModal';
 
 interface CompletionCelebration {
-  type: 'check_in';
+  type: 'check_in' | 'activity';
   pointsEarned: number;
 }
 
@@ -55,14 +55,14 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
   useEffect(
     () => () => {
       if (milestoneTimer.current) clearTimeout(milestoneTimer.current);
-      void completionSoundRef.current?.unloadAsync().catch(() => undefined);
+      completionSoundRef.current?.unloadAsync().catch(() => undefined);
     },
     []
   );
 
   const celebrateCompletion = useCallback(async (_completion: CompletionCelebration) => {
     setConfettiKey(Date.now());
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
 
     try {
       if (completionSoundRef.current) {
@@ -77,7 +77,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
           completionSoundRef.current = null;
-          void sound.unloadAsync().catch(() => undefined);
+          sound.unloadAsync().catch(() => undefined);
         }
       });
     } catch (error) {
