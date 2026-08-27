@@ -52,8 +52,8 @@ export const notificationContents = {
 
   // Add this
   dailyCheckInLive: {
-    title: "Today's move is here 👟",
-    body: "Your check-in is live. Show the sisters what you're doing today and keep your streak going.",
+    title: "Time to check in 💬",
+    body: "Show the sisters what you're doing today and keep your streak going.",
   },
 
   dailyCheckInReminder: {

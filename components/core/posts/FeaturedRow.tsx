@@ -78,6 +78,7 @@ function ActiveFeaturedPlayer({
   const [isBuffering, setIsBuffering] = useState(true);
   const player = useVideoPlayer(videoUrl, (p) => {
     p.loop = false;
+    p.volume = 1;
     p.play();
   });
 

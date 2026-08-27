@@ -279,29 +279,25 @@ export default function ChallengeViewScreen() {
     {
       mode: 'record_video' as const,
       label: 'Record video',
-      description: 'Record your proof now',
-      points: 5,
+      description: 'Record your proof · 1 min max',
       icon: <VideoCamera size={21} color="#FF5C1A" />,
     },
     // {
     //   mode: 'take_photo' as const,
     //   label: 'Take photo',
     //   description: 'Use your camera',
-    //   points: 1,
     //   icon: <Camera size={21} color="#FF5C1A" />,
     // },
     // {
     //   mode: 'upload_photo' as const,
     //   label: 'Upload photo',
     //   description: 'Choose a saved photo',
-    //   points: 1,
     //   icon: <ImageSquare size={21} color="#FF5C1A" />,
     // },
     {
       mode: 'upload_video' as const,
       label: 'Upload video',
-      description: 'Choose a saved video',
-      points: 2,
+      description: 'Choose a saved video · 1 min max',
       icon: <UploadSimple size={21} color="#FF5C1A" />,
     },
   ];
@@ -427,7 +423,7 @@ export default function ChallengeViewScreen() {
         onPress={handleStartChallenge}>
         <View className="flex-row items-center justify-center">
           <ButtonText className="text-lg font-bold text-white">
-            {isCheckIn ? 'Start Check-in' : `Let's Go`}
+            {isCheckIn ? 'Start Check-In' : `Let's Go`}
           </ButtonText>
           {isCheckIn ? (
             <ArrowRight size={18} color="#FFFFFF" weight="bold" style={{ marginLeft: 12 }} />
@@ -553,10 +549,7 @@ export default function ChallengeViewScreen() {
               <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
                 Today&apos;s check-in
               </Text>
-              <Text className="mt-1 font-heading text-[22px] font-extrabold leading-7 text-[#1A1A1A]">
-                {selectedCheckIn?.name ?? challenge.name}
-              </Text>
-              <Text className="mt-1 font-body text-[13px] leading-[19px] text-[#77716D]">
+              <Text className="mt-1.5 font-body text-[13px] leading-[19px] text-[#77716D]">
                 {selectedCheckIn?.categoryDescription ??
                   challenge.checkInDescription?.trim() ??
                   challenge.description}
@@ -569,15 +562,10 @@ export default function ChallengeViewScreen() {
               />
 
               <View className="mt-3 rounded-[22px] bg-white px-4 py-3.5 shadow-sm">
-                <View className="flex-row items-start justify-between">
-                  <View>
-                    <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
-                      Make it work for you
-                    </Text>
-                    <Text className="mt-1 font-heading text-lg font-bold text-[#1A1A1A]">
-                      Swap your check-in
-                    </Text>
-                  </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                    Swap your check-in
+                  </Text>
                   <View className="rounded-full bg-[#F1EFED] px-3 py-1.5">
                     <Text className="font-heading text-[10px] font-bold text-[#77716D]">
                       Optional
@@ -644,7 +632,7 @@ export default function ChallengeViewScreen() {
       progress !== undefined &&
       availableCheckIns !== undefined ? (
         <View
-          className="bg-white px-5 pb-2.5 pt-2.5"
+          className="bg-white px-5 pb-2.5 pt-3"
           style={{
             borderTopWidth: 1,
             borderTopColor: '#EEEAE7',
@@ -653,12 +641,6 @@ export default function ChallengeViewScreen() {
             shadowOpacity: 0.06,
             shadowRadius: 12,
           }}>
-          <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
-            Ready when you are
-          </Text>
-          <Text className="mb-2 mt-0.5 font-heading text-base font-bold text-[#1A1A1A]">
-            Complete today&apos;s check-in
-          </Text>
           {renderActionButton()}
         </View>
       ) : null}
@@ -712,7 +694,7 @@ export default function ChallengeViewScreen() {
                   key={option.mode}
                   activeOpacity={0.72}
                   accessibilityRole="button"
-                  accessibilityLabel={`${option.label}, ${option.points} bonus points`}
+                  accessibilityLabel={`${option.label}. ${option.description}`}
                   onPress={() => handleSelectCheckInMode(option.mode)}
                   className="h-[74px] flex-row items-center px-3.5"
                   style={{
@@ -728,11 +710,6 @@ export default function ChallengeViewScreen() {
                     </Text>
                     <Text className="mt-0.5 font-body text-[11px] text-[#8A827D]">
                       {option.description}
-                    </Text>
-                  </View>
-                  <View className="rounded-full bg-[#FFF0E8] px-2.5 py-1.5">
-                    <Text className="font-heading text-[11px] font-extrabold text-[#E94F12]">
-                      +{option.points} {option.points === 1 ? 'pt' : 'pts'}
                     </Text>
                   </View>
                   <ArrowRight size={16} color="#FF5C1A" weight="bold" style={{ marginLeft: 8 }} />

@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { Menu, MenuOptions, MenuOption, MenuTrigger } from 'react-native-popup-menu';
 import Share from 'react-native-share';
-import { CaretRight } from 'phosphor-react-native';
+
 import { Avatar } from '~/components/core/Avatar';
 import {
   AlertDialog,
@@ -106,6 +106,7 @@ function ActiveVideoPlayer({ videoUrl, aspectRatio }: { videoUrl: string; aspect
 
   const player = useVideoPlayer(videoUrl, (videoPlayer) => {
     videoPlayer.loop = false;
+    videoPlayer.volume = 1;
     videoPlayer.play();
   });
 
@@ -785,7 +786,7 @@ export default function PostRow({
 
             <Text className="font-body text-sm font-bold text-primary-500">Do This</Text>
 
-            <CaretRight size={16} weight="bold" color={colors.primary} />
+            <Icon.CaretRight size={16} weight="bold" color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>

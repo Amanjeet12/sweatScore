@@ -472,14 +472,7 @@ export const createPost = mutation({
         v.literal('progress_pic')
       )
     ),
-    activitySubmissionType: v.optional(
-      v.union(
-        v.literal('record_video'),
-        v.literal('take_photo'),
-        v.literal('upload_photo'),
-        v.literal('upload_video')
-      )
-    ),
+    activitySubmissionType: v.optional(v.literal('take_photo')),
   },
   returns: v.object({ success: v.boolean(), pointsEarned: v.number() }),
   handler: async (ctx, args) => {
@@ -499,13 +492,7 @@ export const createPost = mutation({
         throw new ConvexError('Activity proof is incomplete. Please try again.');
       }
 
-      const expectedMediaType =
-        args.activitySubmissionType === 'record_video' ||
-        args.activitySubmissionType === 'upload_video'
-          ? 'video'
-          : 'image';
-
-      if (args.mediaType !== expectedMediaType) {
+      if (args.mediaType !== 'image') {
         throw new ConvexError('The selected proof does not match this activity option.');
       }
 
@@ -840,6 +827,67 @@ export const deleteComment = mutation({
     await postCounter.dec(ctx, `comments:${comment.postId}`);
     await ctx.db.delete(args.commentId);
     return true;
+  },
+});
+
+/**
+ * Small reactive query used by the Feed tab badge.
+ *
+ * The client stores the time of the last post it displayed, so this does not
+ * require a per-user read-receipt table. Blocked and reported posts are
+ * excluded to ensure the badge always points to content the user can open.
+ */
+export const getLatestVisiblePostCreatedAt = query({
+  args: {},
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx) => {
+    const currentUserId = await getAuthUserId(ctx);
+
+    if (!currentUserId) {
+      return null;
+    }
+
+    const [blockedByCurrentUser, usersBlockingCurrentUser, recentPosts] = await Promise.all([
+      ctx.db
+        .query('blockedUsers')
+        .withIndex('by_user', (queryBuilder) => queryBuilder.eq('userId', currentUserId))
+        .collect(),
+      ctx.db
+        .query('blockedUsers')
+        .withIndex('by_blocked_user', (queryBuilder) =>
+          queryBuilder.eq('blockedUserId', currentUserId)
+        )
+        .collect(),
+      ctx.db.query('posts').order('desc').take(50),
+    ]);
+
+    const blockedAuthorIds = new Set(
+      blockedByCurrentUser.map((block) => String(block.blockedUserId))
+    );
+    const blockingAuthorIds = new Set(
+      usersBlockingCurrentUser.map((block) => String(block.userId))
+    );
+
+    for (const post of recentPosts) {
+      const authorId = String(post.userId);
+
+      if (blockedAuthorIds.has(authorId) || blockingAuthorIds.has(authorId)) {
+        continue;
+      }
+
+      const report = await ctx.db
+        .query('postReports')
+        .withIndex('by_post_user', (queryBuilder) =>
+          queryBuilder.eq('postId', post._id).eq('userId', currentUserId)
+        )
+        .unique();
+
+      if (!report) {
+        return post.createdAt;
+      }
+    }
+
+    return null;
   },
 });
 

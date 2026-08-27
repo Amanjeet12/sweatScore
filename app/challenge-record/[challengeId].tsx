@@ -1,5 +1,5 @@
 import { useQuery } from 'convex/react';
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -8,9 +8,12 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
+  ArrowRight,
   Camera,
   CameraRotate,
   ImageSquare,
+  Microphone,
+  MicrophoneSlash,
   Record,
   UploadSimple,
   VideoCamera,
@@ -224,6 +227,7 @@ export default function DuetRecordingScreen() {
   } | null>(null);
   const [selectedMimeType, setSelectedMimeType] = useState('video/mp4');
   const [isVideoRecorderOpen, setIsVideoRecorderOpen] = useState(false);
+  const [isCheckInAudioMuted, setIsCheckInAudioMuted] = useState(false);
 
   const [caption, setCaption] = useState('');
 
@@ -260,8 +264,6 @@ export default function DuetRecordingScreen() {
   const recordedVideoUriRef = useRef<string | null>(null);
 
   const countdownSoundRef = useRef<Audio.Sound | null>(null);
-
-  const countdownSoundLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
 
   const countdownSoundPlaybackTokenRef = useRef(0);
   const handledCheckInModeRef = useRef(false);
@@ -422,41 +424,23 @@ export default function DuetRecordingScreen() {
     recordedVideoUriRef.current = recordedVideoUri;
   }, [recordedVideoUri]);
 
-  const ensureCountdownSound = useCallback(async () => {
-    if (countdownSoundRef.current) {
-      return countdownSoundRef.current;
+  const stopCountdownSound = useCallback(async () => {
+    const sound = countdownSoundRef.current;
+    countdownSoundRef.current = null;
+
+    if (!sound) return;
+
+    try {
+      await sound.stopAsync();
+    } catch {
+      // Sound may already have completed.
     }
 
-    if (countdownSoundLoadingPromiseRef.current) {
-      return countdownSoundLoadingPromiseRef.current;
+    try {
+      await sound.unloadAsync();
+    } catch {
+      // Sound may already be unloaded.
     }
-
-    countdownSoundLoadingPromiseRef.current = (async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-        });
-
-        const { sound } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
-          shouldPlay: false,
-          volume: 1,
-        });
-
-        countdownSoundRef.current = sound;
-
-        console.log('[RecordingDebug] countdown sound loaded');
-
-        return sound;
-      } catch (error) {
-        console.log('[RecordingDebug] countdown sound failed', error);
-
-        return null;
-      } finally {
-        countdownSoundLoadingPromiseRef.current = null;
-      }
-    })();
-
-    return countdownSoundLoadingPromiseRef.current;
   }, []);
 
   const cleanupRecordingRefs = useCallback(
@@ -500,7 +484,7 @@ export default function DuetRecordingScreen() {
 
       countdownSoundPlaybackTokenRef.current += 1;
 
-      countdownSoundRef.current?.stopAsync().catch(() => {});
+      stopCountdownSound().catch(() => {});
       stopBackgroundMusic().catch(() => {});
 
       if (isRecordingRef.current) {
@@ -521,7 +505,7 @@ export default function DuetRecordingScreen() {
 
       cancelledByBackgroundRef.current = false;
     },
-    [stopBackgroundMusic]
+    [stopBackgroundMusic, stopCountdownSound]
   );
 
   useFocusEffect(
@@ -658,32 +642,6 @@ export default function DuetRecordingScreen() {
 
     return () => subscription.remove();
   }, [state, stopBackgroundMusic]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadCountdownSound = async () => {
-      const sound = await ensureCountdownSound();
-
-      if (!isMounted && sound) {
-        await sound.unloadAsync();
-
-        countdownSoundRef.current = null;
-      }
-    };
-
-    loadCountdownSound().catch(() => {});
-
-    return () => {
-      isMounted = false;
-
-      countdownSoundRef.current?.unloadAsync().catch(() => {});
-
-      countdownSoundRef.current = null;
-
-      console.log('[RecordingDebug] countdown sound unloaded');
-    };
-  }, [ensureCountdownSound]);
 
   const stopRecording = useCallback(() => {
     stopBackgroundMusic().catch(() => {});
@@ -1046,26 +1004,51 @@ export default function DuetRecordingScreen() {
   const playCountdownSound = useCallback(
     async (playbackToken: number) => {
       try {
-        const sound = await ensureCountdownSound();
-
-        if (!sound || playbackToken !== countdownSoundPlaybackTokenRef.current) {
-          return;
-        }
-
-        await sound.stopAsync();
-
-        await sound.setPositionAsync(0);
+        await stopCountdownSound();
 
         if (playbackToken !== countdownSoundPlaybackTokenRef.current) {
           return;
         }
 
-        await sound.playAsync();
+        await Audio.setIsEnabledAsync(true);
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+        });
+
+        if (playbackToken !== countdownSoundPlaybackTokenRef.current) {
+          return;
+        }
+
+        const { sound, status } = await Audio.Sound.createAsync(require('../../assets/beep.mp3'), {
+          shouldPlay: true,
+          isLooping: false,
+          positionMillis: 0,
+          volume: 1,
+        });
+
+        if (playbackToken !== countdownSoundPlaybackTokenRef.current) {
+          await sound.unloadAsync();
+          return;
+        }
+
+        countdownSoundRef.current = sound;
+
+        console.log('[RecordingDebug] countdown sound started', {
+          isLoaded: status.isLoaded,
+          isPlaying: status.isLoaded ? status.isPlaying : false,
+          durationMillis: status.isLoaded ? status.durationMillis : undefined,
+        });
       } catch (error) {
         console.log('[RecordingDebug] countdown sound play failed', error);
       }
     },
-    [ensureCountdownSound]
+    [stopCountdownSound]
   );
 
   const startCountdown = useCallback(() => {
@@ -1134,9 +1117,9 @@ export default function DuetRecordingScreen() {
 
         countdownSoundPlaybackTokenRef.current += 1;
 
-        countdownSoundRef.current?.stopAsync().catch(() => {});
-
-        startRecording().catch(() => {});
+        stopCountdownSound()
+          .catch(() => {})
+          .finally(() => startRecording().catch(() => {}));
       }
     }, 1000);
   }, [
@@ -1149,6 +1132,7 @@ export default function DuetRecordingScreen() {
     playCountdownSound,
     requireSubscription,
     startRecording,
+    stopCountdownSound,
   ]);
 
   const handleSwitchCamera = useCallback(() => {
@@ -1444,10 +1428,7 @@ export default function DuetRecordingScreen() {
     );
   }
 
-  const selectedCheckInBonusPoints =
-    checkInSubmissionType === 'live_video' ? 5 : checkInSubmissionType === 'uploaded_video' ? 2 : 1;
-  const totalPoints =
-    challenge.points + (isCheckIn ? selectedCheckInBonusPoints : allowRepost ? 3 : 0);
+  const totalPoints = challenge.points + (!isCheckIn && allowRepost ? 3 : 0);
 
   const isLiveState = state === 'pre-record' || state === 'countdown' || state === 'recording';
 
@@ -1464,14 +1445,12 @@ export default function DuetRecordingScreen() {
     const MediaChoice = ({
       label,
       description,
-      points,
       featured = false,
       icon,
       onPress,
     }: {
       label: string;
       description: string;
-      points: number;
       featured?: boolean;
       icon: React.ReactNode;
       onPress: () => void;
@@ -1490,17 +1469,7 @@ export default function DuetRecordingScreen() {
           <Text className="font-body text-base font-bold text-[#1F1F1F]">{label}</Text>
           <Text className="mt-0.5 font-body text-xs text-[#777777]">{description}</Text>
         </View>
-        <View
-          className={`min-w-[58px] items-center rounded-full px-3 py-2 ${
-            featured ? 'bg-[#FF5C1A]' : 'bg-[#FFF1EA]'
-          }`}>
-          <Text
-            className={`font-body text-sm font-extrabold ${
-              featured ? 'text-white' : 'text-[#E94F12]'
-            }`}>
-            +{points} {points === 1 ? 'pt' : 'pts'}
-          </Text>
-        </View>
+        <ArrowRight size={19} color="#FF5C1A" weight="bold" />
       </TouchableOpacity>
     );
 
@@ -1518,21 +1487,18 @@ export default function DuetRecordingScreen() {
         <MediaChoice
           label="Take Photo"
           description="Snap a photo now"
-          points={1}
           icon={<Camera size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('camera', 'image')}
         />
         <MediaChoice
           label="Upload Photo"
           description="Choose from your library"
-          points={1}
           icon={<ImageSquare size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('library', 'image')}
         />
         <MediaChoice
           label="Record Video"
-          description="Record live in the app"
-          points={5}
+          description="Record live in the app · 1 min max"
           featured
           icon={<VideoCamera size={23} color="#FF5C1A" />}
           onPress={() => {
@@ -1542,8 +1508,7 @@ export default function DuetRecordingScreen() {
         />
         <MediaChoice
           label="Upload Video"
-          description="Choose a saved video"
-          points={2}
+          description="Choose a saved video · 1 min max"
           icon={<UploadSimple size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('library', 'video')}
         />
@@ -1566,7 +1531,7 @@ export default function DuetRecordingScreen() {
           mode="video"
           videoQuality={RECORDING_VIDEO_QUALITY}
           videoBitrate={RECORDING_VIDEO_BITRATE}
-          mute={!isCheckIn}
+          mute={!isCheckIn || isCheckInAudioMuted}
         />
 
         <View
@@ -1601,6 +1566,50 @@ export default function DuetRecordingScreen() {
               backgroundColor: 'rgba(0,0,0,0.45)',
             }}>
             <CameraRotate size={26} color="#FFFFFF" weight="bold" />
+          </TouchableOpacity>
+        )}
+
+        {state === 'pre-record' && isCheckIn && (
+          <TouchableOpacity
+            activeOpacity={0.78}
+            accessibilityRole="switch"
+            accessibilityLabel="Record microphone audio"
+            accessibilityHint={
+              isCheckInAudioMuted
+                ? 'Turns on the original audio for your check-in video'
+                : 'Mutes the original audio in your check-in video'
+            }
+            accessibilityState={{ checked: !isCheckInAudioMuted }}
+            onPress={() => setIsCheckInAudioMuted((current) => !current)}
+            hitSlop={{
+              top: 8,
+              bottom: 8,
+              left: 8,
+              right: 8,
+            }}
+            style={{
+              position: 'absolute',
+              top: insets.top + 72,
+              right: 16,
+              zIndex: 30,
+              minWidth: 102,
+              height: 42,
+              borderRadius: 21,
+              paddingHorizontal: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              columnGap: 7,
+              backgroundColor: isCheckInAudioMuted ? 'rgba(0,0,0,0.52)' : 'rgba(255,92,26,0.92)',
+            }}>
+            {isCheckInAudioMuted ? (
+              <MicrophoneSlash size={19} color="#FFFFFF" weight="bold" />
+            ) : (
+              <Microphone size={19} color="#FFFFFF" weight="bold" />
+            )}
+            <Text className="font-body text-xs font-bold text-white">
+              {isCheckInAudioMuted ? 'Muted' : 'Audio on'}
+            </Text>
           </TouchableOpacity>
         )}
 

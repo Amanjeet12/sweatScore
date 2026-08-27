@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import { ArrowRight, Check } from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   AppState,
   Easing,
@@ -18,7 +17,10 @@ import { Avatar } from '~/components/core/Avatar';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
-import { colors } from '~/utils/constants';
+import { useAuthStore } from '~/store/useAuthStore';
+import { getData, storeData } from '~/utils/storage';
+
+const DAILY_CHALLENGE_CACHE_KEY = 'daily_challenge_card_cache';
 
 const CHECK_IN_PLACEHOLDERS = [
   { initial: 'A', color: '#C96B4B' },
@@ -45,6 +47,8 @@ function formatRemainingTime(seconds: number) {
 
 export default function DailyChallengeCard() {
   const { requireSubscription } = useSubscriptionGuard();
+  const authenticatedUserId = useAuthStore((state) => state.currentUser?._id);
+  const dailyChallengeCacheKey = `${DAILY_CHALLENGE_CACHE_KEY}_${authenticatedUserId ?? 'user'}`;
 
   /*
    * Changing refreshToken forces Convex
@@ -52,12 +56,47 @@ export default function DailyChallengeCard() {
    */
   const [refreshToken, setRefreshToken] = useState(0);
 
-  const dailyChallenge = useQuery(api.challengeCompletions.getTodayDailyChallenge, {
+  const dailyChallengeResult = useQuery(api.challengeCompletions.getTodayDailyChallenge, {
     refreshToken,
   });
+  const [cachedDailyChallenge, setCachedDailyChallenge] = useState<typeof dailyChallengeResult>(
+    () => {
+      const cached = getData(dailyChallengeCacheKey) as {
+        date?: string;
+        challenge?: typeof dailyChallengeResult;
+      } | null;
+
+      return cached?.date === new Date().toDateString() ? cached.challenge : undefined;
+    }
+  );
+  const dailyChallenge =
+    dailyChallengeResult === undefined ? cachedDailyChallenge : dailyChallengeResult;
   const currentUser = useQuery(api.users.current);
 
   const [secondsRemaining, setSecondsRemaining] = useState(0);
+
+  useEffect(() => {
+    const cached = getData(dailyChallengeCacheKey) as {
+      date?: string;
+      challenge?: typeof dailyChallengeResult;
+    } | null;
+
+    setCachedDailyChallenge(
+      cached?.date === new Date().toDateString() ? cached.challenge : undefined
+    );
+  }, [dailyChallengeCacheKey]);
+
+  useEffect(() => {
+    if (dailyChallengeResult === undefined) {
+      return;
+    }
+
+    setCachedDailyChallenge(dailyChallengeResult);
+    storeData(dailyChallengeCacheKey, {
+      date: new Date().toDateString(),
+      challenge: dailyChallengeResult,
+    });
+  }, [dailyChallengeCacheKey, dailyChallengeResult]);
 
   /*
    * Controls:
@@ -215,8 +254,20 @@ export default function DailyChallengeCard() {
 
   if (dailyChallenge === undefined) {
     return (
-      <View className="mx-5 h-[310px] items-center justify-center rounded-[28px] bg-white">
-        <ActivityIndicator color={colors.primary} />
+      <View className="mx-5 h-[310px] overflow-hidden rounded-[28px] bg-[#2D241F]">
+        <ImageBackground
+          source={require('~/assets/backgrounds/swbg.png')}
+          resizeMode="cover"
+          className="h-full w-full">
+          <LinearGradient
+            colors={['rgba(0,0,0,0.38)', 'rgba(0,0,0,0.74)']}
+            className="h-full w-full px-5 pb-5 pt-5">
+            <View className="h-3 w-32 rounded-full bg-white/40" />
+            <View className="flex-1" />
+            <View className="mb-5 h-7 w-48 rounded-lg bg-white/30" />
+            <View className="h-[52px] w-full rounded-[18px] bg-white/55" />
+          </LinearGradient>
+        </ImageBackground>
       </View>
     );
   }
@@ -268,7 +319,7 @@ export default function DailyChallengeCard() {
                 : undefined
             }>
             <Text className="font-heading text-[11px] font-extrabold tracking-[1px] text-white">
-              TODAY&apos;S MOVE
+              TODAY&apos;S CHECK-IN
             </Text>
 
             <View className="flex-1" />
@@ -393,7 +444,7 @@ export default function DailyChallengeCard() {
           }>
           <View className="flex-row items-start justify-between">
             <Text className="font-heading text-[11px] font-extrabold tracking-[1px] text-white">
-              TODAY&apos;S MOVE
+              TODAY&apos;S CHECK-IN
             </Text>
 
             <View className="rounded-full bg-black/65 px-3 py-1.5">

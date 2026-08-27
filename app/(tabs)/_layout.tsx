@@ -1,5 +1,5 @@
 import { useQuery } from 'convex/react';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { ChartBar, ChatCircleDots, CrownSimple, Fire, Trophy } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
@@ -13,19 +13,28 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { useRefreshStore } from '~/store/useRefreshStore';
 import { useTabStore } from '~/store/useTabStore';
 import { colors } from '~/utils/constants';
+import { storage } from '~/utils/storage';
 import { ALL_TABS } from '~/utils/types';
 
 export default function TabLayout() {
   const setCurrentTab = useTabStore((state) => state.setCurrentTab);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const pathname = usePathname();
   const appState = useRef(AppState.currentState);
-  const [appStateVisible, setAppStateVisible] = useState(appState.current);
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const { activateUser } = useActivateUser();
-  const availableGroups = useQuery(api.chat.groups.listAvailableGroups, currentUser ? {} : 'skip');
-  const hasUnreadMessages = availableGroups?.some(
-    (group) => group.isMember && (group.hasUnread || group.unreadCount > 0)
+  const latestFeedPostCreatedAt = useQuery(
+    api.posts.getLatestVisiblePostCreatedAt,
+    currentUser ? {} : 'skip'
   );
+  const feedSeenStorageKey = currentUser?._id
+    ? `feed_last_seen_post_at_${currentUser._id}`
+    : undefined;
+  const [lastSeenFeedPostAt, setLastSeenFeedPostAt] = useState<number | undefined>();
+  const hasUnseenFeedPosts =
+    typeof latestFeedPostCreatedAt === 'number' &&
+    typeof lastSeenFeedPostAt === 'number' &&
+    latestFeedPostCreatedAt > lastSeenFeedPostAt;
 
   const { syncAllMissedDays } = useHealthSync(
     currentUser?._id as Id<'users'>,
@@ -40,13 +49,42 @@ export default function TabLayout() {
       }
 
       appState.current = nextAppState;
-      setAppStateVisible(appState.current);
     });
 
     return () => {
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    setLastSeenFeedPostAt(feedSeenStorageKey ? storage.getNumber(feedSeenStorageKey) : undefined);
+  }, [feedSeenStorageKey]);
+
+  useEffect(() => {
+    if (!feedSeenStorageKey || latestFeedPostCreatedAt === undefined) {
+      return;
+    }
+
+    if (storage.getNumber(feedSeenStorageKey) === undefined) {
+      const initialSeenAt = latestFeedPostCreatedAt ?? 0;
+
+      storage.set(feedSeenStorageKey, initialSeenAt);
+      setLastSeenFeedPostAt(initialSeenAt);
+    }
+  }, [feedSeenStorageKey, latestFeedPostCreatedAt]);
+
+  useEffect(() => {
+    if (
+      !pathname.startsWith('/share') ||
+      !feedSeenStorageKey ||
+      typeof latestFeedPostCreatedAt !== 'number'
+    ) {
+      return;
+    }
+
+    storage.set(feedSeenStorageKey, latestFeedPostCreatedAt);
+    setLastSeenFeedPostAt(latestFeedPostCreatedAt);
+  }, [feedSeenStorageKey, latestFeedPostCreatedAt, pathname]);
 
   return (
     <View className="flex-1 bg-white">
@@ -158,9 +196,9 @@ export default function TabLayout() {
                   weight={focused ? 'fill' : 'duotone'}
                   size={28}
                 />
-                {hasUnreadMessages ? (
+                {hasUnseenFeedPosts ? (
                   <View
-                    accessibilityLabel="Unread group messages"
+                    accessibilityLabel="New community posts"
                     style={{
                       position: 'absolute',
                       top: -4,
@@ -171,6 +209,11 @@ export default function TabLayout() {
                       borderWidth: 2,
                       borderColor: '#FFFFFF',
                       backgroundColor: '#EF4444',
+                      shadowColor: '#EF4444',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.65,
+                      shadowRadius: 4,
+                      elevation: 4,
                     }}
                   />
                 ) : null}
@@ -180,6 +223,11 @@ export default function TabLayout() {
           }}
           listeners={() => ({
             tabPress: () => {
+              if (feedSeenStorageKey && typeof latestFeedPostCreatedAt === 'number') {
+                storage.set(feedSeenStorageKey, latestFeedPostCreatedAt);
+                setLastSeenFeedPostAt(latestFeedPostCreatedAt);
+              }
+
               setCurrentTab(ALL_TABS.SHARE);
             },
           })}

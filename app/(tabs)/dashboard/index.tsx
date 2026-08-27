@@ -43,8 +43,19 @@ function getHealthConnect() {
   return require('react-native-health-connect') as typeof import('react-native-health-connect');
 }
 
-const TODAY_FEATURE_TOUR_STORAGE_VERSION = 'today_feature_tour_v1';
+/*
+ * Increment this only when the Today experience changes enough that both new
+ * and upgrading users should be guided through it again. MMKV survives normal
+ * app updates, so users who have seen an older version will receive this tour
+ * once, while users who finish this version will not see it on every launch.
+ */
+const TODAY_FEATURE_TOUR_VERSION = 2;
+const TODAY_FEATURE_TOUR_STORAGE_KEY = 'today_feature_tour_seen_version';
 const TODAY_FEATURE_TOUR_STEP_COUNT = 3;
+
+function getTodayFeatureTourStorageKey(userId: string) {
+  return `${TODAY_FEATURE_TOUR_STORAGE_KEY}_${userId}`;
+}
 
 function getCurrentWeekMondayStr(): string {
   const now = new Date();
@@ -226,8 +237,9 @@ export default function TabDashboard() {
       return;
     }
 
-    const storageKey = `${TODAY_FEATURE_TOUR_STORAGE_VERSION}_${currentUser._id}`;
-    if (storage.getBoolean(storageKey)) return;
+    const storageKey = getTodayFeatureTourStorageKey(currentUser._id);
+    const seenVersion = storage.getNumber(storageKey) ?? 0;
+    if (seenVersion >= TODAY_FEATURE_TOUR_VERSION) return;
 
     const timer = setTimeout(() => setTodayTourStep(0), 900);
     return () => clearTimeout(timer);
@@ -308,7 +320,7 @@ export default function TabDashboard() {
 
   const finishTodayTour = () => {
     if (currentUser?._id) {
-      storage.set(`${TODAY_FEATURE_TOUR_STORAGE_VERSION}_${currentUser._id}`, true);
+      storage.set(getTodayFeatureTourStorageKey(currentUser._id), TODAY_FEATURE_TOUR_VERSION);
     }
     setTodayTourStep(null);
     setTodayTourTarget(null);

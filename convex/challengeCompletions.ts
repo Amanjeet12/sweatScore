@@ -283,13 +283,11 @@ export const completeChallenge = mutation({
      */
     const repostBonus = !isCheckIn && args.allowRepost ? 3 : 0;
 
-    const checkInBonusPoints =
-      checkInSubmissionType === 'live_video'
-        ? 5
-        : checkInSubmissionType === 'uploaded_video'
-          ? 2
-          : 1;
-    const rawPoints = challenge.points + (isCheckIn ? checkInBonusPoints : repostBonus);
+    /*
+     * A check-in's submission format is metadata only. Every format earns the
+     * configured challenge points so recording and uploading are treated equally.
+     */
+    const rawPoints = challenge.points + repostBonus;
 
     const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
 

@@ -5,14 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import {
-  ArrowsClockwise,
-  ArrowRight,
-  ImageSquare,
-  PlayCircle,
-  VideoCamera,
-  X,
-} from 'phosphor-react-native';
+import { ArrowRight, ImageSquare, PlayCircle, VideoCamera, X } from 'phosphor-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -51,29 +44,46 @@ import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { getErrorMessage } from '~/utils/error-message';
 
+type RouteParam = string | string[] | undefined;
+
+function getRouteParam(value: RouteParam) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function NewPost() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
-    activityKey?: string;
-    activityMode?: string;
-    activityCaption?: string;
-    activityMediaUri?: string;
-    activityMediaType?: string;
-    activityMediaWidth?: string;
-    activityMediaHeight?: string;
-    activityMediaDuration?: string;
-    activityMediaMimeType?: string;
-    activityMediaFileName?: string;
+    activityKey?: string | string[];
+    activityMode?: string | string[];
+    activityCaption?: string | string[];
+    activityMediaUri?: string | string[];
+    activityMediaType?: string | string[];
+    activityMediaWidth?: string | string[];
+    activityMediaHeight?: string | string[];
+    activityMediaDuration?: string | string[];
+    activityMediaMimeType?: string | string[];
+    activityMediaFileName?: string | string[];
   }>();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { requireSubscription } = useSubscriptionGuard();
   const { celebrateCompletion } = useCelebration();
   const toast = useToast();
 
-  const loggedActivity = useMemo(() => getLoggedActivity(params.activityKey), [params.activityKey]);
+  const activityKey = getRouteParam(params.activityKey);
+  const activityMode = getRouteParam(params.activityMode);
+  const activityCaption = getRouteParam(params.activityCaption);
+  const activityMediaUri = getRouteParam(params.activityMediaUri);
+  const activityMediaType = getRouteParam(params.activityMediaType);
+  const activityMediaWidth = getRouteParam(params.activityMediaWidth);
+  const activityMediaHeight = getRouteParam(params.activityMediaHeight);
+  const activityMediaDuration = getRouteParam(params.activityMediaDuration);
+  const activityMediaMimeType = getRouteParam(params.activityMediaMimeType);
+  const activityMediaFileName = getRouteParam(params.activityMediaFileName);
+
+  const loggedActivity = useMemo(() => getLoggedActivity(activityKey), [activityKey]);
   const activitySubmission = useMemo(
-    () => getActivitySubmissionOption(params.activityMode),
-    [params.activityMode]
+    () => getActivitySubmissionOption(activityMode),
+    [activityMode]
   );
   const activityPoints =
     loggedActivity && activitySubmission
@@ -83,7 +93,7 @@ export default function NewPost() {
   const hasPreparedActivityMedia = useRef(false);
 
   const [body, setBody] = useState(
-    params.activityCaption || (loggedActivity ? getRandomActivityCaption(loggedActivity.key) : '')
+    activityCaption || (loggedActivity ? getRandomActivityCaption(loggedActivity.key) : '')
   );
   const [media, setMedia] = useState<ImagePickerAsset | null>(null);
   const [mediaUri, setMediaUri] = useState<string | undefined>(undefined);
@@ -286,8 +296,8 @@ export default function NewPost() {
     if (
       hasPreparedActivityMedia.current ||
       !isActivityPost ||
-      !params.activityMediaUri ||
-      !params.activityMediaType
+      !activityMediaUri ||
+      !activityMediaType
     ) {
       return;
     }
@@ -297,17 +307,17 @@ export default function NewPost() {
     setUploadProgress(0);
     setMediaLoading(true);
 
-    const width = Number(params.activityMediaWidth);
-    const height = Number(params.activityMediaHeight);
-    const duration = Number(params.activityMediaDuration);
+    const width = Number(activityMediaWidth);
+    const height = Number(activityMediaHeight);
+    const duration = Number(activityMediaDuration);
     const activityMedia: ImagePickerAsset = {
-      uri: params.activityMediaUri,
-      type: params.activityMediaType === 'video' ? 'video' : 'image',
+      uri: activityMediaUri,
+      type: activityMediaType === 'video' ? 'video' : 'image',
       width: Number.isFinite(width) && width > 0 ? width : 1080,
       height: Number.isFinite(height) && height > 0 ? height : 1080,
       duration: Number.isFinite(duration) ? duration : null,
-      mimeType: params.activityMediaMimeType,
-      fileName: params.activityMediaFileName || null,
+      mimeType: activityMediaMimeType,
+      fileName: activityMediaFileName || null,
     };
 
     if (activityMedia.type === 'video') {
@@ -316,14 +326,14 @@ export default function NewPost() {
       prepareImage(activityMedia).catch((prepareError) => setError(getErrorMessage(prepareError)));
     }
   }, [
+    activityMediaDuration,
+    activityMediaFileName,
+    activityMediaHeight,
+    activityMediaMimeType,
+    activityMediaType,
+    activityMediaUri,
+    activityMediaWidth,
     isActivityPost,
-    params.activityMediaDuration,
-    params.activityMediaFileName,
-    params.activityMediaHeight,
-    params.activityMediaMimeType,
-    params.activityMediaType,
-    params.activityMediaUri,
-    params.activityMediaWidth,
     prepareImage,
     prepareVideo,
   ]);
@@ -430,7 +440,7 @@ export default function NewPost() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {loggedActivity && activitySubmission ? (
-            <View className="mx-4 mt-4 rounded-3xl border border-[#F3D8CB] bg-[#FFF8F4] p-4">
+            <View className="mx-4 mt-4 rounded-[26px] border border-[#F3D8CB] bg-[#FFF8F4] p-4">
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-3">
                   <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
@@ -450,99 +460,114 @@ export default function NewPost() {
                   <Text className="font-body text-[9px] text-[#8A827D]">Photo proof</Text>
                 </View>
               </View>
+
+              <View className="my-3 h-px bg-[#F1DED5]" />
+
+              <View className="flex-row items-start">
+                <Avatar
+                  uri={currentUser?.image ?? undefined}
+                  size={42}
+                  showGoldBorder
+                  name={currentUser?.name}
+                />
+                <View className="ml-3 min-w-0 flex-1">
+                  <Text className="font-body text-xs font-semibold text-[#8A827D]">
+                    Posting as {currentUser?.name ?? 'You'}
+                  </Text>
+                  <Input className="mt-2 h-auto min-h-[76px] rounded-2xl border border-[#E9D9D1] bg-white">
+                    <InputField
+                      multiline
+                      className="px-3 py-2.5 font-body text-[15px] leading-5 text-[#2A2725]"
+                      value={body}
+                      onChangeText={(text) => {
+                        setError(null);
+                        setBody(text);
+                      }}
+                      accessibilityLabel="Activity caption"
+                      style={{
+                        minHeight: 74,
+                        ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
+                      }}
+                    />
+                  </Input>
+                </View>
+              </View>
             </View>
           ) : null}
 
-          <View
-            className="mx-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4"
-            style={{ marginTop: isActivityPost ? 12 : 16 }}>
-            <View className="flex-row items-start gap-x-3">
-              <Avatar
-                uri={currentUser?.image ?? undefined}
-                size={46}
-                showGoldBorder
-                name={currentUser?.name}
-              />
+          {!isActivityPost ? (
+            <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
+              <View className="flex-row items-start gap-x-3">
+                <Avatar
+                  uri={currentUser?.image ?? undefined}
+                  size={46}
+                  showGoldBorder
+                  name={currentUser?.name}
+                />
 
-              <View className="flex-1">
-                <Text className="font-body text-sm font-bold text-[#1A1A1A]">
-                  {currentUser?.name ?? 'You'}
-                </Text>
+                <View className="flex-1">
+                  <Text className="font-body text-sm font-bold text-[#1A1A1A]">
+                    {currentUser?.name ?? 'You'}
+                  </Text>
 
-                <Input className="mt-1 h-auto border-0 bg-transparent">
-                  <InputField
-                    multiline
-                    autoFocus={!isActivityPost}
-                    className="border-0 bg-transparent px-0 text-base"
-                    placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
-                    value={body}
-                    onChangeText={(text) => {
-                      setError(null);
-                      setBody(text);
-                    }}
-                    style={{
-                      fontSize: 16,
-                      minHeight: 105,
-                      ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
-                    }}
-                  />
-                </Input>
+                  <Input className="mt-1 h-auto border-0 bg-transparent">
+                    <InputField
+                      multiline
+                      autoFocus
+                      className="border-0 bg-transparent px-0 text-base"
+                      placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
+                      value={body}
+                      onChangeText={(text) => {
+                        setError(null);
+                        setBody(text);
+                      }}
+                      style={{
+                        fontSize: 16,
+                        minHeight: 105,
+                        ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
+                      }}
+                    />
+                  </Input>
+                </View>
+              </View>
 
-                {isActivityPost && loggedActivity ? (
+              {!media && (
+                <View className="mt-4 flex-row gap-x-3">
                   <TouchableOpacity
-                    activeOpacity={0.75}
-                    accessibilityRole="button"
-                    accessibilityLabel="Use another suggested caption"
-                    onPress={() => {
-                      setError(null);
-                      setBody(getRandomActivityCaption(loggedActivity.key, body));
-                    }}
-                    className="mt-2 flex-row items-center self-start rounded-[14px] bg-[#FFF0E8] px-3 py-2">
-                    <ArrowsClockwise size={14} color="#E94F12" weight="bold" />
-                    <Text className="ml-1.5 font-heading text-[11px] font-bold text-[#E94F12]">
-                      Try another caption
-                    </Text>
+                    activeOpacity={0.85}
+                    onPress={selectImage}
+                    disabled={isUploading}
+                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
+                    style={{ opacity: isUploading ? 0.5 : 1 }}>
+                    <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
+                      <ImageSquare size={22} color="#FF5C1A" weight="duotone" />
+                    </View>
+
+                    <View>
+                      <Text className="font-body text-sm font-bold text-[#1A1A1A]">Photo</Text>
+                      <Text className="font-body text-xs text-[#838383]">Upload image</Text>
+                    </View>
                   </TouchableOpacity>
-                ) : null}
-              </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={selectVideo}
+                    disabled={isUploading}
+                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
+                    style={{ opacity: isUploading ? 0.5 : 1 }}>
+                    <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
+                      <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
+                    </View>
+
+                    <View>
+                      <Text className="font-body text-sm font-bold text-[#1A1A1A]">Video</Text>
+                      <Text className="font-body text-xs text-[#838383]">{videoLimitText}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-
-            {!media && !isActivityPost && (
-              <View className="mt-4 flex-row gap-x-3">
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={selectImage}
-                  disabled={isUploading}
-                  className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
-                  style={{ opacity: isUploading ? 0.5 : 1 }}>
-                  <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
-                    <ImageSquare size={22} color="#FF5C1A" weight="duotone" />
-                  </View>
-
-                  <View>
-                    <Text className="font-body text-sm font-bold text-[#1A1A1A]">Photo</Text>
-                    <Text className="font-body text-xs text-[#838383]">Upload image</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={selectVideo}
-                  disabled={isUploading}
-                  className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
-                  style={{ opacity: isUploading ? 0.5 : 1 }}>
-                  <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
-                    <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
-                  </View>
-
-                  <View>
-                    <Text className="font-body text-sm font-bold text-[#1A1A1A]">Video</Text>
-                    <Text className="font-body text-xs text-[#838383]">{videoLimitText}</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+          ) : null}
 
           <View className="mt-4 px-4">
             {mediaLoading ? (
@@ -586,10 +611,10 @@ export default function NewPost() {
                       source={{ uri: mediaUri }}
                       style={{
                         width: '100%',
-                        height: 400,
+                        height: isActivityPost ? 300 : 400,
                         backgroundColor: '#EFEFEF',
                       }}
-                      resizeMode="contain"
+                      resizeMode={isActivityPost ? 'cover' : 'contain'}
                       blurRadius={uploadingMedia ? 5 : 0}
                     />
                   )}
@@ -612,6 +637,8 @@ export default function NewPost() {
                   {!isUploading && (
                     <TouchableOpacity
                       onPress={isActivityPost ? () => router.back() : resetMedia}
+                      accessibilityRole="button"
+                      accessibilityLabel={isActivityPost ? 'Retake activity proof' : 'Remove media'}
                       className="absolute right-3 top-3 rounded-full bg-[rgba(0,0,0,0.75)] p-2">
                       <X color="#fff" size={18} />
                     </TouchableOpacity>
@@ -620,11 +647,19 @@ export default function NewPost() {
 
                 <View className="px-4 py-3">
                   <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
-                    {media.type === 'video' ? 'Video attached' : 'Photo attached'}
+                    {isActivityPost
+                      ? 'Activity proof'
+                      : media.type === 'video'
+                        ? 'Video attached'
+                        : 'Photo attached'}
                   </Text>
 
                   <Text className="mt-0.5 font-body text-xs text-[#838383]">
-                    {uploadingMedia ? 'Uploading media...' : 'Ready to post'}
+                    {uploadingMedia
+                      ? 'Uploading media...'
+                      : isActivityPost
+                        ? 'Ready to share with your community'
+                        : 'Ready to post'}
                   </Text>
                 </View>
               </View>
@@ -669,7 +704,7 @@ export default function NewPost() {
             <ButtonText
               className="flex-1 text-left text-base text-white"
               style={{ fontFamily: 'Inter_700Bold' }}>
-              {isActivityPost ? 'Log activity' : 'Post'}
+              {isActivityPost ? 'Share activity' : 'Post'}
             </ButtonText>
             <ArrowRight size={23} color="#FFFFFF" weight="bold" />
           </LoadingButton>

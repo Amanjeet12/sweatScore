@@ -4,13 +4,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Camera,
-  CameraRotate,
+  Drop,
   Footprints,
   ForkKnife,
   MoonStars,
   Plus,
-  TShirt,
-  TrendUp,
   X,
 } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -45,36 +43,24 @@ function ActivityIcon({ name, size = 22 }: { name: string; size?: number }) {
   const props = { size, color: PRIMARY, weight: 'duotone' as const };
 
   switch (name) {
+    case 'hydration':
+      return <Drop {...props} />;
     case 'footprints':
       return <Footprints {...props} />;
     case 'sleep':
       return <MoonStars {...props} />;
     case 'meal':
       return <ForkKnife {...props} />;
-    case 'selfie':
-      return <CameraRotate {...props} />;
-    case 'outfit':
-      return <TShirt {...props} />;
-    case 'progress':
-      return <TrendUp {...props} />;
     default:
       return <Plus {...props} />;
   }
 }
 
-function SubmissionIcon({ mode }: { mode: ActivitySubmissionMode }) {
-  return mode === 'take_photo' ? (
-    <Camera size={21} color={PRIMARY} />
-  ) : (
-    <CameraRotate size={21} color={PRIMARY} />
-  );
+function SubmissionIcon() {
+  return <Camera size={21} color={PRIMARY} />;
 }
 
-export default function LogActivityButton({
-  tourTargetRef,
-}: {
-  tourTargetRef?: RefObject<View | null>;
-}) {
+export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: RefObject<View> }) {
   const insets = useSafeAreaInsets();
   const { requireSubscription } = useSubscriptionGuard();
   const pulse = useRef(new Animated.Value(0)).current;
@@ -125,17 +111,10 @@ export default function LogActivityButton({
     setIsOpeningMedia(true);
 
     try {
-      const usesCamera = mode === 'take_photo';
-
-      if (usesCamera) {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert(
-            'Camera access needed',
-            'Allow camera access to capture your activity proof.'
-          );
-          return;
-        }
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera access needed', 'Allow camera access to capture your activity proof.');
+        return;
       }
 
       const options: ImagePicker.ImagePickerOptions = {
@@ -145,13 +124,7 @@ export default function LogActivityButton({
         selectionLimit: 1,
       };
 
-      const result = usesCamera
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync({
-            ...options,
-            preferredAssetRepresentationMode:
-              ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
-          });
+      const result = await ImagePicker.launchCameraAsync(options);
 
       if (result.canceled || !result.assets[0]) return;
 
@@ -314,7 +287,7 @@ export default function LogActivityButton({
                         borderBottomColor: '#EEE7E2',
                       }}>
                       <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
-                        <SubmissionIcon mode={option.mode} />
+                        <SubmissionIcon />
                       </View>
                       <View className="min-w-0 flex-1 pr-2">
                         <Text className="font-heading text-sm font-bold text-[#1A1A1A]">

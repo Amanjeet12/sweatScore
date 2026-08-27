@@ -13,7 +13,7 @@ export type TodayTourTarget = {
 
 const TOUR_STEPS = [
   {
-    eyebrow: 'Today’s Move',
+    eyebrow: 'Today’s Check-in',
     title: 'Complete your daily check-in',
     description: 'Open this card, follow today’s move, and share your proof to earn Sweat Points.',
     icon: Fire,
@@ -29,7 +29,7 @@ const TOUR_STEPS = [
     eyebrow: 'Your Activity',
     title: 'Log everyday wins',
     description:
-      'Use Log activity to share steps, sleep, meals, workout photos, and progress for extra points.',
+      'Use Log activity to snap live proof of hydration, healthy meals, sleep, or 10,000 steps for extra points.',
     icon: PlusCircle,
   },
 ] as const;
@@ -70,13 +70,7 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
     : { top: Math.max(insets.top + 180, screenHeight * 0.32) };
 
   return (
-    <Modal
-      transparent
-      statusBarTranslucent
-      navigationBarTranslucent
-      animationType="fade"
-      visible
-      onRequestClose={onSkip}>
+    <Modal transparent statusBarTranslucent animationType="fade" visible onRequestClose={onSkip}>
       <View className="flex-1">
         {spotlight ? (
           <>

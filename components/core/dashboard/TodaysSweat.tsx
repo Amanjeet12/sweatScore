@@ -109,7 +109,7 @@ export default function TodaysSweat({
 }: {
   refreshKey: number;
   streakDays?: number;
-  activityLogTourRef?: RefObject<View | null>;
+  activityLogTourRef?: RefObject<View>;
 }) {
   const [period, setPeriod] = useState<Period>('today');
 
