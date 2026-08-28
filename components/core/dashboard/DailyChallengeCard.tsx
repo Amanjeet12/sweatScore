@@ -24,10 +24,11 @@ import { getData, storeData } from '~/utils/storage';
 const DAILY_CHALLENGE_CACHE_KEY = 'daily_challenge_card_cache';
 
 const CHECK_IN_PLACEHOLDERS = [
-  { initial: 'A', color: '#C96B4B' },
-  { initial: 'M', color: '#8347B8' },
-  { initial: 'S', color: '#2E987D' },
-  { initial: 'T', color: '#DE5D91' },
+  { letter: 'S', color: '#C96B4B' },
+  { letter: 'W', color: '#8347B8' },
+  { letter: 'E', color: '#2E987D' },
+  { letter: 'A', color: '#DE5D91' },
+  { letter: 'T', color: '#B9343A' },
 ];
 
 function formatRemainingTime(seconds: number) {
@@ -397,15 +398,11 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
         }
       : null;
   const recentCheckInUsers = [
-    ...backendCheckInUsers,
     ...(currentUserCheckIn ? [currentUserCheckIn] : []),
-  ].slice(0, 4);
-  const placeholderUsers = CHECK_IN_PLACEHOLDERS.slice(
-    0,
-    Math.max(0, 4 - recentCheckInUsers.length)
-  );
+    ...backendCheckInUsers,
+  ].slice(0, CHECK_IN_PLACEHOLDERS.length);
+  const placeholders = CHECK_IN_PLACEHOLDERS.slice(recentCheckInUsers.length);
   const actualCheckInCount = Math.max(dailyChallenge.actualCheckInCount ?? 0, isCompleted ? 1 : 0);
-  const displayedCompletionCount = 5 + actualCheckInCount;
 
   return (
     <View
@@ -493,22 +490,24 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
                     <Avatar uri={user.imageUrl ?? undefined} name={user.initial} size={30} />
                   </View>
                 ))}
-                {placeholderUsers.map((user, index) => (
+                {placeholders.map((placeholder, index) => (
                   <View
-                    key={`placeholder-${user.initial}`}
+                    key={`placeholder-${placeholder.letter}`}
                     className="h-[34px] w-[34px] items-center justify-center rounded-full border-2 border-white"
                     style={{
                       marginLeft: recentCheckInUsers.length === 0 && index === 0 ? 0 : -9,
-                      backgroundColor: user.color,
+                      backgroundColor: placeholder.color,
                     }}>
                     <Text className="font-heading text-[12px] font-bold text-white">
-                      {user.initial}
+                      {placeholder.letter}
                     </Text>
                   </View>
                 ))}
               </View>
               <Text className="ml-3 flex-shrink text-[12px] font-semibold text-white">
-                {displayedCompletionCount} members completed
+                {actualCheckInCount > 0
+                  ? `${actualCheckInCount} ${actualCheckInCount === 1 ? 'member' : 'members'} completed`
+                  : 'Be the first to check-in'}
               </Text>
             </View>
           </View>

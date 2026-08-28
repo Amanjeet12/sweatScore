@@ -61,9 +61,9 @@ export default function PaywallOverlay({ children }: PaywallOverlayProps) {
           <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
             See where you rank on this month's leaderboard
           </Text>
-          <View className="mb-5 mt-4 flex-row items-center gap-x-2 rounded-xl bg-[#F76B1C] px-5 py-3">
-            <Text className="font-heading text-sm font-bold text-white">Unlock your rank</Text>
-            <ArrowRight size={16} color="#FFFFFF" weight="bold" />
+          <View className="mb-5 mt-4 flex-row items-center gap-x-2 px-2 py-1">
+            <Text className="font-heading text-sm font-bold text-[#F76B1C]">Unlock your rank</Text>
+            <ArrowRight size={16} color="#F76B1C" weight="bold" />
           </View>
         </View>
       </Pressable>

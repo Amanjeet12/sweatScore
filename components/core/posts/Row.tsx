@@ -773,6 +773,9 @@ export default function PostRow({
           <TouchableOpacity
             className="ml-auto flex-row items-center gap-x-1"
             onPress={() => {
+              const redirectTo = `/challenge-view/${post.challengeId}`;
+              if (!requireSubscription({ redirectTo, source: 'feed_do_this' })) return;
+
               router.push({
                 pathname: '/challenge-view/[challengeId]' as any,
                 params: { challengeId: post.challengeId },

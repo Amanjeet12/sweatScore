@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import CompletionFooter from '~/components/core/leaderboard/CompletionFooter';
 import LeaderboardHeader from '~/components/core/leaderboard/LeaderboardHeader';
 import { LeaderboardPeriod } from '~/components/core/leaderboard/LeaderboardPeriodDropdown';
 import MeRow from '~/components/core/leaderboard/MeRow';
@@ -232,28 +231,17 @@ export default function TabRank() {
         <PaywallOverlay>
           <LockedLeaderboardPreview />
         </PaywallOverlay>
-      ) : (
-        <>
-          {otherParticipantCount > 0 ? (
-            <View className="mx-4 mt-5 rounded-2xl bg-[#FFF7F1] px-4 py-3.5">
-              <Text className="text-center font-body text-sm text-[#5A5A5A]">
-                {otherParticipantCount}{' '}
-                {otherParticipantCount === 1
-                  ? 'other is also participating'
-                  : 'others are also participating'}{' '}
-                in this challenge.
-              </Text>
-            </View>
-          ) : null}
-
-          {period === 'month' && leaderboard.completedCount > 0 ? (
-            <CompletionFooter
-              completedCount={leaderboard.completedCount}
-              targetPoints={leaderboard.targetPoints}
-            />
-          ) : null}
-        </>
-      )}
+      ) : otherParticipantCount > 0 ? (
+        <View className="mx-4 mt-5 rounded-2xl bg-[#FFF7F1] px-4 py-3.5">
+          <Text className="text-center font-body text-sm text-[#5A5A5A]">
+            {otherParticipantCount}{' '}
+            {otherParticipantCount === 1
+              ? 'other is also participating'
+              : 'others are also participating'}{' '}
+            in this challenge.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 

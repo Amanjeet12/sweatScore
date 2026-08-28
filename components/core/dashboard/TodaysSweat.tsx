@@ -3,7 +3,7 @@ import { useQuery as useTanstackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Check, LockSimple, X } from 'phosphor-react-native';
+import { Check, Fire, LockSimple, X } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
 import { TouchableOpacity, View } from 'react-native';
@@ -248,21 +248,22 @@ export default function TodaysSweat({
         </View>
 
         {period === 'week' ? (
-          streakDays > 0 ? (
-            <Text className="py-2 font-heading text-[11px] font-extrabold text-[#E34500]">
-              {streakDays} day streak
+          <View className="flex-row items-center rounded-full bg-[#F2EFED] px-3 py-1.5">
+            <Fire size={14} color="#E34500" weight="fill" />
+            <Text className="ml-1.5 font-heading text-[12px] font-extrabold text-[#E34500]">
+              {streakDays} {streakDays === 1 ? 'day' : 'days'} streak
             </Text>
-          ) : null
+          </View>
         ) : (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setShowTooltip(true)}
             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            className="flex-row items-center justify-center py-2">
+            className="flex-row items-center justify-center rounded-full bg-[#F2EFED] px-3 py-1.5">
             {isDailyCapped ? (
               <LockSimple size={13} color="#E34500" weight="bold" style={{ marginRight: 4 }} />
             ) : null}
-            <Text className="font-heading text-[11px] font-extrabold text-[#E34500]">
+            <Text className="font-heading text-[12px] font-extrabold text-[#E34500]">
               {pointsBadgeText}
             </Text>
           </TouchableOpacity>

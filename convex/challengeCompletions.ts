@@ -1105,7 +1105,7 @@ export const getTodayDailyChallenge = query({
     );
     const actualCheckInCount = uniqueCompletions.length;
     const recentCheckInUsers = await Promise.all(
-      uniqueCompletions.slice(0, 4).map(async (completion) => {
+      uniqueCompletions.slice(0, 5).map(async (completion) => {
         const user = await ctx.db.get(completion.userId);
         const name = getSafeMemberName(user);
 

@@ -43,9 +43,9 @@ export default function LeaderboardPeriodDropdown({
         accessibilityLabel={`Leaderboard period: ${LABELS[value]}`}
         accessibilityHint="Opens the leaderboard period options"
         onPress={() => setIsOpen(true)}
-        className="flex-row items-center gap-x-1.5 rounded-full border border-[#E8DED6] bg-white px-3.5 py-2">
-        <Text className="font-heading text-xs font-bold text-[#1A1A1A]">{LABELS[value]}</Text>
-        <CaretDown size={12} color="#F76B1C" weight="bold" />
+        className="flex-row items-center gap-x-1.5 rounded-full bg-white px-3 py-2">
+        <Text className="font-body text-sm font-medium text-[#5A5A5A]">{LABELS[value]}</Text>
+        <CaretDown size={13} color="#5A5A5A" weight="bold" />
       </Pressable>
 
       <Modal

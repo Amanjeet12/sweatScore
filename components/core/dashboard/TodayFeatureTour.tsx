@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  Platform,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -25,6 +26,7 @@ const TOUR_STEPS = [
     title: 'Complete your daily check-in',
     description: 'Open this card, follow today’s move, and share your proof to earn Sweat Points.',
     icon: Fire,
+    cornerRadius: 28,
   },
   {
     eyebrow: 'Your Community',
@@ -32,6 +34,7 @@ const TOUR_STEPS = [
     description:
       'See the latest conversation, meet active members, and jump straight into your group chat.',
     icon: UsersThree,
+    cornerRadius: 26,
   },
   {
     eyebrow: 'Your Activity',
@@ -39,6 +42,7 @@ const TOUR_STEPS = [
     description:
       'Use Log activity to snap live proof of hydration, healthy meals, sleep, or 10,000 steps for extra points.',
     icon: PlusCircle,
+    cornerRadius: 20,
   },
 ] as const;
 
@@ -63,12 +67,21 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
   const isLastStep = stepIndex === TOUR_STEPS.length - 1;
   const horizontalInset = 12;
   const spotlight = target
-    ? {
-        x: Math.max(horizontalInset, target.x),
-        y: Math.max(insets.top + 4, target.y),
-        width: Math.min(screenWidth - horizontalInset * 2, target.width),
-        height: target.height,
-      }
+    ? (() => {
+        const minimumTop = Platform.OS === 'android' ? 4 : insets.top + 4;
+        const maximumBottom = screenHeight - (Platform.OS === 'android' ? 4 : insets.bottom + 4);
+        const x = Math.max(horizontalInset, target.x);
+        const y = Math.max(minimumTop, target.y);
+        const right = Math.min(screenWidth - horizontalInset, target.x + target.width);
+        const bottom = Math.min(maximumBottom, target.y + target.height);
+
+        return {
+          x,
+          y,
+          width: Math.max(1, right - x),
+          height: Math.max(1, bottom - y),
+        };
+      })()
     : null;
   const placeCardAbove = spotlight ? spotlight.y > screenHeight * 0.5 : false;
   const cardPosition = spotlight
@@ -78,7 +91,12 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
     : { top: Math.max(insets.top + 180, screenHeight * 0.32) };
 
   return (
-    <Modal transparent statusBarTranslucent animationType="fade" visible onRequestClose={onSkip}>
+    <Modal
+      transparent
+      statusBarTranslucent={Platform.OS !== 'android'}
+      animationType="fade"
+      visible
+      onRequestClose={onSkip}>
       <View className="flex-1">
         {spotlight ? (
           <>
@@ -95,8 +113,8 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
                     y={spotlight.y}
                     width={spotlight.width}
                     height={spotlight.height}
-                    rx={28}
-                    ry={28}
+                    rx={currentStep.cornerRadius}
+                    ry={currentStep.cornerRadius}
                     fill="#000000"
                   />
                 </Mask>
@@ -112,12 +130,13 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
             </Svg>
             <View
               pointerEvents="none"
-              className="absolute rounded-[28px] border-[3px] border-primary-500"
+              className="absolute border-[3px] border-primary-500"
               style={{
                 left: spotlight.x,
                 top: spotlight.y,
                 width: spotlight.width,
                 height: spotlight.height,
+                borderRadius: currentStep.cornerRadius,
               }}
             />
           </>

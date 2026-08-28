@@ -41,6 +41,14 @@ function getMessagePreview(message: Doc<'chatMessages'> | null) {
 }
 
 /**
+ * Count people rather than membership rows so legacy duplicate records
+ * can never inflate the total shown in the UI.
+ */
+function getUniqueMemberCount(memberships: Doc<'chatMembers'>[]) {
+  return new Set(memberships.map((membership) => String(membership.userId))).size;
+}
+
+/**
  * Creates the default Sweat Sisters group.
  *
  * Only an application administrator can call this mutation.
@@ -205,7 +213,7 @@ export const getGroup = query({
 
       imageUrl: group.imageStorageId ? await ctx.storage.getUrl(group.imageStorageId) : null,
 
-      memberCount: activeMemberships.length,
+      memberCount: getUniqueMemberCount(activeMemberships),
 
       membershipStatus: membership?.status ?? 'not_joined',
 
@@ -292,7 +300,7 @@ export const listMyGroups = query({
 
         imageUrl,
 
-        memberCount: activeMembers.length,
+        memberCount: getUniqueMemberCount(activeMembers),
 
         role: membership.role,
 
@@ -458,7 +466,7 @@ export const getHomeGroupPreview = query({
       isMember: selected.isMember,
       name: selected.group.name,
       imageUrl: await getSafeUserImageUrl(ctx, selected.group.imageStorageId),
-      memberCount: activeMemberships.length,
+      memberCount: getUniqueMemberCount(activeMemberships),
       previewMembers,
       lastMessage: lastMessage
         ? {
@@ -532,7 +540,7 @@ export const listAvailableGroups = query({
           slug: group.slug,
           imageUrl,
 
-          memberCount: activeMembers.length,
+          memberCount: getUniqueMemberCount(activeMembers),
 
           lastMessage: getMessagePreview(lastMessage),
 
