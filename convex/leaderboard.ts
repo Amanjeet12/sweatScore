@@ -480,6 +480,166 @@ type LeaderboardEntry = {
   image: string | null;
 };
 
+const leaderboardPeriodValidator = v.union(
+  v.literal('month'),
+  v.literal('week'),
+  v.literal('today')
+);
+
+type LeaderboardPeriod = 'month' | 'week' | 'today';
+
+type RankedLeaderboardRow = {
+  userId: import('./_generated/dataModel').Id<'users'>;
+  rank: number;
+  displayTotalPoints: number;
+};
+
+/*
+ * Returns the leaderboard for the selected reset window without creating
+ * another persisted leaderboard table. Month reuses the existing ranked
+ * snapshot; week and today aggregate the existing dated point records live.
+ */
+export const getLeaderboardForPeriod = query({
+  args: {
+    period: leaderboardPeriodValidator,
+    startDate: v.string(),
+    endDate: v.string(),
+    yearMonth: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Unauthorized');
+
+    const viewer = await ctx.db.get(userId);
+    if (!viewer) throw new ConvexError('User not found');
+
+    const access = viewer.isAdmin ? 'admin' : viewer.isPremium ? 'paid' : 'free';
+    const banner = await ctx.db.query('rewardsBannerImage').order('desc').first();
+    const targetPoints = banner?.targetPoints ?? 500;
+
+    let rankedRows: RankedLeaderboardRow[] = [];
+    let myPoints = 0;
+
+    if (args.period === 'month') {
+      const monthRows = await ctx.db
+        .query('monthlyLeaderboard')
+        .withIndex('by_year_month_and_rank', (q) => q.eq('yearMonth', args.yearMonth))
+        .order('asc')
+        .collect();
+
+      rankedRows = monthRows
+        .filter((row) => row.totalPoints >= 1)
+        .map((row, index) => ({
+          userId: row.userId,
+          rank: row.rank ?? index + 1,
+          displayTotalPoints: row.displayTotalPoints ?? 0,
+        }));
+
+      const myRow = monthRows.find((row) => row.userId === userId);
+      myPoints = myRow?.displayTotalPoints ?? 0;
+    } else {
+      const [activities, checkIns, completions] = await Promise.all([
+        ctx.db
+          .query('dailyActivities')
+          .withIndex('by_date', (q) => q.gte('date', args.startDate).lte('date', args.endDate))
+          .filter((q) =>
+            q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved'))
+          )
+          .collect(),
+        ctx.db
+          .query('userCheckIns')
+          .withIndex('by_date', (q) => q.gte('date', args.startDate).lte('date', args.endDate))
+          .collect(),
+        ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_date', (q) => q.gte('date', args.startDate).lte('date', args.endDate))
+          .filter((q) => q.neq(q.field('removed'), true))
+          .collect(),
+      ]);
+
+      const pointsByUser = new Map<import('./_generated/dataModel').Id<'users'>, number>();
+      const addPoints = (
+        id: import('./_generated/dataModel').Id<'users'>,
+        points: number | undefined
+      ) => {
+        pointsByUser.set(id, (pointsByUser.get(id) ?? 0) + Math.max(0, points ?? 0));
+      };
+
+      for (const activity of activities) {
+        addPoints(activity.userId, activity.displayTotalPoints);
+      }
+      for (const checkIn of checkIns) {
+        addPoints(checkIn.userId, checkIn.points);
+      }
+      for (const completion of completions) {
+        addPoints(completion.userId, completion.pointsEarned);
+      }
+
+      myPoints = pointsByUser.get(userId) ?? 0;
+
+      rankedRows = Array.from(pointsByUser.entries())
+        .filter(([, points]) => points >= 1)
+        .sort(([firstUserId, firstPoints], [secondUserId, secondPoints]) => {
+          if (secondPoints !== firstPoints) return secondPoints - firstPoints;
+          return String(firstUserId).localeCompare(String(secondUserId));
+        })
+        .map(([rankedUserId, displayTotalPoints], index) => ({
+          userId: rankedUserId,
+          rank: index + 1,
+          displayTotalPoints,
+        }));
+    }
+
+    const totalUsers = rankedRows.length;
+    const completedCount = rankedRows.filter(
+      (row) => row.displayTotalPoints >= targetPoints
+    ).length;
+    const visibleLimit = access === 'admin' ? rankedRows.length : access === 'paid' ? 20 : 10;
+
+    const hydrate = async (row: RankedLeaderboardRow): Promise<LeaderboardEntry | null> => {
+      const user = await ctx.db.get(row.userId);
+      if (!user) return null;
+      const imageUrl = user.image ? await ctx.storage.getUrl(user.image) : null;
+
+      return {
+        ...row,
+        name: user.name ?? 'Anonymous User',
+        image: imageUrl,
+      };
+    };
+
+    const entries = (await Promise.all(rankedRows.slice(0, visibleLimit).map(hydrate))).filter(
+      (entry): entry is LeaderboardEntry => entry !== null
+    );
+
+    const podium: [LeaderboardEntry | null, LeaderboardEntry | null, LeaderboardEntry | null] = [
+      entries.find((entry) => entry.rank === 1) ?? null,
+      entries.find((entry) => entry.rank === 2) ?? null,
+      entries.find((entry) => entry.rank === 3) ?? null,
+    ];
+
+    const myRankedRow = rankedRows.find((row) => row.userId === userId);
+    const me = await hydrate(
+      myRankedRow ?? {
+        userId,
+        rank: 0,
+        displayTotalPoints: myPoints,
+      }
+    );
+
+    return {
+      period: args.period as LeaderboardPeriod,
+      access,
+      targetPoints,
+      podium,
+      me,
+      entries,
+      totalUsers,
+      completedCount,
+    };
+  },
+});
+
 export const getMonthlyLeaderboardHeader = query({
   args: { yearMonth: v.string() },
   handler: async (ctx, args) => {

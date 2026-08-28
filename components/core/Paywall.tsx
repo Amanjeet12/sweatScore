@@ -243,8 +243,6 @@ export default function Paywall() {
     return formatCurrency(monthlyEquivalent, annualPackage.product.currencyCode);
   }, [annualPackage]);
 
-  const hasTrial = Boolean(selectedPackage?.product?.introPrice);
-
   const isCtaDisabled =
     !selectedPackage ||
     !purchasePackage ||
@@ -254,10 +252,10 @@ export default function Paywall() {
     isPackagesLoading;
 
   const paywallBullets = [
-    'Jump rope and sculpt workout challenges',
-    'A simple daily plan to build your streak',
-    'Daily checklist to track and maintain habits',
-    'Auto-tracked steps and workout targets',
+    'Jump rope and sculpt challenges',
+    'A simple plan to stay consistent',
+    'Daily checklist to maintain habits',
+    'Auto-tracked steps and workouts',
     'A community to keep you motivated',
   ];
 
@@ -436,9 +434,7 @@ export default function Paywall() {
       />
 
       <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">
-        {hasTrial
-          ? 'Start with your free trial. Cancel anytime.'
-          : 'Instant access. Cancel anytime.'}
+        Instant access. Cancel anytime.
       </Text>
 
       <View className="mt-7 flex-row items-center justify-center">

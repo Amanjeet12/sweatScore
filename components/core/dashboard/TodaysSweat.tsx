@@ -3,7 +3,7 @@ import { useQuery as useTanstackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Check, Fire, LockSimple, X } from 'phosphor-react-native';
+import { Check, LockSimple, X } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
 import { TouchableOpacity, View } from 'react-native';
@@ -244,25 +244,25 @@ export default function TodaysSweat({
           <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
             Your activity
           </Text>
-          <Text className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">Your movement</Text>
+          <Text className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">Sweat Points</Text>
         </View>
 
         {period === 'week' ? (
-          <View className="h-9 flex-row items-center justify-center rounded-full bg-[#FFECE4] px-3">
-            <Fire size={14} color="#E34500" weight="fill" />
-            <Text className="ml-1.5 font-heading text-[11px] font-extrabold text-[#E34500]">
+          streakDays > 0 ? (
+            <Text className="py-2 font-heading text-[11px] font-extrabold text-[#E34500]">
               {streakDays} day streak
             </Text>
-          </View>
+          ) : null
         ) : (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setShowTooltip(true)}
-            className="h-9 flex-row items-center justify-center rounded-full bg-[#FFECE4] px-3">
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            className="flex-row items-center justify-center py-2">
             {isDailyCapped ? (
-              <LockSimple size={13} color="#FF4B1F" weight="bold" style={{ marginRight: 4 }} />
+              <LockSimple size={13} color="#E34500" weight="bold" style={{ marginRight: 4 }} />
             ) : null}
-            <Text className="font-heading text-[11px] font-extrabold text-[#FF4B1F]">
+            <Text className="font-heading text-[11px] font-extrabold text-[#E34500]">
               {pointsBadgeText}
             </Text>
           </TouchableOpacity>

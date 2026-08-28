@@ -234,7 +234,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                 <Text className="mt-1 font-body text-xs leading-4 text-[#8A827D]">
                   {selectedActivity
                     ? selectedActivity.proof
-                    : 'Choose an optional activity to share with your community.'}
+                    : 'Choose an activity to share with your community.'}
                 </Text>
               </View>
 
@@ -312,7 +312,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                       accessibilityRole="button"
                       accessibilityLabel={`${activity.title}, ${activity.basePoints} points`}
                       onPress={() => setSelectedActivityKey(activity.key)}
-                      className="min-h-[92px] flex-row items-center rounded-[18px] border border-[#E8E1DC] bg-[#FFFCFA] px-3.5 py-3">
+                      className="min-h-[82px] flex-row items-center rounded-[18px] border border-[#E8E1DC] bg-[#FFFCFA] px-3.5 py-3">
                       <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
                         <ActivityIcon name={activity.icon} />
                       </View>
@@ -327,9 +327,6 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                         </View>
                         <Text className="mt-1 font-body text-[11px] leading-4 text-[#6F6864]">
                           {activity.goal}
-                        </Text>
-                        <Text className="mt-0.5 font-body text-[10px] leading-4 text-[#9A928D]">
-                          Proof: {activity.proof}
                         </Text>
                       </View>
                     </TouchableOpacity>

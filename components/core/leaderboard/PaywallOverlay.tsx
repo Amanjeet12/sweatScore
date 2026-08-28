@@ -7,11 +7,10 @@ import { Platform, Pressable, View } from 'react-native';
 import { Text } from '~/components/ui/text';
 
 export type PaywallOverlayProps = {
-  totalUsers: number;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
-export default function PaywallOverlay({ totalUsers, children }: PaywallOverlayProps) {
+export default function PaywallOverlay({ children }: PaywallOverlayProps) {
   const [isNavigating, setIsNavigating] = useState(false);
 
   useFocusEffect(
@@ -62,11 +61,9 @@ export default function PaywallOverlay({ totalUsers, children }: PaywallOverlayP
           <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
             See where you rank on this month's leaderboard
           </Text>
-          <View className="mt-3 mb-5 flex-row items-center gap-x-1">
-            <Text className="font-body text-base font-semibold text-[#F76B1C]">
-              See everyone&apos;s progress
-            </Text>
-            <ArrowRight size={16} color="#F76B1C" weight="bold" />
+          <View className="mb-5 mt-4 flex-row items-center gap-x-2 rounded-xl bg-[#F76B1C] px-5 py-3">
+            <Text className="font-heading text-sm font-bold text-white">Unlock your rank</Text>
+            <ArrowRight size={16} color="#FFFFFF" weight="bold" />
           </View>
         </View>
       </Pressable>

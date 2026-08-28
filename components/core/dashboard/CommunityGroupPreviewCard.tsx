@@ -2,10 +2,12 @@ import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { ArrowRight } from 'phosphor-react-native';
+import type { RefObject } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 
 const PRIMARY = '#FF4B1F';
 
@@ -65,7 +67,12 @@ function formatRelativeTime(timestamp: number) {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-export default function CommunityGroupPreviewCard() {
+export default function CommunityGroupPreviewCard({
+  tourTargetRef,
+}: {
+  tourTargetRef?: RefObject<View>;
+}) {
+  const { requireSubscription } = useSubscriptionGuard();
   const groupPreview = useQuery(api.chat.groups.getHomeGroupPreview);
   const availableGroups = useQuery(api.chat.groups.listAvailableGroups);
   const fallbackGroup = availableGroups?.[0];
@@ -83,6 +90,16 @@ export default function CommunityGroupPreviewCard() {
   const lastMessage = groupPreview?.lastMessage ?? null;
 
   const openGroup = () => {
+    const redirectTo = `/group-chat/${String(groupId)}`;
+    const allowed = requireSubscription({
+      redirectTo,
+      source: 'today_community_chat',
+    });
+
+    if (!allowed) {
+      return;
+    }
+
     router.push({
       pathname: '/group-chat/[groupId]',
       params: { groupId: String(groupId) },
@@ -91,6 +108,8 @@ export default function CommunityGroupPreviewCard() {
 
   return (
     <View
+      ref={tourTargetRef}
+      collapsable={false}
       className="mx-5 rounded-[26px] bg-white px-5 py-5"
       style={{
         shadowColor: '#000',
@@ -178,11 +197,11 @@ export default function CommunityGroupPreviewCard() {
       <TouchableOpacity
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel={isMember ? `Reply to ${groupName}` : `View and join ${groupName}`}
+        accessibilityLabel={isMember ? `Message ${groupName}` : `View and join ${groupName}`}
         onPress={openGroup}
         className="mt-2.5 h-10 flex-row items-center rounded-[16px] bg-[#E8E8E9] px-4">
         <Text numberOfLines={1} className="min-w-0 flex-1 font-body text-[13px] text-[#77716D]">
-          {isMember ? `Reply to ${groupName}...` : `Join ${groupName}`}
+          {isMember ? `Message ${groupName}...` : `Join ${groupName}`}
         </Text>
         <ArrowRight size={19} color="#716A65" weight="bold" />
       </TouchableOpacity>

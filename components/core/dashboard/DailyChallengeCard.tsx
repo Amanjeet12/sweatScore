@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowRight, Check } from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import {
   Animated,
   AppState,
@@ -45,7 +46,7 @@ function formatRemainingTime(seconds: number) {
   return `${minutes} min${minutes !== 1 ? 's' : ''} left`;
 }
 
-export default function DailyChallengeCard() {
+export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: RefObject<View> }) {
   const { requireSubscription } = useSubscriptionGuard();
   const authenticatedUserId = useAuthStore((state) => state.currentUser?._id);
   const dailyChallengeCacheKey = `${DAILY_CHALLENGE_CACHE_KEY}_${authenticatedUserId ?? 'user'}`;
@@ -254,7 +255,10 @@ export default function DailyChallengeCard() {
 
   if (dailyChallenge === undefined) {
     return (
-      <View className="mx-5 h-[310px] overflow-hidden rounded-[28px] bg-[#2D241F]">
+      <View
+        ref={tourTargetRef}
+        collapsable={false}
+        className="mx-5 h-[310px] overflow-hidden rounded-[28px] bg-[#2D241F]">
         <ImageBackground
           source={require('~/assets/backgrounds/swbg.png')}
           resizeMode="cover"
@@ -278,6 +282,8 @@ export default function DailyChallengeCard() {
   if (dailyChallenge === null) {
     return (
       <View
+        ref={tourTargetRef}
+        collapsable={false}
         className="mx-5 overflow-hidden rounded-[28px] bg-black"
         style={{
           height: 310,
@@ -403,6 +409,8 @@ export default function DailyChallengeCard() {
 
   return (
     <View
+      ref={tourTargetRef}
+      collapsable={false}
       className="mx-5 overflow-hidden rounded-[28px] bg-black"
       style={{
         height: 310,
@@ -606,7 +614,7 @@ export default function DailyChallengeCard() {
                     }`}
                     style={Platform.OS === 'ios' ? { fontFamily: 'Inter_700Bold' } : undefined}>
                     {isCompleted
-                      ? `${dailyChallenge.name} Complete!`
+                      ? 'Check-In Complete!'
                       : secondsRemaining <= 0
                         ? 'Challenge Ended'
                         : `Let's Go`}

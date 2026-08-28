@@ -3,6 +3,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ArrowRight,
+  ArrowUpRight,
   LockSimple,
   Play,
   Pulse,
@@ -66,20 +67,16 @@ function CheckItOutLink({ url, isPro, onOpen }: CheckItOutLinkProps) {
         shadowRadius: 12,
         elevation: 2,
       }}>
-      <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
-        Bonus Content
-      </Text>
-
-      <View className="mt-3 flex-row items-center justify-between">
-        <Text className="min-w-0 flex-1 pr-4 font-heading text-lg font-bold text-[#1A1A1A]">
-          Know More
+      <View className="flex-row items-center justify-between">
+        <Text className="min-w-0 flex-1 pr-4 font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+          Bonus Content
         </Text>
 
         <View
           className="items-center justify-center rounded-full bg-[#FF5C35]"
           style={{ width: 40, height: 40 }}>
           {isPro ? (
-            <Play size={17} color="#FFFFFF" weight="fill" />
+            <ArrowUpRight size={19} color="#FFFFFF" weight="bold" />
           ) : (
             <LockSimple size={17} color="#FFFFFF" weight="bold" />
           )}
@@ -546,14 +543,24 @@ export default function ChallengeViewScreen() {
           {/* Check-in options and description */}
           {isCheckIn ? (
             <View className="px-5 pt-2.5">
-              <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
-                Today&apos;s check-in
-              </Text>
-              <Text className="mt-1.5 font-body text-[13px] leading-[19px] text-[#77716D]">
-                {selectedCheckIn?.categoryDescription ??
-                  challenge.checkInDescription?.trim() ??
-                  challenge.description}
-              </Text>
+              <View
+                className="rounded-[22px] bg-white px-4 py-4"
+                style={{
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 5 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 12,
+                  elevation: 2,
+                }}>
+                <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                  Today&apos;s check-in
+                </Text>
+                <Text className="mt-1.5 font-body text-[13px] leading-[19px] text-[#77716D]">
+                  {selectedCheckIn?.categoryDescription ??
+                    challenge.checkInDescription?.trim() ??
+                    challenge.description}
+                </Text>
+              </View>
 
               <CheckItOutLink
                 url={selectedCheckIn ? selectedCheckIn.youtubeUrl : challenge.youtubeUrl}

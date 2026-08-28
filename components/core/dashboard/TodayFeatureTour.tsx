@@ -1,6 +1,14 @@
 import { Fire, PlusCircle, UsersThree, X } from 'phosphor-react-native';
-import { ActivityIndicator, Dimensions, Modal, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 
 import { Text } from '~/components/ui/text';
 
@@ -56,10 +64,10 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
   const horizontalInset = 12;
   const spotlight = target
     ? {
-        x: Math.max(horizontalInset, target.x - 6),
-        y: Math.max(insets.top + 4, target.y - 6),
-        width: Math.min(screenWidth - horizontalInset * 2, target.width + 12),
-        height: target.height + 12,
+        x: Math.max(horizontalInset, target.x),
+        y: Math.max(insets.top + 4, target.y),
+        width: Math.min(screenWidth - horizontalInset * 2, target.width),
+        height: target.height,
       }
     : null;
   const placeCardAbove = spotlight ? spotlight.y > screenHeight * 0.5 : false;
@@ -74,53 +82,37 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
       <View className="flex-1">
         {spotlight ? (
           <>
-            <View
+            <Svg
               pointerEvents="auto"
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: 0,
-                height: spotlight.y,
-                backgroundColor: BACKDROP,
-              }}
-            />
-            <View
-              pointerEvents="auto"
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: spotlight.y,
-                width: spotlight.x,
-                height: spotlight.height,
-                backgroundColor: BACKDROP,
-              }}
-            />
-            <View
-              pointerEvents="auto"
-              style={{
-                position: 'absolute',
-                left: spotlight.x + spotlight.width,
-                right: 0,
-                top: spotlight.y,
-                height: spotlight.height,
-                backgroundColor: BACKDROP,
-              }}
-            />
-            <View
-              pointerEvents="auto"
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: spotlight.y + spotlight.height,
-                bottom: 0,
-                backgroundColor: BACKDROP,
-              }}
-            />
+              width={screenWidth}
+              height={screenHeight}
+              style={StyleSheet.absoluteFillObject}>
+              <Defs>
+                <Mask id="todayTourSpotlightMask">
+                  <Rect x={0} y={0} width={screenWidth} height={screenHeight} fill="#FFFFFF" />
+                  <Rect
+                    x={spotlight.x}
+                    y={spotlight.y}
+                    width={spotlight.width}
+                    height={spotlight.height}
+                    rx={28}
+                    ry={28}
+                    fill="#000000"
+                  />
+                </Mask>
+              </Defs>
+              <Rect
+                x={0}
+                y={0}
+                width={screenWidth}
+                height={screenHeight}
+                fill={BACKDROP}
+                mask="url(#todayTourSpotlightMask)"
+              />
+            </Svg>
             <View
               pointerEvents="none"
-              className="absolute rounded-[30px] border-[3px] border-primary-500"
+              className="absolute rounded-[28px] border-[3px] border-primary-500"
               style={{
                 left: spotlight.x,
                 top: spotlight.y,

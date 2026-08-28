@@ -87,11 +87,11 @@ export default function MeRow({
           <View className="flex-1 flex-row items-center gap-x-2">
             <Text className="font-body text-base font-semibold text-[#1A1A1A]">You</Text>
 
-            {!!rank && (
-              <View className="rounded-full bg-white px-2 py-0.5">
-                <Text className="font-heading text-xs font-bold text-[#F76B1C]">#{rank}</Text>
-              </View>
-            )}
+            <View className="rounded-full bg-white px-2 py-0.5">
+              <Text className="font-heading text-xs font-bold text-[#F76B1C]">
+                {rank ? `#${rank}` : 'Not ranked'}
+              </Text>
+            </View>
           </View>
 
           <Text className="font-heading text-base font-bold text-[#1A1A1A]">

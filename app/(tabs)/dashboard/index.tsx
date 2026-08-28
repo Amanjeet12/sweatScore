@@ -377,17 +377,15 @@ export default function TabDashboard() {
                 />
               </View>
             </View>
-            <View ref={checkInTourRef} collapsable={false} className="bg-[#F9F9F9]">
-              <DailyChallengeCard />
+            <View className="bg-[#F9F9F9] pt-2">
+              <DailyChallengeCard tourTargetRef={checkInTourRef} />
             </View>
             <View
-              ref={communityTourRef}
-              collapsable={false}
               className="mt-3 bg-[#F9F9F9]"
               onLayout={(event) => {
                 sectionOffsetsRef.current.community = event.nativeEvent.layout.y;
               }}>
-              <CommunityGroupPreviewCard />
+              <CommunityGroupPreviewCard tourTargetRef={communityTourRef} />
             </View>
             <View className="mt-3 bg-[#F9F9F9]">
               <TodaysSweat

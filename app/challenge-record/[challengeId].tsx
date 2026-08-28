@@ -1392,7 +1392,13 @@ export default function DuetRecordingScreen() {
     );
   }
 
-  if (isCheckIn && checkInMode && state === 'pre-record' && !isVideoRecorderOpen) {
+  if (
+    isCheckIn &&
+    checkInMode &&
+    state === 'pre-record' &&
+    !isVideoRecorderOpen &&
+    !handledCheckInModeRef.current
+  ) {
     return <ScreenLoading />;
   }
 
@@ -1484,7 +1490,7 @@ export default function DuetRecordingScreen() {
         <Text className="mb-7 mt-2 font-body text-base text-[#686868]">
           Add one photo or video - whichever feels easiest today.
         </Text>
-        <MediaChoice
+        {/* <MediaChoice
           label="Take Photo"
           description="Snap a photo now"
           icon={<Camera size={23} color="#FF5C1A" />}
@@ -1495,7 +1501,7 @@ export default function DuetRecordingScreen() {
           description="Choose from your library"
           icon={<ImageSquare size={23} color="#FF5C1A" />}
           onPress={() => handlePickCheckInMedia('library', 'image')}
-        />
+        /> */}
         <MediaChoice
           label="Record Video"
           description="Record live in the app · 1 min max"
@@ -1589,8 +1595,8 @@ export default function DuetRecordingScreen() {
             }}
             style={{
               position: 'absolute',
-              top: insets.top + 72,
-              right: 16,
+              top: insets.top + 16,
+              left: '50%',
               zIndex: 30,
               minWidth: 102,
               height: 42,
@@ -1600,7 +1606,8 @@ export default function DuetRecordingScreen() {
               alignItems: 'center',
               justifyContent: 'center',
               columnGap: 7,
-              backgroundColor: isCheckInAudioMuted ? 'rgba(0,0,0,0.52)' : 'rgba(255,92,26,0.92)',
+              backgroundColor: 'rgba(31,31,31,0.9)',
+              transform: [{ translateX: -51 }],
             }}>
             {isCheckInAudioMuted ? (
               <MicrophoneSlash size={19} color="#FFFFFF" weight="bold" />

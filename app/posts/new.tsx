@@ -440,7 +440,15 @@ export default function NewPost() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {loggedActivity && activitySubmission ? (
-            <View className="mx-4 mt-4 rounded-[26px] border border-[#F3D8CB] bg-[#FFF8F4] p-4">
+            <View
+              className="mx-4 mt-4 rounded-[26px] bg-white p-4"
+              style={{
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.05,
+                shadowRadius: 14,
+                elevation: 2,
+              }}>
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-3">
                   <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
@@ -449,49 +457,35 @@ export default function NewPost() {
                   <Text className="mt-1 font-heading text-lg font-extrabold text-[#1A1A1A]">
                     {loggedActivity.title}
                   </Text>
-                  <Text className="mt-0.5 font-body text-xs text-[#817873]">
-                    {loggedActivity.goal}
-                  </Text>
                 </View>
-                <View className="items-end rounded-2xl bg-white px-3 py-2">
+                <View className="items-end py-2">
                   <Text className="font-heading text-base font-extrabold text-[#E94F12]">
                     +{activityPoints} pts
                   </Text>
-                  <Text className="font-body text-[9px] text-[#8A827D]">Photo proof</Text>
                 </View>
               </View>
 
-              <View className="my-3 h-px bg-[#F1DED5]" />
-
-              <View className="flex-row items-start">
-                <Avatar
-                  uri={currentUser?.image ?? undefined}
-                  size={42}
-                  showGoldBorder
-                  name={currentUser?.name}
+              <View className="mb-2 mt-4 flex-row items-center justify-between">
+                <Text className="font-body text-xs font-bold text-[#5F5955]">Caption</Text>
+                <Text className="font-body text-[10px] text-[#9A928D]">{body.length}/150</Text>
+              </View>
+              <Input className="h-auto min-h-[96px] w-full rounded-[18px] border-0 bg-[#F8F8F8]">
+                <InputField
+                  multiline
+                  maxLength={150}
+                  className="px-3.5 py-3 font-body text-[15px] leading-5 text-[#2A2725]"
+                  value={body}
+                  onChangeText={(text) => {
+                    setError(null);
+                    setBody(text);
+                  }}
+                  accessibilityLabel="Activity caption"
+                  style={{
+                    minHeight: 94,
+                    ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
+                  }}
                 />
-                <View className="ml-3 min-w-0 flex-1">
-                  <Text className="font-body text-xs font-semibold text-[#8A827D]">
-                    Posting as {currentUser?.name ?? 'You'}
-                  </Text>
-                  <Input className="mt-2 h-auto min-h-[76px] rounded-2xl border border-[#E9D9D1] bg-white">
-                    <InputField
-                      multiline
-                      className="px-3 py-2.5 font-body text-[15px] leading-5 text-[#2A2725]"
-                      value={body}
-                      onChangeText={(text) => {
-                        setError(null);
-                        setBody(text);
-                      }}
-                      accessibilityLabel="Activity caption"
-                      style={{
-                        minHeight: 74,
-                        ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
-                      }}
-                    />
-                  </Input>
-                </View>
-              </View>
+              </Input>
             </View>
           ) : null}
 
@@ -645,23 +639,17 @@ export default function NewPost() {
                   )}
                 </View>
 
-                <View className="px-4 py-3">
-                  <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
-                    {isActivityPost
-                      ? 'Activity proof'
-                      : media.type === 'video'
-                        ? 'Video attached'
-                        : 'Photo attached'}
-                  </Text>
+                {!isActivityPost ? (
+                  <View className="px-4 py-3">
+                    <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
+                      {media.type === 'video' ? 'Video attached' : 'Photo attached'}
+                    </Text>
 
-                  <Text className="mt-0.5 font-body text-xs text-[#838383]">
-                    {uploadingMedia
-                      ? 'Uploading media...'
-                      : isActivityPost
-                        ? 'Ready to share with your community'
-                        : 'Ready to post'}
-                  </Text>
-                </View>
+                    <Text className="mt-0.5 font-body text-xs text-[#838383]">
+                      {uploadingMedia ? 'Uploading media...' : 'Ready to post'}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>

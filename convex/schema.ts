@@ -304,6 +304,7 @@ const schema = defineSchema({
     .index('by_user_date', ['userId', 'date'])
     .index('by_user_challenge_date', ['userId', 'challengeId', 'date'])
     .index('by_challenge_date', ['challengeId', 'date'])
+    .index('by_date', ['date'])
     .index('by_user_challenge_window', ['userId', 'challengeId', 'dailyWindowStartAt'])
     .index('by_user', ['userId']),
 
