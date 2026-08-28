@@ -107,7 +107,7 @@ const CHECK_IN_CAPTION_TEMPLATES = [
 ];
 
 const FIRST_ATTEMPT_VIDEO_URL =
-  'https://beloved-stoat-88.convex.cloud/api/storage/31a427be-72ed-4d4b-9974-ceb32e41ed02';
+  'https://beloved-stoat-88.convex.cloud/api/storage/181e19bd-40b7-4ec0-b512-68137ab49e1e';
 
 type RecordingState = 'pre-record' | 'countdown' | 'recording' | 'post-record';
 type CheckInMode = 'take_photo' | 'upload_photo' | 'record_video' | 'upload_video';
