@@ -3,7 +3,7 @@ import { useQuery as useTanstackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Check, Fire, LockSimple, X } from 'phosphor-react-native';
+import { Check } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
 import { TouchableOpacity, View } from 'react-native';
@@ -11,15 +11,6 @@ import { TouchableOpacity, View } from 'react-native';
 import { DailyLimitReachedModal, SKIP_DAILY_LIMIT_POPUP_KEY } from './DailyLimitReachedModal';
 import LogActivityButton from './LogActivityButton';
 
-import {
-  AlertDialog,
-  AlertDialogBackdrop,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-} from '@/components/ui/alert-dialog';
-import { Button, ButtonText } from '@/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -105,15 +96,15 @@ const getWeekStats = (overview: any): SweatStats => {
 export default function TodaysSweat({
   refreshKey,
   streakDays = 0,
+  streakTarget = 5,
   activityLogTourRef,
 }: {
   refreshKey: number;
   streakDays?: number;
+  streakTarget?: number;
   activityLogTourRef?: RefObject<View>;
 }) {
   const [period, setPeriod] = useState<Period>('today');
-
-  const [showTooltip, setShowTooltip] = useState(false);
 
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
 
@@ -210,18 +201,13 @@ export default function TodaysSweat({
 
   const selectedTargets = period === 'today' ? TARGETS.today : TARGETS.week;
 
-  const pointsBadgeText =
-    period === 'today'
-      ? pointsToday
-        ? `${
-            pointsToday.isPremium
-              ? pointsToday.earned
-              : Math.min(pointsToday.earned, pointsToday.cap)
-          } pts`
-        : '0 pts'
-      : `${formatNumber(weekStats.points)} pts`;
-
   const isDailyCapped = period === 'today' && Boolean(pointsToday?.isCapped);
+  const displayedStreakDays = Math.min(Math.max(0, streakDays), streakTarget);
+  const displayedTodayPoints = pointsToday
+    ? pointsToday.isPremium
+      ? pointsToday.earned
+      : Math.min(pointsToday.earned, pointsToday.cap)
+    : todayStats.points;
 
   return (
     <View
@@ -247,27 +233,19 @@ export default function TodaysSweat({
           <Text className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">Sweat Points</Text>
         </View>
 
-        {period === 'week' && streakDays > 0 ? (
-          <View className="flex-row items-center rounded-full bg-[#FFF0E9] px-3 py-1.5">
-            <Fire size={14} color="#E34500" weight="fill" />
-            <Text className="ml-1.5 font-heading text-[12px] font-extrabold text-[#E34500]">
-              {streakDays} {streakDays === 1 ? 'day' : 'days'}
+        {period === 'today' ? (
+          <View className="rounded-full bg-[#FFF0E9] px-3 py-1.5">
+            <Text className="font-heading text-[12px] font-extrabold text-[#E34500]">
+              {formatNumber(displayedTodayPoints)} pts
             </Text>
           </View>
-        ) : period === 'today' ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setShowTooltip(true)}
-            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            className="flex-row items-center justify-center rounded-full bg-[#FFF0E9] px-3 py-1.5">
-            {isDailyCapped ? (
-              <LockSimple size={13} color="#E34500" weight="bold" style={{ marginRight: 4 }} />
-            ) : null}
+        ) : (
+          <View className="rounded-full bg-[#FFF0E9] px-3 py-1.5">
             <Text className="font-heading text-[12px] font-extrabold text-[#E34500]">
-              {pointsBadgeText}
+              {displayedStreakDays}/{streakTarget} days
             </Text>
-          </TouchableOpacity>
-        ) : null}
+          </View>
+        )}
       </View>
 
       {/* {communityPreview && communityPreview.previewMembers.length > 0 ? (
@@ -403,8 +381,6 @@ export default function TodaysSweat({
         </View>
       )}
 
-      <HowToEarnPointsModal isOpen={showTooltip} onClose={() => setShowTooltip(false)} />
-
       <DailyLimitReachedModal
         showAlertDialog={showDailyLimitModal}
         handleClose={() => setShowDailyLimitModal(false)}
@@ -486,165 +462,5 @@ function SweatProgressRow({
         </View>
       </View>
     </View>
-  );
-}
-
-function HowToEarnPointsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const rows = [
-    {
-      icon: require('~/assets/icons/Phone.png'),
-      title: 'App Open',
-      description: 'Open the app daily',
-      points: '1 pt',
-    },
-    {
-      icon: require('~/assets/icons/Steps.png'),
-      title: 'Steps',
-      description: 'Walk 1000 steps',
-      points: '1 pt',
-    },
-    {
-      icon: require('~/assets/icons/Active Minutes.png'),
-      title: 'Active Minutes',
-      description: 'Move for 5 minutes',
-      points: '1 pt',
-    },
-    {
-      icon: require('~/assets/icons/Check.png'),
-      title: 'Daily Check-in',
-      description: 'Complete today’s check-in',
-      points: '5+ pts',
-    },
-    {
-      icon: require('~/assets/icons/Move With Us.png'),
-      title: 'Challenges',
-      description: 'Complete a challenge',
-      points: '5+ pts',
-    },
-    {
-      icon: require('~/assets/icons/Flame.png'),
-      title: 'Weekly Streak',
-      description: 'Hit a target 5 days this week',
-      points: '10 pts',
-    },
-  ];
-
-  return (
-    <AlertDialog isOpen={isOpen} onClose={onClose} size="lg">
-      <AlertDialogBackdrop
-        style={{
-          backgroundColor: 'rgba(0,0,0,0.42)',
-        }}
-      />
-
-      <AlertDialogContent
-        className="border border-[#E8E8E8] bg-white p-0"
-        style={{
-          width: '88%',
-          maxWidth: 360,
-          borderRadius: 24,
-          overflow: 'hidden',
-
-          shadowColor: '#000',
-
-          shadowOffset: {
-            width: 0,
-            height: 12,
-          },
-
-          shadowOpacity: 0.18,
-          shadowRadius: 20,
-          elevation: 12,
-        }}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={onClose}
-          className="absolute right-4 top-4 z-20 items-center justify-center rounded-full bg-[#DADADA]"
-          style={{
-            width: 25,
-            height: 25,
-          }}>
-          <X size={16} color="#FFFFFF" weight="bold" />
-        </TouchableOpacity>
-
-        <View className="px-3.5 pb-4 pt-8">
-          <AlertDialogHeader className="p-0">
-            <View className="w-full items-center">
-              <Image
-                source={require('~/assets/icons/Earn.png')}
-                style={{
-                  width: 48,
-                  height: 48,
-                }}
-                contentFit="contain"
-              />
-
-              <Text className="mt-3 text-center font-heading text-[18px] font-extrabold text-[#1A1A1A]">
-                How to Earn Points
-              </Text>
-
-              <Text className="mt-2 max-w-[250px] text-center font-body text-[14px] leading-5 text-[#4D4D4D]">
-                Every activity adds points to your monthly score.
-              </Text>
-            </View>
-          </AlertDialogHeader>
-
-          <AlertDialogBody className="mt-4 p-0">
-            <View className="gap-y-2">
-              {rows.map((row) => (
-                <View
-                  key={row.title}
-                  className="flex-row items-center rounded-[17px] bg-[#F8F8F8] px-3.5"
-                  style={{
-                    minHeight: 59,
-                  }}>
-                  <View
-                    className="items-center justify-center"
-                    style={{
-                      width: 25,
-                    }}>
-                    <Image
-                      source={row.icon}
-                      style={{
-                        width: 19,
-                        height: 19,
-                      }}
-                      contentFit="contain"
-                    />
-                  </View>
-
-                  <View className="ml-2.5 flex-1 pr-2">
-                    <Text className="font-body text-[14px] font-extrabold text-[#272727]">
-                      {row.title}
-                    </Text>
-
-                    <Text numberOfLines={1} className="mt-0.5 font-body text-[11px] text-[#545454]">
-                      {row.description}
-                    </Text>
-                  </View>
-
-                  <Text className="font-heading text-[14px] font-extrabold text-[#272727]">
-                    {row.points}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </AlertDialogBody>
-
-          <AlertDialogFooter className="mt-3 p-0">
-            <Button
-              variant="solid"
-              size="xl"
-              action="primary"
-              className="h-[39px] w-full rounded-full bg-[#FF551F]"
-              onPress={onClose}>
-              <ButtonText className="font-heading text-[13px] font-extrabold text-white">
-                Got It
-              </ButtonText>
-            </Button>
-          </AlertDialogFooter>
-        </View>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }

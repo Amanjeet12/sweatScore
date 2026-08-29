@@ -193,7 +193,7 @@ export default function TabLayout() {
               <View>
                 <Rows
                   color={focused ? colors.primary : color}
-                  weight={focused ? 'bold' : 'regular'}
+                  weight={focused ? 'fill' : 'duotone'}
                   size={28}
                 />
                 {hasUnseenFeedPosts ? (

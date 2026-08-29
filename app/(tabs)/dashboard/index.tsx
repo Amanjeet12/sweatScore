@@ -48,7 +48,7 @@ function getHealthConnect() {
  * app updates, so users who have seen an older version will receive this tour
  * once, while users who finish this version will not see it on every launch.
  */
-const TODAY_FEATURE_TOUR_VERSION = 2;
+const TODAY_FEATURE_TOUR_VERSION = 3;
 const TODAY_FEATURE_TOUR_STORAGE_KEY = 'today_feature_tour_seen_version';
 const TODAY_FEATURE_TOUR_STEP_COUNT = 3;
 
@@ -79,7 +79,8 @@ async function openHealthConnectListing() {
 
 export default function TabDashboard() {
   const appState = useRef(AppState.currentState);
-  const { showSuccess } = useLocalSearchParams();
+  const { showSuccess: showSuccessParam } = useLocalSearchParams();
+  const showSuccess = Array.isArray(showSuccessParam) ? showSuccessParam[0] : showSuccessParam;
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const dashboardScrollRef = useRef<ScrollView>(null);
@@ -91,6 +92,8 @@ export default function TabDashboard() {
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const refreshKey = useRefreshStore((state) => state.refreshKey);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [dashboardReady, setDashboardReady] = useState(false);
+  const [todayTourPending, setTodayTourPending] = useState(true);
   const [todayTourStep, setTodayTourStep] = useState<number | null>(null);
   const [todayTourTarget, setTodayTourTarget] = useState<TodayTourTarget | null>(null);
   const currentUser = useQuery(api.users.current);
@@ -199,8 +202,23 @@ export default function TabDashboard() {
       // state immediately so it cannot block the Today feature tour.
       router.setParams({ showSuccess: undefined });
     } else if (showSuccess === 'install' && Platform.OS === 'android') {
-      checkAvailability();
-      router.setParams({ showSuccess: undefined });
+      let cancelled = false;
+
+      const checkHealthAvailability = async () => {
+        try {
+          await checkAvailability();
+        } finally {
+          if (!cancelled) {
+            router.setParams({ showSuccess: undefined });
+          }
+        }
+      };
+
+      checkHealthAvailability();
+
+      return () => {
+        cancelled = true;
+      };
     }
   }, [showSuccess]);
 
@@ -221,23 +239,40 @@ export default function TabDashboard() {
   }, [streakData?.currentWeekDays, streakData?.currentWeekTarget]);
 
   useEffect(() => {
+    if (!currentUser?._id) {
+      setTodayTourPending(true);
+      return;
+    }
+
+    const storageKey = getTodayFeatureTourStorageKey(currentUser._id);
+    const seenVersion = storage.getNumber(storageKey) ?? 0;
+    setTodayTourPending(seenVersion < TODAY_FEATURE_TOUR_VERSION);
+  }, [currentUser?._id]);
+
+  useEffect(() => {
     if (
       !isFocused ||
       !currentUser?._id ||
-      showSuccess ||
+      !dashboardReady ||
+      !todayTourPending ||
+      showSuccess === 'install' ||
       showInstallDialog ||
       todayTourStep !== null
     ) {
       return;
     }
 
-    const storageKey = getTodayFeatureTourStorageKey(currentUser._id);
-    const seenVersion = storage.getNumber(storageKey) ?? 0;
-    if (seenVersion >= TODAY_FEATURE_TOUR_VERSION) return;
-
-    const timer = setTimeout(() => setTodayTourStep(0), 900);
+    const timer = setTimeout(() => setTodayTourStep(0), 250);
     return () => clearTimeout(timer);
-  }, [currentUser?._id, isFocused, showInstallDialog, showSuccess, todayTourStep]);
+  }, [
+    currentUser?._id,
+    dashboardReady,
+    isFocused,
+    showInstallDialog,
+    showSuccess,
+    todayTourPending,
+    todayTourStep,
+  ]);
 
   useEffect(() => {
     if (!isFocused || todayTourStep === null) {
@@ -266,12 +301,17 @@ export default function TabDashboard() {
     const measureTarget = (attempt: number) => {
       measureTimer = setTimeout(
         () => {
-          if (cancelled || !targetRef.current) return;
+          if (cancelled) return;
+
+          if (!targetRef.current) {
+            if (attempt < 12) measureTarget(attempt + 1);
+            return;
+          }
 
           targetRef.current.measureInWindow((x, y, width, height) => {
             if (cancelled) return;
 
-            if ((width < 40 || height < 40) && attempt < 8) {
+            if ((width < 40 || height < 40) && attempt < 12) {
               measureTarget(attempt + 1);
               return;
             }
@@ -281,7 +321,7 @@ export default function TabDashboard() {
             const isOutsideViewport =
               y < insets.top + 8 || y + height > screenHeight - insets.bottom - 24;
 
-            if (isOutsideViewport && attempt < 8) {
+            if (isOutsideViewport && attempt < 12) {
               dashboardScrollRef.current?.scrollTo({
                 y: Math.max(0, scrollOffsetRef.current + y - desiredTop),
                 animated: true,
@@ -309,6 +349,7 @@ export default function TabDashboard() {
     if (currentUser?._id) {
       storage.set(getTodayFeatureTourStorageKey(currentUser._id), TODAY_FEATURE_TOUR_VERSION);
     }
+    setTodayTourPending(false);
     setTodayTourStep(null);
     setTodayTourTarget(null);
   };
@@ -364,7 +405,11 @@ export default function TabDashboard() {
                 />
               </View>
             </View>
-            <View className="bg-[#F9F9F9] pt-2">
+            <View
+              className="bg-[#F9F9F9] pt-2"
+              onLayout={() => {
+                setDashboardReady(true);
+              }}>
               <DailyChallengeCard tourTargetRef={checkInTourRef} />
             </View>
             <View
@@ -378,6 +423,7 @@ export default function TabDashboard() {
               <TodaysSweat
                 refreshKey={refreshKey}
                 streakDays={streakData?.currentWeekDays ?? 0}
+                streakTarget={streakData?.currentWeekTarget ?? 5}
                 activityLogTourRef={activityLogTourRef}
               />
             </View>
@@ -491,6 +537,7 @@ export default function TabDashboard() {
             showSuccess !== 'yes' &&
             showSuccess !== 'install' &&
             !showInstallDialog &&
+            !todayTourPending &&
             todayTourStep === null
           }
         />

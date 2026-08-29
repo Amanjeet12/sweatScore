@@ -122,7 +122,7 @@ export default function CommunityGroupPreviewCard({
           <Text
             className="font-heading text-[10px] font-extrabold uppercase tracking-wide"
             style={{ color: PRIMARY }}>
-            {isMember ? 'Your community' : 'Community group'}
+            {isMember ? 'Your community' : 'Your community'}
           </Text>
           <Text numberOfLines={1} className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">
             {groupName}
