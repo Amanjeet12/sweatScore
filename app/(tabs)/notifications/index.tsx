@@ -83,22 +83,6 @@ function getTimeLeft(period: LeaderboardPeriod, now: Date) {
   return `${hours}h ${minutes}m left`;
 }
 
-function LockedLeaderboardPreview() {
-  return (
-    <View className="h-[220px] justify-center gap-y-4 bg-white px-5">
-      {[0.88, 0.72, 0.6].map((width, index) => (
-        <View key={index} className="flex-row items-center gap-x-3 opacity-60">
-          <View className="h-11 w-11 rounded-full bg-[#E9E5E1]" />
-          <View className="flex-1 gap-y-2">
-            <View className="h-3 rounded-full bg-[#DFDAD5]" style={{ width: `${width * 52}%` }} />
-            <View className="h-2 rounded-full bg-[#EFEAE4]" style={{ width: `${width * 100}%` }} />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 export default function TabRank() {
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -155,9 +139,7 @@ export default function TabRank() {
 
   const goToUser = useCallback(
     (userId: string) => {
-      const isCurrentUser = userId === currentUser?._id;
-
-      if (!hasFullAccess && !isCurrentUser) {
+      if (!hasFullAccess) {
         router.push({
           pathname: '/(tabs)/notifications/paywall' as any,
           params: { redirectTo: '/(tabs)/notifications' },
@@ -170,7 +152,7 @@ export default function TabRank() {
         params: { userId },
       });
     },
-    [currentUser?._id, hasFullAccess]
+    [hasFullAccess]
   );
 
   if (!leaderboard) {
@@ -228,9 +210,7 @@ export default function TabRank() {
   const ListFooter = (
     <View className="bg-white pb-4">
       {!hasFullAccess ? (
-        <PaywallOverlay>
-          <LockedLeaderboardPreview />
-        </PaywallOverlay>
+        <PaywallOverlay />
       ) : otherParticipantCount > 0 ? (
         <View className="mx-4 mt-5 rounded-2xl bg-[#FFF7F1] px-4 py-3.5">
           <Text className="text-center font-body text-sm text-[#5A5A5A]">

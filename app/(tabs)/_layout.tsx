@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react';
 import { Tabs, usePathname } from 'expo-router';
-import { ChartBar, ChatCircleDots, CrownSimple, Fire, Trophy } from 'phosphor-react-native';
+import { ChartBar, CrownSimple, Fire, Rows, Trophy } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 
@@ -191,9 +191,9 @@ export default function TabLayout() {
             ),
             tabBarIcon: ({ color, focused }) => (
               <View>
-                <ChatCircleDots
+                <Rows
                   color={focused ? colors.primary : color}
-                  weight={focused ? 'fill' : 'duotone'}
+                  weight={focused ? 'bold' : 'regular'}
                   size={28}
                 />
                 {hasUnseenFeedPosts ? (

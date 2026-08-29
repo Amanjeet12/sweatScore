@@ -19,31 +19,18 @@ import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
-const COMMUNITY_TAGLINES = [
-  "Share what's on your plate today, [name]!",
-  'Show us your pre- or post-workout snack, [name]!',
-  'What are we cooking for dinner tonight, [name]?',
-  'Drop your lunch photo below, [name]!',
-  'Hydration check! Show us your water bottle right now, [name]!',
-  'Show us your workout space today, [name]!',
-  'Drop a pic of your view right now, [name]!',
-  'Show us your workout outfit today, [name]!',
-  'What song or playlist is keeping you moving right now, [name]?',
-  'Drop a quick video clip of your workout today, [name]!',
-  'How many points did you lock in today, [name]?',
-  'Drop a selfie after your workout today, [name]!',
-  'Drop an emoji that sums up your energy level right now, [name]!',
-  'How many steps did you clock today, [name]?',
-  'Show us your breakfast today, [name]!',
-  "Coffee, tea, or a smoothie? What's in your cup right now, [name]?",
-  'Show us your gym bag essentials, [name]!',
-  "How did today's session go, [name]?",
-  'Drop your favourite healthy meal right now, [name]!',
-  'What time did you train today, [name]?',
-  "What's your fitness goal this month, [name]?",
-  'Rest day or active day today, [name]?',
-  'Post your water intake so far, [name]!',
-  "What's motivating you this week, [name]?",
+const FEED_PROMPTS = [
+  'Show us your water bottle, [name]',
+  'Share your view right now, [name]',
+  'Share a motivational quote, [name]',
+  'Post your outfit today, [name]',
+  "Share what's on your playlist, [name]",
+  'Post your go-to healthy snack, [name]',
+  'Post your gym bag, [name]',
+  'Post your favourite leggings, [name]',
+  'Post your workout shoes, [name]',
+  'Post your current read, [name]',
+  'Post your feel-good song, [name]',
 ];
 
 const TabShare = () => {
@@ -105,9 +92,9 @@ const TabShare = () => {
   const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
   const userInitial = userName.charAt(0).toUpperCase();
   const userImage = currentUser?.image?.trim();
-  const communityTagline = useMemo(() => {
-    const randomIndex = Math.floor(Math.random() * COMMUNITY_TAGLINES.length);
-    return COMMUNITY_TAGLINES[randomIndex].replace(/\[name\]/g, userName);
+  const feedPrompt = useMemo(() => {
+    const randomIndex = Math.floor(Math.random() * FEED_PROMPTS.length);
+    return FEED_PROMPTS[randomIndex].replace(/\[name\]/g, userName);
   }, [userName]);
 
   return (
@@ -119,7 +106,7 @@ const TabShare = () => {
           style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
           <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] px-4 pb-5 pt-5">
             <View>
-              <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">Community</Text>
+              <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">Feed</Text>
               <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
             </View>
 
@@ -142,7 +129,7 @@ const TabShare = () => {
                   )}
                 </View>
                 <Text className="flex-1 pr-2 font-body text-sm text-[#555658]" numberOfLines={2}>
-                  {communityTagline}
+                  {feedPrompt}
                 </Text>
               </TouchableOpacity>
 

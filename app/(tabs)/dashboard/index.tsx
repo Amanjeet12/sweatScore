@@ -23,7 +23,6 @@ import AchievementPopupManager from '~/components/core/dashboard/AchievementPopu
 import CommunityGroupPreviewCard from '~/components/core/dashboard/CommunityGroupPreviewCard';
 import Confetti from '~/components/core/dashboard/Confetti';
 import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
-import { FirstTimeOnboardingModal } from '~/components/core/dashboard/FirstTimeOnboardingModal';
 import { MyCardAlertDialog } from '~/components/core/dashboard/MyCard';
 import TodayFeatureTour, { TodayTourTarget } from '~/components/core/dashboard/TodayFeatureTour';
 import TodaysSweat from '~/components/core/dashboard/TodaysSweat';
@@ -91,7 +90,6 @@ export default function TabDashboard() {
   const sectionOffsetsRef = useRef({ community: 0 });
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const refreshKey = useRefreshStore((state) => state.refreshKey);
-  const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [todayTourStep, setTodayTourStep] = useState<number | null>(null);
   const [todayTourTarget, setTodayTourTarget] = useState<TodayTourTarget | null>(null);
@@ -197,17 +195,14 @@ export default function TabDashboard() {
 
   useEffect(() => {
     if (showSuccess === 'yes') {
-      // Wait until all data the modal needs is ready
-      if (!currentUser || !rewardsBanner || !streakData) return;
-      setShowFirstTimeModal(true);
-      // Clear the route param so this effect doesn't fire again on
-      // reactive query updates or when the user navigates back to this tab.
+      // Completion used to open a welcome modal here. Clear the one-time route
+      // state immediately so it cannot block the Today feature tour.
       router.setParams({ showSuccess: undefined });
     } else if (showSuccess === 'install' && Platform.OS === 'android') {
       checkAvailability();
       router.setParams({ showSuccess: undefined });
     }
-  }, [showSuccess, currentUser, rewardsBanner, streakData]);
+  }, [showSuccess]);
 
   // Sync is now handled by tab press listener in _layout.tsx
   // This prevents duplicate sync calls that were blocking UI
@@ -230,7 +225,6 @@ export default function TabDashboard() {
       !isFocused ||
       !currentUser?._id ||
       showSuccess ||
-      showFirstTimeModal ||
       showInstallDialog ||
       todayTourStep !== null
     ) {
@@ -243,14 +237,7 @@ export default function TabDashboard() {
 
     const timer = setTimeout(() => setTodayTourStep(0), 900);
     return () => clearTimeout(timer);
-  }, [
-    currentUser?._id,
-    isFocused,
-    showFirstTimeModal,
-    showInstallDialog,
-    showSuccess,
-    todayTourStep,
-  ]);
+  }, [currentUser?._id, isFocused, showInstallDialog, showSuccess, todayTourStep]);
 
   useEffect(() => {
     if (!isFocused || todayTourStep === null) {
@@ -472,16 +459,6 @@ export default function TabDashboard() {
         <ChatCircle size={36} color="#fff" weight="fill" />
       </TouchableOpacity> */}
 
-      <FirstTimeOnboardingModal
-        showAlertDialog={showFirstTimeModal}
-        handleClose={() => setShowFirstTimeModal(false)}
-        firstName={currentUser?.name?.split(' ')[0] ?? 'there'}
-        challengeName={rewardsBanner?.title ?? ''}
-        targetPoints={rewardsBanner?.targetPoints ?? 500}
-        currentPoints={leaderboard?.displayTotalPoints ?? 0}
-        missionTarget={10}
-      />
-
       <MyCardAlertDialog
         showAlertDialog={showInstallDialog}
         handleClose={() => setShowInstallDialog(false)}
@@ -513,7 +490,6 @@ export default function TabDashboard() {
           enabled={
             showSuccess !== 'yes' &&
             showSuccess !== 'install' &&
-            !showFirstTimeModal &&
             !showInstallDialog &&
             todayTourStep === null
           }

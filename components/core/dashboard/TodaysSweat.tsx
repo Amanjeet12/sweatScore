@@ -247,19 +247,19 @@ export default function TodaysSweat({
           <Text className="mt-1 font-heading text-xl font-bold text-[#1A1A1A]">Sweat Points</Text>
         </View>
 
-        {period === 'week' ? (
-          <View className="flex-row items-center rounded-full bg-[#F2EFED] px-3 py-1.5">
+        {period === 'week' && streakDays > 0 ? (
+          <View className="flex-row items-center rounded-full bg-[#FFF0E9] px-3 py-1.5">
             <Fire size={14} color="#E34500" weight="fill" />
             <Text className="ml-1.5 font-heading text-[12px] font-extrabold text-[#E34500]">
-              {streakDays} {streakDays === 1 ? 'day' : 'days'} streak
+              {streakDays} {streakDays === 1 ? 'day' : 'days'}
             </Text>
           </View>
-        ) : (
+        ) : period === 'today' ? (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setShowTooltip(true)}
             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            className="flex-row items-center justify-center rounded-full bg-[#F2EFED] px-3 py-1.5">
+            className="flex-row items-center justify-center rounded-full bg-[#FFF0E9] px-3 py-1.5">
             {isDailyCapped ? (
               <LockSimple size={13} color="#E34500" weight="bold" style={{ marginRight: 4 }} />
             ) : null}
@@ -267,7 +267,7 @@ export default function TodaysSweat({
               {pointsBadgeText}
             </Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
       {/* {communityPreview && communityPreview.previewMembers.length > 0 ? (
@@ -290,7 +290,7 @@ export default function TodaysSweat({
       ) : null} */}
 
       <View className="mt-3 flex-row items-center">
-        <View className="h-10 flex-1 flex-row rounded-full bg-[#EEEEEE] p-1">
+        <View className="h-10 flex-1 flex-row rounded-full bg-[#F8F8F8] p-1">
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => setPeriod('today')}

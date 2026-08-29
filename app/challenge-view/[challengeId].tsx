@@ -422,9 +422,6 @@ export default function ChallengeViewScreen() {
           <ButtonText className="text-lg font-bold text-white">
             {isCheckIn ? 'Start Check-In' : `Let's Go`}
           </ButtonText>
-          {isCheckIn ? (
-            <ArrowRight size={18} color="#FFFFFF" weight="bold" style={{ marginLeft: 12 }} />
-          ) : null}
         </View>
       </LoadingButton>
     );

@@ -619,13 +619,16 @@ export const getLeaderboardForPeriod = query({
     ];
 
     const myRankedRow = rankedRows.find((row) => row.userId === userId);
-    const me = await hydrate(
-      myRankedRow ?? {
-        userId,
-        rank: 0,
-        displayTotalPoints: myPoints,
-      }
-    );
+    const me =
+      access === 'free'
+        ? null
+        : await hydrate(
+            myRankedRow ?? {
+              userId,
+              rank: 0,
+              displayTotalPoints: myPoints,
+            }
+          );
 
     return {
       period: args.period as LeaderboardPeriod,

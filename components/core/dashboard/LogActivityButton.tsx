@@ -11,12 +11,10 @@ import {
   Plus,
   X,
 } from 'phosphor-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { RefObject } from 'react';
 import {
   Alert,
-  Animated,
-  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -63,34 +61,11 @@ function SubmissionIcon() {
 export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: RefObject<View> }) {
   const insets = useSafeAreaInsets();
   const { requireSubscription } = useSubscriptionGuard();
-  const pulse = useRef(new Animated.Value(0)).current;
   const [isOpen, setIsOpen] = useState(false);
   const [selectedActivityKey, setSelectedActivityKey] = useState<LoggedActivityKey | null>(null);
   const [isOpeningMedia, setIsOpeningMedia] = useState(false);
 
   const selectedActivity = getLoggedActivity(selectedActivityKey ?? undefined);
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1100,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 900,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    animation.start();
-    return () => animation.stop();
-  }, [pulse]);
 
   const close = () => {
     if (isOpeningMedia) return;
@@ -158,38 +133,13 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
   return (
     <>
       <View ref={tourTargetRef} collapsable={false} className="mt-5 h-14 w-full justify-center">
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            bottom: 0,
-            left: 0,
-            borderRadius: 17,
-            backgroundColor: PRIMARY,
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.04] }),
-            transform: [
-              { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] }) },
-            ],
-          }}
-        />
-
         <TouchableOpacity
           activeOpacity={0.84}
           accessibilityRole="button"
           accessibilityLabel="Log optional activity"
           onPress={() => setIsOpen(true)}
-          className="h-14 w-full flex-row items-center justify-between rounded-[17px] bg-primary-500 px-[22px]"
-          style={{
-            shadowColor: PRIMARY,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.2,
-            shadowRadius: 14,
-            elevation: 4,
-          }}>
+          className="h-14 w-full items-center justify-center rounded-[17px] bg-primary-500 px-[22px]">
           <Text className="font-heading text-base font-bold text-white">Log activity</Text>
-          <ArrowRight size={23} color="#FFFFFF" weight="bold" />
         </TouchableOpacity>
       </View>
 
