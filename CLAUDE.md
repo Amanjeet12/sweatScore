@@ -53,6 +53,8 @@ installs FFmpeg from trigger.config.ts
 includes additional assets
         ↓
 deploys tasks to PROD
+
+npx expo run:android
 ```
 
 ## Architecture Overview

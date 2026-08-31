@@ -218,6 +218,41 @@ async function downloadFile(
 }
 
 /**
+ * Read the video duration so every FFmpeg output has a finite upper bound.
+ * This is especially important when a background-music input is looped.
+ */
+async function getVideoDuration(filePath: string, description: string): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (error, metadata) => {
+      if (error) {
+        reject(
+          new Error(
+            `Failed to inspect ${description}: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          )
+        );
+        return;
+      }
+
+      const videoStream = metadata.streams.find((stream) => stream.codec_type === 'video');
+      const duration = Number(videoStream?.duration ?? metadata.format.duration);
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        reject(new Error(`Could not determine a valid duration for ${description}`));
+        return;
+      }
+
+      logger.log(`${description} duration detected`, {
+        durationSeconds: duration,
+      });
+
+      resolve(duration);
+    });
+  });
+}
+
+/**
  * Safely remove a temporary file.
  */
 function removeTemporaryFile(filePath: string): void {
@@ -284,6 +319,22 @@ export const mergeVideosTask = task({
 
       await downloadFile(payload.userVideoUrl, userVideoPath, 'right user video');
 
+      const userVideoDuration = await getVideoDuration(userVideoPath, 'right user video');
+      const adminVideoDuration = payload.checkInMusicOnly
+        ? undefined
+        : await getVideoDuration(adminVideoPath, 'left challenge video');
+
+      // The side-by-side hstack ends with the shorter video. A music-only
+      // check-in uses the user's video unchanged.
+      const outputDuration = payload.checkInMusicOnly
+        ? userVideoDuration
+        : Math.min(adminVideoDuration ?? userVideoDuration, userVideoDuration);
+      const outputDurationArg = outputDuration.toFixed(3);
+
+      logger.log('Using finite FFmpeg output duration', {
+        outputDurationSeconds: outputDuration,
+      });
+
       const leftVideoFilter = buildVideoFilter(payload.leftLabel, videoFontFile);
 
       const rightVideoFilter = buildVideoFilter(payload.rightLabel, videoFontFile);
@@ -312,14 +363,22 @@ export const mergeVideosTask = task({
         if (musicFile) command.input(musicFile).inputOptions(['-stream_loop', '-1']);
 
         if (payload.checkInMusicOnly) {
-          command.complexFilter(musicFile ? [`[1:a]volume=${FINAL_MUSIC_VOLUME}[music]`] : []);
+          if (musicFile) {
+            command.complexFilter([
+              `[1:a]atrim=duration=${outputDurationArg},asetpts=PTS-STARTPTS,volume=${FINAL_MUSIC_VOLUME}[music]`,
+            ]);
+          }
         } else {
           const musicInputIndex = 2;
           command.complexFilter([
             `[0:v]${leftVideoFilter}[left]`,
             `[1:v]${rightVideoFilter}[right]`,
             '[left][right]hstack=inputs=2:shortest=1[v]',
-            ...(musicFile ? [`[${musicInputIndex}:a]volume=${FINAL_MUSIC_VOLUME}[music]`] : []),
+            ...(musicFile
+              ? [
+                  `[${musicInputIndex}:a]atrim=duration=${outputDurationArg},asetpts=PTS-STARTPTS,volume=${FINAL_MUSIC_VOLUME}[music]`,
+                ]
+              : []),
           ]);
         }
 
@@ -356,6 +415,10 @@ export const mergeVideosTask = task({
 
             '-movflags',
             '+faststart',
+
+            // Do not let an infinitely-looped music input keep the task alive.
+            '-t',
+            outputDurationArg,
 
             '-shortest',
           ])
