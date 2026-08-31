@@ -590,7 +590,13 @@ export const getLeaderboardForPeriod = query({
         }));
     }
 
-    const totalUsers = rankedRows.length;
+    // The client uses this total to render the "others are also participating"
+    // line beneath the visible leaderboard. Keep the ranked rows limited to
+    // users who earned points, but base the community count on every registered
+    // app user so the installed app can show the wider SweatScore community
+    // without requiring a new mobile bundle.
+    const allUsers = await ctx.db.query('users').collect();
+    const totalUsers = allUsers.length;
     const completedCount = rankedRows.filter(
       (row) => row.displayTotalPoints >= targetPoints
     ).length;
