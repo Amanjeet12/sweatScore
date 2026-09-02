@@ -3,12 +3,19 @@ import { ShardedCounter } from '@convex-dev/sharded-counter';
 import { ConvexError, v } from 'convex/values';
 
 import { components, internal } from './_generated/api';
-import { Id } from './_generated/dataModel';
+import { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, QueryCtx, MutationCtx } from './_generated/server';
 import { getSafeMemberName, getSafeUserImageUrl } from './chat/userPresentation';
 import { evaluateUserMilestones } from './utils/milestones';
 import { getStreakEarnedDatesInRange, WEEKLY_STREAK_TARGET_DAYS } from './utils/streak';
-import { addDaysUTC, formatDateInTZ, getMondayInTZ, ymdUTC } from './utils/timezone';
+import {
+  addDaysUTC,
+  DAILY_SCHEDULE_TIMEZONE,
+  formatDateInTZ,
+  getMondayInTZ,
+  getNextMidnightTimestamp,
+  ymdUTC,
+} from './utils/timezone';
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 3;
@@ -16,6 +23,62 @@ const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2860bxfy26wcmex6cxtrvhcn8d93mv' as Id<
 
 // production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
 // testing: kg2711e7c0h5kyag5avvms5was8an2wv
+
+function getLocalDateKey(date: string): number {
+  return Date.parse(`${date}T00:00:00.000Z`);
+}
+
+function getScheduledCheckInForLocalDate(
+  challenges: Doc<'challenges'>[],
+  localDate: string
+): Doc<'challenges'> | undefined {
+  const localDay = getLocalDateKey(localDate);
+  const scheduledCheckIns = challenges
+    .filter(
+      (challenge) =>
+        challenge.isPublished &&
+        challenge.isDailyChallenge === true &&
+        challenge.type === 'check_in' &&
+        challenge.dailyStartAt !== undefined &&
+        challenge.dailyEndAt !== undefined
+    )
+    .map((challenge) => {
+      const scheduledDate = formatDateInTZ(
+        new Date(challenge.dailyStartAt!),
+        DAILY_SCHEDULE_TIMEZONE
+      );
+      const dayDifference = Math.round(
+        (getLocalDateKey(scheduledDate) - localDay) / (24 * 60 * 60 * 1000)
+      );
+
+      return { challenge, dayDifference };
+    });
+
+  if (scheduledCheckIns.length === 0) {
+    return undefined;
+  }
+
+  if (scheduledCheckIns.length === 1) {
+    return scheduledCheckIns[0].challenge;
+  }
+
+  /*
+   * The admin maintains two consecutive London-dated check-ins. They alternate
+   * forever, so users whose local date is one day behind or ahead select the
+   * matching item by calendar-day parity. This lets every timezone change at
+   * its own midnight without duplicating the admin schedule per timezone.
+   */
+  const matchingParity = scheduledCheckIns.filter(
+    ({ dayDifference }) => Math.abs(dayDifference) % 2 === 0
+  );
+  const candidates = matchingParity.length > 0 ? matchingParity : scheduledCheckIns;
+
+  return candidates.sort(
+    (a, b) =>
+      Math.abs(a.dayDifference) - Math.abs(b.dayDifference) ||
+      (b.challenge.dailyStartAt ?? 0) - (a.challenge.dailyStartAt ?? 0)
+  )[0]?.challenge;
+}
 
 function getChallengeCounterKey(
   challengeId: Id<'challenges'>,
@@ -162,21 +225,42 @@ export const completeChallenge = mutation({
     }
 
     const now = Date.now();
+    const user = await ctx.db.get(userId);
+
+    if (!user) {
+      throw new ConvexError('User not found');
+    }
+
+    /*
+     * Points, streaks and daily eligibility always follow the member's local
+     * calendar date, not the London admin schedule.
+     */
+    const todayStr = formatDateInTZ(new Date(now), user.timezone);
 
     const isDailyChallenge = challenge.isDailyChallenge === true;
+    const isCheckIn = challenge.type === 'check_in';
 
     let dailyWindowStartAt: number | undefined;
 
     /*
-     * Validate that a scheduled daily challenge
-     * is inside its active time window.
-     *
-     * This prevents users from completing the
-     * next-day challenge before its start time.
+     * London controls the two check-ins staged by the admin, while each user
+     * changes to the appropriate staged item at midnight in her own timezone.
+     * Store a logical local-date key for duplicate protection.
      */
-    if (isDailyChallenge) {
-      const dailyStartAt = challenge.dailyStartAt;
+    if (isDailyChallenge && isCheckIn) {
+      const scheduledChallenges = await ctx.db
+        .query('challenges')
+        .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
+        .collect();
+      const assignedCheckIn = getScheduledCheckInForLocalDate(scheduledChallenges, todayStr);
 
+      if (!assignedCheckIn || assignedCheckIn._id !== challenge._id) {
+        throw new ConvexError('This daily challenge is not currently active');
+      }
+
+      dailyWindowStartAt = getLocalDateKey(todayStr);
+    } else if (isDailyChallenge) {
+      const dailyStartAt = challenge.dailyStartAt;
       const dailyEndAt = challenge.dailyEndAt;
 
       if (dailyStartAt === undefined || dailyEndAt === undefined) {
@@ -190,18 +274,6 @@ export const completeChallenge = mutation({
       dailyWindowStartAt = dailyStartAt;
     }
 
-    const user = await ctx.db.get(userId);
-
-    if (!user) {
-      throw new ConvexError('User not found');
-    }
-
-    /*
-     * Keep the local date for leaderboard,
-     * points and activity tracking.
-     */
-    const todayStr = formatDateInTZ(new Date(), user.timezone);
-
     if (challenge.endDate && todayStr >= challenge.endDate) {
       throw new ConvexError('Challenge has ended');
     }
@@ -210,7 +282,6 @@ export const completeChallenge = mutation({
       throw new ConvexError('Premium required');
     }
 
-    const isCheckIn = challenge.type === 'check_in';
     const mediaType: 'image' | 'video' =
       isCheckIn && args.mediaType === 'image' ? 'image' : 'video';
     const checkInSubmissionType = isCheckIn
@@ -236,7 +307,7 @@ export const completeChallenge = mutation({
      * Normal challenges continue using the
      * user's local date.
      */
-    const existingCompletion =
+    let existingCompletion =
       dailyWindowStartAt !== undefined
         ? await ctx.db
             .query('challengeCompletions')
@@ -255,6 +326,26 @@ export const completeChallenge = mutation({
             )
             .filter((q) => q.neq(q.field('removed'), true))
             .first();
+
+    /*
+     * Compatibility with completions created before local-day keys were
+     * introduced, and with a different check-in selected from the swap list.
+     */
+    if (!existingCompletion && isDailyChallenge && isCheckIn) {
+      const localDayCompletions = await ctx.db
+        .query('challengeCompletions')
+        .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+        .filter((q) => q.neq(q.field('removed'), true))
+        .collect();
+
+      for (const completion of localDayCompletions) {
+        const completedChallenge = await ctx.db.get(completion.challengeId);
+        if (completedChallenge?.type === 'check_in') {
+          existingCompletion = completion;
+          break;
+        }
+      }
+    }
 
     if (existingCompletion) {
       throw new ConvexError(
@@ -1013,33 +1104,21 @@ export const getTodayDailyChallenge = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     const now = Date.now();
+    const user = userId ? await ctx.db.get(userId) : null;
+    const todayStr = formatDateInTZ(new Date(now), user?.timezone);
+    const localDayStartAt = getLocalDateKey(todayStr);
+    const localDayEndAt = getNextMidnightTimestamp(new Date(now), user?.timezone);
 
     /*
-     * Find the daily challenge whose schedule
-     * is currently active.
+     * The admin's two check-ins are dated and rolled in London time. Select the
+     * correct alternating item for the member's own local calendar date.
      */
-    const activeChallenges = await ctx.db
+    const scheduledChallenges = await ctx.db
       .query('challenges')
       .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field('isPublished'), true),
-          q.lte(q.field('dailyStartAt'), now),
-          q.gt(q.field('dailyEndAt'), now)
-        )
-      )
       .collect();
 
-    /*
-     * There should normally be only one active
-     * daily challenge.
-     *
-     * If multiple records overlap, use the one
-     * with the most recent start time.
-     */
-    const challenge = activeChallenges.sort(
-      (a, b) => (b.dailyStartAt ?? 0) - (a.dailyStartAt ?? 0)
-    )[0];
+    const challenge = getScheduledCheckInForLocalDate(scheduledChallenges, todayStr);
 
     if (!challenge) {
       return null;
@@ -1053,39 +1132,23 @@ export const getTodayDailyChallenge = query({
       return null;
     }
 
-    const windowStartAt = challenge.dailyStartAt;
-    const windowEndAt = challenge.dailyEndAt;
-
     const coverImageUrl = await ctx.storage.getUrl(challenge.coverImage);
 
     const instructionalVideoUrl = challenge.instructionalVideo
       ? await ctx.storage.getUrl(challenge.instructionalVideo)
       : null;
 
-    /*
-     * Community completion count is connected
-     * to this exact daily challenge window.
-     */
-    const counterKey = getChallengeCounterKey(challenge._id, challenge.dailyStartAt, '');
-
-    const communityDoneToday = await challengeCounter.count(ctx, counterKey);
-
-    const windowCompletions = await ctx.db
+    const localDateCompletions = await ctx.db
       .query('challengeCompletions')
+      .withIndex('by_date', (q) => q.eq('date', todayStr))
       .order('desc')
-      .filter((q) =>
-        q.and(
-          q.gte(q.field('_creationTime'), windowStartAt),
-          q.lt(q.field('_creationTime'), windowEndAt),
-          q.neq(q.field('removed'), true)
-        )
-      )
+      .filter((q) => q.neq(q.field('removed'), true))
       .collect();
 
     const challengeTypes = new Map<string, string | undefined>();
-    const checkInCompletions: typeof windowCompletions = [];
+    const checkInCompletions: typeof localDateCompletions = [];
 
-    for (const completion of windowCompletions) {
+    for (const completion of localDateCompletions) {
       const challengeId = String(completion.challengeId);
       let challengeType = challengeTypes.get(challengeId);
 
@@ -1117,45 +1180,15 @@ export const getTodayDailyChallenge = query({
       })
     );
 
-    let userCompletedToday = false;
-
-    if (userId) {
-      const scheduledCompletion = await ctx.db
-        .query('challengeCompletions')
-        .withIndex('by_user_challenge_window', (q) =>
-          q
-            .eq('userId', userId)
-            .eq('challengeId', challenge._id)
-            .eq('dailyWindowStartAt', challenge.dailyStartAt)
-        )
-        .filter((q) => q.neq(q.field('removed'), true))
-        .first();
-
-      userCompletedToday = Boolean(scheduledCompletion);
-
-      /*
-       * The featured card opens a set of check-in categories. Completing any
-       * one of those check-ins should finish the card for the day, even when
-       * the selected category uses a different challenge record.
-       */
-      if (!userCompletedToday && challenge.type === 'check_in') {
-        const user = await ctx.db.get(userId);
-        const todayStr = formatDateInTZ(new Date(now), user?.timezone);
-        const todaysCompletions = await ctx.db
-          .query('challengeCompletions')
-          .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
-          .filter((q) => q.neq(q.field('removed'), true))
-          .collect();
-
-        for (const completion of todaysCompletions) {
-          const completedChallenge = await ctx.db.get(completion.challengeId);
-          if (completedChallenge?.type === 'check_in') {
-            userCompletedToday = true;
-            break;
-          }
-        }
-      }
-    }
+    /*
+     * Completing any check-in category finishes the featured card for this
+     * member's local date. At her local midnight, todayStr changes and the card
+     * becomes available again automatically.
+     */
+    const userCompletedToday = Boolean(
+      userId &&
+      checkInCompletions.some((completion) => String(completion.userId) === String(userId))
+    );
 
     /*
      * Recording type is permanent and does not
@@ -1180,10 +1213,15 @@ export const getTodayDailyChallenge = query({
     const dashboardDescription =
       challenge.shortDescription?.trim() || typeDescription?.trim() || challenge.description;
 
-    const secondsRemaining = Math.max(0, Math.floor((challenge.dailyEndAt - now) / 1000));
+    const secondsRemaining = Math.max(0, Math.floor((localDayEndAt - now) / 1000));
 
     return {
       ...challenge,
+
+      // The mobile countdown and refresh follow this member's local midnight.
+      dailyStartAt: localDayStartAt,
+      dailyEndAt: localDayEndAt,
+      dailyTimezone: user?.timezone ?? 'UTC',
 
       coverImageUrl,
       instructionalVideoUrl,
@@ -1201,7 +1239,7 @@ export const getTodayDailyChallenge = query({
       typeDescription,
 
       secondsRemaining,
-      communityDoneToday,
+      communityDoneToday: actualCheckInCount,
       actualCheckInCount,
       recentCheckInUsers,
       userCompletedToday,

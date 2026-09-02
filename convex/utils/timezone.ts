@@ -1,4 +1,5 @@
 export const DEFAULT_TZ = 'UTC';
+export const DAILY_SCHEDULE_TIMEZONE = 'Europe/London';
 
 export function formatDateInTZ(date: Date, timezone?: string | null): string {
   const tz = timezone || DEFAULT_TZ;

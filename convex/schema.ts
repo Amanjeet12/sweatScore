@@ -241,6 +241,7 @@ const schema = defineSchema({
     isDailyChallenge: v.optional(v.boolean()),
     dailyStartAt: v.optional(v.number()),
     dailyEndAt: v.optional(v.number()),
+    dailyTimezone: v.optional(v.string()),
     shortDescription: v.optional(v.string()),
     type: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
     checkInDescription: v.optional(v.string()),

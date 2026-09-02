@@ -3,8 +3,8 @@ import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { mutation, query, internalMutation, MutationCtx } from './_generated/server';
 import { Id } from './_generated/dataModel';
+import { mutation, query, internalMutation, MutationCtx } from './_generated/server';
 import {
   CHALLENGE_TAGS,
   CHALLENGE_POINTS_MIN,
@@ -12,12 +12,52 @@ import {
   CHALLENGE_DURATION_MIN,
   CHALLENGE_DURATION_MAX,
 } from './challenges';
-import { getNextMidnightTimestamp } from './utils/timezone';
+import { DAILY_SCHEDULE_TIMEZONE, getNextMidnightTimestamp } from './utils/timezone';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 const DAILY_CHECK_IN_LIVE_DELAY_MS = 7 * ONE_HOUR_MS;
 const DAILY_CHECK_IN_REMINDER_BEFORE_END_MS = 5 * ONE_HOUR_MS;
+async function scheduleCheckInWindowNotifications(
+  ctx: MutationCtx,
+  challengeId: Id<'challenges'>,
+  startsAt: number,
+  endsAt: number,
+  now: number
+) {
+  const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
+  const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
+
+  if (liveNotificationAt > now && liveNotificationAt < endsAt) {
+    await ctx.scheduler.runAt(
+      liveNotificationAt,
+      internal.notifications.processScheduledCheckInNotification,
+      {
+        challengeId,
+        expectedStartAt: startsAt,
+        expectedEndAt: endsAt,
+        notificationType: 'dailyCheckInLive',
+      }
+    );
+  }
+
+  if (
+    reminderNotificationAt > now &&
+    reminderNotificationAt > startsAt &&
+    reminderNotificationAt < endsAt
+  ) {
+    await ctx.scheduler.runAt(
+      reminderNotificationAt,
+      internal.notifications.processScheduledCheckInNotification,
+      {
+        challengeId,
+        expectedStartAt: startsAt,
+        expectedEndAt: endsAt,
+        notificationType: 'dailyCheckInReminder',
+      }
+    );
+  }
+}
 
 async function validateCheckInCategoryId(
   ctx: MutationCtx,
@@ -1215,9 +1255,9 @@ export const setCurrentDailyChallenge = mutation({
 
     /*
      * Today's daily challenge expires at the next
-     * midnight in the admin user's timezone.
+     * midnight in the app's London schedule timezone.
      */
-    const todayEndsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
+    const todayEndsAt = getNextMidnightTimestamp(new Date(now), DAILY_SCHEDULE_TIMEZONE);
 
     const scheduledChallenges = await ctx.db
       .query('challenges')
@@ -1241,6 +1281,7 @@ export const setCurrentDailyChallenge = mutation({
       await ctx.db.patch(args.challengeId, {
         shortDescription,
         dailyEndAt: todayEndsAt,
+        dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
       });
 
       const futureChallenges = scheduledChallenges
@@ -1262,6 +1303,7 @@ export const setCurrentDailyChallenge = mutation({
           isDailyChallenge: false,
           dailyStartAt: undefined,
           dailyEndAt: undefined,
+          dailyTimezone: undefined,
           shortDescription: undefined,
         });
       }
@@ -1271,12 +1313,15 @@ export const setCurrentDailyChallenge = mutation({
        * ending time of today's challenge.
        */
       if (nextChallenge) {
-        const nextEndsAt = getNextMidnightTimestamp(new Date(todayEndsAt), user.timezone);
+        const nextEndsAt = getNextMidnightTimestamp(new Date(todayEndsAt), DAILY_SCHEDULE_TIMEZONE);
 
         await ctx.db.patch(nextChallenge._id, {
           dailyStartAt: todayEndsAt,
           dailyEndAt: nextEndsAt,
+          dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
         });
+
+        await ctx.scheduler.runAt(todayEndsAt, internal.admin.maintainRollingDailyCheckIns, {});
       }
 
       return {
@@ -1296,6 +1341,7 @@ export const setCurrentDailyChallenge = mutation({
         isDailyChallenge: false,
         dailyStartAt: undefined,
         dailyEndAt: undefined,
+        dailyTimezone: undefined,
         shortDescription: undefined,
       });
     }
@@ -1310,50 +1356,11 @@ export const setCurrentDailyChallenge = mutation({
       isDailyChallenge: true,
       dailyStartAt: startsAt,
       dailyEndAt: endsAt,
+      dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
       shortDescription,
     });
 
-    /*
-     * Notification 1:
-     * 7 hours after the daily challenge starts.
-     */
-    const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
-
-    /*
-     * Notification 2:
-     * 5 hours before the daily challenge closes.
-     */
-    const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
-
-    if (liveNotificationAt > now && liveNotificationAt < endsAt) {
-      await ctx.scheduler.runAt(
-        liveNotificationAt,
-        internal.notifications.processScheduledCheckInNotification,
-        {
-          challengeId: args.challengeId,
-          expectedStartAt: startsAt,
-          expectedEndAt: endsAt,
-          notificationType: 'dailyCheckInLive',
-        }
-      );
-    }
-
-    if (
-      reminderNotificationAt > now &&
-      reminderNotificationAt > startsAt &&
-      reminderNotificationAt < endsAt
-    ) {
-      await ctx.scheduler.runAt(
-        reminderNotificationAt,
-        internal.notifications.processScheduledCheckInNotification,
-        {
-          challengeId: args.challengeId,
-          expectedStartAt: startsAt,
-          expectedEndAt: endsAt,
-          notificationType: 'dailyCheckInReminder',
-        }
-      );
-    }
+    await scheduleCheckInWindowNotifications(ctx, args.challengeId, startsAt, endsAt, now);
 
     return {
       success: true,
@@ -1424,14 +1431,14 @@ export const setNextDailyChallenge = mutation({
 
     /*
      * Tomorrow's challenge starts at the next midnight
-     * in the admin user's timezone.
+     * in the app's London schedule timezone.
      */
-    const startsAt = getNextMidnightTimestamp(new Date(now), user.timezone);
+    const startsAt = getNextMidnightTimestamp(new Date(now), DAILY_SCHEDULE_TIMEZONE);
 
     /*
      * Tomorrow's challenge ends at the following midnight.
      */
-    const endsAt = getNextMidnightTimestamp(new Date(startsAt), user.timezone);
+    const endsAt = getNextMidnightTimestamp(new Date(startsAt), DAILY_SCHEDULE_TIMEZONE);
 
     /*
      * Ensure today's challenge ends exactly when
@@ -1440,6 +1447,7 @@ export const setNextDailyChallenge = mutation({
     if (currentChallenge.dailyEndAt !== startsAt) {
       await ctx.db.patch(currentChallenge._id, {
         dailyEndAt: startsAt,
+        dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
       });
     }
 
@@ -1458,6 +1466,7 @@ export const setNextDailyChallenge = mutation({
           isDailyChallenge: false,
           dailyStartAt: undefined,
           dailyEndAt: undefined,
+          dailyTimezone: undefined,
           shortDescription: undefined,
         });
       }
@@ -1467,50 +1476,12 @@ export const setNextDailyChallenge = mutation({
       isDailyChallenge: true,
       dailyStartAt: startsAt,
       dailyEndAt: endsAt,
+      dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
       shortDescription,
     });
 
-    /*
-     * Notification 1:
-     * 7 hours after tomorrow's challenge becomes active.
-     */
-    const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
-
-    /*
-     * Notification 2:
-     * 5 hours before tomorrow's challenge closes.
-     */
-    const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
-
-    if (liveNotificationAt > now && liveNotificationAt < endsAt) {
-      await ctx.scheduler.runAt(
-        liveNotificationAt,
-        internal.notifications.processScheduledCheckInNotification,
-        {
-          challengeId: args.challengeId,
-          expectedStartAt: startsAt,
-          expectedEndAt: endsAt,
-          notificationType: 'dailyCheckInLive',
-        }
-      );
-    }
-
-    if (
-      reminderNotificationAt > now &&
-      reminderNotificationAt > startsAt &&
-      reminderNotificationAt < endsAt
-    ) {
-      await ctx.scheduler.runAt(
-        reminderNotificationAt,
-        internal.notifications.processScheduledCheckInNotification,
-        {
-          challengeId: args.challengeId,
-          expectedStartAt: startsAt,
-          expectedEndAt: endsAt,
-          notificationType: 'dailyCheckInReminder',
-        }
-      );
-    }
+    await scheduleCheckInWindowNotifications(ctx, args.challengeId, startsAt, endsAt, now);
+    await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
 
     return {
       success: true,
@@ -1550,12 +1521,124 @@ export const removeDailyChallengeSchedule = mutation({
       isDailyChallenge: false,
       dailyStartAt: undefined,
       dailyEndAt: undefined,
+      dailyTimezone: undefined,
       shortDescription: undefined,
     });
 
     return {
       success: true,
       challengeId: args.challengeId,
+    };
+  },
+});
+
+/*
+ * Keep an intentionally configured two-check-in schedule rolling forward.
+ *
+ * At midnight the former Next Day check-in becomes current automatically by
+ * timestamp. If there is no longer a future entry, recycle the check-in that
+ * ended exactly when the current one began into the next calendar day. The
+ * exact boundary match prevents unrelated historical schedules from being
+ * revived, and removing either scheduled item stops the cycle cleanly.
+ */
+export const maintainRollingDailyCheckIns = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const scheduledChallenges = await ctx.db
+      .query('challenges')
+      .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
+      .collect();
+
+    const current = scheduledChallenges
+      .filter(
+        (challenge) =>
+          challenge.isPublished &&
+          challenge.type === 'check_in' &&
+          (challenge.dailyStartAt ?? 0) <= now &&
+          (challenge.dailyEndAt ?? 0) > now
+      )
+      .sort((a, b) => (b.dailyStartAt ?? 0) - (a.dailyStartAt ?? 0))[0];
+
+    if (!current?.dailyStartAt || !current.dailyEndAt) {
+      return { status: 'no_current_check_in' as const };
+    }
+
+    const future = scheduledChallenges
+      .filter(
+        (challenge) =>
+          challenge.isPublished &&
+          challenge.type === 'check_in' &&
+          (challenge.dailyStartAt ?? 0) > now
+      )
+      .sort((a, b) => (a.dailyStartAt ?? 0) - (b.dailyStartAt ?? 0))[0];
+
+    if (future) {
+      const startsAt = getNextMidnightTimestamp(new Date(now), DAILY_SCHEDULE_TIMEZONE);
+      const endsAt = getNextMidnightTimestamp(new Date(startsAt), DAILY_SCHEDULE_TIMEZONE);
+      const scheduleChanged =
+        current.dailyEndAt !== startsAt ||
+        current.dailyTimezone !== DAILY_SCHEDULE_TIMEZONE ||
+        future.dailyStartAt !== startsAt ||
+        future.dailyEndAt !== endsAt ||
+        future.dailyTimezone !== DAILY_SCHEDULE_TIMEZONE;
+
+      if (scheduleChanged) {
+        await ctx.db.patch(current._id, {
+          dailyEndAt: startsAt,
+          dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
+        });
+        await ctx.db.patch(future._id, {
+          dailyStartAt: startsAt,
+          dailyEndAt: endsAt,
+          dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
+        });
+
+        await scheduleCheckInWindowNotifications(ctx, future._id, startsAt, endsAt, now);
+        await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
+      }
+
+      return { status: 'next_already_scheduled' as const };
+    }
+
+    const previous = scheduledChallenges
+      .filter(
+        (challenge) =>
+          challenge._id !== current._id &&
+          challenge.isPublished &&
+          challenge.type === 'check_in' &&
+          challenge.dailyEndAt === current.dailyStartAt
+      )
+      .sort((a, b) => (b.dailyStartAt ?? 0) - (a.dailyStartAt ?? 0))[0];
+
+    if (!previous) {
+      return { status: 'no_rollover_pair' as const };
+    }
+
+    const startsAt = getNextMidnightTimestamp(new Date(now), DAILY_SCHEDULE_TIMEZONE);
+    const endsAt = getNextMidnightTimestamp(new Date(startsAt), DAILY_SCHEDULE_TIMEZONE);
+
+    if (current.dailyEndAt !== startsAt || current.dailyTimezone !== DAILY_SCHEDULE_TIMEZONE) {
+      await ctx.db.patch(current._id, {
+        dailyEndAt: startsAt,
+        dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
+      });
+    }
+
+    await ctx.db.patch(previous._id, {
+      dailyStartAt: startsAt,
+      dailyEndAt: endsAt,
+      dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
+    });
+
+    await scheduleCheckInWindowNotifications(ctx, previous._id, startsAt, endsAt, now);
+    await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
+
+    return {
+      status: 'scheduled' as const,
+      challengeId: previous._id,
+      startsAt,
+      endsAt,
     };
   },
 });

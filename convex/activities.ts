@@ -558,10 +558,18 @@ export const getUserActivities = query({
       .withIndex('by_user', (q) => q.eq('userId', targetUserId))
       .collect();
 
-    // Create a map to track check-ins by date
-    const checkInByDate = new Map<string, any>();
+    // Aggregate check-ins by date. Source records intentionally live separately
+    // from daily activities, but the profile should render one combined day.
+    const checkInByDate = new Map<string, { points: number; record: any }>();
     for (const checkIn of checkIns) {
-      checkInByDate.set(checkIn.date, checkIn);
+      const existing = checkInByDate.get(checkIn.date);
+      checkInByDate.set(checkIn.date, {
+        points: (existing?.points ?? 0) + checkIn.points,
+        record:
+          !existing || checkIn._creationTime > existing.record._creationTime
+            ? checkIn
+            : existing.record,
+      });
     }
 
     // Resolve target user's premium status + daily cap for display clamp
@@ -575,35 +583,53 @@ export const getUserActivities = query({
       .withIndex('by_user', (q) => q.eq('userId', targetUserId))
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
-    const challengePointsByDate = new Map<string, number>();
+    const challengePointsByDate = new Map<string, { points: number; record: any }>();
     for (const c of challengeCompletions) {
-      challengePointsByDate.set(c.date, (challengePointsByDate.get(c.date) ?? 0) + c.pointsEarned);
+      const existing = challengePointsByDate.get(c.date);
+      challengePointsByDate.set(c.date, {
+        points: (existing?.points ?? 0) + c.pointsEarned,
+        record: !existing || c._creationTime > existing.record._creationTime ? c : existing.record,
+      });
     }
 
-    // Process all activities and add points breakdown
-    const processedActivities: any[] = [];
-    const datesWithActivities = new Set<string>();
-
+    // A day may contain a health-sync row plus multiple approved activity-log
+    // rows. Group all source records first so check-in and challenge points are
+    // attached to the same daily card instead of creating duplicate dates.
+    const activitiesByDate = new Map<string, any[]>();
     for (const activity of activities) {
-      // Calculate individual points (without flooring yet)
-      const stepsPoints = calculateStepsPoints(activity.steps ?? 0);
-      const zone2Points = calculateZone2Points(activity.zone2Minutes ?? 0);
+      const dateActivities = activitiesByDate.get(activity.date) ?? [];
+      dateActivities.push(activity);
+      activitiesByDate.set(activity.date, dateActivities);
+    }
 
-      // Check if this is the first activity for this date and if there's a check-in
-      const isFirstActivityForDate = !datesWithActivities.has(activity.date);
-      const checkIn = checkInByDate.get(activity.date);
-      const checkInPoints = isFirstActivityForDate && checkIn ? checkIn.points : 0;
+    const allDates = new Set<string>([
+      ...activitiesByDate.keys(),
+      ...checkInByDate.keys(),
+      ...challengePointsByDate.keys(),
+    ]);
 
-      datesWithActivities.add(activity.date);
+    const processedActivities: any[] = [];
 
-      // Floor individual points
-      const flooredStepsPoints = Math.floor(stepsPoints);
-      const flooredZone2Points = Math.floor(zone2Points);
-      const flooredCheckInPoints = Math.floor(checkInPoints);
-      const flooredMissionPoints = Math.floor(activity.missionPoints ?? 0);
-      const challengePoints = isFirstActivityForDate
-        ? Math.floor(challengePointsByDate.get(activity.date) ?? 0)
-        : 0;
+    for (const date of allDates) {
+      const dateActivities = activitiesByDate.get(date) ?? [];
+      const checkIn = checkInByDate.get(date);
+      const challenge = challengePointsByDate.get(date);
+      const representativeActivity =
+        dateActivities.find((activity) => activity.synced) ?? dateActivities[0];
+      const sourceRecord = representativeActivity ?? checkIn?.record ?? challenge?.record;
+
+      const totalSteps = dateActivities.reduce((sum, activity) => sum + (activity.steps ?? 0), 0);
+      const totalZone2Minutes = dateActivities.reduce(
+        (sum, activity) => sum + (activity.zone2Minutes ?? 0),
+        0
+      );
+      const flooredStepsPoints = Math.floor(calculateStepsPoints(totalSteps));
+      const flooredZone2Points = Math.floor(calculateZone2Points(totalZone2Minutes));
+      const flooredCheckInPoints = Math.floor(checkIn?.points ?? 0);
+      const flooredMissionPoints = Math.floor(
+        dateActivities.reduce((sum, activity) => sum + (activity.missionPoints ?? 0), 0)
+      );
+      const challengePoints = Math.floor(challenge?.points ?? 0);
       const recalculatedPoints =
         flooredStepsPoints + flooredZone2Points + flooredCheckInPoints + challengePoints;
 
@@ -612,7 +638,18 @@ export const getUserActivities = query({
         : Math.min(dailyCap, Math.floor(recalculatedPoints));
 
       processedActivities.push({
-        ...activity,
+        ...representativeActivity,
+        _id:
+          representativeActivity?._id ?? `${checkIn ? 'checkin' : 'challenge'}_${sourceRecord._id}`,
+        _creationTime: Math.max(
+          ...dateActivities.map((activity) => activity._creationTime),
+          checkIn?.record._creationTime ?? 0,
+          challenge?.record._creationTime ?? 0
+        ),
+        userId: targetUserId,
+        date,
+        steps: totalSteps,
+        zone2Minutes: totalZone2Minutes,
         stepsPoints: flooredStepsPoints,
         zone2Points: flooredZone2Points,
         checkInPoints: flooredCheckInPoints,
@@ -620,36 +657,9 @@ export const getUserActivities = query({
         missionPoints: flooredMissionPoints,
         challengePoints,
         displayTotalPoints: displayTotal,
+        synced: dateActivities.length > 1 ? true : (representativeActivity?.synced ?? true),
+        isCheckInOnly: dateActivities.length === 0 && Boolean(checkIn),
       });
-    }
-
-    // Add check-in only days (days with check-in but no activities)
-
-    for (const [date, checkIn] of checkInByDate) {
-      if (!datesWithActivities.has(date)) {
-        const cp = Math.floor(challengePointsByDate.get(checkIn.date) ?? 0);
-        const checkInRowTotal = Math.floor(checkIn.points) + cp;
-        const checkInDisplayTotal = targetIsPremium
-          ? checkInRowTotal
-          : Math.min(dailyCap, checkInRowTotal);
-        processedActivities.push({
-          _id: `checkin_${checkIn._id}`,
-          _creationTime: checkIn._creationTime,
-          userId: checkIn.userId,
-          date: checkIn.date,
-          steps: 0,
-          zone2Minutes: 0,
-          points: checkInRowTotal,
-          displayTotalPoints: checkInDisplayTotal,
-          synced: true,
-          isCheckInOnly: true,
-          stepsPoints: 0,
-          zone2Points: 0,
-          checkInPoints: Math.floor(checkIn.points),
-          missionPoints: 0,
-          challengePoints: cp,
-        });
-      }
     }
 
     // Filter out activities with less than 1 point, then sort

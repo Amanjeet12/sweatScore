@@ -21,6 +21,12 @@ crons.hourly(
   internal.notifications.processDailyMissionNotifications
 );
 
+crons.interval(
+  'Maintain Rolling Daily Check-Ins',
+  { minutes: 5 },
+  internal.admin.maintainRollingDailyCheckIns
+);
+
 // crons.cron(
 //   'Send Reward Notifications',
 //   '0 * 28 * *', // 28th day of the month
