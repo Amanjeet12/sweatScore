@@ -322,7 +322,7 @@ export default function TabLayout() {
           })}
         /> */}
       </Tabs>
-      <UpdateAvailableBanner />
+      {/* <UpdateAvailableBanner /> */}
     </View>
   );
 }
