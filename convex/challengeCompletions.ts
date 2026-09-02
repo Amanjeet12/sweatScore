@@ -19,7 +19,7 @@ import {
 
 const challengeCounter = new ShardedCounter(components.shardedCounter);
 const MAX_DAILY_CHALLENGE_COMPLETIONS = 3;
-const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg2860bxfy26wcmex6cxtrvhcn8d93mv' as Id<'_storage'>;
+const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg27tw959tpd9gd9jcf0dey5x58dmdec' as Id<'_storage'>;
 
 // production : kg25g2j1k7vcx2h2qq58gw9h5n89p5fp
 // testing: kg2711e7c0h5kyag5avvms5was8an2wv
