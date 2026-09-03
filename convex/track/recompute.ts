@@ -79,17 +79,14 @@ async function computeDailyTotals(
   );
 
   /*
-   * Only challenges configured with:
-   *
-   * isDailyChallenge = true
-   * dailyChallengeType = 'check_in'
-   *
-   * are counted as physical daily check-ins.
+   * Every check-in option represents a physical daily check-in. The featured
+   * check-in and alternatives selected from the swap list must count
+   * identically; isDailyChallenge only identifies the scheduled card.
    */
-  const dailyCheckIns = completions.filter((completion, index) => {
+  const dailyCheckIns = completions.filter((_completion, index) => {
     const challenge = completedChallenges[index];
 
-    return completion.dailyWindowStartAt !== undefined || challenge?.isDailyChallenge === true;
+    return challenge?.type === 'check_in';
   }).length;
 
   /*
