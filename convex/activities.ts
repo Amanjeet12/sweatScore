@@ -629,7 +629,14 @@ export const getUserActivities = query({
       const flooredMissionPoints = Math.floor(
         dateActivities.reduce((sum, activity) => sum + (activity.missionPoints ?? 0), 0)
       );
-      const challengePoints = Math.floor(challenge?.points ?? 0);
+      const loggedActivityPoints = Math.floor(
+        dateActivities.reduce(
+          (sum, activity) =>
+            activity.loggedActivityKey ? sum + (activity.displayTotalPoints ?? 0) : sum,
+          0
+        )
+      );
+      const challengePoints = Math.floor(challenge?.points ?? 0) + loggedActivityPoints;
       const recalculatedPoints =
         flooredStepsPoints + flooredZone2Points + flooredCheckInPoints + challengePoints;
 
