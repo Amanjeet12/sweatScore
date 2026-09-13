@@ -48,8 +48,8 @@ export const createChallengePost = internalMutation({
       .first();
 
     if (existingPost) {
-      // Upgrade the immediately published original without duplicating the post
-      // or losing its comments/reactions when video processing finishes.
+      // Preserve retry/legacy behavior without duplicating the post or losing
+      // comments and reactions when video processing finishes.
       await ctx.db.patch(existingPost._id, {
         media: args.compositeVideoStorageId,
         mediaWidth: 1080,
@@ -70,6 +70,7 @@ export const createChallengePost = internalMutation({
       mediaType: 'video',
       mediaWidth: 1080,
       mediaHeight: 960,
+      ...(completion.thumbnailStorageId ? { mediaThumbnail: completion.thumbnailStorageId } : {}),
 
       challengeId: args.challengeId,
       challengeCompletionId: args.challengeCompletionId,

@@ -316,6 +316,8 @@ export const completeChallenge = mutation({
     const isDailyChallenge = challenge.isDailyChallenge === true;
     const isCheckIn = challenge.type === 'check_in';
     const isCommunityChallenge = challenge.isCommunityChallenge === true;
+    const isSideBySideChallenge =
+      !isCheckIn && (!isCommunityChallenge || challenge.outputType === 'side_by_side');
     const communityTiming = getCommunityChallengeTiming(challenge, now, user.timezone);
     let communityChallengeDay: number | undefined;
     let communityParticipant: Doc<'challengeParticipants'> | null = null;
@@ -652,7 +654,8 @@ export const completeChallenge = mutation({
      */
     if (args.videoStorageId) {
       // Publish the original immediately for submissions that need asynchronous
-      // processing. The callback upgrades this same post to the final video.
+      // single-video processing. Side-by-side challenges wait until Trigger.dev
+      // creates the composite so the raw recording never appears in the feed.
       const needsProcessing =
         !(isCheckIn && !musicTrackId) &&
         !(
@@ -661,7 +664,7 @@ export const completeChallenge = mutation({
           challenge.outputType === 'single_video' &&
           !musicTrackId
         );
-      if (needsProcessing) {
+      if (needsProcessing && !isSideBySideChallenge) {
         await ctx.db.insert('posts', {
           userId,
           createdAt: now,
