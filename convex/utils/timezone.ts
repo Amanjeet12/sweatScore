@@ -80,7 +80,7 @@ function getTimezoneOffsetMs(date: Date, timezone: string): number {
   return representedAsUtc - timestampWithoutMilliseconds;
 }
 
-function localMidnightToUtcTimestamp(
+export function localMidnightToUtcTimestamp(
   year: number,
   month: number,
   day: number,
@@ -98,6 +98,29 @@ function localMidnightToUtcTimestamp(
   timestamp = utcGuess - correctedOffset;
 
   return timestamp;
+}
+
+export function getDateStartTimestampInTimezone(dateKey: string, timezone?: string | null): number {
+  const tz = timezone || DEFAULT_TZ;
+  const [year, month, day] = dateKey.split('-').map(Number);
+
+  if (!year || !month || !day) {
+    throw new Error(`Invalid date key: ${dateKey}`);
+  }
+
+  return localMidnightToUtcTimestamp(year, month, day, tz);
+}
+
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return ymdUTC(date);
+}
+
+export function differenceInCalendarDays(startDateKey: string, endDateKey: string): number {
+  const start = Date.parse(`${startDateKey}T00:00:00.000Z`);
+  const end = Date.parse(`${endDateKey}T00:00:00.000Z`);
+  return Math.round((end - start) / (24 * 60 * 60 * 1000));
 }
 
 export function getNextMidnightTimestamp(

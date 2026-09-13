@@ -1,32 +1,43 @@
-import { View } from 'react-native';
-
-import LeaderboardPeriodDropdown, { LeaderboardPeriod } from './LeaderboardPeriodDropdown';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
 
-type LeaderboardHeaderProps = {
-  period: LeaderboardPeriod;
+type Props = {
+  mode: 'points' | 'streak';
   timeLeft: string;
-  canChangePeriod: boolean;
-  onChangePeriod: (period: LeaderboardPeriod) => void;
+  onChangeMode: (mode: 'points' | 'streak') => void;
 };
-
-export default function LeaderboardHeader({
-  period,
-  timeLeft,
-  canChangePeriod,
-  onChangePeriod,
-}: LeaderboardHeaderProps) {
+export default function LeaderboardHeader({ mode, timeLeft, onChangeMode }: Props) {
   return (
-    <View className="flex-row items-start justify-between gap-x-3 px-4 pb-5 pt-5">
-      <View className="flex-1">
-        <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">League</Text>
-        <Text className="mt-0.5 font-body text-sm text-[#5A5A5A]">{timeLeft}</Text>
+    <View className="px-5 pb-4 pt-5">
+      <View className="mb-1 flex-row items-center justify-between gap-x-3">
+        <Text className="font-body text-[10px] uppercase tracking-[0.5px] text-[#C65D32]">
+          {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())}
+        </Text>
+        {mode === 'points' ? (
+          <Text className="font-body text-[13px] text-[#817A76]">{timeLeft}</Text>
+        ) : null}
       </View>
-
-      {canChangePeriod ? (
-        <LeaderboardPeriodDropdown value={period} onChange={onChangePeriod} />
+      <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-[25px] text-[#1A1A1A]">
+        League
+      </Text>
+      {mode === 'streak' ? (
+        <Text className="mt-1 font-body text-[13px] text-[#817A76]">Longest streak</Text>
       ) : null}
+      <View className="mt-4 flex-row rounded-[24px] bg-[#EEEDE8] p-1">
+        {(['points', 'streak'] as const).map((value) => (
+          <Pressable
+            key={value}
+            onPress={() => onChangeMode(value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === value }}
+            className={`flex-1 items-center rounded-[20px] py-2 ${mode === value ? 'bg-white' : ''}`}>
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#1A1A1A]">
+              {value === 'points' ? 'Points' : 'Streak'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }

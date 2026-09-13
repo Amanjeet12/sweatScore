@@ -87,14 +87,11 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
               className="border-2 border-[#EEEAE5]"
               style={{
                 backgroundColor: 'white',
-                borderRadius: 20,
+                borderRadius: 12,
                 padding: 24,
                 marginHorizontal: 0,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 8,
-                elevation: 4, // For Android
+
+                // For Android
                 position: 'relative',
                 width: '100%',
               }}>
@@ -102,12 +99,9 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
                 <View
                   style={{
                     backgroundColor: 'transparent',
-                    borderRadius: 50,
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: Platform.OS === 'android' ? 0.1 : 0.3,
-                    shadowRadius: 30,
-                    elevation: Platform.OS === 'android' ? 30 : 8, // For Android
+                    borderRadius: 12,
+
+                    // For Android
                   }}>
                   <Text
                     className="text-6xl font-bold leading-tight"

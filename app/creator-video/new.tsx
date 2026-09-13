@@ -146,7 +146,7 @@ export default function AddNewCreatorVideo() {
           className="flex-1">
           <View className="flex-1 justify-start px-6">
             <View className="mt-4">
-              <Text className="mb-2 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
+              <Text className="mb-2 text-center font-heading text-3xl font-semibold text-[#1A1A1A]">
                 Add new creator video
               </Text>
             </View>
@@ -286,7 +286,7 @@ export default function AddNewCreatorVideo() {
                     variant="solid"
                     size="xl"
                     action="primary"
-                    className="h-16 w-full rounded-3xl"
+                    className="h-16 w-full rounded-lg"
                     onPress={handleSubmit}
                     disabled={isLoading}
                     loading={isLoading}>

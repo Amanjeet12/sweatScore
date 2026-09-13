@@ -78,9 +78,8 @@ function PlanCard({
       style={{
         position: 'relative',
         minHeight: 132,
-        borderRadius: 22,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? '#FF5C1A' : '#D7D7D7',
+        borderRadius: 12,
+
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 10,
         paddingTop: 28,
@@ -90,7 +89,7 @@ function PlanCard({
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-      <Text className="font-heading text-xl font-bold text-[#1A1A1A]">{title}</Text>
+      <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">{title}</Text>
 
       <Text
         className="mt-2 w-full text-center font-body text-lg text-[#4F4F4F]"
@@ -114,23 +113,11 @@ function PlanCard({
             position: 'absolute',
             top: -16,
             alignSelf: 'center',
-            borderRadius: 999,
+            borderRadius: 12,
             backgroundColor: '#FF5C1A',
             paddingHorizontal: 15,
             paddingVertical: 6,
-            ...(Platform.OS === 'ios'
-              ? {
-                  shadowColor: '#FF5C1A',
-                  shadowOffset: {
-                    width: 0,
-                    height: 3,
-                  },
-                  shadowOpacity: 0.18,
-                  shadowRadius: 5,
-                }
-              : {
-                  elevation: 3,
-                }),
+            ...(Platform.OS === 'ios' ? {} : {}),
           }}>
           <Text
             className="text-[12px] font-extrabold uppercase text-white"
@@ -375,7 +362,7 @@ export default function Paywall() {
       </View>
 
       <View className="mt-9 items-center">
-        <Text className="text-center font-heading text-[32px] font-bold leading-10 text-[#111111]">
+        <Text className="text-center font-heading text-[32px] font-semibold leading-10 text-[#111111]">
           Choose your plan
         </Text>
         <Text className="mt-2 max-w-[330px] text-center font-body text-lg font-semibold leading-7 text-[#5F6270]">

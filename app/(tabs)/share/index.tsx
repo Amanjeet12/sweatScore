@@ -2,8 +2,8 @@ import { LegendList } from '@legendapp/list';
 import { usePaginatedQuery, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ImageSquare } from 'phosphor-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ImageSquare, NotePencil, VideoCamera } from 'phosphor-react-native';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,20 +18,6 @@ import type { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
-
-const FEED_PROMPTS = [
-  'Show us your water bottle, [name]',
-  'Share your view right now, [name]',
-  'Share a motivational quote, [name]',
-  'Post your outfit today, [name]',
-  "Share what's on your playlist, [name]",
-  'Post your go-to healthy snack, [name]',
-  'Post your gym bag, [name]',
-  'Post your favourite leggings, [name]',
-  'Post your workout shoes, [name]',
-  'Post your current read, [name]',
-  'Post your feel-good song, [name]',
-];
 
 const TabShare = () => {
   const insets = useSafeAreaInsets();
@@ -51,8 +37,12 @@ const TabShare = () => {
     if (status === 'CanLoadMore') loadMore(15);
   };
 
-  const handleCreatePost = () => {
+  const handleCreatePost = (initialMediaType?: 'image' | 'video') => {
     if (!requireSubscription({ redirectTo: '/(tabs)/share', source: 'community_create_post' })) {
+      return;
+    }
+    if (initialMediaType) {
+      router.push({ pathname: '/posts/new', params: { initialMediaType } });
       return;
     }
     router.push('/posts/new');
@@ -92,79 +82,116 @@ const TabShare = () => {
   const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
   const userInitial = userName.charAt(0).toUpperCase();
   const userImage = currentUser?.image?.trim();
-  const feedPrompt = useMemo(() => {
-    const randomIndex = Math.floor(Math.random() * FEED_PROMPTS.length);
-    return FEED_PROMPTS[randomIndex].replace(/\[name\]/g, userName);
-  }, [userName]);
-
   return (
     <MenuProvider>
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
         <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
         <View
           className="flex-1 flex-col"
           style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-          <View className="border-b border-b-[#EEEAE5] bg-[#FAFAFA] px-4 pb-5 pt-5">
+          <View className="bg-[#F9F9F9] px-4 pb-3 pt-5">
             <View>
-              <Text className="font-heading text-2xl font-extrabold text-[#1A1A1A]">Feed</Text>
-              <Text className="mt-0.5 font-body text-sm text-[#5F5F5F]">Sweat Sisters</Text>
-            </View>
-
-            <View className="mt-4 flex-row items-center rounded-full border border-[#DB6D06] bg-white px-3 py-2.5">
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleCreatePost}
-                accessibilityRole="button"
-                accessibilityLabel="Create community post"
-                className="flex-1 flex-row items-center">
-                <View style={styles.avatar}>
-                  {userImage ? (
-                    <Image
-                      source={{ uri: userImage }}
-                      style={StyleSheet.absoluteFillObject}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <Text className="font-heading text-sm font-bold text-white">{userInitial}</Text>
-                  )}
-                </View>
-                <Text className="flex-1 pr-2 font-body text-sm text-[#555658]" numberOfLines={2}>
-                  {feedPrompt}
-                </Text>
-              </TouchableOpacity>
-
-              <View className="ml-2 flex-row items-center gap-x-2">
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={handleCreatePost}
-                  accessibilityRole="button"
-                  accessibilityLabel="Create a post with an image"
-                  className="h-9 w-9 items-center justify-center rounded-full bg-[#FFF2E9]">
-                  <ImageSquare size={20} color="#F76B1C" weight="bold" />
-                </TouchableOpacity>
-              </View>
+              <Text
+                style={{ fontFamily: 'Inter_700Bold' }}
+                className="mt-1 text-[28px] text-[#1A1A1A]">
+                Community
+              </Text>
             </View>
           </View>
 
-          {status === 'LoadingFirstPage' ? (
-            <ScreenLoading className="bg-transparent" />
-          ) : (
-            <View className="flex-1 flex-col bg-white">
-              <LegendList
-                showsVerticalScrollIndicator={false}
-                data={results}
-                renderItem={({ item }: { item: (typeof results)[number] }) => (
-                  <PostRow post={item} />
-                )}
-                keyExtractor={(item) => item._id.toString()}
-                ListHeaderComponent={renderPinnedPost}
-                ListFooterComponent={<View className="mb-4" />}
-                onEndReached={loadMorePages}
-                onEndReachedThreshold={2}
-                recycleItems
-              />
-            </View>
-          )}
+          <View className="flex-1 flex-col bg-[#F9F9F9]">
+            <LegendList
+              showsVerticalScrollIndicator={false}
+              data={results}
+              renderItem={({ item }: { item: (typeof results)[number] }) => <PostRow post={item} />}
+              keyExtractor={(item) => item._id.toString()}
+              ListHeaderComponent={
+                <>
+                  <View className="px-4 pb-3 pt-5">
+                    <View className="overflow-hidden rounded-[24px] bg-white px-4 pb-2 pt-4">
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => handleCreatePost()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Create community post"
+                        className="flex-row items-center">
+                        <View style={styles.avatar}>
+                          {userImage ? (
+                            <Image
+                              source={{ uri: userImage }}
+                              style={StyleSheet.absoluteFillObject}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <Text
+                              style={{ fontFamily: 'Inter_600SemiBold' }}
+                              className="text-sm text-white">
+                              {userInitial}
+                            </Text>
+                          )}
+                        </View>
+                        <View className="min-h-11 flex-1 justify-center rounded-[20px] bg-[#FBF9F7] px-4">
+                          <Text className="font-body text-xs text-[#77716D]" numberOfLines={1}>
+                            Share something with the community
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <View className="mt-3 flex-row border-t border-[#EEE8E3] pt-2">
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleCreatePost('image')}
+                          accessibilityRole="button"
+                          accessibilityLabel="Create a post with an image"
+                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
+                          <ImageSquare size={17} color="#FF5C35" weight="bold" />
+                          <Text
+                            style={{ fontFamily: 'Inter_600SemiBold' }}
+                            className="text-[11px] text-[#4D4946]">
+                            Photo
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleCreatePost('video')}
+                          accessibilityRole="button"
+                          accessibilityLabel="Create a post with a video"
+                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
+                          <VideoCamera size={17} color="#FF5C35" weight="bold" />
+                          <Text
+                            style={{ fontFamily: 'Inter_600SemiBold' }}
+                            className="text-[11px] text-[#4D4946]">
+                            Video
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleCreatePost()}
+                          accessibilityRole="button"
+                          accessibilityLabel="Write a community post"
+                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] bg-[#FFF0E8]">
+                          <NotePencil size={17} color="#FF5C35" weight="bold" />
+                          <Text
+                            style={{ fontFamily: 'Inter_600SemiBold' }}
+                            className="text-[11px] text-[#F05A28]">
+                            Write
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                  {renderPinnedPost()}
+                </>
+              }
+              ListEmptyComponent={
+                status === 'LoadingFirstPage' ? <ScreenLoading className="bg-transparent" /> : null
+              }
+              ListFooterComponent={<View className="mb-6" />}
+              onEndReached={loadMorePages}
+              onEndReachedThreshold={2}
+              recycleItems
+            />
+          </View>
         </View>
       </SafeAreaView>
     </MenuProvider>

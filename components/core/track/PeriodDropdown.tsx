@@ -26,13 +26,13 @@ export default function PeriodDropdown({ value, onChange }: PeriodDropdownProps)
         customStyles={{
           triggerWrapper: {
             backgroundColor: '#F76B1C',
-            borderRadius: 9999,
+            borderRadius: 12,
             paddingHorizontal: 16,
             paddingVertical: 6,
           },
         }}>
         <View className="flex-row items-center gap-x-1">
-          <Text className="font-heading text-sm font-bold text-white">{LABEL[value]}</Text>
+          <Text className="font-heading text-sm font-semibold text-white">{LABEL[value]}</Text>
           <CaretDown size={12} color="#FFFFFF" weight="bold" />
         </View>
       </MenuTrigger>
@@ -53,7 +53,7 @@ export default function PeriodDropdown({ value, onChange }: PeriodDropdownProps)
                 <Text
                   className={
                     selected
-                      ? 'font-heading text-base font-bold text-primary-500'
+                      ? 'font-heading text-base font-semibold text-primary-500'
                       : 'font-body text-base text-[#1A1A1A]'
                   }>
                   {o.label}

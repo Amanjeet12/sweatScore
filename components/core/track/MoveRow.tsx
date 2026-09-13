@@ -117,7 +117,7 @@ export default function MoveRow({
 
       <View className="flex-1">
         <Text
-          className="font-heading text-base font-bold leading-5 text-[#1A1A1A]"
+          className="font-heading text-base font-semibold leading-5 text-[#1A1A1A]"
           numberOfLines={2}>
           {challengeName}
         </Text>
@@ -127,7 +127,7 @@ export default function MoveRow({
             {formatDistanceToNow(new Date(createdAt))}
           </Text>
           {challengeType === 'challenge' && (
-            <View className="rounded-full border border-primary-100 bg-primary-50 px-2.5 py-0.5">
+            <View className="rounded-lg  bg-primary-50 px-2.5 py-0.5">
               <Text className="font-body text-[11px] font-bold text-primary-500">
                 Day {timesCompleted}
               </Text>

@@ -1,4 +1,4 @@
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -6,14 +6,13 @@ import {
   ArrowUpRight,
   LockSimple,
   Play,
-  Pulse,
   UploadSimple,
   VideoCamera,
   X,
 } from 'phosphor-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Image,
+  Alert,
   Linking,
   Modal,
   Pressable,
@@ -27,11 +26,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import CommunityChallengeDetail from '~/components/core/challenges/CommunityChallengeDetail';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
+import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useTabStore } from '~/store/useTabStore';
 
@@ -59,16 +60,11 @@ function CheckItOutLink({ url, isPro, onOpen }: CheckItOutLinkProps) {
       onPress={async () => {
         await onOpen(url);
       }}
-      className="mt-3 rounded-[22px] bg-white px-4 py-3.5"
-      style={{
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 2,
-      }}>
+      className="mt-3 rounded-[20px] bg-white px-4 py-3.5">
       <View className="flex-row items-center justify-between">
-        <Text className="min-w-0 flex-1 pr-4 font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+        <Text
+          style={{ fontFamily: 'Inter_600SemiBold' }}
+          className="min-w-0 flex-1 pr-4 text-[10px] uppercase tracking-[1px] text-[#FF4B1F]">
           Bonus Content
         </Text>
 
@@ -94,26 +90,27 @@ export default function ChallengeViewScreen() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showCheckInOptions, setShowCheckInOptions] = useState(false);
-
-  const [selectedCheckInId, setSelectedCheckInId] = useState<Id<'challenges'> | null>(null);
+  const [joiningCommunityChallenge, setJoiningCommunityChallenge] = useState(false);
+  const [communityRefreshToken, setCommunityRefreshToken] = useState(() =>
+    Math.floor(Date.now() / 60000)
+  );
 
   const challenge = useQuery(api.challengeCompletions.getPublishedChallenge, {
     challengeId: challengeId as Id<'challenges'>,
   });
+  const communityChallengeResult = useQuery(api.challengeCompletions.getCommunityChallengeDetails, {
+    challengeId: challengeId as Id<'challenges'>,
+    refreshToken: communityRefreshToken,
+  });
+  const communityChallenge = useRetainedQueryResult(communityChallengeResult, String(challengeId));
+  const joinCommunityChallenge = useMutation(api.challengeCompletions.joinCommunityChallenge);
 
   const availableCheckIns = useQuery(
     api.challengeCompletions.getAvailableCheckIns,
     challenge?.type === 'check_in' ? { openedChallengeId: challengeId as Id<'challenges'> } : 'skip'
   );
 
-  const selectedCheckIn = useMemo(() => {
-    if (!availableCheckIns?.length) return undefined;
-    return (
-      availableCheckIns.find((item) => item.challengeId === selectedCheckInId) ??
-      availableCheckIns.find((item) => item.challengeId === challengeId) ??
-      availableCheckIns[0]
-    );
-  }, [availableCheckIns, challengeId, selectedCheckInId]);
+  const selectedCheckIn = availableCheckIns?.find((item) => item.challengeId === challengeId);
 
   const activeChallengeId = selectedCheckIn?.challengeId ?? (challengeId as Id<'challenges'>);
 
@@ -148,15 +145,11 @@ export default function ChallengeViewScreen() {
   });
 
   useEffect(() => {
-    if (!availableCheckIns?.length) {
-      setSelectedCheckInId(null);
-      return;
-    }
-    if (!availableCheckIns.some((item) => item.challengeId === selectedCheckInId)) {
-      const opened = availableCheckIns.find((item) => item.challengeId === challengeId);
-      setSelectedCheckInId(opened?.challengeId ?? availableCheckIns[0].challengeId);
-    }
-  }, [availableCheckIns, challengeId, selectedCheckInId]);
+    const interval = setInterval(() => {
+      setCommunityRefreshToken(Math.floor(Date.now() / 60000));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     player.pause();
@@ -238,10 +231,13 @@ export default function ChallengeViewScreen() {
   const handleStartChallenge = () => {
     safePausePlayer();
 
-    const hasSubscription = requireSubscription({
-      redirectTo: `/challenge-view/${challengeId}`,
-      source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
-    });
+    const hasSubscription =
+      challenge?.isCommunityChallenge === true && !challenge.isLocked
+        ? true
+        : requireSubscription({
+            redirectTo: `/challenge-view/${challengeId}`,
+            source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
+          });
 
     if (!hasSubscription) {
       return;
@@ -259,6 +255,26 @@ export default function ChallengeViewScreen() {
         challengeId: activeChallengeId,
       },
     });
+  };
+
+  const handleJoinCommunityChallenge = async () => {
+    const allowed =
+      communityChallenge && !communityChallenge.isLocked
+        ? true
+        : requireSubscription({
+            redirectTo: `/challenge-view/${challengeId}`,
+            source: 'community_challenge_join',
+          });
+    if (!allowed) return;
+
+    setJoiningCommunityChallenge(true);
+    try {
+      await joinCommunityChallenge({ challengeId: challengeId as Id<'challenges'> });
+    } catch (error) {
+      Alert.alert('Unable to join', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setJoiningCommunityChallenge(false);
+    }
   };
 
   const handleSelectCheckInMode = (checkInMode: CheckInMode) => {
@@ -307,7 +323,7 @@ export default function ChallengeViewScreen() {
             variant="solid"
             size="xl"
             action="primary"
-            className="h-14 w-full"
+            className="h-14 w-full rounded-[20px]"
             onPress={() => {
               safePausePlayer();
 
@@ -319,7 +335,9 @@ export default function ChallengeViewScreen() {
               if (!allowed) return;
               retryChallengeUpload(activeChallengeId);
             }}>
-            <ButtonText className="text-lg font-bold text-white">Retry Upload</ButtonText>
+            <ButtonText style={{ fontFamily: 'Inter_600SemiBold' }} className="text-lg text-white">
+              Retry Upload
+            </ButtonText>
           </LoadingButton>
           <Text className="mt-2 text-center font-body text-sm text-[#E5484D]">
             Upload failed. Tap retry and keep the app open while your video uploads.
@@ -335,9 +353,13 @@ export default function ChallengeViewScreen() {
             variant="outline"
             size="xl"
             action="secondary"
-            className="h-14 w-full"
+            className="h-14 w-full rounded-[20px]"
             disabled>
-            <ButtonText className="text-lg font-bold text-[#838383]">Uploading...</ButtonText>
+            <ButtonText
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="text-lg text-[#838383]">
+              Uploading...
+            </ButtonText>
           </LoadingButton>
           <Text className="mt-2 text-center font-body text-sm text-[#838383]">
             Please keep the app open while your video uploads.
@@ -353,7 +375,7 @@ export default function ChallengeViewScreen() {
             variant="solid"
             size="xl"
             action="primary"
-            className="h-14 w-full"
+            className="h-14 w-full rounded-[20px]"
             onPress={() => {
               safePausePlayer();
               requireSubscription({
@@ -363,7 +385,11 @@ export default function ChallengeViewScreen() {
             }}>
             <View className="flex-row items-center gap-x-2">
               <LockSimple size={18} color="#FFFFFF" weight="bold" />
-              <ButtonText className="text-lg font-bold text-white">Unlock Duet</ButtonText>
+              <ButtonText
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="text-lg text-white">
+                Unlock Duet
+              </ButtonText>
             </View>
           </LoadingButton>
           <Text className="mt-2 text-center font-body text-sm text-[#838383]">
@@ -380,9 +406,13 @@ export default function ChallengeViewScreen() {
             variant="outline"
             size="xl"
             action="secondary"
-            className="h-14 w-full"
+            className="h-14 w-full rounded-[20px]"
             disabled>
-            <ButtonText className="text-lg font-bold text-[#838383]">Completed Today</ButtonText>
+            <ButtonText
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="text-lg text-[#838383]">
+              Completed Today
+            </ButtonText>
           </LoadingButton>
           <Text className="mt-2 text-center font-body text-sm text-[#838383]">
             Come back tomorrow to try again!
@@ -398,9 +428,11 @@ export default function ChallengeViewScreen() {
             variant="outline"
             size="xl"
             action="secondary"
-            className="h-14 w-full"
+            className="h-14 w-full rounded-[20px]"
             disabled>
-            <ButtonText className="text-lg font-bold text-[#838383]">
+            <ButtonText
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="text-lg text-[#838383]">
               Today&apos;s Limit Reached
             </ButtonText>
           </LoadingButton>
@@ -416,10 +448,10 @@ export default function ChallengeViewScreen() {
         variant="solid"
         size="xl"
         action="primary"
-        className="h-14 w-full"
+        className="h-14 w-full rounded-[20px]"
         onPress={handleStartChallenge}>
         <View className="flex-row items-center justify-center">
-          <ButtonText className="text-lg font-bold text-white">
+          <ButtonText style={{ fontFamily: 'Inter_600SemiBold' }} className="text-lg text-white">
             {isCheckIn ? 'Start Check-In' : `Let's Go`}
           </ButtonText>
         </View>
@@ -436,7 +468,9 @@ export default function ChallengeViewScreen() {
           title: '',
           headerTitle: () =>
             challenge ? (
-              <Text className="text-center font-heading text-lg font-bold text-[#1A1A1A]">
+              <Text
+                style={{ fontFamily: 'Inter_700Bold' }}
+                className="text-center text-lg text-[#1A1A1A]">
                 {selectedCheckIn?.name ?? challenge.name}
               </Text>
             ) : null,
@@ -448,10 +482,25 @@ export default function ChallengeViewScreen() {
         }}
       />
 
-      {challenge === undefined ||
-      cooldown === undefined ||
-      progress === undefined ||
-      (challenge?.type === 'check_in' && availableCheckIns === undefined) ? (
+      {challenge?.isCommunityChallenge === true ? (
+        communityChallenge === undefined ? (
+          <ScreenLoading />
+        ) : communityChallenge === null ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-base text-gray-500">Challenge not available</Text>
+          </View>
+        ) : (
+          <CommunityChallengeDetail
+            challenge={communityChallenge}
+            joining={joiningCommunityChallenge}
+            onJoin={handleJoinCommunityChallenge}
+            onRecord={handleStartChallenge}
+          />
+        )
+      ) : challenge === undefined ||
+        cooldown === undefined ||
+        progress === undefined ||
+        (challenge?.type === 'check_in' && availableCheckIns === undefined) ? (
         <ScreenLoading />
       ) : challenge === null ? (
         <View className="flex-1 items-center justify-center">
@@ -466,13 +515,14 @@ export default function ChallengeViewScreen() {
           }}>
           {/* Challenge video */}
           {selectedVideoUrl ? (
-            <View className={isCheckIn ? 'mx-5 mt-3 overflow-hidden rounded-[24px]' : 'mt-4'}>
+            <View
+              className={isCheckIn ? 'relative mx-5 mt-3 overflow-hidden rounded-[24px]' : 'mt-4'}>
               {isPlaying ? (
                 <VideoView
                   player={player}
                   style={{
                     width: '100%',
-                    aspectRatio: isCheckIn ? 1.62 : 414 / 480,
+                    aspectRatio: isCheckIn ? 0.85 : 414 / 480,
                   }}
                   contentFit="cover"
                   allowsFullscreen
@@ -486,7 +536,7 @@ export default function ChallengeViewScreen() {
                       pointerEvents="none"
                       style={{
                         width: '100%',
-                        aspectRatio: isCheckIn ? 1.62 : 414 / 480,
+                        aspectRatio: isCheckIn ? 0.85 : 414 / 480,
                       }}
                       contentFit="cover"
                       nativeControls={false}
@@ -517,13 +567,23 @@ export default function ChallengeViewScreen() {
                   </View>
                 </TouchableOpacity>
               )}
+              {isCheckIn ? (
+                <View
+                  pointerEvents="none"
+                  className="absolute right-3 top-3 rounded-full bg-[#FF5C35] px-3 py-1.5"
+                  style={{ zIndex: 2 }}>
+                  <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-white">
+                    +{selectedCheckIn?.points ?? challenge.points} pts
+                  </Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
 
           {/* Normal challenge description */}
           {!isCheckIn ? (
             <View className="mt-6 px-8">
-              <View className="rounded-xl px-4 py-4 shadow-sm">
+              <View className="rounded-[24px] px-4 py-4">
                 <Text className="text-center font-body text-base leading-6 text-[#313131]">
                   {selectedDescription}
                 </Text>
@@ -540,16 +600,10 @@ export default function ChallengeViewScreen() {
           {/* Check-in options and description */}
           {isCheckIn ? (
             <View className="px-5 pt-2.5">
-              <View
-                className="rounded-[22px] bg-white px-4 py-4"
-                style={{
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 5 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 12,
-                  elevation: 2,
-                }}>
-                <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+              <View className="rounded-[24px] bg-white px-4 py-4">
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-[10px] uppercase tracking-[1px] text-[#FF4B1F]">
                   Today&apos;s check-in
                 </Text>
                 <Text className="mt-1.5 font-body text-[13px] leading-[19px] text-[#77716D]">
@@ -564,64 +618,6 @@ export default function ChallengeViewScreen() {
                 isPro={isPro}
                 onOpen={handleOpenBonusContent}
               />
-
-              <View className="mt-3 rounded-[22px] bg-white px-4 py-3.5 shadow-sm">
-                <View className="flex-row items-center justify-between">
-                  <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
-                    Swap your check-in
-                  </Text>
-                  <View className="rounded-full bg-[#F1EFED] px-3 py-1.5">
-                    <Text className="font-heading text-[10px] font-bold text-[#77716D]">
-                      Optional
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="mt-3 flex-row flex-wrap justify-between gap-y-2">
-                  {(availableCheckIns ?? []).map((item) => {
-                    const selected = item.challengeId === selectedCheckIn?.challengeId;
-
-                    return (
-                      <TouchableOpacity
-                        key={item.categoryId}
-                        activeOpacity={0.8}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        accessibilityLabel={item.categoryName}
-                        onPress={() => {
-                          safePausePlayer();
-                          setSelectedCheckInId(item.challengeId);
-                        }}
-                        className="h-[74px] items-center justify-center rounded-2xl px-2 py-2"
-                        style={{
-                          width: '31.5%',
-                          borderWidth: selected ? 1.5 : 1,
-                          borderColor: selected ? '#FF5C35' : '#E3DEDA',
-                          backgroundColor: selected ? '#FFF9F6' : '#FFFFFF',
-                        }}>
-                        <View className="h-7 items-center justify-center">
-                          {item.categoryIconUrl ? (
-                            <Image
-                              source={{ uri: item.categoryIconUrl }}
-                              className="h-6 w-6 rounded"
-                            />
-                          ) : item.categoryEmoji ? (
-                            <Text className="text-lg">{item.categoryEmoji}</Text>
-                          ) : (
-                            <Pulse size={20} color="#4A4A4A" />
-                          )}
-                        </View>
-
-                        <Text
-                          className="mt-1.5 text-center font-body text-[11px] font-bold leading-4 text-[#313131]"
-                          numberOfLines={2}>
-                          {item.categoryName}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
             </View>
           ) : null}
 
@@ -640,10 +636,6 @@ export default function ChallengeViewScreen() {
           style={{
             borderTopWidth: 1,
             borderTopColor: '#EEEAE7',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -5 },
-            shadowOpacity: 0.06,
-            shadowRadius: 12,
           }}>
           {renderActionButton()}
         </View>
@@ -668,16 +660,20 @@ export default function ChallengeViewScreen() {
           />
 
           <View
-            className="rounded-t-[30px] bg-white px-5 pt-2"
+            className="rounded-t-[24px] bg-white px-5 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-[#CEC7C2]" />
 
             <View className="mb-4 flex-row items-start justify-between">
               <View className="min-w-0 flex-1 pr-4">
-                <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-[10px] uppercase tracking-[1px] text-[#FF4B1F]">
                   Today&apos;s check-in
                 </Text>
-                <Text className="mt-1 font-heading text-[22px] font-extrabold leading-7 text-[#1A1A1A]">
+                <Text
+                  style={{ fontFamily: 'Inter_700Bold' }}
+                  className="mt-1 text-[22px] leading-7 text-[#1A1A1A]">
                   How would you like to check in?
                 </Text>
               </View>
@@ -692,7 +688,7 @@ export default function ChallengeViewScreen() {
               </TouchableOpacity>
             </View>
 
-            <View className="overflow-hidden rounded-[20px] border border-[#E8E1DC]">
+            <View className="overflow-hidden rounded-[24px]  ">
               {checkInOptions.map((option, index) => (
                 <TouchableOpacity
                   key={option.mode}
@@ -705,11 +701,13 @@ export default function ChallengeViewScreen() {
                     borderBottomWidth: index === checkInOptions.length - 1 ? 0 : 1,
                     borderBottomColor: '#EEE7E2',
                   }}>
-                  <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
+                  <View className="mr-3 h-11 w-11 items-center justify-center rounded-[24px] bg-[#FFF0E8]">
                     {option.icon}
                   </View>
                   <View className="min-w-0 flex-1 pr-2">
-                    <Text className="font-heading text-sm font-bold text-[#1A1A1A]">
+                    <Text
+                      style={{ fontFamily: 'Inter_600SemiBold' }}
+                      className="text-sm text-[#1A1A1A]">
                       {option.label}
                     </Text>
                     <Text className="mt-0.5 font-body text-[11px] text-[#8A827D]">

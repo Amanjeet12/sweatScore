@@ -28,7 +28,7 @@ const StartWorkoutPopup = ({
   return (
     <AlertDialog isOpen={showAlertDialog} onClose={handleClose} size="md">
       <AlertDialogBackdrop />
-      <AlertDialogContent className="rounded-3xl">
+      <AlertDialogContent className="rounded-xl">
         <AlertDialogHeader>
           <View className="flex-row items-center justify-center gap-x-2">
             <Text className="font-bold" size="2xl">
@@ -63,7 +63,7 @@ const StartWorkoutPopup = ({
               variant="solid"
               size="xl"
               action="primary"
-              className="mt-2 h-16 w-full rounded-2xl"
+              className="mt-2 h-16 w-full rounded-lg"
               onPress={() => {
                 if (dontShowAgain) {
                   storeData('skipWorkoutPopup', true);

@@ -81,25 +81,16 @@ export default function BlurOverlay({
             onPress={handleUpgrade}
             activeOpacity={0.8}
             style={{
-              borderRadius: 9999,
+              borderRadius: 12,
               width: '100%',
-              ...(Platform.OS === 'ios'
-                ? {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 8,
-                  }
-                : {
-                    elevation: 6,
-                  }),
+              ...(Platform.OS === 'ios' ? {} : {}),
             }}>
             <LinearGradient
               colors={['#FFA480', '#FF5C1A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
-                borderRadius: 9999,
+                borderRadius: 12,
                 paddingVertical: 16,
                 paddingHorizontal: 40,
                 alignItems: 'center',
@@ -137,23 +128,14 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: 'white',
-    borderRadius: 24,
+    borderRadius: 12,
     paddingBottom: 16,
     paddingTop: 44,
     paddingHorizontal: 32,
     alignItems: 'center',
     maxWidth: 360,
     marginHorizontal: 24,
-    ...(Platform.OS === 'ios'
-      ? {
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.1,
-          shadowRadius: 16,
-        }
-      : {
-          elevation: 8,
-        }),
+    ...(Platform.OS === 'ios' ? {} : {}),
   },
   iconContainer: {
     position: 'absolute',
@@ -165,15 +147,6 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    ...(Platform.OS === 'ios'
-      ? {
-          shadowColor: '#FF5C1A',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-        }
-      : {
-          elevation: 8,
-        }),
+    ...(Platform.OS === 'ios' ? {} : {}),
   },
 });

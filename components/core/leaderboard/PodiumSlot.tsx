@@ -6,6 +6,7 @@ import { Text } from '~/components/ui/text';
 import { formatName } from '~/utils/formatter';
 
 export type PodiumSlotProps = {
+  mode?: 'points' | 'streak';
   rank: 1 | 2 | 3;
   isHero?: boolean;
   entry: {
@@ -17,19 +18,16 @@ export type PodiumSlotProps = {
   onPress?: (userId: string) => void;
 };
 
-const MEDAL_SRC = {
-  1: require('~/assets/icons/Gold cup.png'),
-  2: require('~/assets/icons/Silver medal.png'),
-  3: require('~/assets/icons/Bronze medal.png'),
-} as const;
+const RANK_COLORS = { 1: '#F1C56F', 2: '#AAA6A3', 3: '#FF5C35' } as const;
+const AVATAR_COLORS = { 1: '#FF5C35', 2: '#B4522E', 3: '#D77845' } as const;
 
-const RANK_LABEL = {
-  1: '1st',
-  2: '2nd',
-  3: '3rd',
-} as const;
-
-export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotProps) {
+export default function PodiumSlot({
+  rank,
+  isHero,
+  entry,
+  onPress,
+  mode = 'points',
+}: PodiumSlotProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -38,9 +36,8 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
 
   const firstLetter = entry?.name ? entry.name.trim().substring(0, 1).toUpperCase() : '?';
 
-  const avatarSize = isHero ? 96 : 80;
-  const medalSize = isHero ? 36 : 28;
-  const ringColor = isHero ? '#F76B1C' : '#E8DCD0';
+  const avatarSize = isHero ? 68 : 58;
+  const ringColor = isHero ? '#FF5C35' : '#FFFFFF';
 
   const Wrapper: any = entry && onPress ? TouchableOpacity : View;
 
@@ -53,53 +50,29 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
       : {};
 
   return (
-    <Wrapper {...wrapperProps} className="items-center" style={{ width: isHero ? 130 : 100 }}>
-      <Image
-        source={MEDAL_SRC[rank]}
-        style={{
-          width: medalSize,
-          height: medalSize,
-        }}
-        contentFit="contain"
-      />
-
-      {/* Rank text */}
-      <Text
-        className="mt-1 text-xs font-bold text-[#6B6B6B]"
-        style={{ fontFamily: 'Inter_700Bold' }}>
-        {RANK_LABEL[rank]}
-      </Text>
-
-      {entry ? (
-        <View
-          className="rounded-full bg-[#F9F9F9] px-3 py-1"
-          style={{
-            marginTop: 4,
-            marginBottom: -14,
-            zIndex: 3,
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 4,
-            shadowOffset: {
-              width: 0,
-              height: 2,
-            },
-            elevation: 3,
-          }}>
-          <Text className="text-sm text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
-            {entry.displayTotalPoints}
-          </Text>
-        </View>
-      ) : null}
+    <Wrapper
+      {...wrapperProps}
+      accessible={!entry}
+      accessibilityLabel={!entry ? `Rank ${rank}: up for grabs` : undefined}
+      className="items-center"
+      style={{ width: isHero ? 116 : 92 }}>
+      <View
+        className="mb-1 h-6 w-6 items-center justify-center rounded-full"
+        style={{ backgroundColor: RANK_COLORS[rank] }}>
+        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[11px] text-white">
+          {rank}
+        </Text>
+      </View>
 
       <View
         style={{
           width: avatarSize,
           height: avatarSize,
           borderRadius: avatarSize / 2,
-          borderWidth: 3,
-          borderColor: ringColor,
-          backgroundColor: '#F76B1C',
+          borderWidth: entry ? 0 : 1,
+          borderStyle: entry ? 'solid' : 'dashed',
+          borderColor: entry ? ringColor : '#D8D2CD',
+          backgroundColor: entry ? AVATAR_COLORS[rank] : '#F4F1EE',
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
@@ -109,9 +82,9 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
             <Image
               source={{ uri: entry.image }}
               style={{
-                width: avatarSize - 6,
-                height: avatarSize - 6,
-                borderRadius: (avatarSize - 6) / 2,
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: avatarSize / 2,
               }}
               contentFit="cover"
               onError={() => setImageFailed(true)}
@@ -119,8 +92,8 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
           ) : (
             <Text
               style={{
-                fontSize: isHero ? 34 : 28,
-                lineHeight: isHero ? 40 : 34,
+                fontSize: isHero ? 27 : 20,
+                lineHeight: isHero ? 33 : 25,
                 color: '#FFFFFF',
                 fontFamily: 'Inter_700Bold',
                 textAlign: 'center',
@@ -128,11 +101,23 @@ export default function PodiumSlot({ rank, isHero, entry, onPress }: PodiumSlotP
               {firstLetter}
             </Text>
           )
-        ) : null}
+        ) : (
+          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xl text-[#AAA39D]">
+            —
+          </Text>
+        )}
       </View>
 
-      <Text className="mt-3 font-body text-base font-medium text-[#1A1A1A]" numberOfLines={1}>
-        {entry?.name ? formatName(entry.name) : '-'}
+      <Text
+        style={{ fontFamily: 'Inter_600SemiBold' }}
+        className="mt-2 text-[11px] text-[#1A1A1A]"
+        numberOfLines={1}>
+        {entry ? formatName(entry.name) : 'Up for grabs'}
+      </Text>
+      <Text className="mt-0.5 font-body text-[10px] text-[#817A76]">
+        {entry
+          ? `${entry.displayTotalPoints.toLocaleString()} ${mode === 'streak' ? (entry.displayTotalPoints === 1 ? 'week' : 'weeks') : 'pts'}`
+          : '—'}
       </Text>
     </Wrapper>
   );

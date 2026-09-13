@@ -1,4 +1,6 @@
-import { Stack } from 'expo-router';
+import { Redirect } from 'expo-router';
+// Group chat temporarily disabled.
+// import { Stack } from 'expo-router';
 
 /*
  * Always keep the group list as the first screen
@@ -10,6 +12,8 @@ export const unstable_settings = {
 };
 
 export default function GroupChatLayout() {
+  return <Redirect href="/(tabs)/dashboard" />;
+  /* Restore this stack when group chat is enabled.
   return (
     <Stack
       screenOptions={{
@@ -37,4 +41,5 @@ export default function GroupChatLayout() {
       />
     </Stack>
   );
+  */
 }

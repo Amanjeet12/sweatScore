@@ -124,7 +124,7 @@ export default function Home() {
             <View className="flex-1 justify-end px-6 pb-6">
               {/* Heading */}
               <View className="mb-6 items-center">
-                <Text className="text-center font-heading text-3xl font-bold leading-9 text-white">
+                <Text className="text-center font-heading text-3xl font-semibold leading-9 text-white">
                   Movement That {'\n'}Hits Different.
                 </Text>
               </View>

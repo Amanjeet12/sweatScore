@@ -11,6 +11,10 @@ import {
   CHALLENGE_POINTS_MAX,
   CHALLENGE_DURATION_MIN,
   CHALLENGE_DURATION_MAX,
+  COMMUNITY_CHALLENGE_DURATION_MIN,
+  COMMUNITY_CHALLENGE_DURATION_MAX,
+  COMPLETION_BANK_POINTS_MIN,
+  COMPLETION_BANK_POINTS_MAX,
 } from './challenges';
 import { DAILY_SCHEDULE_TIMEZONE, getNextMidnightTimestamp } from './utils/timezone';
 
@@ -67,6 +71,45 @@ async function validateCheckInCategoryId(
   const category = await ctx.db.get(id);
   if (!category || !category.isActive) {
     throw new ConvexError('The selected Check-In category must be active');
+  }
+}
+
+function validateCommunityChallengeFields(args: {
+  startDate?: string;
+  durationDays?: number;
+  outputType?: 'single_video' | 'side_by_side';
+  completionBankPoints?: number;
+}) {
+  const parsedStartDate = args.startDate ? new Date(`${args.startDate}T00:00:00.000Z`) : null;
+  if (
+    !args.startDate ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(args.startDate) ||
+    !parsedStartDate ||
+    Number.isNaN(parsedStartDate.getTime()) ||
+    parsedStartDate.toISOString().slice(0, 10) !== args.startDate
+  ) {
+    throw new ConvexError('Select a valid community challenge start date');
+  }
+  if (
+    args.durationDays === undefined ||
+    args.durationDays < COMMUNITY_CHALLENGE_DURATION_MIN ||
+    args.durationDays > COMMUNITY_CHALLENGE_DURATION_MAX
+  ) {
+    throw new ConvexError(
+      `Challenge duration must be between ${COMMUNITY_CHALLENGE_DURATION_MIN} and ${COMMUNITY_CHALLENGE_DURATION_MAX} days`
+    );
+  }
+  if (!args.outputType) {
+    throw new ConvexError('Select single video or side-by-side output');
+  }
+  if (
+    args.completionBankPoints === undefined ||
+    args.completionBankPoints < COMPLETION_BANK_POINTS_MIN ||
+    args.completionBankPoints > COMPLETION_BANK_POINTS_MAX
+  ) {
+    throw new ConvexError(
+      `Completion bank must be between ${COMPLETION_BANK_POINTS_MIN} and ${COMPLETION_BANK_POINTS_MAX} points`
+    );
   }
 }
 
@@ -600,6 +643,11 @@ export const createChallenge = mutation({
     type: v.union(v.literal('challenge'), v.literal('check_in')),
     checkInDescription: v.optional(v.string()),
     checkInCategoryId: v.optional(v.id('checkInCategories')),
+    isCommunityChallenge: v.optional(v.boolean()),
+    startDate: v.optional(v.string()),
+    durationDays: v.optional(v.number()),
+    outputType: v.optional(v.union(v.literal('single_video'), v.literal('side_by_side'))),
+    completionBankPoints: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -638,6 +686,9 @@ export const createChallenge = mutation({
       throw new ConvexError('Invalid tag');
     }
     if (args.type === 'check_in') await validateCheckInCategoryId(ctx, args.checkInCategoryId);
+    if (args.type === 'challenge' && args.isCommunityChallenge) {
+      validateCommunityChallengeFields(args);
+    }
     if (!args.instructionalVideo) {
       throw new ConvexError(
         args.type === 'check_in'
@@ -664,6 +715,19 @@ export const createChallenge = mutation({
       type: args.type,
       checkInDescription: args.checkInDescription?.trim() || undefined,
       checkInCategoryId: args.type === 'check_in' ? args.checkInCategoryId : undefined,
+      isCommunityChallenge:
+        args.type === 'challenge' ? args.isCommunityChallenge === true : undefined,
+      startDate:
+        args.type === 'challenge' && args.isCommunityChallenge ? args.startDate : undefined,
+      durationDays:
+        args.type === 'challenge' && args.isCommunityChallenge ? args.durationDays : undefined,
+      outputType:
+        args.type === 'challenge' && args.isCommunityChallenge ? args.outputType : undefined,
+      completionBankPoints:
+        args.type === 'challenge' && args.isCommunityChallenge
+          ? args.completionBankPoints
+          : undefined,
+      participantCount: args.type === 'challenge' && args.isCommunityChallenge ? 0 : undefined,
     });
 
     return { success: true, challengeId };
@@ -691,6 +755,11 @@ export const updateChallenge = mutation({
     type: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
     checkInDescription: v.optional(v.string()),
     checkInCategoryId: v.optional(v.id('checkInCategories')),
+    isCommunityChallenge: v.optional(v.boolean()),
+    startDate: v.optional(v.string()),
+    durationDays: v.optional(v.number()),
+    outputType: v.optional(v.union(v.literal('single_video'), v.literal('side_by_side'))),
+    completionBankPoints: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -728,14 +797,47 @@ export const updateChallenge = mutation({
       throw new ConvexError('Invalid tag');
     }
     const nextType = args.type ?? challenge.type ?? 'challenge';
+    const nextIsCommunityChallenge =
+      nextType === 'challenge'
+        ? (args.isCommunityChallenge ?? challenge.isCommunityChallenge ?? false)
+        : false;
+    const nextCommunityFields = {
+      startDate: args.startDate ?? challenge.startDate,
+      durationDays: args.durationDays ?? challenge.durationDays,
+      outputType: args.outputType ?? challenge.outputType,
+      completionBankPoints: args.completionBankPoints ?? challenge.completionBankPoints,
+    };
     const nextCategoryId = args.checkInCategoryId ?? challenge.checkInCategoryId;
     if (nextType === 'check_in') await validateCheckInCategoryId(ctx, nextCategoryId);
+    if (nextIsCommunityChallenge) validateCommunityChallengeFields(nextCommunityFields);
     if (!(args.instructionalVideo ?? challenge.instructionalVideo)) {
       throw new ConvexError(
         nextType === 'check_in'
           ? 'Check-In video is required'
           : 'Instructional video is required for a normal challenge'
       );
+    }
+
+    if (challenge.isCommunityChallenge) {
+      const hasParticipants = Boolean(
+        await ctx.db
+          .query('challengeParticipants')
+          .withIndex('by_challenge', (q) => q.eq('challengeId', args.challengeId))
+          .first()
+      );
+      const changesScoringOrSchedule =
+        nextIsCommunityChallenge !== true ||
+        nextCommunityFields.startDate !== challenge.startDate ||
+        nextCommunityFields.durationDays !== challenge.durationDays ||
+        nextCommunityFields.outputType !== challenge.outputType ||
+        nextCommunityFields.completionBankPoints !== challenge.completionBankPoints ||
+        (args.points !== undefined && args.points !== challenge.points);
+
+      if (hasParticipants && changesScoringOrSchedule) {
+        throw new ConvexError(
+          'Start date, duration, output type and points cannot change after members join'
+        );
+      }
     }
 
     // Clean up old media if replaced
@@ -763,6 +865,14 @@ export const updateChallenge = mutation({
       checkInDescription: args.checkInDescription?.trim() ?? challenge.checkInDescription,
       checkInCategoryId: nextType === 'check_in' ? nextCategoryId : undefined,
       checkInCategoryIds: undefined,
+      isCommunityChallenge: nextIsCommunityChallenge || undefined,
+      startDate: nextIsCommunityChallenge ? nextCommunityFields.startDate : undefined,
+      durationDays: nextIsCommunityChallenge ? nextCommunityFields.durationDays : undefined,
+      outputType: nextIsCommunityChallenge ? nextCommunityFields.outputType : undefined,
+      completionBankPoints: nextIsCommunityChallenge
+        ? nextCommunityFields.completionBankPoints
+        : undefined,
+      participantCount: nextIsCommunityChallenge ? (challenge.participantCount ?? 0) : undefined,
     });
 
     return { success: true, challengeId: args.challengeId };
@@ -848,6 +958,18 @@ export const deleteChallenge = mutation({
 
     if (challenge.isDailyChallenge) {
       throw new ConvexError('Remove this challenge from the daily schedule before deleting it');
+    }
+
+    if (
+      challenge.isCommunityChallenge &&
+      (await ctx.db
+        .query('challengeParticipants')
+        .withIndex('by_challenge', (q) => q.eq('challengeId', args.challengeId))
+        .first())
+    ) {
+      throw new ConvexError(
+        'A community challenge with joined members cannot be deleted. Unpublish it instead.'
+      );
     }
 
     // Clean up storage files

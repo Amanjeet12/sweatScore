@@ -15,7 +15,12 @@ type ChallengeRowProps = {
 export default function ChallengeRow({ challenge, currentTime }: ChallengeRowProps) {
   const challengeType = challenge.type ?? 'challenge';
 
-  const typeLabel = challengeType === 'check_in' ? 'Check-In' : 'Challenge';
+  const typeLabel =
+    challengeType === 'check_in'
+      ? 'Check-In'
+      : challenge.isCommunityChallenge
+        ? 'Community Challenge'
+        : 'Legacy Challenge';
 
   const startAt = challenge.dailyStartAt;
 
@@ -57,7 +62,7 @@ export default function ChallengeRow({ challenge, currentTime }: ChallengeRowPro
         };
 
   return (
-    <View className="flex-row items-center gap-x-4 rounded-lg border border-gray-100 bg-white p-3">
+    <View className="flex-row items-center gap-x-4 rounded-lg bg-white p-3">
       {challenge.coverImageUrl ? (
         <Image
           source={{
@@ -84,12 +89,25 @@ export default function ChallengeRow({ challenge, currentTime }: ChallengeRowPro
         <Text className="text-sm font-semibold text-[#313131]">Type: {typeLabel}</Text>
 
         <View className="flex-row flex-wrap items-center gap-2">
-          <View className="rounded-full bg-primary-100 px-2 py-0.5">
+          <View className="rounded-lg bg-primary-100 px-2 py-0.5">
             <Text className="text-xs font-semibold text-primary-600">{challenge.tag}</Text>
           </View>
 
-          <Text className="text-sm text-gray-500">{challenge.points} pts</Text>
+          <Text className="text-sm text-gray-500">
+            {challenge.isCommunityChallenge && challenge.durationDays
+              ? `${challenge.points}/day · ${
+                  challenge.points * challenge.durationDays + (challenge.completionBankPoints ?? 0)
+                } total`
+              : `${challenge.points} pts`}
+          </Text>
         </View>
+
+        {challenge.isCommunityChallenge ? (
+          <Text className="text-xs text-gray-500">
+            Starts {challenge.startDate} · {challenge.durationDays} days ·{' '}
+            {challenge.outputType === 'single_video' ? 'Single video' : 'Side-by-side'}
+          </Text>
+        ) : null}
 
         <View className="flex-row flex-wrap items-center gap-2">
           <View
@@ -109,13 +127,13 @@ export default function ChallengeRow({ challenge, currentTime }: ChallengeRowPro
           <View className="mt-1">
             <View className="flex-row flex-wrap items-center gap-2">
               <View
-                className={`flex-row items-center gap-x-1 rounded-full px-2.5 py-1 ${scheduleClasses.container}`}>
+                className={`flex-row items-center gap-x-1 rounded-lg px-2.5 py-1 ${scheduleClasses.container}`}>
                 <View className={`h-2 w-2 rounded-full ${scheduleClasses.dot}`} />
 
                 <Text className={`text-xs font-bold ${scheduleClasses.text}`}>{scheduleLabel}</Text>
               </View>
 
-              <View className="rounded-full bg-purple-100 px-2.5 py-1">
+              <View className="rounded-lg bg-purple-100 px-2.5 py-1">
                 <Text className="text-xs font-semibold text-purple-700">Mode: {typeLabel}</Text>
               </View>
             </View>

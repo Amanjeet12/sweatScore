@@ -1,18 +1,16 @@
 import { Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 
-const DAILY_STEP_TARGET = 5000;
-const DAILY_ACTIVE_MINUTES_TARGET = 50;
 export const WEEKLY_STREAK_TARGET_DAYS = 5;
 
 /**
  * Returns dates where the user completed at least one
- * physical daily streak target:
+ * active daily streak action:
  *
- * 1. Reached 5,000 steps.
- * 2. Reached 50 active minutes.
- * 3. Completed a physical Daily Check-in video.
+ * 1. Completed a Quick Log.
+ * 2. Completed a physical Daily Check-in video.
  *
+ * Passively synced steps and active minutes do not protect the streak.
  * Normal challenge completions do not count.
  * Opening the app does not count.
  *
@@ -43,43 +41,8 @@ export async function getStreakEarnedDatesInRange(
 
   const earnedDates = new Set<string>();
 
-  /*
-   * A user may have multiple activity rows
-   * for the same date, so combine them first.
-   */
-  const activityTotalsByDate = new Map<
-    string,
-    {
-      steps: number;
-      activeMinutes: number;
-    }
-  >();
-
   for (const activity of activities) {
-    const current = activityTotalsByDate.get(activity.date) ?? {
-      steps: 0,
-      activeMinutes: 0,
-    };
-
-    current.steps += activity.steps ?? 0;
-
-    current.activeMinutes += activity.zone2Minutes ?? 0;
-
-    activityTotalsByDate.set(activity.date, current);
-  }
-
-  /*
-   * Mark a date when the steps target or
-   * active-minutes target is reached.
-   */
-  for (const [date, totals] of activityTotalsByDate) {
-    const stepTargetReached = totals.steps >= DAILY_STEP_TARGET;
-
-    const activeMinutesTargetReached = totals.activeMinutes >= DAILY_ACTIVE_MINUTES_TARGET;
-
-    if (stepTargetReached || activeMinutesTargetReached) {
-      earnedDates.add(date);
-    }
+    if (activity.loggedActivityKey) earnedDates.add(activity.date);
   }
 
   /*

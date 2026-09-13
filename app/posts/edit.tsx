@@ -307,7 +307,7 @@ export default function EditPost() {
             headerBackVisible: false,
             headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
             headerTitle: () => (
-              <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Edit Post</Text>
+              <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Edit Post</Text>
             ),
           }}
         />
@@ -327,7 +327,7 @@ export default function EditPost() {
           headerBackVisible: false,
           headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
           headerTitle: () => (
-            <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Edit Post</Text>
+            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Edit Post</Text>
           ),
         }}
       />

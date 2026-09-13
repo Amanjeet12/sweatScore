@@ -25,14 +25,14 @@ export default function UpdateAvailableBanner() {
       }}>
       <View className="flex-row items-center justify-between bg-[#1A1A1A]/90 px-5 py-3">
         <Text
-          className="flex-1 pr-3 font-heading text-sm font-bold text-white"
+          className="flex-1 pr-3 font-heading text-sm font-semibold text-white"
           numberOfLines={2}>
           New SweatScore{'\n'}update available
         </Text>
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => Linking.openURL(storeUrl)}
-          className="rounded-full bg-primary-500 px-5 py-2">
+          className="rounded-lg bg-primary-500 px-5 py-2">
           <Text className="font-body text-sm font-semibold text-white">Update</Text>
         </TouchableOpacity>
       </View>

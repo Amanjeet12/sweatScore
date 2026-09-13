@@ -8,7 +8,11 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
+import {
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+} from '@expo-google-fonts/montserrat';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConvexReactClient } from 'convex/react';
 import { router, Stack, useRootNavigationState } from 'expo-router';
@@ -69,6 +73,7 @@ export default function Layout() {
   const insets = useSafeAreaInsets();
 
   const [montserratLoaded, montserratError] = useFonts({
+    Montserrat_600SemiBold,
     Montserrat_700Bold,
     Montserrat_800ExtraBold,
   });
@@ -146,6 +151,8 @@ export default function Layout() {
             });
           }
         } else if (notificationData.notificationType === NOTIFICATION_TYPE.NEW_CHAT_MESSAGE) {
+          // Group chat temporarily disabled; ignore old chat notifications.
+          /*
           const notificationGroupId = notificationData.groupId;
 
           if (typeof notificationGroupId === 'string' && notificationGroupId) {
@@ -159,6 +166,7 @@ export default function Layout() {
           } else {
             router.push('/group-chat');
           }
+          */
         } else {
           // Unknown notification type
         }
@@ -285,6 +293,13 @@ export default function Layout() {
                             animation: 'slide_from_right',
                             headerShown: false,
                             gestureEnabled: false,
+                          }}
+                        />
+                        <Stack.Screen
+                          name="progress-photo"
+                          options={{
+                            presentation: 'card',
+                            animation: 'slide_from_right',
                           }}
                         />
                         <Stack.Screen

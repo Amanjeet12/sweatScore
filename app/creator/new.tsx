@@ -225,7 +225,7 @@ export default function AddNewCreator() {
           className="flex-1">
           <View className="flex-1 justify-start px-6">
             <View className="mt-4">
-              <Text className="mb-2 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
+              <Text className="mb-2 text-center font-heading text-3xl font-semibold text-[#1A1A1A]">
                 Add new creator
               </Text>
             </View>
@@ -313,7 +313,7 @@ export default function AddNewCreator() {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      className="flex-row items-center gap-x-2 rounded-lg border border-gray-200 p-4"
+                      className="flex-row items-center gap-x-2 rounded-lg   p-4"
                       onPress={selectImage}>
                       <ImageSquare size={32} weight="duotone" color={colors.primary} />
                       <Text className="font-semibold text-gray-500">Upload poster image</Text>
@@ -332,7 +332,7 @@ export default function AddNewCreator() {
                     variant="solid"
                     size="xl"
                     action="primary"
-                    className="h-16 w-full rounded-3xl"
+                    className="h-16 w-full rounded-lg"
                     onPress={handleSubmit}
                     disabled={isLoading || mediaLoading || uploadingMedia}
                     loading={isLoading}>

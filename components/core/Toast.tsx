@@ -30,17 +30,13 @@ export const ToastMessage = ({ message, action }: ToastProps) => {
     <Toast
       action={action}
       variant="solid"
-      className="rounded-2xl border-0 px-4 py-3"
+      className="rounded-xl  px-4 py-3"
       style={{
         marginTop: insets.top + 10,
         width: width - 32,
         maxWidth: width - 32,
         alignSelf: 'center',
         backgroundColor: toastColors.background,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
       }}>
       <View
         style={{

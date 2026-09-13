@@ -35,12 +35,19 @@ import {
   CHALLENGE_POINTS_MAX,
   CHALLENGE_POINTS_MIN,
   CHALLENGE_TAGS,
+  COMMUNITY_CHALLENGE_DURATION_DEFAULT,
+  COMMUNITY_CHALLENGE_DURATION_MAX,
+  COMMUNITY_CHALLENGE_DURATION_MIN,
+  COMPLETION_BANK_POINTS_DEFAULT,
+  COMPLETION_BANK_POINTS_MAX,
+  COMPLETION_BANK_POINTS_MIN,
 } from '~/convex/challenges';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 
 type ChallengeType = 'challenge' | 'check_in';
+type ChallengeOutputType = 'single_video' | 'side_by_side';
 
 type ScheduleAction = 'current' | 'next' | null;
 
@@ -104,6 +111,26 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
   const [tag, setTag] = useState(initialData?.tag ?? '');
 
   const [isLocked, setIsLocked] = useState(initialData?.isLocked ?? false);
+
+  const [isCommunityChallenge, setIsCommunityChallenge] = useState(
+    initialData ? initialData.isCommunityChallenge === true : true
+  );
+
+  const [communityStartDate, setCommunityStartDate] = useState<Date>(
+    initialData?.startDate ? new Date(`${initialData.startDate}T00:00:00`) : new Date()
+  );
+
+  const [communityDurationDays, setCommunityDurationDays] = useState(
+    String(initialData?.durationDays ?? COMMUNITY_CHALLENGE_DURATION_DEFAULT)
+  );
+
+  const [challengeOutputType, setChallengeOutputType] = useState<ChallengeOutputType>(
+    initialData?.outputType ?? 'side_by_side'
+  );
+
+  const [completionBankPoints, setCompletionBankPoints] = useState(
+    String(initialData?.completionBankPoints ?? COMPLETION_BANK_POINTS_DEFAULT)
+  );
 
   const [hasEndDate, setHasEndDate] = useState(Boolean(initialData?.endDate));
 
@@ -488,6 +515,23 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
     });
   };
 
+  const handleCommunityStartDateChange = (_event: unknown, selectedDate?: Date) => {
+    if (selectedDate) {
+      clearMessages();
+      setCommunityStartDate(selectedDate);
+    }
+  };
+
+  const openAndroidCommunityStartDatePicker = () => {
+    DateTimePickerAndroid.open({
+      value: communityStartDate,
+      onChange: handleCommunityStartDateChange,
+      mode: 'date',
+      display: 'spinner',
+      minimumDate: new Date(),
+    });
+  };
+
   const validateScheduleFields = () => {
     if (!initialData) {
       setError('Create the challenge before scheduling it');
@@ -662,6 +706,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
       const parsedPoints = parseInt(points, 10);
 
       const parsedDuration = parseInt(durationMinutes, 10) * 60;
+      const parsedCommunityDurationDays = parseInt(communityDurationDays, 10);
+      const parsedCompletionBankPoints = parseInt(completionBankPoints, 10);
 
       const result = challengeSchema.safeParse({
         name: name.trim(),
@@ -688,12 +734,47 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         return;
       }
 
-      if (hasEndDate && endDate && isBefore(startOfDay(endDate), startOfDay(new Date()))) {
+      const usesCommunityLifecycle = challengeType === 'challenge' && isCommunityChallenge;
+      if (
+        usesCommunityLifecycle &&
+        (Number.isNaN(parsedCommunityDurationDays) ||
+          parsedCommunityDurationDays < COMMUNITY_CHALLENGE_DURATION_MIN ||
+          parsedCommunityDurationDays > COMMUNITY_CHALLENGE_DURATION_MAX)
+      ) {
+        setError(
+          `Challenge duration must be between ${COMMUNITY_CHALLENGE_DURATION_MIN} and ${COMMUNITY_CHALLENGE_DURATION_MAX} days`
+        );
+        return;
+      }
+      if (
+        usesCommunityLifecycle &&
+        (Number.isNaN(parsedCompletionBankPoints) ||
+          parsedCompletionBankPoints < COMPLETION_BANK_POINTS_MIN ||
+          parsedCompletionBankPoints > COMPLETION_BANK_POINTS_MAX)
+      ) {
+        setError(
+          `Completion bank must be between ${COMPLETION_BANK_POINTS_MIN} and ${COMPLETION_BANK_POINTS_MAX} points`
+        );
+        return;
+      }
+
+      if (
+        !usesCommunityLifecycle &&
+        hasEndDate &&
+        endDate &&
+        isBefore(startOfDay(endDate), startOfDay(new Date()))
+      ) {
         setError('End date must be in the future');
         return;
       }
 
-      const endDateString = hasEndDate && endDate ? format(endDate, 'yyyy-MM-dd') : undefined;
+      const endDateString =
+        !usesCommunityLifecycle && hasEndDate && endDate
+          ? format(endDate, 'yyyy-MM-dd')
+          : undefined;
+      const communityStartDateString = usesCommunityLifecycle
+        ? format(communityStartDate, 'yyyy-MM-dd')
+        : undefined;
 
       if (mode === 'create') {
         const [createError, response] = await CatchPromise(
@@ -726,6 +807,11 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             isLocked,
 
             endDate: endDateString,
+            isCommunityChallenge: usesCommunityLifecycle,
+            startDate: communityStartDateString,
+            durationDays: usesCommunityLifecycle ? parsedCommunityDurationDays : undefined,
+            outputType: usesCommunityLifecycle ? challengeOutputType : undefined,
+            completionBankPoints: usesCommunityLifecycle ? parsedCompletionBankPoints : undefined,
           })
         );
 
@@ -767,6 +853,22 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
         }
         updates.checkInCategoryId =
           result.data.type === 'check_in' ? selectedCategoryId : undefined;
+        updates.isCommunityChallenge = usesCommunityLifecycle;
+
+        if (usesCommunityLifecycle) {
+          if (communityStartDateString !== initialData.startDate) {
+            updates.startDate = communityStartDateString;
+          }
+          if (parsedCommunityDurationDays !== initialData.durationDays) {
+            updates.durationDays = parsedCommunityDurationDays;
+          }
+          if (challengeOutputType !== initialData.outputType) {
+            updates.outputType = challengeOutputType;
+          }
+          if (parsedCompletionBankPoints !== initialData.completionBankPoints) {
+            updates.completionBankPoints = parsedCompletionBankPoints;
+          }
+        }
 
         if (result.data.createdBy !== initialData.createdBy) {
           updates.createdBy = result.data.createdBy;
@@ -808,7 +910,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           updates.videoDuration = videoDuration;
         }
 
-        if (!hasEndDate && initialData.endDate) {
+        if ((usesCommunityLifecycle || !hasEndDate) && initialData.endDate) {
           updates.removeEndDate = true;
         } else if (endDateString !== initialData.endDate) {
           updates.endDate = endDateString;
@@ -883,7 +985,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                         key={category._id}
                         disabled={!category.isActive && !selected}
                         onPress={() => setSelectedCategoryId(category._id)}
-                        className={`rounded-xl border p-4 ${selected ? 'border-primary-500 bg-orange-50' : 'border-gray-200 bg-white'}`}>
+                        className={`rounded-xl  p-4 ${selected ? ' bg-orange-50' : ' bg-white'}`}>
                         <View className="flex-row items-center gap-x-2">
                           <Text className="font-bold text-gray-800">{selected ? '✓' : '○'}</Text>
                           {category.iconUrl ? (
@@ -965,10 +1067,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
                   setChallengeType('check_in');
                 }}
-                className={`flex-1 rounded-2xl border px-3 py-4 ${
-                  challengeType === 'check_in'
-                    ? 'border-primary-500 bg-primary-500'
-                    : 'border-gray-300 bg-white'
+                className={`flex-1 rounded-xl  px-3 py-4 ${
+                  challengeType === 'check_in' ? ' bg-primary-500' : ' bg-white'
                 }`}>
                 <Text
                   className={`text-center font-bold ${
@@ -992,10 +1092,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
                   setChallengeType('challenge');
                 }}
-                className={`flex-1 rounded-2xl border px-3 py-4 ${
-                  challengeType === 'challenge'
-                    ? 'border-primary-500 bg-primary-500'
-                    : 'border-gray-300 bg-white'
+                className={`flex-1 rounded-xl  px-3 py-4 ${
+                  challengeType === 'challenge' ? ' bg-primary-500' : ' bg-white'
                 }`}>
                 <Text
                   className={`text-center font-bold ${
@@ -1008,11 +1106,125 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                   className={`mt-1 text-center text-xs ${
                     challengeType === 'challenge' ? 'text-white' : 'text-gray-500'
                   }`}>
-                  Side-by-side comparison
+                  Community programme
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+
+          {challengeType === 'challenge' ? (
+            <View className="mb-5 rounded-xl bg-[#FFF9F5] p-4">
+              <View className="flex-row items-center justify-between">
+                <View className="mr-4 flex-1">
+                  <Text className="text-lg font-bold text-primary-500">Community Challenge</Text>
+                  <Text className="mt-1 text-xs leading-4 text-gray-500">
+                    Members join once and submit one video on every challenge day.
+                  </Text>
+                </View>
+                <Switch value={isCommunityChallenge} onValueChange={setIsCommunityChallenge} />
+              </View>
+
+              {isCommunityChallenge ? (
+                <View className="mt-5">
+                  <Text className="mb-2 text-base font-bold text-primary-500">Start Date</Text>
+                  <Text className="mb-2 text-xs text-gray-500">
+                    The challenge begins globally at midnight London time.
+                  </Text>
+                  {Platform.OS === 'ios' ? (
+                    <DateTimePicker
+                      testID="communityStartDatePicker"
+                      value={communityStartDate}
+                      mode="date"
+                      onChange={handleCommunityStartDateChange}
+                      display="compact"
+                      minimumDate={new Date()}
+                    />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={openAndroidCommunityStartDatePicker}
+                      className="rounded-xl bg-white p-4">
+                      <Text className="text-base text-gray-700">
+                        {format(communityStartDate, 'MMM dd, yyyy')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <View className="mt-5">
+                    <Text className="mb-2 text-base font-bold text-primary-500">
+                      Duration in Days ({COMMUNITY_CHALLENGE_DURATION_MIN}-
+                      {COMMUNITY_CHALLENGE_DURATION_MAX})
+                    </Text>
+                    <Input size="xl" variant="rounded" className="bg-white">
+                      <InputField
+                        placeholder="7"
+                        value={communityDurationDays}
+                        onChangeText={(text) => {
+                          clearMessages();
+                          setCommunityDurationDays(text.replace(/[^0-9]/g, ''));
+                        }}
+                        keyboardType="number-pad"
+                      />
+                    </Input>
+                  </View>
+
+                  <View className="mt-5">
+                    <Text className="mb-2 text-base font-bold text-primary-500">Output Type</Text>
+                    <Text className="mb-3 text-xs text-gray-500">
+                      This controls how each member&apos;s submitted video is produced.
+                    </Text>
+                    <View className="flex-row gap-x-3">
+                      {(
+                        [
+                          ['single_video', 'Single Video'],
+                          ['side_by_side', 'Side-by-Side'],
+                        ] as const
+                      ).map(([value, label]) => {
+                        const selected = challengeOutputType === value;
+                        return (
+                          <TouchableOpacity
+                            key={value}
+                            onPress={() => {
+                              clearMessages();
+                              setChallengeOutputType(value);
+                            }}
+                            className={`flex-1 rounded-xl  px-3 py-4 ${
+                              selected ? ' bg-primary-500' : ' bg-white'
+                            }`}>
+                            <Text
+                              className={`text-center text-sm font-bold ${
+                                selected ? 'text-white' : 'text-gray-700'
+                              }`}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  <View className="mt-5">
+                    <Text className="mb-2 text-base font-bold text-primary-500">
+                      Completion Bank Points
+                    </Text>
+                    <Text className="mb-2 text-xs text-gray-500">
+                      Awarded once, only when every required day has a submission.
+                    </Text>
+                    <Input size="xl" variant="rounded" className="bg-white">
+                      <InputField
+                        placeholder="50"
+                        value={completionBankPoints}
+                        onChangeText={(text) => {
+                          clearMessages();
+                          setCompletionBankPoints(text.replace(/[^0-9]/g, ''));
+                        }}
+                        keyboardType="number-pad"
+                      />
+                    </Input>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           <View className="mb-4">
             <Text className="mb-2 text-xl font-bold text-primary-500">Created By</Text>
@@ -1081,7 +1293,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                   </View>
                 ) : (
                   <TouchableOpacity
-                    className="flex-row items-center gap-x-2 rounded-lg border border-gray-200 p-4"
+                    className="flex-row items-center gap-x-2 rounded-lg   p-4"
                     onPress={selectCoverImage}>
                     <ImageSquare size={32} weight="duotone" color={colors.primary} />
 
@@ -1143,7 +1355,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                   </View>
                 ) : (
                   <TouchableOpacity
-                    className="flex-row items-center gap-x-2 rounded-lg border border-gray-200 p-4"
+                    className="flex-row items-center gap-x-2 rounded-lg   p-4"
                     onPress={selectVideo}>
                     <VideoCamera size={32} weight="duotone" color={colors.primary} />
 
@@ -1178,7 +1390,11 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           </View>
 
           <View className="mb-4">
-            <Text className="mb-2 text-xl font-bold text-primary-500">Points (1-50)</Text>
+            <Text className="mb-2 text-xl font-bold text-primary-500">
+              {challengeType === 'challenge' && isCommunityChallenge
+                ? 'Points Per Daily Submission (1-50)'
+                : 'Points (1-50)'}
+            </Text>
 
             <Input size="xl" variant="rounded">
               <InputField
@@ -1228,10 +1444,8 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
 
                       setTag(challengeTag);
                     }}
-                    className={`rounded-full border px-4 py-2 ${
-                      tag === challengeTag
-                        ? 'border-primary-500 bg-primary-500'
-                        : 'border-gray-300 bg-white'
+                    className={`rounded-lg  px-4 py-2 ${
+                      tag === challengeTag ? ' bg-primary-500' : ' bg-white'
                     }`}>
                     <Text
                       className={`text-sm font-semibold ${
@@ -1251,58 +1465,58 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             <Switch value={isLocked} onValueChange={setIsLocked} />
           </View>
 
-          <View className="mb-4">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="text-xl font-bold text-primary-500">End Date (Optional)</Text>
+          {!(challengeType === 'challenge' && isCommunityChallenge) ? (
+            <View className="mb-4">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-xl font-bold text-primary-500">End Date (Optional)</Text>
 
-              <Switch
-                value={hasEndDate}
-                onValueChange={(value) => {
-                  clearMessages();
-                  setHasEndDate(value);
+                <Switch
+                  value={hasEndDate}
+                  onValueChange={(value) => {
+                    clearMessages();
+                    setHasEndDate(value);
 
-                  if (!value) {
-                    setEndDate(null);
-                  }
-                }}
-              />
-            </View>
-
-            {hasEndDate && (
-              <View>
-                {Platform.OS === 'ios' ? (
-                  <DateTimePicker
-                    testID="endDatePicker"
-                    value={endDate ?? new Date()}
-                    mode="date"
-                    onChange={handleDateChange}
-                    display="spinner"
-                    minimumDate={new Date()}
-                  />
-                ) : (
-                  <TouchableOpacity
-                    onPress={openAndroidDatePicker}
-                    className="rounded-lg border border-gray-200 p-4">
-                    <Text className="text-base text-gray-700">
-                      {endDate ? format(endDate, 'MMM dd, yyyy') : 'Select end date'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {endDate && (
-                  <TouchableOpacity onPress={() => setEndDate(null)} className="mt-2">
-                    <Text className="text-sm text-red-500">Clear date</Text>
-                  </TouchableOpacity>
-                )}
+                    if (!value) {
+                      setEndDate(null);
+                    }
+                  }}
+                />
               </View>
-            )}
-          </View>
 
-          {mode === 'edit' && initialData && (
-            <View className="mb-6 rounded-3xl border border-gray-200 bg-gray-50 p-4">
+              {hasEndDate && (
+                <View>
+                  {Platform.OS === 'ios' ? (
+                    <DateTimePicker
+                      testID="endDatePicker"
+                      value={endDate ?? new Date()}
+                      mode="date"
+                      onChange={handleDateChange}
+                      display="spinner"
+                      minimumDate={new Date()}
+                    />
+                  ) : (
+                    <TouchableOpacity onPress={openAndroidDatePicker} className="rounded-lg   p-4">
+                      <Text className="text-base text-gray-700">
+                        {endDate ? format(endDate, 'MMM dd, yyyy') : 'Select end date'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {endDate && (
+                    <TouchableOpacity onPress={() => setEndDate(null)} className="mt-2">
+                      <Text className="text-sm text-red-500">Clear date</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          ) : null}
+
+          {mode === 'edit' && initialData && challengeType === 'check_in' && (
+            <View className="mb-6 rounded-xl bg-gray-50 p-4">
               <Text className="text-xl font-bold text-primary-500">Daily Check In Schedule</Text>
 
-              <View className="mt-4 rounded-2xl bg-white px-4 py-3">
+              <View className="mt-4 rounded-xl bg-white px-4 py-3">
                 <Text className="text-xs font-semibold uppercase text-gray-400">
                   Current status
                 </Text>
@@ -1364,7 +1578,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     variant={isCurrentChallenge ? 'solid' : 'outline'}
                     size="lg"
                     action="primary"
-                    className="h-14 w-full rounded-2xl"
+                    className="h-14 w-full rounded-lg"
                     onPress={handleSetCurrentDay}
                     loading={scheduleAction === 'current'}
                     disabled={isScheduling || isCurrentChallenge || !initialData.isPublished}>
@@ -1377,7 +1591,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     variant={isNextChallenge ? 'solid' : 'outline'}
                     size="lg"
                     action="secondary"
-                    className="h-14 w-full rounded-2xl"
+                    className="h-14 w-full rounded-lg"
                     onPress={handleSetNextDay}
                     loading={scheduleAction === 'next'}
                     disabled={
@@ -1398,7 +1612,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
                     variant="outline"
                     size="lg"
                     action="negative"
-                    className="h-12 w-full rounded-2xl"
+                    className="h-12 w-full rounded-lg"
                     onPress={handleRemoveDailySchedule}
                     loading={isRemovingSchedule}
                     disabled={isRemovingSchedule || isScheduling}>
@@ -1410,7 +1624,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
           )}
 
           {scheduleMessage && (
-            <View className="mb-4 rounded-2xl bg-green-50 px-4 py-3">
+            <View className="mb-4 rounded-xl bg-green-50 px-4 py-3">
               <Text className="text-sm font-semibold text-green-700">{scheduleMessage}</Text>
             </View>
           )}
@@ -1422,7 +1636,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
               variant="solid"
               size="xl"
               action="primary"
-              className="h-16 w-full rounded-3xl"
+              className="h-16 w-full rounded-lg"
               onPress={handleSubmit}
               disabled={isLoading || isUploading || isScheduling || isRemovingSchedule}
               loading={isLoading}>

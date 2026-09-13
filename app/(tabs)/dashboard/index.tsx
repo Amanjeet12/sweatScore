@@ -20,11 +20,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '~/components/core/Avatar';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import AchievementPopupManager from '~/components/core/dashboard/AchievementPopupManager';
-import CommunityGroupPreviewCard from '~/components/core/dashboard/CommunityGroupPreviewCard';
+// Group chat temporarily disabled.
+// import CommunityGroupPreviewCard from '~/components/core/dashboard/CommunityGroupPreviewCard';
 import Confetti from '~/components/core/dashboard/Confetti';
 import DailyChallengeCard from '~/components/core/dashboard/DailyChallengeCard';
 import { MyCardAlertDialog } from '~/components/core/dashboard/MyCard';
 import TodayFeatureTour, { TodayTourTarget } from '~/components/core/dashboard/TodayFeatureTour';
+import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
 import TodaysSweat from '~/components/core/dashboard/TodaysSweat';
 // import WeeklyStreakCard from '~/components/core/dashboard/WeeklyStreakCard';
 import { Text } from '~/components/ui/text';
@@ -48,9 +50,9 @@ function getHealthConnect() {
  * app updates, so users who have seen an older version will receive this tour
  * once, while users who finish this version will not see it on every launch.
  */
-const TODAY_FEATURE_TOUR_VERSION = 3;
+const TODAY_FEATURE_TOUR_VERSION = 4;
 const TODAY_FEATURE_TOUR_STORAGE_KEY = 'today_feature_tour_seen_version';
-const TODAY_FEATURE_TOUR_STEP_COUNT = 3;
+const TODAY_FEATURE_TOUR_STEP_COUNT = 2;
 
 function getTodayFeatureTourStorageKey(userId: string) {
   return `${TODAY_FEATURE_TOUR_STORAGE_KEY}_${userId}`;
@@ -86,9 +88,9 @@ export default function TabDashboard() {
   const dashboardScrollRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const checkInTourRef = useRef<View>(null);
-  const communityTourRef = useRef<View>(null);
+  // const communityTourRef = useRef<View>(null);
   const activityLogTourRef = useRef<View>(null);
-  const sectionOffsetsRef = useRef({ community: 0 });
+  // const sectionOffsetsRef = useRef({ community: 0 });
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const refreshKey = useRefreshStore((state) => state.refreshKey);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
@@ -105,6 +107,10 @@ export default function TabDashboard() {
   }, [refreshKey]);
   const leaderboard = useQuery(api.activities.getUserLeaderboardPosition, { yearMonth });
   const streakData = useQuery(api.challengeCompletions.getUserStreaksForMonth);
+  const pointsToday = useQuery(
+    api.challengeCompletions.getPointsEarnedToday,
+    currentUser?._id ? {} : 'skip'
+  );
   const trackOverview = useQuery(
     api.track.queries.getTrackOverview,
     currentUser?._id ? {} : 'skip'
@@ -123,9 +129,11 @@ export default function TabDashboard() {
   const now = new Date();
   const greeting =
     now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
-  const formattedDate = now
-    .toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })
-    .toUpperCase();
+  const displayedPointsToday = pointsToday
+    ? pointsToday.isPremium
+      ? pointsToday.earned
+      : Math.min(pointsToday.earned, pointsToday.cap)
+    : 0;
 
   const updatePushToken = async () => {
     let token;
@@ -282,18 +290,13 @@ export default function TabDashboard() {
 
     let cancelled = false;
     let measureTimer: ReturnType<typeof setTimeout> | undefined;
-    const targetRefs = [checkInTourRef, communityTourRef, activityLogTourRef];
+    const targetRefs = [checkInTourRef, activityLogTourRef];
     const targetRef = targetRefs[todayTourStep];
 
     setTodayTourTarget(null);
 
     if (todayTourStep === 0) {
       dashboardScrollRef.current?.scrollTo({ y: 0, animated: true });
-    } else if (todayTourStep === 1) {
-      dashboardScrollRef.current?.scrollTo({
-        y: Math.max(0, sectionOffsetsRef.current.community - 110),
-        animated: true,
-      });
     } else {
       dashboardScrollRef.current?.scrollToEnd({ animated: true });
     }
@@ -385,15 +388,15 @@ export default function TabDashboard() {
           <View
             className="flex-1 flex-col bg-[#F9F9F9]"
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-            <View className="px-5 pb-3 pt-3">
+            <View className="px-5 pb-4 pt-4">
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-4">
-                  <Text className="font-heading text-[10px] font-extrabold tracking-[1.1px] text-[#FF4B1F]">
-                    TODAY · {formattedDate}
+                  <Text className="font-heading text-[10px] font-semibold tracking-[1.1px] text-[#FF4B1F]">
+                    TODAY · {displayedPointsToday} PTS
                   </Text>
                   <Text
                     numberOfLines={1}
-                    className="mt-1 font-heading text-[23px] font-extrabold leading-7 text-[#1A1A1A]">
+                    className="mt-1.5 font-heading text-[23px] font-semibold leading-7 text-[#1A1A1A]">
                     {greeting}, {currentUser?.name?.split(' ')[0] ?? 'there'}
                   </Text>
                 </View>
@@ -405,21 +408,28 @@ export default function TabDashboard() {
                 />
               </View>
             </View>
+            <TodayWeeklyStreak
+              daysEarned={streakData?.currentWeekDays ?? 0}
+              target={streakData?.currentWeekTarget ?? 5}
+              currentWeeklyStreak={trackOverview?.lifetime.currentWeeklyStreak ?? 0}
+            />
             <View
-              className="bg-[#F9F9F9] pt-2"
+              className="bg-[#F9F9F9] pt-1"
               onLayout={() => {
                 setDashboardReady(true);
               }}>
               <DailyChallengeCard tourTargetRef={checkInTourRef} />
             </View>
+            {/* Group chat temporarily disabled.
             <View
-              className="mt-3 bg-[#F9F9F9]"
+              className="mt-2 bg-[#F9F9F9]"
               onLayout={(event) => {
                 sectionOffsetsRef.current.community = event.nativeEvent.layout.y;
               }}>
               <CommunityGroupPreviewCard tourTargetRef={communityTourRef} />
             </View>
-            <View className="mt-3 bg-[#F9F9F9]">
+            */}
+            <View className="mt-2 bg-[#F9F9F9]">
               <TodaysSweat
                 refreshKey={refreshKey}
                 streakDays={streakData?.currentWeekDays ?? 0}
@@ -552,7 +562,6 @@ export default function TabDashboard() {
           right: 0,
           bottom: 0,
           zIndex: 9999,
-          elevation: 9999,
         }}>
         <Confetti trigger={confettiTrigger} />
       </View>

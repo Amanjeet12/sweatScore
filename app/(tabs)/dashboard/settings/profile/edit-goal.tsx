@@ -94,7 +94,7 @@ export default function ProfileEditGoal() {
         <View className="flex-1 flex-col">
           <View className="flex-col items-center gap-y-2">
             <View className="px-10">
-              <Text className="mb-4 mt-8 text-center font-heading text-2xl font-black text-[#1A1A1A]">
+              <Text className="mb-4 mt-8 text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
                 What's your goal right now?
               </Text>
             </View>
@@ -107,7 +107,7 @@ export default function ProfileEditGoal() {
               <TouchableOpacity
                 key={goal}
                 onPress={() => setActivityGoal(goal)}
-                className={cn('w-full gap-x-2 rounded-3xl border border-primary-400 p-3', {
+                className={cn('w-full gap-x-2 rounded-xl   p-3', {
                   'bg-primary-500': activityGoal === goal,
                 })}>
                 <Text
@@ -125,7 +125,7 @@ export default function ProfileEditGoal() {
                 variant="solid"
                 size="xl"
                 action="primary"
-                className="h-16 w-full rounded-3xl"
+                className="h-16 w-full rounded-lg"
                 onPress={handleSubmit}
                 loading={isLoading}>
                 <ButtonText className="text-xl font-bold text-white">Update goal</ButtonText>

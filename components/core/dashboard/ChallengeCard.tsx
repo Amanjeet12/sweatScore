@@ -98,7 +98,7 @@ export default function ChallengeCard({
       style={{
         width: fullWidth ? '100%' : SCREEN_WIDTH * 0.7,
       }}
-      className="overflow-hidden rounded-2xl">
+      className="overflow-hidden rounded-xl">
       {challenge.coverImageUrl && (
         <Image
           source={{ uri: challenge.coverImageUrl }}
@@ -122,13 +122,13 @@ export default function ChallengeCard({
         }}
       />
 
-      <View className="absolute right-3 top-3 rounded-full bg-black/75 px-3 py-1">
+      <View className="absolute right-3 top-3 rounded-lg bg-black/75 px-3 py-1">
         <Text className="font-body text-xs font-semibold text-white">+{challenge.points} pts</Text>
       </View>
 
       {isLocked && (
         <View
-          className="absolute left-3 top-3 items-center justify-center rounded-full px-3 py-1"
+          className="absolute left-3 top-3 items-center justify-center rounded-lg px-3 py-1"
           style={{
             backgroundColor: 'rgba(0,0,0,0.55)',
           }}>
@@ -157,7 +157,7 @@ export default function ChallengeCard({
       <View className="absolute bottom-0 left-0 right-0 px-4 pb-4">
         <View className="flex-row items-end justify-between">
           <View style={{ flex: 1, marginRight: 12 }}>
-            <Text className="font-heading text-lg font-bold text-white" numberOfLines={1}>
+            <Text className="font-heading text-lg font-semibold text-white" numberOfLines={1}>
               {challenge.name}
             </Text>
 

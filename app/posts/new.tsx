@@ -63,6 +63,7 @@ export default function NewPost() {
     activityMediaDuration?: string | string[];
     activityMediaMimeType?: string | string[];
     activityMediaFileName?: string | string[];
+    initialMediaType?: string | string[];
   }>();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { requireSubscription } = useSubscriptionGuard();
@@ -79,6 +80,7 @@ export default function NewPost() {
   const activityMediaDuration = getRouteParam(params.activityMediaDuration);
   const activityMediaMimeType = getRouteParam(params.activityMediaMimeType);
   const activityMediaFileName = getRouteParam(params.activityMediaFileName);
+  const initialMediaType = getRouteParam(params.initialMediaType);
 
   const loggedActivity = useMemo(() => getLoggedActivity(activityKey), [activityKey]);
   const activitySubmission = useMemo(
@@ -91,6 +93,7 @@ export default function NewPost() {
       : 0;
   const isActivityPost = Boolean(loggedActivity && activitySubmission);
   const hasPreparedActivityMedia = useRef(false);
+  const hasOpenedInitialMedia = useRef(false);
 
   const [body, setBody] = useState(
     activityCaption || (loggedActivity ? getRandomActivityCaption(loggedActivity.key) : '')
@@ -243,7 +246,7 @@ export default function NewPost() {
     [generateUploadUrl, uploadFile, videoLimitError, videoMaxDurationMs]
   );
 
-  const selectImage = async () => {
+  const selectImage = useCallback(async () => {
     if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_upload_image' }))
       return;
     setError(null);
@@ -265,9 +268,9 @@ export default function NewPost() {
     }
 
     await prepareImage(result.assets[0]);
-  };
+  }, [prepareImage, requireSubscription]);
 
-  const selectVideo = async () => {
+  const selectVideo = useCallback(async () => {
     if (!requireSubscription({ redirectTo: '/posts/new', source: 'community_upload_video' }))
       return;
     setError(null);
@@ -290,7 +293,23 @@ export default function NewPost() {
     }
 
     await prepareVideo(result.assets[0]);
-  };
+  }, [prepareVideo, requireSubscription, videoMaxDurationSeconds]);
+
+  useEffect(() => {
+    if (isActivityPost || hasOpenedInitialMedia.current) return;
+    if (initialMediaType !== 'image' && initialMediaType !== 'video') return;
+
+    hasOpenedInitialMedia.current = true;
+    const timer = setTimeout(() => {
+      if (initialMediaType === 'image') {
+        selectImage().catch((selectError) => setError(getErrorMessage(selectError)));
+      } else {
+        selectVideo().catch((selectError) => setError(getErrorMessage(selectError)));
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [initialMediaType, isActivityPost, selectImage, selectVideo]);
 
   useEffect(() => {
     if (
@@ -423,7 +442,7 @@ export default function NewPost() {
             />
           ),
           headerTitle: () => (
-            <Text className="font-heading text-xl font-bold text-[#1A1A1A]">
+            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">
               {isActivityPost ? 'Log Activity' : 'New Post'}
             </Text>
           ),
@@ -440,26 +459,18 @@ export default function NewPost() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {loggedActivity && activitySubmission ? (
-            <View
-              className="mx-4 mt-4 rounded-[26px] bg-white p-4"
-              style={{
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 6 },
-                shadowOpacity: 0.05,
-                shadowRadius: 14,
-                elevation: 2,
-              }}>
+            <View className="mx-4 mt-4 rounded-xl bg-white p-4">
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-3">
-                  <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                  <Text className="font-heading text-[10px] font-semibold uppercase tracking-[1px] text-[#FF4B1F]">
                     Daily activity
                   </Text>
-                  <Text className="mt-1 font-heading text-lg font-extrabold text-[#1A1A1A]">
+                  <Text className="mt-1 font-heading text-lg font-semibold text-[#1A1A1A]">
                     {loggedActivity.title}
                   </Text>
                 </View>
                 <View className="items-end py-2">
-                  <Text className="font-heading text-base font-extrabold text-[#E94F12]">
+                  <Text className="font-heading text-base font-semibold text-[#E94F12]">
                     +{activityPoints} pts
                   </Text>
                 </View>
@@ -469,7 +480,7 @@ export default function NewPost() {
                 <Text className="font-body text-xs font-bold text-[#5F5955]">Caption</Text>
                 <Text className="font-body text-[10px] text-[#9A928D]">{body.length}/150</Text>
               </View>
-              <Input className="h-auto min-h-[96px] w-full rounded-[18px] border-0 bg-[#F8F8F8]">
+              <Input className="h-auto min-h-[96px] w-full rounded-xl bg-[#F8F8F8]">
                 <InputField
                   multiline
                   maxLength={150}
@@ -490,7 +501,7 @@ export default function NewPost() {
           ) : null}
 
           {!isActivityPost ? (
-            <View className="mx-4 mt-4 rounded-3xl border border-[#CDCFD0] bg-white px-4 py-4">
+            <View className="mx-4 mt-4 rounded-xl bg-white px-4 py-4">
               <View className="flex-row items-start gap-x-3">
                 <Avatar
                   uri={currentUser?.image ?? undefined}
@@ -531,7 +542,7 @@ export default function NewPost() {
                     activeOpacity={0.85}
                     onPress={selectImage}
                     disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
+                    className="flex-1 flex-row items-center rounded-lg bg-[#fff] px-4 py-3"
                     style={{ opacity: isUploading ? 0.5 : 1 }}>
                     <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
                       <ImageSquare size={22} color="#FF5C1A" weight="duotone" />
@@ -547,7 +558,7 @@ export default function NewPost() {
                     activeOpacity={0.85}
                     onPress={selectVideo}
                     disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-2xl border border-[#F2DED4] bg-[#fff] px-4 py-3"
+                    className="flex-1 flex-row items-center rounded-lg bg-[#fff] px-4 py-3"
                     style={{ opacity: isUploading ? 0.5 : 1 }}>
                     <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
                       <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
@@ -565,12 +576,12 @@ export default function NewPost() {
 
           <View className="mt-4 px-4">
             {mediaLoading ? (
-              <View className="h-28 items-center justify-center rounded-3xl bg-white">
+              <View className="h-28 items-center justify-center rounded-xl bg-white">
                 <ActivityIndicator color={colors.primary} />
                 <Text className="mt-2 font-body text-sm text-[#838383]">Preparing media...</Text>
               </View>
             ) : media && mediaUri ? (
-              <View className="overflow-hidden rounded-3xl bg-white">
+              <View className="overflow-hidden rounded-xl bg-white">
                 <View className="relative">
                   {media.type === 'video' ? (
                     <View>
@@ -682,7 +693,7 @@ export default function NewPost() {
             variant="solid"
             size="xl"
             action="primary"
-            className="h-14 w-full rounded-[17px] px-[22px]"
+            className="h-14 w-full rounded-lg px-[22px]"
             style={{
               backgroundColor: canSubmit ? '#FF5C1A' : '#F5D5C8',
             }}

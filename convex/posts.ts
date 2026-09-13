@@ -113,6 +113,7 @@ export const getPinnedPost = query({
           compositeVideoUrl: v.optional(v.string()),
           thumbnailUrl: v.optional(v.string()),
           allowRepost: v.optional(v.boolean()),
+          isCheckIn: v.optional(v.boolean()),
         })
       ),
       likeCount: v.number(),
@@ -180,6 +181,7 @@ export const getPinnedPost = query({
           return {
             name: ch.name,
             points: ch.points,
+            isCheckIn: ch.type === 'check_in' || ch.dailyChallengeType === 'check_in',
             instructionalVideoUrl: instructionalVideoUrl ?? undefined,
             compositeVideoUrl,
             thumbnailUrl,
@@ -568,6 +570,31 @@ export const createPost = mutation({
   },
 });
 
+export const getLoggedActivityKeysToday = query({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const user = await ctx.db.get(userId);
+    const date = formatDateInTZ(new Date(), user?.timezone);
+    const activities = await ctx.db
+      .query('dailyActivities')
+      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
+      .filter((q) => q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved')))
+      .collect();
+
+    return Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.loggedActivityKey)
+          .filter((key): key is NonNullable<typeof key> => Boolean(key))
+      )
+    );
+  },
+});
+
 export const updatePost = mutation({
   args: {
     postId: v.id('posts'),
@@ -932,6 +959,7 @@ export const getLatestPosts = query({
             thumbnailUrl: v.optional(v.string()),
 
             allowRepost: v.optional(v.boolean()),
+            isCheckIn: v.optional(v.boolean()),
           })
         ),
 
@@ -1202,6 +1230,9 @@ export const getLatestPosts = query({
                 name: challengeDocument.name,
 
                 points: challengeDocument.points,
+                isCheckIn:
+                  challengeDocument.type === 'check_in' ||
+                  challengeDocument.dailyChallengeType === 'check_in',
 
                 ...(instructionalVideoUrl
                   ? {
@@ -1330,6 +1361,7 @@ export const getSinglePost = query({
           compositeVideoUrl: v.optional(v.string()),
           thumbnailUrl: v.optional(v.string()),
           allowRepost: v.optional(v.boolean()),
+          isCheckIn: v.optional(v.boolean()),
         })
       ),
       likeCount: v.number(),
@@ -1433,6 +1465,8 @@ export const getSinglePost = query({
             return {
               name: challenge.name,
               points: challenge.points,
+              isCheckIn:
+                challenge.type === 'check_in' || challenge.dailyChallengeType === 'check_in',
               instructionalVideoUrl: instructionalVideoUrl ?? undefined,
               compositeVideoUrl,
               thumbnailUrl,

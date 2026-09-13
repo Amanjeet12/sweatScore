@@ -99,7 +99,7 @@ export default function AdminViewPendingApprovals() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Pending Approvals
             </Text>
           ),
@@ -214,7 +214,7 @@ const PendingApprovalRow = ({
   openAlertDialog: (activity: any) => void;
 }) => {
   return (
-    <View className="mb-4 flex-row items-center rounded-lg border border-gray-200 p-4">
+    <View className="mb-4 flex-row items-center rounded-lg   p-4">
       <View className="flex-1">
         <TouchableOpacity onPress={() => openAlertDialog(item)}>
           <View className="flex-row gap-x-2">

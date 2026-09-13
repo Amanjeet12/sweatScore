@@ -19,6 +19,7 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useHealthSync } from '~/hooks/useHealthSync';
 import { useAuthStore } from '~/store/useAuthStore';
+import { storage } from '~/utils/storage';
 
 type Entry = {
   userId: Id<'users'>;
@@ -87,7 +88,8 @@ export default function TabRank() {
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { isPro } = useRevenueCat();
-  const [period, setPeriod] = useState<LeaderboardPeriod>('month');
+  const period: LeaderboardPeriod = 'month';
+  const [mode, setMode] = useState<'points' | 'streak'>('points');
   const [now, setNow] = useState(() => new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -102,11 +104,18 @@ export default function TabRank() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!currentUser?._id) return;
+    storage.set(`today_leaderboard_viewed_${currentUser._id}_${formatLocalDate(new Date())}`, true);
+  }, [currentUser?._id]);
+
   const periodWindow = useMemo(() => getPeriodWindow(period, now), [now, period]);
   const timeLeft = useMemo(() => getTimeLeft(period, now), [now, period]);
 
   const leaderboard = useQuery(api.leaderboard.getLeaderboardForPeriod, {
     period,
+    mode,
+    refreshToken: Math.floor(now.getTime() / 60000),
     ...periodWindow,
   });
 
@@ -115,12 +124,6 @@ export default function TabRank() {
     currentUser?.isAdmin === true ||
     leaderboard?.access === 'paid' ||
     leaderboard?.access === 'admin';
-
-  useEffect(() => {
-    if (leaderboard?.access === 'free' && !isPro && period !== 'month') {
-      setPeriod('month');
-    }
-  }, [isPro, leaderboard?.access, period]);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -165,9 +168,7 @@ export default function TabRank() {
   }
 
   const entries = leaderboard.entries as Entry[];
-  const visibleEntries = hasFullAccess
-    ? entries.filter((entry) => entry.userId !== currentUser?._id)
-    : entries;
+  const visibleEntries = entries;
   const myRank = leaderboard.me?.rank || undefined;
   const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
 
@@ -180,19 +181,15 @@ export default function TabRank() {
   const ListHeader = (
     <View>
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-        <LeaderboardHeader
-          period={period}
-          timeLeft={timeLeft}
-          canChangePeriod={hasFullAccess}
-          onChangePeriod={setPeriod}
-        />
+        <LeaderboardHeader mode={mode} timeLeft={timeLeft} onChangeMode={setMode} />
       </View>
 
-      <Podium podium={leaderboard.podium} onPressEntry={goToUser} />
+      <Podium podium={leaderboard.podium} onPressEntry={goToUser} mode={mode} />
 
-      {hasFullAccess ? (
-        <View className="overflow-hidden rounded-t-3xl bg-white">
+      {leaderboard.me ? (
+        <View>
           <MeRow
+            mode={mode}
             rank={myRank}
             avatarUri={currentUser?.image ?? undefined}
             displayTotalPoints={leaderboard.me?.displayTotalPoints ?? 0}
@@ -202,23 +199,23 @@ export default function TabRank() {
           />
         </View>
       ) : (
-        <View className="h-6 rounded-t-3xl bg-white" />
+        <View className="h-1" />
       )}
     </View>
   );
 
   const ListFooter = (
-    <View className="bg-white pb-4">
+    <View className={hasFullAccess ? 'bg-[#F9F9F9] pb-6' : 'bg-white pb-4'}>
       {!hasFullAccess ? (
         <PaywallOverlay />
       ) : otherParticipantCount > 0 ? (
-        <View className="mx-4 mt-5 rounded-2xl bg-[#FFF7F1] px-4 py-3.5">
+        <View className="mx-4 mt-5 rounded-[24px] bg-[#FFF7F1] px-4 py-3.5">
           <Text className="text-center font-body text-sm text-[#5A5A5A]">
             {otherParticipantCount}{' '}
             {otherParticipantCount === 1
               ? 'other is also participating'
               : 'others are also participating'}{' '}
-            in this challenge.
+            {mode === 'streak' ? 'with a recorded streak.' : 'in this month’s League.'}
           </Text>
         </View>
       ) : null}
@@ -233,19 +230,29 @@ export default function TabRank() {
         data={visibleEntries}
         keyExtractor={(item) => item.userId}
         renderItem={({ item }: { item: Entry }) => (
-          <View className="bg-white">
+          <View className="bg-[#F9F9F9]">
             <RankRow
+              mode={mode}
               rank={item.rank}
               name={item.name}
               avatarUri={item.image}
               displayTotalPoints={item.displayTotalPoints}
               targetPoints={leaderboard.targetPoints}
               onPress={() => goToUser(item.userId)}
+              isFirst={item.rank === visibleEntries[0]?.rank}
+              isLast={item.rank === visibleEntries[visibleEntries.length - 1]?.rank}
             />
           </View>
         )}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
+        ListEmptyComponent={
+          mode === 'streak' && entries.length === 0 ? (
+            <Text className="px-5 py-6 text-center font-body text-sm text-[#817A76]">
+              No recorded streaks yet. Check in or log a habit on 5 days to earn your first week.
+            </Text>
+          ) : null
+        }
         estimatedItemSize={72}
         contentContainerStyle={{ paddingBottom: 0 }}
         showsVerticalScrollIndicator={false}

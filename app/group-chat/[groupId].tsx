@@ -538,8 +538,8 @@ export default function GroupChatScreen() {
           ) : (
             <View className="border-t border-[#EEE7E2] bg-white px-4 pb-4 pt-3">
               {group.isRestricted ? (
-                <View className="rounded-2xl bg-[#FFF1F1] px-4 py-4">
-                  <Text className="text-center font-heading text-base font-bold text-[#B42318]">
+                <View className="rounded-xl bg-[#FFF1F1] px-4 py-4">
+                  <Text className="text-center font-heading text-base font-semibold text-[#B42318]">
                     Group access restricted
                   </Text>
 
@@ -548,8 +548,8 @@ export default function GroupChatScreen() {
                   </Text>
                 </View>
               ) : (
-                <View className="rounded-2xl border border-[#F4D7C6] bg-[#FFF7F2] px-4 py-4">
-                  <Text className="text-center font-heading text-base font-bold text-[#1A1A1A]">
+                <View className="rounded-xl bg-[#FFF7F2] px-4 py-4">
+                  <Text className="text-center font-heading text-base font-semibold text-[#1A1A1A]">
                     Join this group to participate
                   </Text>
 
@@ -568,7 +568,9 @@ export default function GroupChatScreen() {
                     {isJoiningGroup ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text className="font-heading text-sm font-bold text-white">Join Group</Text>
+                      <Text className="font-heading text-sm font-semibold text-white">
+                        Join Group
+                      </Text>
                     )}
                   </TouchableOpacity>
                 </View>

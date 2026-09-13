@@ -68,7 +68,7 @@ export default function TabSettings() {
             backgroundColor: '#F9F9F9',
           },
           headerTitle: () => (
-            <Text className="text-center font-heading text-xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
               My Profile
             </Text>
           ),
@@ -94,7 +94,7 @@ export default function TabSettings() {
               <Text style={styles.iosBackText}>Back</Text>
             </TouchableOpacity>
 
-            <Text className="text-center font-heading text-xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
               My Profile
             </Text>
 

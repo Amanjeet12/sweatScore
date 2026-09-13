@@ -42,24 +42,15 @@ export default function SwipeableMissionCard({ todayCard }: SwipeableMissionCard
       onPress={() => router.push(`/(tabs)/share`)}
       activeOpacity={0.9}
       style={{
-        borderRadius: 24,
-        ...(Platform.OS === 'ios'
-          ? {
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08,
-              shadowRadius: 4,
-            }
-          : {
-              elevation: 3,
-            }),
+        borderRadius: 12,
+        ...(Platform.OS === 'ios' ? {} : {}),
       }}>
       <LinearGradient
         colors={['#DC6743', '#EE875E', '#FCB38A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{
-          borderRadius: 24,
+          borderRadius: 12,
           paddingHorizontal: 24,
           paddingVertical: 24,
           minHeight: 158,

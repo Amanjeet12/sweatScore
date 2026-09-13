@@ -15,7 +15,7 @@ export default function ForceUpdateGate() {
       statusBarTranslucent
       onRequestClose={() => {}}>
       <View className="flex-1 items-center justify-center bg-black/40 px-6">
-        <View className="w-full rounded-3xl bg-white px-8 py-10">
+        <View className="w-full rounded-xl bg-white px-8 py-10">
           <Text
             className="text-center text-[#1A1A1A]"
             size="2xl"
@@ -29,7 +29,7 @@ export default function ForceUpdateGate() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => storeUrl && Linking.openURL(storeUrl)}
-            className="mt-8 items-center justify-center rounded-full bg-primary-500 px-6 py-4">
+            className="mt-8 items-center justify-center rounded-lg bg-primary-500 px-6 py-4">
             <Text className="font-body text-lg font-semibold text-white">Update Now</Text>
           </TouchableOpacity>
         </View>

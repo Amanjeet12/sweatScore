@@ -21,7 +21,7 @@ export default function NewChallenge() {
         }}
       />
 
-      <Text className="mb-4 mt-4 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
+      <Text className="mb-4 mt-4 text-center font-heading text-3xl font-semibold text-[#1A1A1A]">
         New Challenge
       </Text>
 

@@ -45,7 +45,7 @@ export default function WeeklyStreakCard() {
       <View className="flex-row items-center justify-between">
         <View className="min-w-0 flex-1 pr-3">
           <View className="flex-row items-center">
-            <Text className="font-heading text-xl font-bold text-[#1A1A1A]" numberOfLines={1}>
+            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]" numberOfLines={1}>
               Your Streak
             </Text>
 

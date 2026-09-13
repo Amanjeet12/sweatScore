@@ -1,8 +1,5 @@
 import { v } from 'convex/values';
 
-import { Id } from '../_generated/dataModel';
-import { internalMutation, MutationCtx } from '../_generated/server';
-import { formatDateInTZ } from '../utils/timezone';
 import {
   getWeeklyTargetDays,
   mondayOf,
@@ -11,9 +8,10 @@ import {
   yearOf,
   yearWeekOf,
 } from './helpers';
+import { Id } from '../_generated/dataModel';
+import { internalMutation, MutationCtx } from '../_generated/server';
+import { formatDateInTZ } from '../utils/timezone';
 
-const DAILY_STEP_TARGET = 5000;
-const DAILY_ACTIVE_MINUTES_TARGET = 50;
 const DAILY_CHECK_IN_TARGET = 1;
 const DEFAULT_STREAK_BONUS_POINTS = 10;
 
@@ -110,23 +108,20 @@ async function computeDailyTotals(
   const dailyPoints = Math.floor(activityPoints + appCheckInPoints + challengePoints);
 
   /*
-   * A day counts toward the weekly streak only when
-   * any one physical target is completed:
+   * A day counts toward the weekly streak only after active input:
    *
-   * 1. 5,000 steps
-   * 2. 50 active minutes
-   * 3. One physical daily check-in video
+   * 1. One Quick Log, or
+   * 2. One physical Daily Check-in video.
    *
+   * Passively synced steps and active minutes do not mark targetMet.
    * A normal challenge does not mark targetMet.
    * Opening the app does not mark targetMet.
    */
-  const stepTargetReached = steps >= DAILY_STEP_TARGET;
-
-  const activeMinutesTargetReached = activeMinutes >= DAILY_ACTIVE_MINUTES_TARGET;
+  const quickLogCompleted = activities.some((activity) => Boolean(activity.loggedActivityKey));
 
   const dailyCheckInTargetReached = dailyCheckIns >= DAILY_CHECK_IN_TARGET;
 
-  const targetMet = stepTargetReached || activeMinutesTargetReached || dailyCheckInTargetReached;
+  const targetMet = quickLogCompleted || dailyCheckInTargetReached;
 
   return {
     steps: Math.floor(steps),

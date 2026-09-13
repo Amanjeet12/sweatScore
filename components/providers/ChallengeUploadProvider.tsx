@@ -86,6 +86,8 @@ function isRetryableChallengeUploadError(message: string) {
     'user not found',
     'saved recording could not be found',
     'daily challenge limit reached',
+    'join this challenge before recording',
+    'this challenge has not started yet',
   ];
 
   return !nonRetryableFragments.some((fragment) => normalized.includes(fragment));

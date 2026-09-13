@@ -94,7 +94,7 @@ export default function CheckInCategoryForm({ category }: { category?: CategoryW
       <TouchableOpacity
         onPress={selectIcon}
         disabled={uploading}
-        className="mb-4 items-center justify-center rounded-xl border border-gray-300 p-4">
+        className="mb-4 items-center justify-center rounded-xl   p-4">
         {iconUri ? (
           <Image source={{ uri: iconUri }} className="h-20 w-20 rounded-xl" />
         ) : (

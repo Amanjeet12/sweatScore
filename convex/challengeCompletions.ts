@@ -10,8 +10,11 @@ import { evaluateUserMilestones } from './utils/milestones';
 import { getStreakEarnedDatesInRange, WEEKLY_STREAK_TARGET_DAYS } from './utils/streak';
 import {
   addDaysUTC,
+  addDaysToDateKey,
   DAILY_SCHEDULE_TIMEZONE,
+  differenceInCalendarDays,
   formatDateInTZ,
+  getDateStartTimestampInTimezone,
   getMondayInTZ,
   getNextMidnightTimestamp,
   ymdUTC,
@@ -26,6 +29,78 @@ const FIRST_ATTEMPT_VIDEO_STORAGE_ID = 'kg27tw959tpd9gd9jcf0dey5x58dmdec' as Id<
 
 function getLocalDateKey(date: string): number {
   return Date.parse(`${date}T00:00:00.000Z`);
+}
+
+function getCommunityChallengeTiming(
+  challenge: Doc<'challenges'>,
+  now: number,
+  userTimezone?: string | null
+) {
+  if (challenge.isCommunityChallenge !== true || !challenge.startDate || !challenge.durationDays) {
+    return null;
+  }
+
+  const startAt = getDateStartTimestampInTimezone(challenge.startDate, DAILY_SCHEDULE_TIMEZONE);
+  const endDate = addDaysToDateKey(challenge.startDate, challenge.durationDays);
+  const endAt = getDateStartTimestampInTimezone(endDate, DAILY_SCHEDULE_TIMEZONE);
+  const userStartDate = formatDateInTZ(new Date(startAt), userTimezone);
+  const userToday = formatDateInTZ(new Date(now), userTimezone);
+  const rawDay = differenceInCalendarDays(userStartDate, userToday) + 1;
+  const status = now < startAt ? 'upcoming' : now >= endAt ? 'ended' : 'active';
+  const currentDay = status === 'upcoming' ? 0 : Math.min(challenge.durationDays, rawDay);
+  const millisecondsUntilStart = Math.max(0, startAt - now);
+
+  return {
+    status,
+    startAt,
+    endAt,
+    endDate,
+    currentDay,
+    userToday,
+    userStartDate,
+    daysUntilStart: Math.max(0, Math.ceil(millisecondsUntilStart / (24 * 60 * 60 * 1000))),
+    totalAvailablePoints:
+      challenge.points * challenge.durationDays + (challenge.completionBankPoints ?? 0),
+  } as const;
+}
+
+async function getChallengeParticipant(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<'users'>,
+  challengeId: Id<'challenges'>
+) {
+  return await ctx.db
+    .query('challengeParticipants')
+    .withIndex('by_user_challenge', (q) => q.eq('userId', userId).eq('challengeId', challengeId))
+    .unique();
+}
+
+async function getParticipantAvatars(
+  ctx: QueryCtx,
+  participants: Doc<'challengeParticipants'>[],
+  currentUserId: Id<'users'> | null,
+  limit: number
+) {
+  const currentParticipant = currentUserId
+    ? participants.find((row) => String(row.userId) === String(currentUserId))
+    : undefined;
+  const ordered = [
+    ...(currentParticipant ? [currentParticipant] : []),
+    ...participants.filter((row) => row._id !== currentParticipant?._id),
+  ].slice(0, limit);
+  const avatars = [];
+
+  for (const row of ordered) {
+    const member = await ctx.db.get(row.userId);
+    const name = getSafeMemberName(member);
+    avatars.push({
+      userId: row.userId,
+      imageUrl: await getSafeUserImageUrl(ctx, member?.image),
+      initial: Array.from(name)[0]?.toUpperCase() ?? '?',
+    });
+  }
+
+  return avatars;
 }
 
 function getScheduledCheckInForLocalDate(
@@ -100,6 +175,7 @@ async function getDailyPointsEarned(
   const completions = await ctx.db
     .query('challengeCompletions')
     .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
+    .filter((q) => q.neq(q.field('removed'), true))
     .collect();
   const challengePoints = completions.reduce((sum, c) => sum + c.pointsEarned, 0);
 
@@ -239,25 +315,38 @@ export const completeChallenge = mutation({
 
     const isDailyChallenge = challenge.isDailyChallenge === true;
     const isCheckIn = challenge.type === 'check_in';
+    const isCommunityChallenge = challenge.isCommunityChallenge === true;
+    const communityTiming = getCommunityChallengeTiming(challenge, now, user.timezone);
+    let communityChallengeDay: number | undefined;
+    let communityParticipant: Doc<'challengeParticipants'> | null = null;
+
+    if (isCommunityChallenge) {
+      if (!communityTiming) {
+        throw new ConvexError('Community challenge schedule is invalid');
+      }
+      if (communityTiming.status === 'upcoming') {
+        throw new ConvexError('This challenge has not started yet');
+      }
+      if (communityTiming.status === 'ended') {
+        throw new ConvexError('Challenge has ended');
+      }
+
+      communityParticipant = await getChallengeParticipant(ctx, userId, args.challengeId);
+      if (!communityParticipant) {
+        throw new ConvexError('Join this challenge before recording');
+      }
+
+      communityChallengeDay = communityTiming.currentDay;
+    }
 
     let dailyWindowStartAt: number | undefined;
 
     /*
-     * London controls the two check-ins staged by the admin, while each user
-     * changes to the appropriate staged item at midnight in her own timezone.
-     * Store a logical local-date key for duplicate protection.
+     * The rotation controls which check-in is featured, not which published
+     * category a member may choose. Every check-in uses the member's local-day
+     * key so a scheduled future category can remain available in the swap pool.
      */
     if (isDailyChallenge && isCheckIn) {
-      const scheduledChallenges = await ctx.db
-        .query('challenges')
-        .withIndex('by_daily_challenge', (q) => q.eq('isDailyChallenge', true))
-        .collect();
-      const assignedCheckIn = getScheduledCheckInForLocalDate(scheduledChallenges, todayStr);
-
-      if (!assignedCheckIn || assignedCheckIn._id !== challenge._id) {
-        throw new ConvexError('This daily challenge is not currently active');
-      }
-
       dailyWindowStartAt = getLocalDateKey(todayStr);
     } else if (isDailyChallenge) {
       const dailyStartAt = challenge.dailyStartAt;
@@ -274,7 +363,7 @@ export const completeChallenge = mutation({
       dailyWindowStartAt = dailyStartAt;
     }
 
-    if (challenge.endDate && todayStr >= challenge.endDate) {
+    if (!isCommunityChallenge && challenge.endDate && todayStr >= challenge.endDate) {
       throw new ConvexError('Challenge has ended');
     }
 
@@ -331,7 +420,7 @@ export const completeChallenge = mutation({
      * Compatibility with completions created before local-day keys were
      * introduced, and with a different check-in selected from the swap list.
      */
-    if (!existingCompletion && isDailyChallenge && isCheckIn) {
+    if (!existingCompletion && isCheckIn) {
       const localDayCompletions = await ctx.db
         .query('challengeCompletions')
         .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
@@ -349,7 +438,7 @@ export const completeChallenge = mutation({
 
     if (existingCompletion) {
       throw new ConvexError(
-        isDailyChallenge ? 'Already completed this daily challenge' : 'Already completed today'
+        isCheckIn ? 'You already completed a check-in today' : 'Already completed today'
       );
     }
 
@@ -363,7 +452,18 @@ export const completeChallenge = mutation({
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
 
-    if (todayCompletions.length >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
+    let completionsTowardDailyLimit = todayCompletions.length;
+    if (isCommunityChallenge) {
+      completionsTowardDailyLimit = 0;
+      for (const completion of todayCompletions) {
+        const completedChallenge = await ctx.db.get(completion.challengeId);
+        if (completedChallenge?.isCommunityChallenge === true) {
+          completionsTowardDailyLimit += 1;
+        }
+      }
+    }
+
+    if (completionsTowardDailyLimit >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
       throw new ConvexError('Daily challenge limit reached');
     }
 
@@ -378,10 +478,6 @@ export const completeChallenge = mutation({
      * A check-in's submission format is metadata only. Every format earns the
      * configured challenge points so recording and uploading are treated equally.
      */
-    const rawPoints = challenge.points + repostBonus;
-
-    const totalPoints = await applyFreeDailyCap(ctx, userId, todayStr, rawPoints, 'challenge');
-
     /*
      * Fetch all previous attempts for progress
      * and Day-1 comparison logic.
@@ -404,6 +500,43 @@ export const completeChallenge = mutation({
       (completion) => completion.videoStorageId
     );
 
+    const rawDailyPoints = challenge.points + repostBonus;
+    const dailyPointsEarned = await applyFreeDailyCap(
+      ctx,
+      userId,
+      todayStr,
+      rawDailyPoints,
+      'challenge'
+    );
+
+    let completionBankPointsEarned = 0;
+    if (
+      isCommunityChallenge &&
+      communityTiming &&
+      communityParticipant &&
+      communityChallengeDay === challenge.durationDays &&
+      communityParticipant.bankEligibleAtJoin &&
+      !communityParticipant.completionBankAwarded
+    ) {
+      const completedDays = new Set(
+        sortedPreviousCompletions
+          .map((completion) => completion.communityChallengeDay)
+          .filter((day): day is number => typeof day === 'number')
+      );
+      const completedEveryEarlierDay = Array.from(
+        { length: Math.max(0, (challenge.durationDays ?? 1) - 1) },
+        (_, index) => index + 1
+      ).every((day) => completedDays.has(day));
+
+      if (completedEveryEarlierDay) {
+        // The completion bank is an earned challenge prize, not another daily
+        // activity award, so it is not reduced by the free user's daily cap.
+        completionBankPointsEarned = challenge.completionBankPoints ?? 0;
+      }
+    }
+
+    const totalPoints = dailyPointsEarned + completionBankPointsEarned;
+
     /*
      * Do not insert undefined for optional
      * fields. Include dailyWindowStartAt only
@@ -418,6 +551,13 @@ export const completeChallenge = mutation({
       ...(dailyWindowStartAt !== undefined
         ? {
             dailyWindowStartAt,
+          }
+        : {}),
+
+      ...(communityChallengeDay !== undefined
+        ? {
+            communityChallengeDay,
+            completionBankPointsEarned,
           }
         : {}),
 
@@ -447,7 +587,7 @@ export const completeChallenge = mutation({
        * Normal challenges keep Day-1 and
        * transformation comparison data.
        */
-      ...(!isCheckIn
+      ...(!isCheckIn && (!isCommunityChallenge || challenge.outputType === 'side_by_side')
         ? {
             comparisonMode: day1Completion?.videoStorageId
               ? ('day1_vs_current' as const)
@@ -469,6 +609,13 @@ export const completeChallenge = mutation({
     };
 
     const completionId = await ctx.db.insert('challengeCompletions', completionData);
+
+    if (communityParticipant && completionBankPointsEarned > 0) {
+      await ctx.db.patch(communityParticipant._id, {
+        completionBankAwarded: true,
+        completionBankAwardedAt: now,
+      });
+    }
 
     /*
      * Daily challenge counters use the exact
@@ -504,6 +651,30 @@ export const completeChallenge = mutation({
      * Process the user's uploaded video.
      */
     if (args.videoStorageId) {
+      // Publish the original immediately for submissions that need asynchronous
+      // processing. The callback upgrades this same post to the final video.
+      const needsProcessing =
+        !(isCheckIn && !musicTrackId) &&
+        !(
+          !isCheckIn &&
+          isCommunityChallenge &&
+          challenge.outputType === 'single_video' &&
+          !musicTrackId
+        );
+      if (needsProcessing) {
+        await ctx.db.insert('posts', {
+          userId,
+          createdAt: now,
+          body: args.caption?.trim() || `${challenge.name} completed`,
+          media: args.videoStorageId,
+          ...(args.thumbnailStorageId ? { mediaThumbnail: args.thumbnailStorageId } : {}),
+          mediaWidth: args.mediaWidth && args.mediaWidth > 0 ? args.mediaWidth : 1080,
+          mediaHeight: args.mediaHeight && args.mediaHeight > 0 ? args.mediaHeight : 1350,
+          mediaType,
+          challengeId: args.challengeId,
+          challengeCompletionId: completionId,
+        });
+      }
       /*
        * CHECK-IN:
        * Post the original user video directly.
@@ -543,6 +714,40 @@ export const completeChallenge = mutation({
           userId,
           postId,
         });
+      } else if (!isCheckIn && isCommunityChallenge && challenge.outputType === 'single_video') {
+        const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
+
+        if (musicTrackId && userVideoUrl) {
+          // Reuse the existing single-video processor so the selected
+          // challenge music is present in the final feed video.
+          await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
+            userVideoUrl,
+            challengeCompletionId: completionId,
+            userId,
+            caption: args.caption?.trim() || '',
+            challengeId: args.challengeId,
+            musicTrackId,
+            checkInMusicOnly: true,
+          });
+        } else {
+          const postId = await ctx.db.insert('posts', {
+            userId,
+            createdAt: now,
+            body: args.caption?.trim() || `${challenge.name} · Day ${communityChallengeDay}`,
+            media: args.videoStorageId,
+            ...(args.thumbnailStorageId ? { mediaThumbnail: args.thumbnailStorageId } : {}),
+            mediaWidth: args.mediaWidth && args.mediaWidth > 0 ? args.mediaWidth : 1080,
+            mediaHeight: args.mediaHeight && args.mediaHeight > 0 ? args.mediaHeight : 1350,
+            mediaType: 'video',
+            challengeId: args.challengeId,
+            challengeCompletionId: completionId,
+          });
+
+          await ctx.scheduler.runAfter(0, internal.http.sendChallengeNotification, {
+            userId,
+            postId,
+          });
+        }
       } else if (!isCheckIn) {
         /*
          * NORMAL CHALLENGE:
@@ -588,8 +793,10 @@ export const completeChallenge = mutation({
             leftVideoType: day1VideoUrl ? 'day_1_video' : 'instructor_video',
           });
 
-          const leftLabel = day1VideoUrl ? 'Day 1' : undefined;
-          const rightLabel = `Day ${attemptNumber}`;
+          const leftLabel = day1VideoUrl
+            ? `Day ${day1Completion?.communityChallengeDay ?? 1}`
+            : undefined;
+          const rightLabel = `Day ${communityChallengeDay ?? attemptNumber}`;
 
           await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
             adminVideoUrl,
@@ -632,6 +839,8 @@ export const completeChallenge = mutation({
     return {
       success: true,
       pointsEarned: totalPoints,
+      dailyPointsEarned,
+      completionBankPointsEarned,
       completionId,
       attemptNumber,
       isDay1Baseline: attemptNumber === 1,
@@ -677,7 +886,7 @@ export const getUserCompletionsForWeek = query({
 
     const earnedDates = await getStreakEarnedDatesInRange(ctx, userId, weekStartStr, weekEndStr);
 
-    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thr', 'Fri', 'Sat', 'Sun'];
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const days = [];
     for (let i = 0; i < 7; i++) {
       const date = addDaysUTC(monday, i);
@@ -774,24 +983,48 @@ export const getChallengeCooldown = query({
     const user = await ctx.db.get(userId);
     const todayStr = formatDateInTZ(new Date(), user?.timezone);
 
-    const completions = await ctx.db
-      .query('challengeCompletions')
-      .withIndex('by_user_challenge_date', (q) =>
-        q.eq('userId', userId).eq('challengeId', args.challengeId)
-      )
-      .filter((q) => q.neq(q.field('removed'), true))
-      .collect();
+    const challenge = await ctx.db.get(args.challengeId);
+    const completions =
+      challenge?.type === 'check_in'
+        ? await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+            .filter((q) => q.neq(q.field('removed'), true))
+            .collect()
+        : await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_challenge_date', (q) =>
+              q.eq('userId', userId).eq('challengeId', args.challengeId)
+            )
+            .filter((q) => q.neq(q.field('removed'), true))
+            .collect();
 
-    if (completions.length === 0) {
+    const relevantCompletions =
+      challenge?.type === 'check_in'
+        ? (
+            await Promise.all(
+              completions.map(async (completion) => ({
+                completion,
+                challenge: await ctx.db.get(completion.challengeId),
+              }))
+            )
+          )
+            .filter(({ challenge: completedChallenge }) => completedChallenge?.type === 'check_in')
+            .map(({ completion }) => completion)
+        : completions;
+
+    if (relevantCompletions.length === 0) {
       return {
         completedToday: false,
         lastCompletedAt: null,
       };
     }
 
-    const latestCompletion = completions.sort((a, b) => b._creationTime - a._creationTime)[0];
+    const latestCompletion = relevantCompletions.sort(
+      (a, b) => b._creationTime - a._creationTime
+    )[0];
 
-    const completedToday = completions.some((completion) => completion.date === todayStr);
+    const completedToday = relevantCompletions.some((completion) => completion.date === todayStr);
 
     return {
       completedToday,
@@ -828,6 +1061,282 @@ export const getTodayCompletionCount = query({
     const todayStr = formatDateInTZ(new Date(), tz);
     const count = await challengeCounter.count(ctx, `challenge:${args.challengeId}:${todayStr}`);
     return count;
+  },
+});
+
+export const joinCommunityChallenge = mutation({
+  args: { challengeId: v.id('challenges') },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Unauthorized');
+
+    const [user, challenge] = await Promise.all([ctx.db.get(userId), ctx.db.get(args.challengeId)]);
+    if (!user) throw new ConvexError('User not found');
+    if (
+      !challenge ||
+      !challenge.isPublished ||
+      challenge.type === 'check_in' ||
+      challenge.isCommunityChallenge !== true
+    ) {
+      throw new ConvexError('Challenge is not available');
+    }
+    if (challenge.isLocked && !user.isPremium && !user.isAdmin) {
+      throw new ConvexError('Premium required');
+    }
+
+    const timing = getCommunityChallengeTiming(challenge, Date.now(), user.timezone);
+    if (!timing) throw new ConvexError('Challenge schedule is invalid');
+    if (timing.status === 'ended') throw new ConvexError('Challenge has ended');
+
+    const existing = await getChallengeParticipant(ctx, userId, args.challengeId);
+    if (existing) {
+      return {
+        success: true,
+        participantId: existing._id,
+        alreadyJoined: true,
+        bankEligibleAtJoin: existing.bankEligibleAtJoin,
+      };
+    }
+
+    const existingParticipations = await ctx.db
+      .query('challengeParticipants')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .collect();
+    let overlappingJoinedChallenges = 0;
+
+    for (const participation of existingParticipations) {
+      const joinedChallenge = await ctx.db.get(participation.challengeId);
+      if (!joinedChallenge?.isCommunityChallenge) continue;
+      const joinedTiming = getCommunityChallengeTiming(joinedChallenge, Date.now(), user.timezone);
+      if (
+        joinedTiming &&
+        joinedTiming.startAt < timing.endAt &&
+        timing.startAt < joinedTiming.endAt
+      ) {
+        overlappingJoinedChallenges += 1;
+      }
+    }
+
+    if (overlappingJoinedChallenges >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
+      throw new ConvexError(
+        `You can join up to ${MAX_DAILY_CHALLENGE_COMPLETIONS} overlapping challenges`
+      );
+    }
+
+    const participantId = await ctx.db.insert('challengeParticipants', {
+      challengeId: args.challengeId,
+      userId,
+      joinedAt: Date.now(),
+      joinedDate: timing.userToday,
+      bankEligibleAtJoin: timing.status === 'upcoming' || timing.currentDay <= 1,
+      completionBankAwarded: false,
+    });
+    await ctx.db.patch(challenge._id, {
+      participantCount: (challenge.participantCount ?? 0) + 1,
+    });
+
+    return {
+      success: true,
+      participantId,
+      alreadyJoined: false,
+      bankEligibleAtJoin: timing.status === 'upcoming' || timing.currentDay <= 1,
+    };
+  },
+});
+
+export const getCommunityChallenges = query({
+  args: { refreshToken: v.optional(v.number()) },
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+    const now = Date.now();
+    const challenges = await ctx.db
+      .query('challenges')
+      .withIndex('by_published', (q) => q.eq('isPublished', true))
+      .collect();
+
+    const results = [];
+
+    for (const challenge of challenges) {
+      if (challenge.type === 'check_in' || challenge.isCommunityChallenge !== true) continue;
+
+      const timing = getCommunityChallengeTiming(challenge, now, user?.timezone);
+      if (!timing || timing.status === 'ended') continue;
+
+      const recentParticipantRows = await ctx.db
+        .query('challengeParticipants')
+        .withIndex('by_challenge', (q) => q.eq('challengeId', challenge._id))
+        .order('desc')
+        .take(4);
+      const participant = userId ? await getChallengeParticipant(ctx, userId, challenge._id) : null;
+      const userCompletions = userId
+        ? await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_challenge_date', (q) =>
+              q.eq('userId', userId).eq('challengeId', challenge._id)
+            )
+            .filter((q) => q.neq(q.field('removed'), true))
+            .collect()
+        : [];
+      const completedDays = new Set(
+        userCompletions
+          .map((completion) => completion.communityChallengeDay)
+          .filter((day): day is number => typeof day === 'number')
+      );
+      const requiredEarlierDays = Math.max(
+        0,
+        Math.min(timing.currentDay - 1, challenge.durationDays!)
+      );
+      const hasEveryEarlierDay = Array.from(
+        { length: requiredEarlierDays },
+        (_, index) => index + 1
+      ).every((day) => completedDays.has(day));
+      const participantAvatars = await getParticipantAvatars(
+        ctx,
+        [
+          ...(participant ? [participant] : []),
+          ...recentParticipantRows.filter((row) => row._id !== participant?._id),
+        ],
+        userId,
+        4
+      );
+
+      results.push({
+        ...challenge,
+        coverImageUrl: await ctx.storage.getUrl(challenge.coverImage),
+        instructionalVideoUrl: challenge.instructionalVideo
+          ? await ctx.storage.getUrl(challenge.instructionalVideo)
+          : null,
+        ...timing,
+        isJoined: Boolean(participant),
+        joinedAt: participant?.joinedAt ?? null,
+        participantCount: challenge.participantCount ?? recentParticipantRows.length,
+        participantAvatars,
+        completedToday: userCompletions.some((completion) => completion.date === timing.userToday),
+        completedDays: completedDays.size,
+        completionBankEligible: Boolean(
+          participant?.bankEligibleAtJoin &&
+          !participant.completionBankAwarded &&
+          hasEveryEarlierDay
+        ),
+        completionBankAwarded: participant?.completionBankAwarded ?? false,
+      });
+    }
+
+    results.sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
+      if (a.isJoined !== b.isJoined) return a.isJoined ? -1 : 1;
+      return a.startAt - b.startAt;
+    });
+
+    const joinedActive = results.filter(
+      (challenge) => challenge.isJoined && challenge.status === 'active'
+    );
+    const completedToday = joinedActive.filter((challenge) => challenge.completedToday).length;
+    const yearMonth = formatDateInTZ(new Date(now), user?.timezone || 'Europe/London').slice(0, 7);
+    const monthCompletions = userId
+      ? await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_date', (q) =>
+            q.eq('userId', userId).gte('date', `${yearMonth}-01`).lte('date', `${yearMonth}-31`)
+          )
+          .filter((q) => q.neq(q.field('removed'), true))
+          .collect()
+      : [];
+    const monthPoints = monthCompletions.reduce(
+      (sum, completion) => sum + completion.pointsEarned,
+      0
+    );
+
+    return {
+      challenges: results,
+      summary: {
+        liveCount: results.filter((challenge) => challenge.status === 'active').length,
+        joinedCount: results.filter((challenge) => challenge.isJoined).length,
+        notJoinedCount: results.filter((challenge) => !challenge.isJoined).length,
+        completedToday,
+        dueToday: joinedActive.length,
+        monthPoints,
+        slotsLeft: Math.max(0, MAX_DAILY_CHALLENGE_COMPLETIONS - completedToday),
+        dailyLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
+      },
+    };
+  },
+});
+
+export const getCommunityChallengeDetails = query({
+  args: {
+    challengeId: v.id('challenges'),
+    refreshToken: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+    const challenge = await ctx.db.get(args.challengeId);
+    if (
+      !challenge ||
+      !challenge.isPublished ||
+      challenge.type === 'check_in' ||
+      challenge.isCommunityChallenge !== true
+    ) {
+      return null;
+    }
+
+    const timing = getCommunityChallengeTiming(challenge, Date.now(), user?.timezone);
+    if (!timing) return null;
+
+    const recentParticipantRows = await ctx.db
+      .query('challengeParticipants')
+      .withIndex('by_challenge', (q) => q.eq('challengeId', challenge._id))
+      .order('desc')
+      .take(5);
+    const participant = userId ? await getChallengeParticipant(ctx, userId, challenge._id) : null;
+    const userCompletions = userId
+      ? await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_challenge_date', (q) =>
+            q.eq('userId', userId).eq('challengeId', challenge._id)
+          )
+          .filter((q) => q.neq(q.field('removed'), true))
+          .collect()
+      : [];
+    const completedDays = new Set(
+      userCompletions
+        .map((completion) => completion.communityChallengeDay)
+        .filter((day): day is number => typeof day === 'number')
+    );
+    const earlierDayCount = Math.max(0, Math.min(timing.currentDay - 1, challenge.durationDays!));
+    const hasEveryEarlierDay = Array.from(
+      { length: earlierDayCount },
+      (_, index) => index + 1
+    ).every((day) => completedDays.has(day));
+    const participantAvatars = await getParticipantAvatars(
+      ctx,
+      [
+        ...(participant ? [participant] : []),
+        ...recentParticipantRows.filter((row) => row._id !== participant?._id),
+      ],
+      userId,
+      5
+    );
+
+    return {
+      ...challenge,
+      ...timing,
+      coverImageUrl: await ctx.storage.getUrl(challenge.coverImage),
+      instructionalVideoUrl: challenge.instructionalVideo
+        ? await ctx.storage.getUrl(challenge.instructionalVideo)
+        : null,
+      isJoined: Boolean(participant),
+      participantCount: challenge.participantCount ?? recentParticipantRows.length,
+      participantAvatars,
+      completedToday: userCompletions.some((completion) => completion.date === timing.userToday),
+      completedDays: completedDays.size,
+      completionBankEligible: Boolean(
+        participant?.bankEligibleAtJoin && !participant.completionBankAwarded && hasEveryEarlierDay
+      ),
+      completionBankAwarded: participant?.completionBankAwarded ?? false,
+    };
   },
 });
 
@@ -916,10 +1425,11 @@ export const getPublishedChallenge = query({
 });
 
 export const getAvailableCheckIns = query({
-  args: { openedChallengeId: v.id('challenges') },
+  args: { openedChallengeId: v.optional(v.id('challenges')) },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const today = new Date().toISOString().slice(0, 10);
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+    const today = formatDateInTZ(new Date(), user?.timezone);
     const checkIns = (
       await ctx.db
         .query('challenges')
@@ -930,14 +1440,24 @@ export const getAvailableCheckIns = query({
         challenge.type === 'check_in' &&
         challenge.checkInCategoryId &&
         challenge.instructionalVideo &&
-        (!challenge.endDate || challenge.endDate > today) &&
-        (!challenge.isDailyChallenge ||
-          challenge._id === args.openedChallengeId ||
-          (challenge.dailyStartAt !== undefined &&
-            challenge.dailyEndAt !== undefined &&
-            now >= challenge.dailyStartAt &&
-            now < challenge.dailyEndAt))
+        (!challenge.endDate || challenge.endDate > today)
     );
+
+    const todayCompletions = userId
+      ? await ctx.db
+          .query('challengeCompletions')
+          .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', today))
+          .filter((q) => q.neq(q.field('removed'), true))
+          .collect()
+      : [];
+    let completedCheckInId: Id<'challenges'> | null = null;
+    for (const completion of todayCompletions) {
+      const completedChallenge = await ctx.db.get(completion.challengeId);
+      if (completedChallenge?.type === 'check_in') {
+        completedCheckInId = completion.challengeId;
+        break;
+      }
+    }
 
     // One deterministic option per category: prefer the record the user opened,
     // otherwise use the most recently created published Check-In.
@@ -975,6 +1495,8 @@ export const getAvailableCheckIns = query({
         points: checkIn.points,
         durationLimit: checkIn.durationLimit,
         youtubeUrl: checkIn.youtubeUrl,
+        userCompletedToday: completedCheckInId !== null,
+        userCompletedThisCheckIn: completedCheckInId === checkIn._id,
       });
     }
     return resolved.sort((a, b) => a.sortOrder - b.sortOrder);
@@ -1001,7 +1523,14 @@ export const getPointsEarnedToday = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return { earned: 0, cap: 10, isCapped: false, isPremium: false };
+      return {
+        earned: 0,
+        checkInPoints: 0,
+        challengeCompleted: false,
+        cap: 10,
+        isCapped: false,
+        isPremium: false,
+      };
     }
 
     const user = await ctx.db.get(userId);
@@ -1009,12 +1538,42 @@ export const getPointsEarnedToday = query({
 
     const isPremium = (user?.isPremium ?? false) || (user?.isAdmin ?? false);
 
-    const dailyCap = await getDailyPointsCap(ctx);
-
-    const earned = await getDailyPointsEarned(ctx, userId, todayStr);
+    const [dailyCap, earned, completions, activities] = await Promise.all([
+      getDailyPointsCap(ctx),
+      getDailyPointsEarned(ctx, userId, todayStr),
+      ctx.db
+        .query('challengeCompletions')
+        .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+        .filter((q) => q.neq(q.field('removed'), true))
+        .collect(),
+      ctx.db
+        .query('dailyActivities')
+        .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+        .filter((q) =>
+          q.or(q.eq(q.field('synced'), true), q.eq(q.field('reviewStatus'), 'approved'))
+        )
+        .collect(),
+    ]);
+    const completedChallenges = await Promise.all(
+      completions.map((completion) => ctx.db.get(completion.challengeId))
+    );
+    const workoutPoints = completions.reduce(
+      (sum, completion, index) =>
+        completedChallenges[index]?.type === 'check_in' ? sum + completion.pointsEarned : sum,
+      0
+    );
+    const habitPoints = activities.reduce(
+      (sum, activity) =>
+        activity.loggedActivityKey ? sum + (activity.displayTotalPoints ?? 0) : sum,
+      0
+    );
 
     return {
       earned,
+      checkInPoints: workoutPoints + habitPoints,
+      challengeCompleted: completedChallenges.some(
+        (challenge) => challenge !== null && challenge.type !== 'check_in'
+      ),
       cap: dailyCap,
       isCapped: !isPremium && earned >= dailyCap,
       isPremium,
@@ -1052,7 +1611,16 @@ export const getChallengeProgress = query({
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
 
-    const dailyCompletionCount = todayCompletions.length;
+    const selectedChallenge = await ctx.db.get(args.challengeId);
+    let dailyCompletionCount = todayCompletions.length;
+
+    if (selectedChallenge?.isCommunityChallenge) {
+      dailyCompletionCount = 0;
+      for (const completion of todayCompletions) {
+        const completedChallenge = await ctx.db.get(completion.challengeId);
+        if (completedChallenge?.isCommunityChallenge) dailyCompletionCount += 1;
+      }
+    }
 
     const completions = await ctx.db
       .query('challengeCompletions')

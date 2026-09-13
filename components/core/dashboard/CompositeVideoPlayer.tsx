@@ -111,7 +111,7 @@ export default function CompositeVideoPlayer({
           left: 10,
           bottom: 10,
           zIndex: 10,
-          borderRadius: 999,
+          borderRadius: 12,
           backgroundColor: 'rgba(0, 0, 0, 0.65)',
           paddingHorizontal: 11,
           paddingVertical: 6,

@@ -265,16 +265,7 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
               className="flex-1 flex-col items-center rounded-card bg-[#FFE6DA] px-4 py-3"
               onPress={() => setShowMissionLeftDaysCountAlertDialog(true)}
               style={{
-                ...(Platform.OS === 'ios'
-                  ? {
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 4,
-                    }
-                  : {
-                      elevation: 3,
-                    }),
+                ...(Platform.OS === 'ios' ? {} : {}),
               }}>
               <View className="flex-col items-center gap-y-2">
                 <View>
@@ -286,18 +277,11 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
                   <View
                     style={{
                       backgroundColor: 'transparent',
-                      borderRadius: 50,
-                      ...(Platform.OS === 'ios'
-                        ? {
-                            shadowColor: colors.primary,
-                            shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 30,
-                          }
-                        : {}),
+                      borderRadius: 12,
+                      ...(Platform.OS === 'ios' ? {} : {}),
                     }}>
                     <Text
-                      className="font-heading text-4xl font-extrabold leading-tight"
+                      className="font-heading text-4xl font-semibold leading-tight"
                       style={{
                         color: '#FF5C1A',
                         textAlign: 'center',
@@ -317,16 +301,7 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
               className="flex-1 flex-col items-center rounded-card bg-[#FFE6DA] px-4 py-3"
               onPress={() => setShowPointsAlertDialog(true)}
               style={{
-                ...(Platform.OS === 'ios'
-                  ? {
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 4,
-                    }
-                  : {
-                      elevation: 3,
-                    }),
+                ...(Platform.OS === 'ios' ? {} : {}),
               }}>
               <View className="flex-col items-center gap-y-2">
                 <View>
@@ -338,18 +313,11 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
                   <View
                     style={{
                       backgroundColor: 'transparent',
-                      borderRadius: 50,
-                      ...(Platform.OS === 'ios'
-                        ? {
-                            shadowColor: colors.primary,
-                            shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 30,
-                          }
-                        : {}),
+                      borderRadius: 12,
+                      ...(Platform.OS === 'ios' ? {} : {}),
                     }}>
                     <Text
-                      className="font-heading text-4xl font-extrabold leading-tight"
+                      className="font-heading text-4xl font-semibold leading-tight"
                       style={{
                         color: '#FF5C1A',
                         textAlign: 'center',
@@ -380,21 +348,12 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
         <View className="mt-4">
           <TouchableOpacity
             onPress={() => setShowCheckInAlertDialog(true)}
-            className="border-1 rounded-card border-[#EEEAE5] bg-white px-4 py-4"
+            className="rounded-card bg-white px-4 py-4"
             style={{
-              ...(Platform.OS === 'ios'
-                ? {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 4,
-                  }
-                : {
-                    elevation: 3,
-                  }),
+              ...(Platform.OS === 'ios' ? {} : {}),
             }}>
             <View className="h-14 flex-row items-center gap-x-4">
-              <View className="h-14 w-14 flex-row items-center justify-center rounded-2xl bg-[#EEEAE5] p-2">
+              <View className="h-14 w-14 flex-row items-center justify-center rounded-xl bg-[#EEEAE5] p-2">
                 <Icon.CheckFat weight="fill" color="#FF5C1A" />
               </View>
               <View className="flex-1 flex-row items-center justify-between">
@@ -411,21 +370,12 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowStepsAlertDialog(true)}
-            className="border-1 mt-4 rounded-card border-[#EEEAE5] bg-white px-4 py-4"
+            className="mt-4 rounded-card bg-white px-4 py-4"
             style={{
-              ...(Platform.OS === 'ios'
-                ? {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 4,
-                  }
-                : {
-                    elevation: 3,
-                  }),
+              ...(Platform.OS === 'ios' ? {} : {}),
             }}>
             <View className="h-14 flex-row items-center gap-x-4">
-              <View className="h-14 w-14 flex-row items-center justify-center rounded-2xl bg-[#EEEAE5] p-2">
+              <View className="h-14 w-14 flex-row items-center justify-center rounded-xl bg-[#EEEAE5] p-2">
                 <Icon.Footprints weight="fill" color="#FF5C1A" />
               </View>
               <View className="flex-1 flex-row items-center justify-between">
@@ -445,21 +395,12 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowSweatAlertDialog(true)}
-            className="border-1 mt-4 rounded-card border-[#EEEAE5] bg-white px-4 py-4"
+            className="mt-4 rounded-card bg-white px-4 py-4"
             style={{
-              ...(Platform.OS === 'ios'
-                ? {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 4,
-                  }
-                : {
-                    elevation: 3,
-                  }),
+              ...(Platform.OS === 'ios' ? {} : {}),
             }}>
             <View className="h-14 flex-row items-center gap-x-4">
-              <View className="h-14 w-14 flex-row items-center justify-center rounded-2xl bg-[#EEEAE5] p-2">
+              <View className="h-14 w-14 flex-row items-center justify-center rounded-xl bg-[#EEEAE5] p-2">
                 <Icon.Drop weight="fill" color="#FF5C1A" />
               </View>
               <View className="flex-1 flex-row items-center justify-between">
@@ -479,21 +420,12 @@ const MyCard = ({ refreshKey }: { refreshKey: number }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowMissionAlertDialog(true)}
-            className="border-1 mt-4 rounded-card border-[#EEEAE5] bg-white px-4 py-4"
+            className="mt-4 rounded-card bg-white px-4 py-4"
             style={{
-              ...(Platform.OS === 'ios'
-                ? {
-                    shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 4,
-                  }
-                : {
-                    elevation: 3,
-                  }),
+              ...(Platform.OS === 'ios' ? {} : {}),
             }}>
             <View className="h-14 flex-row items-center gap-x-4">
-              <View className="h-14 w-14 flex-row items-center justify-center rounded-2xl bg-[#EEEAE5] p-2">
+              <View className="h-14 w-14 flex-row items-center justify-center rounded-xl bg-[#EEEAE5] p-2">
                 <Icon.Target weight="bold" color="#FF5C1A" />
               </View>
               <View className="flex-1 flex-row items-center justify-between">
@@ -649,7 +581,7 @@ export const MyCardAlertDialog = ({
                 )}
               </>
             ) : null}
-            <Text className="font-heading font-bold" size="2xl">
+            <Text className="font-heading font-semibold" size="2xl">
               {title}
             </Text>
           </View>
@@ -665,7 +597,7 @@ export const MyCardAlertDialog = ({
               variant="solid"
               size="xl"
               action="primary"
-              className="h-16 w-full rounded-2xl"
+              className="h-16 w-full rounded-lg"
               onPress={() => {
                 handlePrimaryButtonPress?.();
                 handleClose();
@@ -678,7 +610,7 @@ export const MyCardAlertDialog = ({
                 variant="outline"
                 size="xl"
                 action="negative"
-                className="h-16 w-full rounded-2xl"
+                className="h-16 w-full rounded-lg"
                 onPress={handleClose}>
                 <ButtonText className="text-xl font-bold text-red-500">
                   {secondaryButtonText}

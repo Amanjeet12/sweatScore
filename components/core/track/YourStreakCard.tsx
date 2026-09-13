@@ -30,7 +30,7 @@ export default function YourStreakCard({
   return (
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       {/* Title */}
-      <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Streak</Text>
+      <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Streak</Text>
 
       {/* Big fire icon with current streak number */}
       <View className="mt-4 items-center">
@@ -53,13 +53,13 @@ export default function YourStreakCard({
               paddingTop: 24,
             }}>
             <Text
-              className="font-heading font-bold text-white"
+              className="font-heading font-semibold text-white"
               style={{ fontSize: 24, lineHeight: 26 }}>
               {currentWeeklyStreak}
             </Text>
           </View>
         </View>
-        <Text className="mt-2 font-heading text-lg font-bold text-[#1A1A1A]">
+        <Text className="mt-2 font-heading text-lg font-semibold text-[#1A1A1A]">
           Current weekly streak
         </Text>
       </View>
@@ -107,7 +107,7 @@ export default function YourStreakCard({
         <>
           <View className="mt-4 h-px bg-[#EFEAE4]" />
           <View
-            className="mt-4 flex-row items-center justify-between rounded-2xl px-4 py-3"
+            className="mt-4 flex-row items-center justify-between rounded-xl px-4 py-3"
             style={{ backgroundColor: '#FFF1E6', borderWidth: 1, borderColor: '#FFD0B5' }}>
             <View className="flex-row items-center gap-x-3">
               <Image
@@ -116,17 +116,17 @@ export default function YourStreakCard({
                 contentFit="contain"
               />
               <View>
-                <Text className="font-heading text-base font-bold text-primary-500">
+                <Text className="font-heading text-base font-semibold text-primary-500">
                   Longest Streak
                 </Text>
                 <Text className="font-body text-sm text-[#5A5A5A]">Your personal best</Text>
               </View>
             </View>
             <View className="flex-row items-baseline gap-x-1">
-              <Text className="font-heading text-3xl font-bold text-primary-500">
+              <Text className="font-heading text-3xl font-semibold text-primary-500">
                 {longestWeeklyStreak}
               </Text>
-              <Text className="font-heading text-sm font-bold text-primary-500">WKS</Text>
+              <Text className="font-heading text-sm font-semibold text-primary-500">WKS</Text>
             </View>
           </View>
         </>

@@ -21,8 +21,8 @@ export default function YourMovesCard() {
 
   return (
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
-      <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Journey</Text>
-      <Text className=" pt-1 font-body text-sm text-[#838383]">
+      <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Journey</Text>
+      <Text className="pt-1 font-body text-sm text-[#838383]">
         Your videos will be saved for 30 days
       </Text>
       {cardEmpty ? (
@@ -94,10 +94,10 @@ export default function YourMovesCard() {
             <View>
               <Text className="mt-4 font-body text-base text-[#5A5A5A]">Earlier this month</Text>
               <View className="items-center py-4">
-                <View className="items-center justify-center rounded-full bg-[#1A1A1A] px-4 py-1.5">
+                <View className="items-center justify-center rounded-lg bg-[#1A1A1A] px-4 py-1.5">
                   <Text className="font-body text-sm font-semibold text-white">Pro</Text>
                 </View>
-                <Text className="mt-3 text-center font-heading text-lg font-bold text-[#1A1A1A]">
+                <Text className="mt-3 text-center font-heading text-lg font-semibold text-[#1A1A1A]">
                   You&apos;ve moved. Now own it.
                 </Text>
                 <TouchableOpacity

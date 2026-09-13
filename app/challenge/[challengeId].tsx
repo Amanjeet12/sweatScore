@@ -96,7 +96,7 @@ export default function EditChallenge() {
         <ScreenLoading />
       ) : (
         <View className="flex-1">
-          <Text className="mb-2 mt-4 text-center font-heading text-3xl font-bold text-[#1A1A1A]">
+          <Text className="mb-2 mt-4 text-center font-heading text-3xl font-semibold text-[#1A1A1A]">
             Edit Challenge
           </Text>
 
@@ -116,7 +116,7 @@ export default function EditChallenge() {
                 variant="outline"
                 size="lg"
                 action={challenge.isPublished ? 'secondary' : 'primary'}
-                className="h-14 w-full rounded-2xl"
+                className="h-14 w-full rounded-lg"
                 onPress={handleTogglePublish}>
                 <ButtonText>{challenge.isPublished ? 'Unpublish' : 'Publish'}</ButtonText>
               </LoadingButton>
@@ -126,7 +126,7 @@ export default function EditChallenge() {
                 variant="outline"
                 size="lg"
                 action="negative"
-                className="h-14 w-full rounded-2xl"
+                className="h-14 w-full rounded-lg"
                 onPress={handleDelete}
                 loading={isDeleting}
                 disabled={isDeleting}>

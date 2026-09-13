@@ -36,9 +36,9 @@ export const OffSyncWarningModal = ({
   return (
     <AlertDialog isOpen={showAlertDialog} onClose={handleDismiss} size="md" useRNModal>
       <AlertDialogBackdrop />
-      <AlertDialogContent className="rounded-3xl p-8">
+      <AlertDialogContent className="rounded-xl p-8">
         <AlertDialogHeader>
-          <Text className="font-heading font-bold" size="2xl">
+          <Text className="font-heading font-semibold" size="2xl">
             Your preview might look slightly off sync
           </Text>
         </AlertDialogHeader>
@@ -68,7 +68,7 @@ export const OffSyncWarningModal = ({
               variant="solid"
               size="xl"
               action="primary"
-              className="h-16 w-full rounded-2xl"
+              className="h-16 w-full rounded-lg"
               onPress={handleDismiss}>
               <ButtonText className="text-xl font-bold text-white">Got It!</ButtonText>
             </Button>

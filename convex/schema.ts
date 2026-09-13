@@ -249,6 +249,14 @@ const schema = defineSchema({
     // Deprecated compatibility field; new writes use checkInCategoryId only.
     checkInCategoryIds: v.optional(v.array(v.id('checkInCategories'))),
     dailyChallengeType: v.optional(v.union(v.literal('challenge'), v.literal('check_in'))),
+    // Community challenge fields. These remain optional so historical
+    // 30-day challenges and their completions continue to resolve unchanged.
+    isCommunityChallenge: v.optional(v.boolean()),
+    startDate: v.optional(v.string()), // YYYY-MM-DD in Europe/London
+    durationDays: v.optional(v.number()),
+    outputType: v.optional(v.union(v.literal('single_video'), v.literal('side_by_side'))),
+    completionBankPoints: v.optional(v.number()),
+    participantCount: v.optional(v.number()),
   })
     .index('by_daily_challenge', ['isDailyChallenge'])
     .index('by_published', ['isPublished'])
@@ -301,6 +309,8 @@ const schema = defineSchema({
     caption: v.optional(v.string()),
     removed: v.optional(v.boolean()),
     dailyWindowStartAt: v.optional(v.number()),
+    communityChallengeDay: v.optional(v.number()),
+    completionBankPointsEarned: v.optional(v.number()),
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user_challenge_date', ['userId', 'challengeId', 'date'])
@@ -308,6 +318,19 @@ const schema = defineSchema({
     .index('by_date', ['date'])
     .index('by_user_challenge_window', ['userId', 'challengeId', 'dailyWindowStartAt'])
     .index('by_user', ['userId']),
+
+  challengeParticipants: defineTable({
+    challengeId: v.id('challenges'),
+    userId: v.id('users'),
+    joinedAt: v.number(),
+    joinedDate: v.string(),
+    bankEligibleAtJoin: v.boolean(),
+    completionBankAwarded: v.boolean(),
+    completionBankAwardedAt: v.optional(v.number()),
+  })
+    .index('by_challenge', ['challengeId'])
+    .index('by_user', ['userId'])
+    .index('by_user_challenge', ['userId', 'challengeId']),
 
   userMilestones: defineTable({
     userId: v.id('users'),
@@ -383,6 +406,16 @@ const schema = defineSchema({
     lastActiveDate: v.optional(v.string()),
     updatedAt: v.number(),
   }).index('by_user', ['userId']),
+  progressPhotos: defineTable({
+    userId: v.id('users'),
+    // Monday in the member's timezone. One private entry is allowed per week.
+    weekStart: v.string(),
+    frontPhoto: v.id('_storage'),
+    sidePhoto: v.optional(v.id('_storage')),
+    createdAt: v.number(),
+  })
+    .index('by_user_week', ['userId', 'weekStart'])
+    .index('by_user', ['userId']),
   appVersionConfig: defineTable({
     platform: v.union(v.literal('ios'), v.literal('android')),
     latestVersion: v.string(),

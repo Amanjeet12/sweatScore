@@ -276,7 +276,7 @@ export default function AddNewActivity() {
           <View className="flex-1 justify-start px-6">
             <FullLogo className="h-8 w-48" />
             <View className="mt-4">
-              <Text className="mb-2 text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+              <Text className="mb-2 text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
                 Log activity
               </Text>
               <View className="mb-2 flex-col items-center justify-center gap-y-2">
@@ -391,7 +391,7 @@ export default function AddNewActivity() {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      className="flex-row items-center gap-x-2 rounded-lg border border-gray-200 p-4"
+                      className="flex-row items-center gap-x-2 rounded-lg   p-4"
                       onPress={selectImage}>
                       <ImageSquare size={32} weight="duotone" color={colors.primary} />
                       <Text className="font-semibold text-gray-500">
@@ -412,7 +412,7 @@ export default function AddNewActivity() {
                     variant="solid"
                     size="xl"
                     action="primary"
-                    className="h-16 w-full rounded-3xl"
+                    className="h-16 w-full rounded-lg"
                     onPress={handleSubmit}
                     disabled={isLoading || mediaLoading || uploadingMedia}
                     loading={isLoading}>

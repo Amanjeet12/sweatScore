@@ -248,7 +248,7 @@ export default function AchievementPopupManager({
       <View
         accessibilityViewIsModal
         className="flex-1 items-center justify-center bg-black/40 px-5">
-        <View className="relative w-full rounded-[28px] bg-white px-6 pb-6 pt-7">
+        <View className="relative w-full rounded-xl bg-white px-6 pb-6 pt-7">
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Close achievement popup"
@@ -262,11 +262,11 @@ export default function AchievementPopupManager({
 
           <Text className="text-center text-[52px] leading-[62px]">{activePopup.icon}</Text>
 
-          <Text className="mt-1 text-center font-heading text-2xl font-bold text-[#202020]">
+          <Text className="mt-1 text-center font-heading text-2xl font-semibold text-[#202020]">
             {activePopup.title}
           </Text>
 
-          <Text className="mt-5 text-center font-heading text-base font-extrabold text-primary-500">
+          <Text className="mt-5 text-center font-heading text-base font-semibold text-primary-500">
             {activePopup.highlight}
           </Text>
 
@@ -281,7 +281,7 @@ export default function AchievementPopupManager({
               void handleShare();
             }}
             className="mt-8 h-14 items-center justify-center rounded-full bg-primary-500">
-            <Text className="font-heading text-base font-bold text-white">
+            <Text className="font-heading text-base font-semibold text-white">
               {activePopup.buttonText}
             </Text>
           </TouchableOpacity>

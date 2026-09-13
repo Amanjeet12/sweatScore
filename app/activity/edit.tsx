@@ -313,7 +313,7 @@ export default function EditActivity() {
             <View className="flex-1 justify-start px-6">
               <FullLogo className="h-8 w-48" />
               <View className="mt-4">
-                <Text className="mb-2 text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+                <Text className="mb-2 text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
                   Update or delete activity
                 </Text>
                 <Text className="mb-2 text-center text-xl font-bold text-black">
@@ -389,7 +389,7 @@ export default function EditActivity() {
                       </View>
                     ) : (
                       <TouchableOpacity
-                        className="flex-row items-center gap-x-2 rounded-lg border border-gray-200 p-4"
+                        className="flex-row items-center gap-x-2 rounded-lg   p-4"
                         onPress={selectImage}>
                         <ImageSquare size={32} weight="duotone" color={colors.primary} />
                         <Text className="font-semibold text-gray-500">
@@ -410,7 +410,7 @@ export default function EditActivity() {
                       variant="solid"
                       size="xl"
                       action="primary"
-                      className="h-16 w-full rounded-3xl"
+                      className="h-16 w-full rounded-lg"
                       onPress={handleSubmit}
                       disabled={isLoading || mediaLoading || uploadingMedia}
                       loading={isLoading}>
@@ -426,7 +426,7 @@ export default function EditActivity() {
                         variant="outline"
                         size="xl"
                         action="negative"
-                        className="h-16 w-full rounded-3xl"
+                        className="h-16 w-full rounded-lg"
                         onPress={handleDelete}
                         disabled={isLoading || mediaLoading || uploadingMedia}
                         loading={isLoading}>

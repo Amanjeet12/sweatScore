@@ -30,23 +30,18 @@ export function OnboardingPrimaryButton({
       style={{
         height: 56,
         backgroundColor: '#FF5C1A',
-        borderRadius: 17,
+        borderRadius: 12,
         paddingHorizontal: 22,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         opacity: isDisabled ? 0.72 : 1,
-        shadowColor: '#FF5C1A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 14,
-        elevation: 4,
       }}>
       {isLoading ? (
         <ActivityIndicator color="#FFFFFF" style={{ flex: 1 }} />
       ) : (
         <>
-          <Text className="font-heading text-base font-bold text-white">{label}</Text>
+          <Text className="font-heading text-base font-semibold text-white">{label}</Text>
           <Feather name="arrow-right" size={23} color="#FFFFFF" />
         </>
       )}

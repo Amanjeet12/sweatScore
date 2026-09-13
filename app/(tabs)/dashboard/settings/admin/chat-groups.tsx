@@ -418,7 +418,7 @@ export default function AdminChatGroupsScreen() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Chat Groups
             </Text>
           ),
@@ -443,7 +443,7 @@ export default function AdminChatGroupsScreen() {
             Create groups, upload their images, add members, or edit group details.
           </Text>
 
-          <View className="mt-5 flex-row rounded-2xl bg-neutral-100 p-1">
+          <View className="mt-5 flex-row rounded-xl bg-neutral-100 p-1">
             <ModeButton
               active={mode === 'create'}
               icon="add-circle-outline"
@@ -494,7 +494,7 @@ export default function AdminChatGroupsScreen() {
 
                 <View className="ml-4 flex-1">
                   <TouchableOpacity
-                    className="self-start rounded-xl bg-orange-500 px-4 py-2.5"
+                    className="self-start rounded-lg bg-orange-500 px-4 py-2.5"
                     disabled={isSubmitting}
                     onPress={pickGroupImage}>
                     <Text className="font-semibold text-white">
@@ -519,7 +519,7 @@ export default function AdminChatGroupsScreen() {
 
               <Text className="mb-2 mt-5 text-sm font-semibold text-neutral-800">Group name</Text>
               <TextInput
-                className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
+                className="rounded-xl border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
                 editable={!isSubmitting}
                 maxLength={60}
                 placeholder="Example: Morning Warriors"
@@ -532,7 +532,7 @@ export default function AdminChatGroupsScreen() {
                 Group description
               </Text>
               <TextInput
-                className="min-h-28 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
+                className="min-h-28 rounded-xl border-neutral-200 bg-white px-4 py-3 text-base text-neutral-900"
                 editable={!isSubmitting}
                 maxLength={500}
                 multiline
@@ -571,7 +571,7 @@ export default function AdminChatGroupsScreen() {
 
           {mode === 'edit' && selectedGroup ? (
             <TouchableOpacity
-              className={`mt-6 flex-row items-center justify-center rounded-2xl border border-red-200 py-4 ${
+              className={`mt-6 flex-row items-center justify-center rounded-xl  border-red-200 py-4 ${
                 selectedGroup.canDelete ? 'bg-red-50' : 'bg-neutral-100'
               }`}
               disabled={isSubmitting}
@@ -593,7 +593,7 @@ export default function AdminChatGroupsScreen() {
 
         <View className="border-t border-neutral-100 bg-white px-4 pb-3 pt-3">
           <TouchableOpacity
-            className={`items-center rounded-2xl py-4 ${
+            className={`items-center rounded-xl py-4 ${
               isSubmitting ? 'bg-orange-300' : 'bg-orange-500'
             }`}
             disabled={isSubmitting || (mode !== 'create' && !selectedGroupId)}
@@ -654,8 +654,8 @@ function GroupSelector({
             return (
               <TouchableOpacity
                 key={group._id}
-                className={`min-w-40 flex-row items-center rounded-2xl border px-3 py-3 ${
-                  selected ? 'border-orange-500 bg-orange-50' : 'border-neutral-200 bg-white'
+                className={`min-w-40 flex-row items-center rounded-lg  px-3 py-3 ${
+                  selected ? ' bg-orange-50' : ' bg-white'
                 }`}
                 onPress={() => onSelect(group._id)}>
                 {group.imageUrl ? (
@@ -685,7 +685,7 @@ function GroupSelector({
           })}
         </ScrollView>
       ) : (
-        <View className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-6">
+        <View className="rounded-xl  bg-neutral-50 px-4 py-6">
           <Text className="text-center text-neutral-500">No active groups found.</Text>
         </View>
       )}
@@ -721,14 +721,14 @@ function MemberPicker({
       <Text className="mt-0.5 text-xs text-neutral-500">{selectedUserIds.length} selected</Text>
 
       <TextInput
-        className="mt-3 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900"
+        className="mt-3 rounded-xl border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900"
         placeholder="Search by name or email"
         placeholderTextColor="#A3A3A3"
         value={search}
         onChangeText={onSearchChange}
       />
 
-      <View className="mt-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+      <View className="mt-3 overflow-hidden rounded-xl  bg-white">
         {users.map((user, index) => {
           const selected = selectedUserIds.some((userId) => userId === user._id);
           const disabled = mode === 'add' && user.isMember;
@@ -789,7 +789,7 @@ function ModeButton({
 }) {
   return (
     <TouchableOpacity
-      className={`flex-1 items-center rounded-xl py-2.5 ${active ? 'bg-white' : 'bg-transparent'}`}
+      className={`flex-1 items-center rounded-lg py-2.5 ${active ? 'bg-white' : 'bg-transparent'}`}
       onPress={onPress}>
       <Ionicons name={icon} size={19} color={active ? '#EA580C' : '#737373'} />
       <Text

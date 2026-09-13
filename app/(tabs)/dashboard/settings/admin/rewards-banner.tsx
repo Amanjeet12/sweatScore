@@ -166,7 +166,7 @@ export default function AdminViewRewardsBanner() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Rewards Banner
             </Text>
           ),
@@ -250,7 +250,7 @@ export default function AdminViewRewardsBanner() {
                                 />
                               </View>
                             ) : (
-                              <View className="flex h-40 w-full items-center justify-center rounded-3xl bg-gray-200">
+                              <View className="flex h-40 w-full items-center justify-center rounded-xl bg-gray-200">
                                 <Text className="text-xl font-bold text-gray-500">
                                   No banner uploaded
                                 </Text>
@@ -265,7 +265,7 @@ export default function AdminViewRewardsBanner() {
 
                 {/* Challenge Title */}
                 <View className="mb-2">
-                  <Text className="mb-1 font-heading text-base font-bold text-[#1A1A1A]">
+                  <Text className="mb-1 font-heading text-base font-semibold text-[#1A1A1A]">
                     Challenge Title
                   </Text>
                   <Input size="xl" variant="rounded">
@@ -279,7 +279,7 @@ export default function AdminViewRewardsBanner() {
 
                 {/* Target Points */}
                 <View className="mb-2">
-                  <Text className="mb-1 font-heading text-base font-bold text-[#1A1A1A]">
+                  <Text className="mb-1 font-heading text-base font-semibold text-[#1A1A1A]">
                     Target Points
                   </Text>
                   <Input size="xl" variant="rounded">
@@ -296,7 +296,7 @@ export default function AdminViewRewardsBanner() {
                   variant="solid"
                   size="xl"
                   action="primary"
-                  className={cn('h-16 w-full rounded-3xl bg-primary-500')}
+                  className={cn('h-16 w-full rounded-lg bg-primary-500')}
                   disabled={uploadingMedia || mediaLoading}
                   loading={uploadingMedia || mediaLoading}
                   onPress={selectImage}>

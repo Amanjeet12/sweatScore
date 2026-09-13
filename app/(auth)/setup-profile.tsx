@@ -208,10 +208,6 @@ export default function SetupProfile() {
               marginTop: -30,
               borderTopLeftRadius: 32,
               borderTopRightRadius: 32,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: -5 },
-              shadowOpacity: 0.05,
-              shadowRadius: 12,
             }}>
             <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
               {!keyboardVisible && (
@@ -219,7 +215,7 @@ export default function SetupProfile() {
                   <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
                     Make it yours
                   </Text>
-                  <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+                  <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
                     Personalise your profile
                   </Text>
                   <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
@@ -232,13 +228,13 @@ export default function SetupProfile() {
                 accessibilityRole="button"
                 activeOpacity={0.75}
                 onPress={selectImage}
-                className={`${keyboardVisible ? 'mt-0' : 'mt-3'} h-[68px] flex-row items-center rounded-2xl border border-[#E8DDD6] bg-[#FFF9F6] px-3`}>
+                className={`${keyboardVisible ? 'mt-0' : 'mt-3'} h-[68px] flex-row items-center rounded-xl   bg-[#FFF9F6] px-3`}>
                 <View>
                   {hasAvatar ? (
                     <Avatar uri={avatarUri} size={48} name={name} />
                   ) : (
                     <View className="h-12 w-12 items-center justify-center rounded-full bg-[#FFF0E8]">
-                      <Text className="font-heading text-sm font-bold text-primary-500">
+                      <Text className="font-heading text-sm font-semibold text-primary-500">
                         {initials}
                       </Text>
                     </View>
@@ -261,10 +257,7 @@ export default function SetupProfile() {
               <Text className="mb-2 mt-3 font-body text-xs font-bold text-[#4A4745]">
                 Your name
               </Text>
-              <Input
-                size="xl"
-                variant="outline"
-                className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+              <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
                 <InputField
                   className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
                   placeholder="How should we call you?"
@@ -282,10 +275,7 @@ export default function SetupProfile() {
                 Date of birth
               </Text>
               {Platform.OS === 'ios' ? (
-                <Input
-                  size="xl"
-                  variant="outline"
-                  className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+                <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
                   <InputField
                     className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
                     placeholder="DD / MM / YYYY"
@@ -298,10 +288,7 @@ export default function SetupProfile() {
                   </InputSlot>
                 </Input>
               ) : (
-                <Input
-                  size="xl"
-                  variant="outline"
-                  className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+                <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
                   <TouchableOpacity
                     className="flex-1"
                     onPress={() =>
@@ -379,12 +366,12 @@ export default function SetupProfile() {
                 variant="solid"
                 action="primary"
                 size="xl"
-                className="h-14 rounded-[17px]"
+                className="h-14 rounded-lg"
                 onPress={() => {
                   setBirthdate(date);
                   setShowDatePicker(false);
                 }}>
-                <ButtonText className="font-heading text-base font-bold text-white">
+                <ButtonText className="font-heading text-base font-semibold text-white">
                   Confirm
                 </ButtonText>
               </Button>

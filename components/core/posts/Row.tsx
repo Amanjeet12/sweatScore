@@ -41,7 +41,7 @@ import { colors } from '~/utils/constants';
 import { formatDistanceToNow, intToString } from '~/utils/formatter';
 import { buildCaption } from '~/utils/share';
 
-type PostWithUser = {
+export type PostWithUser = {
   _id: Id<'posts'>;
   userId: Id<'users'>;
   createdAt: number;
@@ -59,12 +59,12 @@ type PostWithUser = {
   user: {
     name: string;
     image: Id<'_storage'> | undefined;
-    imageUrl: string | undefined;
+    imageUrl?: string;
     isAuthor: boolean;
     isAdmin: boolean;
     hasHit500: boolean;
   };
-  mediaUrl: string | undefined;
+  mediaUrl?: string;
   mediaType?: string;
   mediaThumbnailUrl?: string;
   challengeId?: string;
@@ -75,6 +75,7 @@ type PostWithUser = {
     compositeVideoUrl?: string;
     thumbnailUrl?: string;
     allowRepost?: boolean;
+    isCheckIn?: boolean;
   };
 };
 
@@ -281,9 +282,11 @@ function ChallengeVideoPlayer({
 export default function PostRow({
   post,
   menuMarginTop = 25,
+  isFeatured = false,
 }: {
   post: PostWithUser;
   menuMarginTop?: number;
+  isFeatured?: boolean;
 }) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const { requireSubscription } = useSubscriptionGuard();
@@ -308,7 +311,6 @@ export default function PostRow({
   const [blockReason, setBlockReason] = useState<string | null>(null);
 
   // Optimistic update state
-  const [optimisticLikeCount, setOptimisticLikeCount] = useState(post.likeCount);
   const [optimisticIsLiked, setOptimisticIsLiked] = useState(post.isLiked);
   const [optimisticHeartCount, setOptimisticHeartCount] = useState(post.heartLikesCount);
   const [optimisticFireCount, setOptimisticFireCount] = useState(post.fireLikesCount);
@@ -320,12 +322,12 @@ export default function PostRow({
   const unlikePost = useMutation(api.posts.unlikePost);
   const deletePost = useMutation(api.posts.deletePost);
   const pinPost = useMutation(api.posts.pinPost);
+  const unpinPost = useMutation(api.posts.unpinPost);
   const reportPost = useMutation(api.posts.reportPost);
   const blockUser = useMutation(api.posts.blockUser);
 
   // Sync optimistic state with server state when post data updates
   useEffect(() => {
-    setOptimisticLikeCount(post.likeCount);
     setOptimisticIsLiked(post.isLiked);
     setOptimisticHeartCount(post.heartLikesCount);
     setOptimisticFireCount(post.fireLikesCount);
@@ -344,7 +346,6 @@ export default function PostRow({
     setShowReactionPicker(false);
 
     // Optimistic update
-    setOptimisticLikeCount((prev) => prev + 1);
     setOptimisticIsLiked(true);
 
     // Update individual reaction counts
@@ -360,7 +361,6 @@ export default function PostRow({
 
     // Revert on error
     if (err) {
-      setOptimisticLikeCount((prev) => prev - 1);
       setOptimisticIsLiked(false);
 
       // Revert individual reaction counts
@@ -384,14 +384,12 @@ export default function PostRow({
       setIsLoading(true);
 
       // Optimistic update
-      setOptimisticLikeCount((prev) => prev - 1);
       setOptimisticIsLiked(false);
 
       const [err] = await CatchPromise(unlikePost({ postId: post._id }));
 
       // Revert on error
       if (err) {
-        setOptimisticLikeCount((prev) => prev + 1);
         setOptimisticIsLiked(true);
       }
 
@@ -451,6 +449,14 @@ export default function PostRow({
     setIsLoading(false);
   };
 
+  const handleUnpinPost = async () => {
+    if (!requireSubscription({ source: 'community_unpin_post' })) return;
+    setIsLoading(true);
+    const [err] = await CatchPromise(unpinPost({ postId: post._id }));
+    if (!err) Alert.alert('Success', 'Post has been unpinned.');
+    setIsLoading(false);
+  };
+
   const handleReportPost = () => {
     setShowReportModal(true);
   };
@@ -460,16 +466,22 @@ export default function PostRow({
   };
 
   const handleSharePost = async () => {
-    if (!post.challenge?.compositeVideoUrl || mediaBusy) return;
+    if (mediaBusy) return;
     setSharing(true);
     try {
-      const localUri = FileSystem.cacheDirectory + 'share_video_' + Date.now() + '.mp4';
-      await FileSystem.downloadAsync(post.challenge.compositeVideoUrl, localUri);
-      await Share.open({
-        url: localUri,
-        message: buildCaption(post.body ?? ''),
-        type: 'video/mp4',
-      });
+      if (post.challenge?.compositeVideoUrl) {
+        const localUri = FileSystem.cacheDirectory + 'share_video_' + Date.now() + '.mp4';
+        await FileSystem.downloadAsync(post.challenge.compositeVideoUrl, localUri);
+        await Share.open({
+          url: localUri,
+          message: buildCaption(post.body ?? ''),
+          type: 'video/mp4',
+        });
+      } else {
+        await Share.open({
+          message: [buildCaption(post.body ?? ''), post.mediaUrl].filter(Boolean).join('\n\n'),
+        });
+      }
     } catch {
       // User cancelled or error
     }
@@ -544,253 +556,308 @@ export default function PostRow({
   };
 
   return (
-    <View className="border-b border-b-[#EEEAE5] bg-white px-4 py-4">
-      <View className="flex-row items-start gap-x-2">
-        <View>
-          <Avatar uri={post.user.imageUrl} size={46} showGoldBorder name={post?.user?.name} />
-        </View>
-        <View className="flex-1 flex-col">
-          <View className="flex-row justify-between gap-x-2">
-            <View className="flex-1">
-              <View className="flex-row items-center gap-x-1">
-                <Text className="text-lg" style={{ fontFamily: 'Inter_700Bold' }}>
-                  {post.user.name}
+    <View className="mx-4 mb-4 rounded-[24px]">
+      <View className="overflow-hidden rounded-[24px] bg-white px-4 pb-3 pt-4">
+        <View className="flex-row items-start gap-x-3">
+          <View>
+            <Avatar uri={post.user.imageUrl} size={40} name={post?.user?.name} />
+          </View>
+          <View className="flex-1 flex-col">
+            <View className="flex-row justify-between gap-x-2">
+              <View className="flex-1">
+                <View className="flex-row items-center gap-x-1">
+                  <Text
+                    style={{ fontFamily: 'Inter_600SemiBold' }}
+                    className="text-sm text-[#1A1A1A]">
+                    {post.user.name}
+                  </Text>
+                  {post.user.hasHit500 && (
+                    <ExpoImage
+                      source={require('~/assets/icons/500points.png')}
+                      style={{ width: 20, height: 20 }}
+                      contentFit="contain"
+                    />
+                  )}
+                </View>
+                <Text className="mt-0.5 font-body text-[10px] text-[#77716D]" numberOfLines={1}>
+                  {formatDistanceToNow(post.createdAt)} ·{' '}
+                  {post.challenge
+                    ? post.challenge.name
+                    : post.mediaType === 'image'
+                      ? 'Photo'
+                      : post.mediaType === 'video'
+                        ? 'Video'
+                        : 'Community'}
                 </Text>
-                {post.user.hasHit500 && (
-                  <ExpoImage
-                    source={require('~/assets/icons/500points.png')}
-                    style={{ width: 20, height: 20 }}
-                    contentFit="contain"
-                  />
-                )}
               </View>
-              <Text className="text-sm">
-                <Text className="text-[#1A1A1A]">
-                  {post.challenge ? post.challenge.name : 'Shared a post'}
-                </Text>
-                <Text className="text-[#838383]"> {formatDistanceToNow(post.createdAt)}</Text>
-              </Text>
-            </View>
 
-            {(post.user.isAuthor || currentUser?.isAdmin || !post.user.isAdmin) && (
-              <Menu>
-                <MenuTrigger>
-                  <Ionicons size={20} name="ellipsis-horizontal" color="black" />
-                </MenuTrigger>
-                <MenuOptions
-                  customStyles={{
-                    optionsContainer: {
-                      borderRadius: 12,
-                      padding: 8,
-                      marginTop: menuMarginTop,
-                    },
-                  }}>
-                  {post.user.isAuthor ? (
-                    <>
-                      <MenuOption onSelect={handleEditPost} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="pencil-outline" size={18} color="black" />
-                          <Text className="text-base text-black">Edit</Text>
-                        </View>
-                      </MenuOption>
-                      {currentUser?.isAdmin && (
-                        <MenuOption onSelect={handlePinPost} disabled={isLoading}>
+              {(post.user.isAuthor || currentUser?.isAdmin || !post.user.isAdmin) && (
+                <Menu>
+                  <MenuTrigger>
+                    <Ionicons size={20} name="ellipsis-horizontal" color="black" />
+                  </MenuTrigger>
+                  <MenuOptions
+                    customStyles={{
+                      optionsContainer: {
+                        borderRadius: 12,
+                        padding: 8,
+                        marginTop: menuMarginTop,
+                      },
+                    }}>
+                    {post.user.isAuthor ? (
+                      <>
+                        <MenuOption onSelect={handleEditPost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
-                            <Ionicons name="pin-outline" size={18} color="black" />
-                            <Text className="text-base text-black">Pin</Text>
+                            <Ionicons name="pencil-outline" size={18} color="black" />
+                            <Text className="text-base text-black">Edit</Text>
                           </View>
                         </MenuOption>
-                      )}
-                      {downloadableVideoUrl &&
-                        (post.user.isAuthor ||
-                          (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
-                          <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                        {currentUser?.isAdmin && (
+                          <MenuOption
+                            onSelect={isFeatured ? handleUnpinPost : handlePinPost}
+                            disabled={isLoading}>
                             <View className="flex-row items-center gap-x-3 px-2 py-2">
-                              <Ionicons size={20} name="download-outline" color="black" />
-                              <Text className="text-base text-black">Download</Text>
+                              <Ionicons
+                                name={isFeatured ? 'close-circle-outline' : 'pin-outline'}
+                                size={18}
+                                color="black"
+                              />
+                              <Text className="text-base text-black">
+                                {isFeatured ? 'Unpin' : 'Pin'}
+                              </Text>
                             </View>
                           </MenuOption>
                         )}
-                      <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="trash-outline" size={18} color="red" />
-                          <Text className="text-base text-red-500">Delete</Text>
-                        </View>
-                      </MenuOption>
-                    </>
-                  ) : currentUser?.isAdmin ? (
-                    <>
-                      <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="trash-outline" size={18} color="red" />
-                          <Text className="text-base text-red-500">Delete Post</Text>
-                        </View>
-                      </MenuOption>
-                      <MenuOption onSelect={handleReportPost} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="flag-outline" size={18} color="black" />
-                          <Text className="text-base text-black">Report Post</Text>
-                        </View>
-                      </MenuOption>
-                      {downloadableVideoUrl &&
-                        (post.user.isAuthor ||
-                          (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
-                          <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                        {downloadableVideoUrl &&
+                          (post.user.isAuthor ||
+                            (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
+                            <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                              <View className="flex-row items-center gap-x-3 px-2 py-2">
+                                <Ionicons size={20} name="download-outline" color="black" />
+                                <Text className="text-base text-black">Download</Text>
+                              </View>
+                            </MenuOption>
+                          )}
+                        <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="trash-outline" size={18} color="red" />
+                            <Text className="text-base text-red-500">Delete</Text>
+                          </View>
+                        </MenuOption>
+                      </>
+                    ) : currentUser?.isAdmin ? (
+                      <>
+                        {isFeatured ? (
+                          <MenuOption onSelect={handleUnpinPost} disabled={isLoading}>
                             <View className="flex-row items-center gap-x-3 px-2 py-2">
-                              <Ionicons size={20} name="download-outline" color="black" />
-                              <Text className="text-base text-black">Download</Text>
+                              <Ionicons name="close-circle-outline" size={18} color="black" />
+                              <Text className="text-base text-black">Unpin</Text>
                             </View>
                           </MenuOption>
-                        )}
-                      <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="ban-outline" size={18} color="red" />
-                          <Text className="text-base text-red-500">Block User</Text>
-                        </View>
-                      </MenuOption>
-                    </>
-                  ) : (
-                    <>
-                      <MenuOption onSelect={handleReportPost} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="flag-outline" size={18} color="black" />
-                          <Text className="text-base text-black">Report Post</Text>
-                        </View>
-                      </MenuOption>
-                      <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
-                        <View className="flex-row items-center gap-x-3 px-2 py-2">
-                          <Ionicons name="ban-outline" size={18} color="red" />
-                          <Text className="text-base text-red-500">Block User</Text>
-                        </View>
-                      </MenuOption>
-                    </>
-                  )}
-                </MenuOptions>
-              </Menu>
-            )}
-          </View>
-        </View>
-      </View>
-      {/* Body text */}
-      {post.body ? (
-        <View className="mt-2">
-          <Text className="text-lg">{post.body}</Text>
-        </View>
-      ) : null}
-      {/* Media — edge to edge */}
-      {post.challenge?.compositeVideoUrl ? (
-        <View className="-mx-4 mt-2">
-          <ChallengeVideoPlayer
-            videoUrl={post.challenge.compositeVideoUrl}
-            thumbnailUrl={post.challenge.thumbnailUrl}
-          />
-        </View>
-      ) : post.mediaUrl && post.mediaType === 'video' ? (
-        <View className="-mx-4 mt-2">
-          <ChallengeVideoPlayer
-            videoUrl={post.mediaUrl}
-            thumbnailUrl={post.mediaThumbnailUrl}
-            aspectRatio={(post.mediaWidth ?? 1) / (post.mediaHeight ?? 1)}
-          />
-        </View>
-      ) : (
-        post.mediaUrl && (
-          <View className="-mx-4 mt-2">
-            <View className="relative">
-              {imageLoading && (
-                <View className="absolute z-10 flex h-full w-full items-center justify-center">
-                  <ActivityIndicator size="large" />
-                </View>
+                        ) : null}
+                        <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="trash-outline" size={18} color="red" />
+                            <Text className="text-base text-red-500">Delete Post</Text>
+                          </View>
+                        </MenuOption>
+                        <MenuOption onSelect={handleReportPost} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="flag-outline" size={18} color="black" />
+                            <Text className="text-base text-black">Report Post</Text>
+                          </View>
+                        </MenuOption>
+                        {downloadableVideoUrl &&
+                          (post.user.isAuthor ||
+                            (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
+                            <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
+                              <View className="flex-row items-center gap-x-3 px-2 py-2">
+                                <Ionicons size={20} name="download-outline" color="black" />
+                                <Text className="text-base text-black">Download</Text>
+                              </View>
+                            </MenuOption>
+                          )}
+                        <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="ban-outline" size={18} color="red" />
+                            <Text className="text-base text-red-500">Block User</Text>
+                          </View>
+                        </MenuOption>
+                      </>
+                    ) : (
+                      <>
+                        <MenuOption onSelect={handleReportPost} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="flag-outline" size={18} color="black" />
+                            <Text className="text-base text-black">Report Post</Text>
+                          </View>
+                        </MenuOption>
+                        <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
+                          <View className="flex-row items-center gap-x-3 px-2 py-2">
+                            <Ionicons name="ban-outline" size={18} color="red" />
+                            <Text className="text-base text-red-500">Block User</Text>
+                          </View>
+                        </MenuOption>
+                      </>
+                    )}
+                  </MenuOptions>
+                </Menu>
               )}
-              <ExpoImage
-                source={{ uri: post.mediaUrl }}
-                contentFit="contain"
-                onLoadStart={() => setImageLoading(true)}
-                onLoad={(event) => {
-                  setImageLoading(false);
-                  if (event.source.width > 0 && event.source.height > 0) {
-                    setLoadedImageAspectRatio(event.source.width / event.source.height);
-                  }
-                }}
-                cachePolicy="memory-disk"
-                transition={200}
-                style={{
-                  width: '100%',
-                  height: undefined,
-                  resizeMode: 'contain',
-                  aspectRatio:
-                    loadedImageAspectRatio ?? (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
-                }}
-              />
             </View>
           </View>
-        )
-      )}
-      {/* Actions row */}
-      <View className="mt-3 flex-row items-center gap-x-4">
-        <Pressable
-          disabled={isLoading}
-          ref={likesButtonRef}
-          onPress={handleLongPress}
-          className={cn('flex-shrink-0 flex-row items-center gap-x-1.5 rounded-full px-2.5 py-1', {
-            'bg-background-50': !optimisticIsLiked,
-            'bg-[#FFE6DA]': optimisticIsLiked,
-          })}>
-          <Text numberOfLines={1} className="text-sm">
-            🔥 💪 😍
-          </Text>
-          <Text numberOfLines={1} className="text-base text-black">
-            {intToString(optimisticLikeCount)}
-          </Text>
-        </Pressable>
-
-        <TouchableOpacity
-          onPress={handleViewComments}
-          disabled={isLoading}
-          className="flex-shrink-0 flex-row items-center gap-x-2">
-          <Ionicons size={16} name="chatbubble-outline" color="black" />
-          <Text numberOfLines={1} className="text-base text-black">
-            {intToString(post.commentCount)}
-          </Text>
-        </TouchableOpacity>
-
-        {post.challenge?.compositeVideoUrl &&
-          (post.user.isAuthor || (currentUser?.isAdmin && post.challenge?.allowRepost)) && (
-            <TouchableOpacity
-              className="flex-shrink-0"
-              onPress={handleSharePost}
-              disabled={mediaBusy}
-              style={{ width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-              {sharing ? (
-                <ActivityIndicator size="small" color="black" />
-              ) : (
-                <Ionicons size={16} name="arrow-redo-outline" color="black" />
-              )}
-            </TouchableOpacity>
-          )}
-
-        {post.challengeId ? (
-          <TouchableOpacity
-            className="ml-auto flex-row items-center gap-x-1"
-            onPress={() => {
-              const redirectTo = `/challenge-view/${post.challengeId}`;
-              if (!requireSubscription({ redirectTo, source: 'feed_do_this' })) return;
-
-              router.push({
-                pathname: '/challenge-view/[challengeId]' as any,
-                params: { challengeId: post.challengeId },
-              });
-            }}>
-            {/* <Image
-              source={require('~/assets/icons/Flame.png')}
-              style={{ width: 14, height: 14 }}
-              resizeMode="contain"
-            /> */}
-
-            <Text className="font-body text-sm font-bold text-primary-500">Do This</Text>
-
-            <Icon.CaretRight size={16} weight="bold" color={colors.primary} />
+        </View>
+        {/* Body text */}
+        {post.body ? (
+          <View className="mt-4">
+            <Text className="font-body text-[15px] leading-[22px] text-[#252321]">{post.body}</Text>
+          </View>
+        ) : null}
+        {/* Media — edge to edge */}
+        {post.challenge?.compositeVideoUrl ? (
+          <View className="-mx-4 mt-3">
+            <ChallengeVideoPlayer
+              videoUrl={post.challenge.compositeVideoUrl}
+              thumbnailUrl={post.challenge.thumbnailUrl}
+            />
+          </View>
+        ) : post.mediaUrl && post.mediaType === 'video' ? (
+          <View className="-mx-4 mt-3">
+            <ChallengeVideoPlayer
+              videoUrl={post.mediaUrl}
+              thumbnailUrl={post.mediaThumbnailUrl}
+              aspectRatio={(post.mediaWidth ?? 1) / (post.mediaHeight ?? 1)}
+            />
+          </View>
+        ) : (
+          post.mediaUrl && (
+            <View className="-mx-4 mt-3">
+              <View className="relative">
+                {imageLoading && (
+                  <View className="absolute z-10 flex h-full w-full items-center justify-center">
+                    <ActivityIndicator size="large" />
+                  </View>
+                )}
+                <ExpoImage
+                  source={{ uri: post.mediaUrl }}
+                  contentFit="contain"
+                  onLoadStart={() => setImageLoading(true)}
+                  onLoad={(event) => {
+                    setImageLoading(false);
+                    if (event.source.width > 0 && event.source.height > 0) {
+                      setLoadedImageAspectRatio(event.source.width / event.source.height);
+                    }
+                  }}
+                  cachePolicy="memory-disk"
+                  transition={200}
+                  style={{
+                    width: '100%',
+                    height: undefined,
+                    resizeMode: 'contain',
+                    aspectRatio:
+                      loadedImageAspectRatio ?? (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
+                  }}
+                />
+              </View>
+            </View>
+          )
+        )}
+        <View className="mt-3 flex-row items-center justify-between">
+          <View className="flex-1 flex-row flex-wrap items-center gap-2 pr-2">
+            {[
+              { emoji: '🔥', label: 'Fire', count: optimisticFireCount },
+              { emoji: '💪', label: 'Strong', count: optimisticClapCount },
+              { emoji: '😍', label: 'Love', count: optimisticHeartCount },
+            ].map(({ emoji, label, count }) => (
+              <View
+                key={label}
+                accessible
+                accessibilityLabel={`${label}: ${count} reactions`}
+                className="flex-row items-center gap-x-1 rounded-[20px] bg-[#FFF4ED] px-2 py-1">
+                <Text style={{ fontSize: 18, lineHeight: 26 }}>{emoji}</Text>
+                <Text className="font-body text-xs font-semibold leading-5 text-[#4D4946]">
+                  {count.toLocaleString()}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity onPress={handleViewComments} disabled={isLoading}>
+            <Text className="font-body text-[10px] text-[#77716D]">
+              {intToString(post.commentCount)} {post.commentCount === 1 ? 'comment' : 'comments'}
+            </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Actions row */}
+        <View className="-mx-4 mt-3 flex-row border-t border-[#EEE8E3] px-2 pt-2">
+          <Pressable
+            disabled={isLoading}
+            ref={likesButtonRef}
+            onPress={handleLongPress}
+            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
+            <Icon.Heart
+              size={17}
+              color={optimisticIsLiked ? '#FF5C35' : '#77716D'}
+              weight={optimisticIsLiked ? 'fill' : 'regular'}
+            />
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              numberOfLines={1}
+              className={`text-[11px] ${optimisticIsLiked ? 'text-[#FF5C35]' : 'text-[#5A5652]'}`}>
+              Like
+            </Text>
+          </Pressable>
+
+          <TouchableOpacity
+            onPress={handleViewComments}
+            disabled={isLoading}
+            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
+            <Icon.ChatCircle size={17} color="#77716D" weight="regular" />
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="text-[11px] text-[#5A5652]">
+              Comment
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleSharePost}
+            disabled={mediaBusy}
+            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
+            {sharing ? (
+              <ActivityIndicator size="small" color="#77716D" />
+            ) : (
+              <Icon.ShareNetwork size={17} color="#77716D" weight="regular" />
+            )}
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="text-[11px] text-[#5A5652]">
+              Share
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {post.challengeId && post.challenge?.isCheckIn === false ? (
+          <View className="-mx-4 border-t border-[#F2EDE9] px-4 pt-2">
+            <TouchableOpacity
+              className="min-h-9 flex-row items-center justify-end gap-x-1"
+              onPress={() => {
+                const redirectTo = `/challenge-view/${post.challengeId}`;
+                if (!requireSubscription({ redirectTo, source: 'feed_do_this' })) return;
+
+                router.push({
+                  pathname: '/challenge-view/[challengeId]' as any,
+                  params: { challengeId: post.challengeId },
+                });
+              }}>
+              <Text
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="text-[11px] text-primary-500">
+                Do This
+              </Text>
+
+              <Icon.CaretRight size={16} weight="bold" color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         ) : null}
       </View>
 
@@ -806,7 +873,7 @@ export default function PostRow({
               left: pickerPosition.x,
               top: pickerPosition.y,
             }}
-            className="flex-row gap-x-3 rounded-full bg-white px-4 py-3 shadow-lg">
+            className="flex-row gap-x-3 rounded-[20px] bg-white px-4 py-3">
             <TouchableOpacity
               onPress={() => handleReactionSelect('fire')}
               className="flex flex-row items-center justify-center gap-x-1">
@@ -838,7 +905,7 @@ export default function PostRow({
         }}
         size="lg">
         <AlertDialogBackdrop />
-        <AlertDialogContent className="w-[90%] max-w-[500px] rounded-card">
+        <AlertDialogContent className="w-[90%] max-w-[500px] rounded-[24px]">
           <AlertDialogHeader>
             <View className="flex-row items-center justify-center gap-x-2">
               <View
@@ -863,7 +930,7 @@ export default function PostRow({
                 <TouchableOpacity
                   key={reason}
                   onPress={() => setReportReason(reason)}
-                  className={cn('w-full gap-x-2 rounded-full bg-primary-100 px-3 py-3', {
+                  className={cn('w-full gap-x-2 rounded-[20px] bg-primary-100 px-3 py-3', {
                     'bg-primary-500': reportReason === reason,
                   })}>
                   <Text
@@ -882,7 +949,7 @@ export default function PostRow({
                 variant="solid"
                 size="xl"
                 action="primary"
-                className="h-16 w-full rounded-2xl"
+                className="h-16 w-full rounded-[20px]"
                 disabled={isLoading || !reportReason}
                 loading={isLoading}
                 onPress={handleReportSubmit}>
@@ -892,7 +959,7 @@ export default function PostRow({
                 variant="outline"
                 size="xl"
                 action="negative"
-                className="h-16 w-full rounded-2xl"
+                className="h-16 w-full rounded-[20px]"
                 disabled={isLoading}
                 onPress={() => {
                   setShowReportModal(false);
@@ -914,7 +981,7 @@ export default function PostRow({
         }}
         size="lg">
         <AlertDialogBackdrop />
-        <AlertDialogContent className="w-[90%] max-w-[500px] rounded-card">
+        <AlertDialogContent className="w-[90%] max-w-[500px] rounded-[24px]">
           <AlertDialogHeader>
             <View className="flex-row items-center justify-center gap-x-2">
               <View
@@ -940,7 +1007,7 @@ export default function PostRow({
                 <TouchableOpacity
                   key={reason}
                   onPress={() => setBlockReason(reason)}
-                  className={cn('w-full gap-x-2 rounded-full bg-primary-100 px-3 py-3', {
+                  className={cn('w-full gap-x-2 rounded-[20px] bg-primary-100 px-3 py-3', {
                     'bg-primary-500': blockReason === reason,
                   })}>
                   <Text
@@ -959,7 +1026,7 @@ export default function PostRow({
                 variant="solid"
                 size="xl"
                 action="negative"
-                className="h-16 w-full rounded-2xl"
+                className="h-16 w-full rounded-[20px]"
                 disabled={isLoading || !blockReason}
                 loading={isLoading}
                 onPress={handleBlockSubmit}>
@@ -968,7 +1035,7 @@ export default function PostRow({
               <Button
                 variant="outline"
                 size="xl"
-                className="h-16 w-full rounded-2xl"
+                className="h-16 w-full rounded-[20px]"
                 disabled={isLoading}
                 onPress={() => {
                   setShowBlockModal(false);

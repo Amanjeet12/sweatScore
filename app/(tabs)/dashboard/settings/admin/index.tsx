@@ -18,7 +18,7 @@ export default function AdminView() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Admin View
             </Text>
           ),
@@ -96,6 +96,7 @@ export default function AdminView() {
           </View>
         </TouchableOpacity>
 
+        {/* Group chat temporarily disabled.
         <TouchableOpacity
           onPress={() => {
             router.push('/dashboard/settings/admin/chat-groups');
@@ -107,6 +108,7 @@ export default function AdminView() {
             <Text className="font-lsBold text-2xl">Manage Chat Groups</Text>
           </View>
         </TouchableOpacity>
+        */}
       </View>
     </SafeAreaView>
   );

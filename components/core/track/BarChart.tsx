@@ -180,7 +180,7 @@ export default function BarChart({ bars, target = 0, targetLabel = 'Goal' }: Bar
           <View>
             <Text className="font-body text-xs text-[#838383]">Current best</Text>
 
-            <Text className="font-heading text-base font-bold text-[#1A1A1A]">
+            <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
               {formatChartValue(achievedValue)}
             </Text>
           </View>
@@ -190,7 +190,7 @@ export default function BarChart({ bars, target = 0, targetLabel = 'Goal' }: Bar
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
-              borderRadius: 20,
+              borderRadius: 12,
               // backgroundColor: '#FFF3EC',
               paddingHorizontal: 12,
               paddingVertical: 7,

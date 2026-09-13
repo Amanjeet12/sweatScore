@@ -11,19 +11,13 @@ export type RankRowProps = {
   avatarUri: string | null;
   displayTotalPoints: number;
   targetPoints: number;
+  mode?: 'points' | 'streak';
   onPress?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 };
 
-const AVATAR_COLORS = [
-  '#F76B1C',
-  '#7C3AED',
-  '#2563EB',
-  '#059669',
-  '#DB2777',
-  '#DC2626',
-  '#0891B2',
-  '#9333EA',
-];
+const AVATAR_COLORS = ['#C65D32', '#A94725', '#D77845', '#B4522E'];
 
 const getInitial = (name: string) => {
   const trimmedName = name?.trim();
@@ -53,9 +47,9 @@ function RankAvatar({ name, uri }: { name: string; uri?: string | null }) {
   return (
     <View
       style={{
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
@@ -65,14 +59,16 @@ function RankAvatar({ name, uri }: { name: string; uri?: string | null }) {
         <Image
           source={{ uri: cleanUri }}
           style={{
-            width: 44,
-            height: 44,
+            width: 36,
+            height: 36,
           }}
           contentFit="cover"
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <Text className="font-heading text-base font-extrabold text-white">{initial}</Text>
+        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-white">
+          {initial}
+        </Text>
       )}
     </View>
   );
@@ -84,54 +80,62 @@ export default function RankRow({
   avatarUri,
   displayTotalPoints,
   targetPoints,
+  mode = 'points',
   onPress,
+  isFirst = false,
+  isLast = false,
 }: RankRowProps) {
   const safeTarget = Math.max(1, targetPoints);
   const pct = Math.min(1, displayTotalPoints / safeTarget);
   const pctLabel = Math.round(pct * 100);
-  const isComplete = displayTotalPoints >= safeTarget;
 
   const Wrapper: any = onPress ? TouchableOpacity : View;
   const wrapperProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
 
   return (
-    <Wrapper {...wrapperProps} className="mt-3 flex-row items-center gap-x-3 bg-white p-3">
+    <Wrapper
+      {...wrapperProps}
+      className={`mx-5 flex-row items-center gap-x-3 bg-white px-3 py-3 ${isFirst ? 'mt-3 rounded-t-[24px]' : ''} ${isLast ? 'rounded-b-[24px]' : ''}`}
+      style={isFirst ? {} : undefined}>
       <RankAvatar name={name} uri={avatarUri} />
 
       <View className="flex-1">
         <View className="flex-row items-center justify-between gap-x-3">
           <View className="flex-1 flex-row items-center gap-x-2">
-            <Text className="shrink font-body text-base text-[#1A1A1A]" numberOfLines={1}>
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="shrink font-body text-sm text-[#1A1A1A]"
+              numberOfLines={1}>
               {formatName(name)}
             </Text>
 
             {!!rank && (
-              <View className="rounded-full bg-[#FFF0E8] px-2 py-0.5">
-                <Text className="font-heading text-xs font-bold text-[#F76B1C]">#{rank}</Text>
+              <View className="rounded bg-[#FFF0E8] px-1 py-0.5">
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-xs text-[#F76B1C]">
+                  #{rank}
+                </Text>
               </View>
             )}
           </View>
 
-          <Text className="font-heading text-base font-bold text-[#1A1A1A]">
+          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-[#1A1A1A]">
             {displayTotalPoints}
+            {mode === 'streak' ? (displayTotalPoints === 1 ? ' week' : ' weeks') : ''}
           </Text>
         </View>
 
-        <View className="mt-2 flex-row items-center gap-x-2">
-          <View className="h-2 flex-1 overflow-hidden rounded-full bg-[#EFEAE4]">
-            <View className="h-full rounded-full bg-[#F76B1C]" style={{ width: `${pctLabel}%` }} />
+        {mode === 'points' && (
+          <View className="mt-3 flex-row items-center gap-x-2">
+            <View className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#EFEAE4]">
+              <View
+                className="h-full rounded-full bg-[#F76B1C]"
+                style={{ width: `${pctLabel}%` }}
+              />
+            </View>
           </View>
-
-          {isComplete ? (
-            <Image
-              source={require('~/assets/icons/500points.png')}
-              style={{ width: 22, height: 22 }}
-              contentFit="contain"
-            />
-          ) : (
-            <Text className="w-9 text-right font-body text-xs text-[#5A5A5A]">{pctLabel}%</Text>
-          )}
-        </View>
+        )}
       </View>
     </Wrapper>
   );

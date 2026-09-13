@@ -56,7 +56,7 @@ export default function ChallengesScreen() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Progress Videos{' '}
             </Text>
           ),
@@ -74,10 +74,8 @@ export default function ChallengesScreen() {
               <TouchableOpacity
                 key={tag}
                 onPress={() => setSelectedTag(tag)}
-                className={`rounded-full border px-4 py-2 ${
-                  selectedTag === tag
-                    ? 'border-primary-500 bg-primary-500'
-                    : 'border-gray-300 bg-white'
+                className={`rounded-lg  px-4 py-2 ${
+                  selectedTag === tag ? ' bg-primary-500' : ' bg-white'
                 }`}>
                 <Text
                   className={`font-body text-sm font-medium ${

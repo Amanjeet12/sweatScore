@@ -72,11 +72,11 @@ const UserCard = ({
           </View>
         )}
       </View>
-      <Avatar uri={user.image ?? undefined} size={44} showGoldBorder name={user?.name}/>
+      <Avatar uri={user.image ?? undefined} size={44} showGoldBorder name={user?.name} />
       <View className="ml-1 flex-1 flex-row items-center justify-between gap-x-2">
         <View className="flex-1 flex-row items-center">
           {isCurrentUser ? (
-            <View className="rounded-2xl bg-primary-500 px-2 py-1">
+            <View className="rounded-xl bg-primary-500 px-2 py-1">
               <Text className="text-xl font-bold text-white">Me</Text>
             </View>
           ) : (
@@ -128,24 +128,15 @@ const UserCard = ({
             }
           }}
           style={{
-            borderRadius: 35,
-            ...(Platform.OS === 'ios'
-              ? {
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 4,
-                }
-              : {
-                  elevation: 3,
-                }),
+            borderRadius: 12,
+            ...(Platform.OS === 'ios' ? {} : {}),
           }}>
           <LinearGradient
             colors={['#C23E0C', '#FF5C1A', '#FFA480']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{
-              borderRadius: 35,
+              borderRadius: 12,
               paddingHorizontal: 16,
               paddingVertical: 16,
             }}>
@@ -167,20 +158,11 @@ const UserCard = ({
               });
             }
           }}
-          className={cn('rounded-card border border-gray-200 bg-white px-4 py-4', {
-            'border border-primary-300 bg-[#FFE6DA]': isCurrentUser,
+          className={cn('rounded-card   bg-white px-4 py-4', {
+            '  bg-[#FFE6DA]': isCurrentUser,
           })}
           style={{
-            ...(Platform.OS === 'ios'
-              ? {
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.08,
-                  shadowRadius: 4,
-                }
-              : {
-                  elevation: 3,
-                }),
+            ...(Platform.OS === 'ios' ? {} : {}),
           }}>
           {cardContent}
         </TouchableOpacity>

@@ -138,8 +138,8 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
           accessibilityRole="button"
           accessibilityLabel="Log optional activity"
           onPress={() => setIsOpen(true)}
-          className="h-14 w-full items-center justify-center rounded-[17px] bg-primary-500 px-[22px]">
-          <Text className="font-heading text-base font-bold text-white">Log activity</Text>
+          className="h-14 w-full items-center justify-center rounded-lg bg-primary-500 px-[22px]">
+          <Text className="font-heading text-base font-semibold text-white">Log activity</Text>
         </TouchableOpacity>
       </View>
 
@@ -153,7 +153,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
           />
 
           <View
-            className="max-h-[86%] rounded-t-[30px] bg-white px-5 pt-2"
+            className="max-h-[86%] rounded-t-xl bg-white px-5 pt-2"
             style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <View className="mb-3 h-1 w-10 self-center rounded-full bg-[#CEC7C2]" />
 
@@ -169,16 +169,16 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                       <ArrowLeft size={14} color={PRIMARY} weight="bold" />
                     </TouchableOpacity>
                   ) : null}
-                  <Text className="font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+                  <Text className="font-heading text-[10px] font-semibold uppercase tracking-[1px] text-[#FF4B1F]">
                     Log activity
                   </Text>
-                  <View className="ml-2 rounded-full bg-[#F1EFED] px-2.5 py-1">
-                    <Text className="font-heading text-[9px] font-bold text-[#77716D]">
+                  <View className="ml-2 rounded-lg bg-[#F1EFED] px-2.5 py-1">
+                    <Text className="font-heading text-[9px] font-semibold text-[#77716D]">
                       Optional
                     </Text>
                   </View>
                 </View>
-                <Text className="mt-1 font-heading text-[22px] font-extrabold leading-7 text-[#1A1A1A]">
+                <Text className="mt-1 font-heading text-[22px] font-semibold leading-7 text-[#1A1A1A]">
                   {selectedActivity ? 'Add your proof' : 'What did you do today?'}
                 </Text>
                 <Text className="mt-1 font-body text-xs leading-4 text-[#8A827D]">
@@ -200,17 +200,17 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
 
             {selectedActivity ? (
               <View>
-                <View className="mb-3 rounded-[18px] bg-[#FFF8F4] p-4">
+                <View className="mb-3 rounded-xl bg-[#FFF8F4] p-4">
                   <View className="flex-row items-center">
-                    <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
+                    <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
                       <ActivityIcon name={selectedActivity.icon} />
                     </View>
                     <View className="min-w-0 flex-1">
                       <View className="flex-row items-center justify-between">
-                        <Text className="font-heading text-sm font-bold text-[#1A1A1A]">
+                        <Text className="font-heading text-sm font-semibold text-[#1A1A1A]">
                           {selectedActivity.title}
                         </Text>
-                        <Text className="font-heading text-xs font-extrabold text-[#E94F12]">
+                        <Text className="font-heading text-xs font-semibold text-[#E94F12]">
                           +{selectedActivity.basePoints} pts
                         </Text>
                       </View>
@@ -221,7 +221,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                   </View>
                 </View>
 
-                <View className="overflow-hidden rounded-[20px] border border-[#E8E1DC]">
+                <View className="overflow-hidden rounded-xl  ">
                   {ACTIVITY_SUBMISSION_OPTIONS.map((option, index) => (
                     <TouchableOpacity
                       key={option.mode}
@@ -236,11 +236,11 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                         borderBottomWidth: index === ACTIVITY_SUBMISSION_OPTIONS.length - 1 ? 0 : 1,
                         borderBottomColor: '#EEE7E2',
                       }}>
-                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
+                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
                         <SubmissionIcon />
                       </View>
                       <View className="min-w-0 flex-1 pr-2">
-                        <Text className="font-heading text-sm font-bold text-[#1A1A1A]">
+                        <Text className="font-heading text-sm font-semibold text-[#1A1A1A]">
                           {option.label}
                         </Text>
                         <Text className="mt-0.5 font-body text-[11px] text-[#8A827D]">
@@ -262,16 +262,16 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                       accessibilityRole="button"
                       accessibilityLabel={`${activity.title}, ${activity.basePoints} points`}
                       onPress={() => setSelectedActivityKey(activity.key)}
-                      className="min-h-[82px] flex-row items-center rounded-[18px] border border-[#E8E1DC] bg-[#FFFCFA] px-3.5 py-3">
-                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
+                      className="min-h-[82px] flex-row items-center rounded-lg bg-[#FFFCFA] px-3.5 py-3">
+                      <View className="mr-3 h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
                         <ActivityIcon name={activity.icon} />
                       </View>
                       <View className="min-w-0 flex-1 pr-2">
                         <View className="flex-row items-center justify-between">
-                          <Text className="font-heading text-sm font-bold text-[#1A1A1A]">
+                          <Text className="font-heading text-sm font-semibold text-[#1A1A1A]">
                             {activity.title}
                           </Text>
-                          <Text className="font-heading text-[11px] font-extrabold text-[#E94F12]">
+                          <Text className="font-heading text-[11px] font-semibold text-[#E94F12]">
                             +{activity.basePoints} pts
                           </Text>
                         </View>

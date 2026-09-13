@@ -48,6 +48,14 @@ export const createChallengePost = internalMutation({
       .first();
 
     if (existingPost) {
+      // Upgrade the immediately published original without duplicating the post
+      // or losing its comments/reactions when video processing finishes.
+      await ctx.db.patch(existingPost._id, {
+        media: args.compositeVideoStorageId,
+        mediaWidth: 1080,
+        mediaHeight: 960,
+        mediaThumbnail: completion.thumbnailStorageId,
+      });
       return existingPost._id;
     }
 

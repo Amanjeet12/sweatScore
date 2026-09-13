@@ -23,14 +23,11 @@ export default function CategoryTabs({ value, onChange }: CategoryTabsProps) {
         const active = value === t.id;
 
         return (
-          <TouchableOpacity
-            key={t.id}
-            onPress={() => onChange(t.id)}
-            activeOpacity={0.7}>
+          <TouchableOpacity key={t.id} onPress={() => onChange(t.id)} activeOpacity={0.7}>
             <Text
               className={
                 active
-                  ? 'font-heading text-base font-bold text-primary-500'
+                  ? 'font-heading text-base font-semibold text-primary-500'
                   : 'font-body text-base text-[#838383]'
               }>
               {t.label}

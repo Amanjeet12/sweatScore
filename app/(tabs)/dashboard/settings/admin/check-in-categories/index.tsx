@@ -35,7 +35,7 @@ export default function CategoryList() {
               onPress={() =>
                 router.push(`/dashboard/settings/admin/check-in-categories/${category._id}` as any)
               }
-              className="rounded-xl border border-gray-200 p-4">
+              className="rounded-xl   p-4">
               <View className="flex-row items-center">
                 {category.iconUrl ? (
                   <Image source={{ uri: category.iconUrl }} className="mr-3 h-12 w-12 rounded-xl" />

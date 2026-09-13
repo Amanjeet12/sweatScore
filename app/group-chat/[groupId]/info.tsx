@@ -95,7 +95,7 @@ const MemberAvatar = ({ imageUrl, initial, color, size = 48 }: MemberAvatarProps
         />
       ) : (
         <Text
-          className="font-heading font-bold text-white"
+          className="font-heading font-semibold text-white"
           style={{
             fontSize: Math.max(14, size * 0.36),
           }}>
@@ -109,7 +109,7 @@ const MemberAvatar = ({ imageUrl, initial, color, size = 48 }: MemberAvatarProps
 const RoleBadge = ({ role }: { role: GroupRole }) => {
   if (role === 'owner') {
     return (
-      <View className="flex-row items-center rounded-full bg-[#FFF4D8] px-2.5 py-1">
+      <View className="flex-row items-center rounded-lg bg-[#FFF4D8] px-2.5 py-1">
         <Crown size={13} color="#B7791F" weight="fill" />
 
         <Text className="ml-1 font-body text-[10px] font-bold text-[#96620F]">Owner</Text>
@@ -119,7 +119,7 @@ const RoleBadge = ({ role }: { role: GroupRole }) => {
 
   if (role === 'admin') {
     return (
-      <View className="flex-row items-center rounded-full bg-[#EEE9FF] px-2.5 py-1">
+      <View className="flex-row items-center rounded-lg bg-[#EEE9FF] px-2.5 py-1">
         <ShieldCheck size={13} color="#7C3AED" weight="fill" />
 
         <Text className="ml-1 font-body text-[10px] font-bold text-[#6D28D9]">Admin</Text>
@@ -128,7 +128,7 @@ const RoleBadge = ({ role }: { role: GroupRole }) => {
   }
 
   return (
-    <View className="rounded-full bg-[#F3F1EF] px-2.5 py-1">
+    <View className="rounded-lg bg-[#F3F1EF] px-2.5 py-1">
       <Text className="font-body text-[10px] font-semibold text-[#77716D]">Member</Text>
     </View>
   );
@@ -616,7 +616,7 @@ export default function GroupInfoScreen() {
   if (!groupId) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-[#FAF8F6] px-8">
-        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Group unavailable</Text>
+        <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Group unavailable</Text>
 
         <Text className="mt-2 text-center font-body text-sm text-[#77716D]">
           A valid group ID was not provided.
@@ -625,7 +625,7 @@ export default function GroupInfoScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => router.back()}
-          className="mt-5 rounded-full bg-[#F76B1C] px-6 py-3">
+          className="mt-5 rounded-lg bg-[#F76B1C] px-6 py-3">
           <Text className="font-body font-bold text-white">Go back</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -672,7 +672,7 @@ export default function GroupInfoScreen() {
           <ArrowLeft size={23} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
 
-        <Text className="ml-3 flex-1 font-heading text-xl font-bold text-[#1A1A1A]">
+        <Text className="ml-3 flex-1 font-heading text-xl font-semibold text-[#1A1A1A]">
           Group information
         </Text>
       </View>
@@ -695,7 +695,9 @@ export default function GroupInfoScreen() {
                 />
               ) : (
                 <View style={styles.groupImageFallback}>
-                  <Text className="font-heading text-4xl font-bold text-white">{groupInitial}</Text>
+                  <Text className="font-heading text-4xl font-semibold text-white">
+                    {groupInitial}
+                  </Text>
                 </View>
               )}
 
@@ -711,7 +713,7 @@ export default function GroupInfoScreen() {
               ) : null}
             </View>
 
-            <Text className="mt-4 text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="mt-4 text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               {groupInfo.name}
             </Text>
 
@@ -741,7 +743,7 @@ export default function GroupInfoScreen() {
                   activeOpacity={0.8}
                   disabled={isSaving}
                   onPress={openEditModal}
-                  className="mr-2 flex-1 flex-row items-center justify-center rounded-2xl bg-[#FFF0E7] px-4 py-3">
+                  className="mr-2 flex-1 flex-row items-center justify-center rounded-lg bg-[#FFF0E7] px-4 py-3">
                   <PencilSimple size={18} color="#F76B1C" weight="bold" />
 
                   <Text className="ml-2 font-body text-sm font-bold text-[#F76B1C]">
@@ -755,7 +757,7 @@ export default function GroupInfoScreen() {
                   activeOpacity={0.8}
                   disabled={isSaving}
                   onPress={openAddModal}
-                  className="ml-2 flex-1 flex-row items-center justify-center rounded-2xl bg-[#F76B1C] px-4 py-3">
+                  className="ml-2 flex-1 flex-row items-center justify-center rounded-lg bg-[#F76B1C] px-4 py-3">
                   <Plus size={18} color="#FFFFFF" weight="bold" />
 
                   <Text className="ml-2 font-body text-sm font-bold text-white">Add members</Text>
@@ -767,7 +769,7 @@ export default function GroupInfoScreen() {
 
         <View style={styles.sectionCard}>
           <View className="flex-row items-center justify-between">
-            <Text className="font-heading text-lg font-bold text-[#1A1A1A]">Members</Text>
+            <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">Members</Text>
 
             <Text className="font-body text-xs font-semibold text-[#77716D]">
               {groupInfo.memberCount}
@@ -775,7 +777,7 @@ export default function GroupInfoScreen() {
           </View>
 
           {groupInfo.memberCount > 6 ? (
-            <View className="mt-4 h-11 flex-row items-center rounded-2xl bg-[#F7F3F0] px-4">
+            <View className="mt-4 h-11 flex-row items-center rounded-xl bg-[#F7F3F0] px-4">
               <MagnifyingGlass size={18} color="#A09A96" weight="bold" />
 
               <TextInput
@@ -874,14 +876,14 @@ export default function GroupInfoScreen() {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text className="font-heading text-lg font-bold text-[#1A1A1A]">Group actions</Text>
+          <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">Group actions</Text>
 
           {groupInfo.canLeaveGroup ? (
             <TouchableOpacity
               activeOpacity={0.75}
               disabled={isSaving}
               onPress={confirmLeaveGroup}
-              className="mt-4 flex-row items-center rounded-2xl border border-[#F1D4C3] bg-[#FFF8F4] px-4 py-4">
+              className="mt-4 flex-row items-center rounded-xl bg-[#FFF8F4] px-4 py-4">
               <View className="h-10 w-10 items-center justify-center rounded-full bg-[#FFE6D7]">
                 <SignOut size={20} color="#F35E16" weight="bold" />
               </View>
@@ -895,7 +897,7 @@ export default function GroupInfoScreen() {
               </View>
             </TouchableOpacity>
           ) : (
-            <View className="mt-4 rounded-2xl bg-[#F7F3F0] px-4 py-3">
+            <View className="mt-4 rounded-xl bg-[#F7F3F0] px-4 py-3">
               <Text className="font-body text-xs leading-5 text-[#77716D]">
                 Group owners cannot leave their group. Delete the group or transfer ownership before
                 leaving.
@@ -908,7 +910,7 @@ export default function GroupInfoScreen() {
               activeOpacity={0.75}
               disabled={isSaving}
               onPress={confirmDeleteGroup}
-              className="mt-3 flex-row items-center rounded-2xl border border-[#F4C7C3] bg-[#FFF1F0] px-4 py-4">
+              className="mt-3 flex-row items-center rounded-xl bg-[#FFF1F0] px-4 py-4">
               <View className="h-10 w-10 items-center justify-center rounded-full bg-[#FFE0DE]">
                 <Trash size={20} color="#D92D20" weight="bold" />
               </View>
@@ -922,7 +924,7 @@ export default function GroupInfoScreen() {
               </View>
             </TouchableOpacity>
           ) : groupInfo.isDefaultGroup && groupInfo.currentUserRole === 'owner' ? (
-            <View className="mt-3 rounded-2xl bg-[#F7F3F0] px-4 py-3">
+            <View className="mt-3 rounded-xl bg-[#F7F3F0] px-4 py-3">
               <Text className="font-body text-xs leading-5 text-[#77716D]">
                 The default Sweat Sisters group is protected and cannot be deleted.
               </Text>
@@ -950,7 +952,7 @@ export default function GroupInfoScreen() {
                 <X size={23} color="#1A1A1A" weight="bold" />
               </TouchableOpacity>
 
-              <Text className="ml-2 flex-1 font-heading text-xl font-bold text-[#1A1A1A]">
+              <Text className="ml-2 flex-1 font-heading text-xl font-semibold text-[#1A1A1A]">
                 Edit group
               </Text>
 
@@ -958,7 +960,7 @@ export default function GroupInfoScreen() {
                 activeOpacity={0.8}
                 disabled={isSaving}
                 onPress={() => void handleSaveGroup()}
-                className="rounded-full bg-[#F76B1C] px-5 py-2.5"
+                className="rounded-lg bg-[#F76B1C] px-5 py-2.5"
                 style={{
                   opacity: isSaving ? 0.65 : 1,
                 }}>
@@ -1007,7 +1009,7 @@ export default function GroupInfoScreen() {
                   activeOpacity={0.75}
                   disabled={isSaving}
                   onPress={() => void pickGroupImage()}
-                  className="mt-4 rounded-full bg-[#FFF0E7] px-5 py-2.5">
+                  className="mt-4 rounded-lg bg-[#FFF0E7] px-5 py-2.5">
                   <Text className="font-body text-sm font-bold text-[#F76B1C]">
                     {previewImageUri ? 'Change image' : 'Choose image'}
                   </Text>
@@ -1044,7 +1046,7 @@ export default function GroupInfoScreen() {
                 placeholder="Group name"
                 placeholderTextColor="#A09A96"
                 selectionColor="#F76B1C"
-                className="rounded-2xl border border-[#EDE7E2] bg-white px-4 py-3.5 font-body text-base text-[#1A1A1A]"
+                className="rounded-xl bg-white px-4 py-3.5 font-body text-base text-[#1A1A1A]"
               />
 
               <Text className="mt-2 font-body text-xs text-[#77716D]">
@@ -1072,7 +1074,7 @@ export default function GroupInfoScreen() {
             </TouchableOpacity>
 
             <View className="ml-2 flex-1">
-              <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Add members</Text>
+              <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Add members</Text>
 
               <Text className="font-body text-xs text-[#77716D]">
                 {selectedUserIds.length} selected
@@ -1083,7 +1085,7 @@ export default function GroupInfoScreen() {
               activeOpacity={0.8}
               disabled={isSaving || selectedUserIds.length === 0}
               onPress={() => void handleAddMembers()}
-              className="rounded-full bg-[#F76B1C] px-5 py-2.5"
+              className="rounded-lg bg-[#F76B1C] px-5 py-2.5"
               style={{
                 opacity: isSaving || selectedUserIds.length === 0 ? 0.55 : 1,
               }}>
@@ -1096,7 +1098,7 @@ export default function GroupInfoScreen() {
           </View>
 
           <View className="px-4 pb-2 pt-4">
-            <View className="h-12 flex-row items-center rounded-2xl bg-[#F7F3F0] px-4">
+            <View className="h-12 flex-row items-center rounded-xl bg-[#F7F3F0] px-4">
               <MagnifyingGlass size={19} color="#A09A96" weight="bold" />
 
               <TextInput
@@ -1177,7 +1179,7 @@ export default function GroupInfoScreen() {
                 <View className="items-center px-8 py-20">
                   <UsersThree size={42} color="#A09A96" />
 
-                  <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
+                  <Text className="mt-4 text-center font-heading text-lg font-semibold text-[#1A1A1A]">
                     No people available
                   </Text>
 
@@ -1201,29 +1203,16 @@ const styles = StyleSheet.create({
   },
 
   heroCard: {
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 12,
+
     backgroundColor: COLORS.white,
     padding: 20,
-
-    shadowColor: '#5E3E2B',
-
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
   },
 
   sectionCard: {
     marginTop: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 12,
+
     backgroundColor: COLORS.white,
     padding: 18,
   },

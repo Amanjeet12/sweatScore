@@ -9,9 +9,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ArrowRight,
-  Camera,
   CameraRotate,
-  ImageSquare,
   Microphone,
   MicrophoneSlash,
   Record,
@@ -280,11 +278,18 @@ export default function DuetRecordingScreen() {
     challengeId: challengeId as Id<'challenges'>,
   });
 
+  const communityChallenge = useQuery(api.challengeCompletions.getCommunityChallengeDetails, {
+    challengeId: challengeId as Id<'challenges'>,
+    refreshToken: undefined,
+  });
+
   const progress = useQuery(api.challengeCompletions.getChallengeProgress, {
     challengeId: challengeId as Id<'challenges'>,
   });
 
   const isCheckIn = challenge?.type === 'check_in';
+  const isCommunityChallenge = challenge?.isCommunityChallenge === true;
+  const requiresSubscription = !isCommunityChallenge || challenge?.isLocked === true;
 
   const selectMusicTrackForSession = useCallback(() => {
     if (selectedMusicTrackRef.current) return selectedMusicTrackRef.current;
@@ -928,7 +933,10 @@ export default function DuetRecordingScreen() {
         setCaption(
           isCheckIn
             ? getCheckInCaption()
-            : getDefaultCaption(progress?.nextAttemptNumber, challenge?.name ?? 'this exercise')
+            : getDefaultCaption(
+                communityChallenge?.currentDay ?? progress?.nextAttemptNumber,
+                challenge?.name ?? 'this exercise'
+              )
         );
 
         setState('post-record');
@@ -995,6 +1003,7 @@ export default function DuetRecordingScreen() {
   }, [
     challenge?.name,
     challengeId,
+    communityChallenge?.currentDay,
     isCheckIn,
     progress?.nextAttemptNumber,
     startBackgroundMusic,
@@ -1053,6 +1062,7 @@ export default function DuetRecordingScreen() {
 
   const startCountdown = useCallback(() => {
     if (
+      requiresSubscription &&
       !requireSubscription({
         redirectTo: challengeRedirectTo,
         source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
@@ -1131,6 +1141,7 @@ export default function DuetRecordingScreen() {
     isCheckIn,
     playCountdownSound,
     requireSubscription,
+    requiresSubscription,
     startRecording,
     stopCountdownSound,
   ]);
@@ -1296,7 +1307,13 @@ export default function DuetRecordingScreen() {
     setIsSubmitting(false);
 
     setState('pre-record');
-  }, [cleanupRecordingRefs, debugRecordingState, isCheckIn, recordedVideoUri]);
+  }, [
+    cleanupRecordingRefs,
+    debugRecordingState,
+    isCheckIn,
+    isCommunityChallenge,
+    recordedVideoUri,
+  ]);
 
   const handleSubmit = useCallback(async () => {
     debugRecordingState('handleSubmit called');
@@ -1305,6 +1322,7 @@ export default function DuetRecordingScreen() {
       return;
     }
     if (
+      requiresSubscription &&
       !requireSubscription({
         redirectTo: challengeRedirectTo,
         source: isCheckIn ? 'challenge_submit_check_in' : 'challenge_submit_video',
@@ -1347,7 +1365,7 @@ export default function DuetRecordingScreen() {
 
       router.dismissAll();
 
-      router.replace('/(tabs)/dashboard');
+      router.replace(isCommunityChallenge ? '/(tabs)/hub' : '/(tabs)/dashboard');
     } catch (error) {
       Alert.alert('Unable to submit', getErrorMessage(error));
 
@@ -1363,8 +1381,10 @@ export default function DuetRecordingScreen() {
     caption,
     debugRecordingState,
     isCheckIn,
+    isCommunityChallenge,
     challengeRedirectTo,
     requireSubscription,
+    requiresSubscription,
     selectedMediaType,
     checkInSubmissionType,
     selectedMediaDimensions,
@@ -1445,7 +1465,7 @@ export default function DuetRecordingScreen() {
 
   const canStopRecording = state === 'recording' && elapsed >= MIN_STOP_RECORDING_SECONDS;
 
-  const currentChallengeDay = progress?.nextAttemptNumber ?? 1;
+  const currentChallengeDay = communityChallenge?.currentDay ?? progress?.nextAttemptNumber ?? 1;
 
   if (isCheckIn && state === 'pre-record' && !isVideoRecorderOpen) {
     const MediaChoice = ({
@@ -1463,8 +1483,8 @@ export default function DuetRecordingScreen() {
     }) => (
       <TouchableOpacity
         activeOpacity={0.72}
-        className={`mb-3 flex-row items-center rounded-2xl border bg-white px-4 py-4 ${
-          featured ? 'border-[#FFB99C]' : 'border-[#E7E7E7]'
+        className={`mb-3 flex-row items-center rounded-[24px]  bg-white px-4 py-4 ${
+          featured ? '' : ''
         }`}
         disabled={dailyLimitReached}
         onPress={onPress}>
@@ -1472,7 +1492,9 @@ export default function DuetRecordingScreen() {
           {icon}
         </View>
         <View className="min-w-0 flex-1 pr-3">
-          <Text className="font-body text-base font-bold text-[#1F1F1F]">{label}</Text>
+          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-[#1F1F1F]">
+            {label}
+          </Text>
           <Text className="mt-0.5 font-body text-xs text-[#777777]">{description}</Text>
         </View>
         <ArrowRight size={19} color="#FF5C1A" weight="bold" />
@@ -1486,7 +1508,9 @@ export default function DuetRecordingScreen() {
           className="mb-8 h-10 w-10 items-center justify-center rounded-full bg-white">
           <X size={22} color="#222" weight="bold" />
         </TouchableOpacity>
-        <Text className="font-heading text-3xl font-extrabold text-black">Add your check-in</Text>
+        <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-3xl text-black">
+          Add your check-in
+        </Text>
         <Text className="mb-7 mt-2 font-body text-base text-[#686868]">
           Add one photo or video - whichever feels easiest today.
         </Text>
@@ -1519,7 +1543,9 @@ export default function DuetRecordingScreen() {
           onPress={() => handlePickCheckInMedia('library', 'video')}
         />
         {dailyLimitReached && (
-          <Text className="mt-2 text-center font-body text-sm font-semibold text-[#E5484D]">
+          <Text
+            style={{ fontFamily: 'Inter_600SemiBold' }}
+            className="mt-2 text-center text-sm text-[#E5484D]">
             You reached your check-in limit for today.
           </Text>
         )}
@@ -1600,7 +1626,7 @@ export default function DuetRecordingScreen() {
               zIndex: 30,
               minWidth: 102,
               height: 42,
-              borderRadius: 21,
+              borderRadius: 12,
               paddingHorizontal: 12,
               flexDirection: 'row',
               alignItems: 'center',
@@ -1614,7 +1640,7 @@ export default function DuetRecordingScreen() {
             ) : (
               <Microphone size={19} color="#FFFFFF" weight="bold" />
             )}
-            <Text className="font-body text-xs font-bold text-white">
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-white">
               {isCheckInAudioMuted ? 'Muted' : 'Audio on'}
             </Text>
           </TouchableOpacity>
@@ -1649,7 +1675,7 @@ export default function DuetRecordingScreen() {
               right: 0,
               alignItems: 'center',
             }}>
-            <Text className="font-heading text-xl font-bold text-white">
+            <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-xl text-white">
               Day {progress?.nextAttemptNumber ?? 1}
             </Text>
           </View>
@@ -1670,7 +1696,7 @@ export default function DuetRecordingScreen() {
               left: 16,
               zIndex: 20,
               padding: 8,
-              borderRadius: 999,
+              borderRadius: 12,
               backgroundColor: 'rgba(0,0,0,0.35)',
             }}>
             <X size={28} color="#FFFFFF" weight="bold" />
@@ -1694,7 +1720,7 @@ export default function DuetRecordingScreen() {
                 height: 90,
                 backgroundColor: 'rgba(0,0,0,0.55)',
               }}>
-              <Text className="font-heading text-4xl font-extrabold text-white">
+              <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-4xl text-white">
                 {countdownValue}
               </Text>
             </View>
@@ -1707,12 +1733,14 @@ export default function DuetRecordingScreen() {
               position: 'absolute',
               top: insets.top + 16,
               alignSelf: 'center',
-              borderRadius: 999,
+              borderRadius: 12,
               backgroundColor: 'rgba(0,0,0,0.45)',
               paddingHorizontal: 14,
               paddingVertical: 7,
             }}>
-            <Text className="font-body text-sm font-bold text-white">Recording {elapsed}s</Text>
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-white">
+              Recording {elapsed}s
+            </Text>
           </View>
         )}
 
@@ -1729,9 +1757,13 @@ export default function DuetRecordingScreen() {
               variant="solid"
               size="xl"
               action="primary"
-              className="h-14 w-full"
+              className="h-14 w-full rounded-[20px]"
               onPress={stopRecording}>
-              <ButtonText className="text-lg font-bold text-white">Stop Recording</ButtonText>
+              <ButtonText
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="text-lg text-white">
+                Stop Recording
+              </ButtonText>
             </LoadingButton>
           </View>
         )}
@@ -1746,7 +1778,9 @@ export default function DuetRecordingScreen() {
               paddingHorizontal: 24,
             }}>
             {dailyLimitReached && (
-              <Text className="mb-3 text-center font-body text-sm font-semibold text-white">
+              <Text
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="mb-3 text-center text-sm text-white">
                 You reached your limit for today. Come back tomorrow.
               </Text>
             )}
@@ -1761,7 +1795,9 @@ export default function DuetRecordingScreen() {
               <View className="flex-row items-center gap-x-2">
                 <Record size={20} color="#FFFFFF" weight="fill" />
 
-                <ButtonText className="text-lg font-bold text-white">
+                <ButtonText
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-lg text-white">
                   {dailyLimitReached ? 'Daily Limit Reached' : 'Start Recording'}
                 </ButtonText>
               </View>
@@ -1806,7 +1842,9 @@ export default function DuetRecordingScreen() {
                 />
               </View>
 
-              <Text className="mt-3 text-center font-heading text-2xl font-extrabold text-[#000]">
+              <Text
+                style={{ fontFamily: 'Inter_700Bold' }}
+                className="mt-3 text-center text-2xl text-[#000]">
                 Gbam. You did that!
               </Text>
 
@@ -1817,7 +1855,7 @@ export default function DuetRecordingScreen() {
           </View>
 
           {recordedVideoUri && (
-            <View className="mx-5 mt-5 overflow-hidden rounded-3xl bg-black">
+            <View className="mx-5 mt-5 overflow-hidden rounded-[24px] bg-black">
               {isCheckIn && selectedMediaType === 'image' ? (
                 <Image
                   source={{ uri: recordedVideoUri }}
@@ -1825,8 +1863,11 @@ export default function DuetRecordingScreen() {
                   contentFit="cover"
                   contentPosition="center"
                 />
-              ) : isCheckIn ? (
-                <SingleVideoPreview videoUrl={recordedVideoUri} />
+              ) : isCheckIn || (isCommunityChallenge && challenge.outputType === 'single_video') ? (
+                <SingleVideoPreview
+                  videoUrl={recordedVideoUri}
+                  musicTrack={isCommunityChallenge ? (selectedMusicTrack ?? undefined) : undefined}
+                />
               ) : currentChallengeDay === 1 ? (
                 <CompositeVideoPlayer
                   leftVideoUrl={FIRST_ATTEMPT_VIDEO_URL}
@@ -1861,21 +1902,9 @@ export default function DuetRecordingScreen() {
             </View>
           )}
 
-          <View
-            className="mx-5 mt-5 rounded-3xl bg-white px-4 py-4"
-            style={{
-              shadowColor: '#000',
-
-              shadowOffset: {
-                width: 0,
-                height: 6,
-              },
-
-              shadowOpacity: 0.05,
-              shadowRadius: 12,
-            }}>
+          <View className="mx-5 mt-5 rounded-[24px] bg-white px-4 py-4">
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-body text-sm font-bold text-[#1F1F1F]">
+              <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#1F1F1F]">
                 Caption{isCheckIn ? ' (optional)' : ' *'}
               </Text>
 
@@ -1885,7 +1914,7 @@ export default function DuetRecordingScreen() {
               </Text>
             </View>
 
-            <Textarea size="xl" className="rounded-2xl border border-[#E7E7E7] bg-[#FAFAFA]">
+            <Textarea size="xl" className="rounded-[24px] bg-[#FAFAFA]">
               <TextareaInput
                 placeholder={isCheckIn ? 'Share your check-in...' : 'Share a progress update...'}
                 value={caption}
@@ -1893,6 +1922,7 @@ export default function DuetRecordingScreen() {
                 onFocus={handleCaptionFocus}
                 onChangeText={setCaption}
                 style={{
+                  fontFamily: 'Inter_400Regular',
                   minHeight: 104,
                   textAlignVertical: 'top',
                   paddingTop: 12,
@@ -1908,9 +1938,11 @@ export default function DuetRecordingScreen() {
           </View>
 
           {!isCheckIn && (
-            <View className="mx-5 mt-4 flex-row items-center justify-between rounded-3xl bg-white px-4 py-4">
+            <View className="mx-5 mt-4 flex-row items-center justify-between rounded-[24px] bg-white px-4 py-4">
               <View className="flex-1 pr-3">
-                <Text className="font-body text-sm font-bold text-[#1F1F1F]">
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-sm text-[#1F1F1F]">
                   Allow SweatScore to repost this
                 </Text>
 
@@ -1919,8 +1951,12 @@ export default function DuetRecordingScreen() {
                 </Text>
               </View>
 
-              <View className="mr-3 rounded-full bg-[#FFF1EA] px-3 py-1">
-                <Text className="font-body text-xs font-bold text-[#FF5C1A]">+3 pt</Text>
+              <View className="mr-3 rounded-[20px] bg-[#FFF1EA] px-3 py-1">
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-xs text-[#FF5C1A]">
+                  +3 pt
+                </Text>
               </View>
 
               <Switch value={allowRepost} onValueChange={setAllowRepost} />
@@ -1932,18 +1968,22 @@ export default function DuetRecordingScreen() {
               variant="solid"
               size="xl"
               action="primary"
-              className="h-14 w-full"
+              className="h-14 w-full rounded-[20px]"
               loading={isSubmitting}
               disabled={isSubmitting || isCaptionMissing}
               onPress={handleSubmit}>
-              <ButtonText className="text-lg font-bold text-white">
+              <ButtonText
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="text-lg text-white">
                 {isCheckIn
                   ? `Submit Check-In for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`
                   : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
               </ButtonText>
             </LoadingButton>
 
-            <Text className="mt-1 text-center font-body text-sm font-semibold text-[#6F6F6F]">
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className="mt-1 text-center text-sm text-[#6F6F6F]">
               Keep the app open while your {selectedMediaType === 'image' ? 'photo' : 'video'}{' '}
               uploads
             </Text>
@@ -1953,7 +1993,7 @@ export default function DuetRecordingScreen() {
             className="mt-5 items-center"
             disabled={isSubmitting}
             onPress={handleStartOver}>
-            <Text className="font-body text-sm font-semibold text-[#6F6F6F]">
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#6F6F6F]">
               Remove or replace media
             </Text>
           </TouchableOpacity>

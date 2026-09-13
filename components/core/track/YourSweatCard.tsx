@@ -12,6 +12,7 @@ import TrackPaywallOverlay from './TrackPaywallOverlay';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { GREY, TARGETS, getBarColor } from '~/shared/activityGoals';
 import { useAuthStore } from '~/store/useAuthStore';
 import { formatPoints } from '~/utils/formatter';
 
@@ -43,32 +44,6 @@ const PERIOD_LABEL: Record<Period, string> = {
   week: 'Weekly',
   month: 'Monthly',
   year: 'Yearly',
-};
-
-const ORANGE = '#F76B1C';
-const GREY = '#D9D9D9';
-
-const TARGETS: Record<Period, Partial<Record<Category, number>>> = {
-  week: {
-    points: 10,
-    steps: 5000,
-    activeMinutes: 50,
-    moves: 1,
-  },
-
-  month: {
-    points: 125,
-    steps: 35000,
-    activeMinutes: 150,
-    moves: 5,
-  },
-
-  year: {
-    points: 500,
-    steps: 140000,
-    activeMinutes: 600,
-    moves: 20,
-  },
 };
 
 function toNumber(value: unknown): number {
@@ -105,16 +80,6 @@ function valueFor(row: Record<string, any> | undefined, category: Category): num
   }
 
   return 0;
-}
-
-function getBarColor(period: Period, category: Category, value: number): string {
-  const target = TARGETS[period]?.[category];
-
-  if (!target) {
-    return value > 0 ? ORANGE : GREY;
-  }
-
-  return value >= target ? ORANGE : GREY;
 }
 
 function buildEmptyBars(period: Period): Bar[] {
@@ -278,7 +243,7 @@ export default function YourSweatCard() {
       <View className="flex-row items-center">
         <Text
           numberOfLines={1}
-          className="flex-1 pr-3 font-heading text-xl font-bold text-[#1A1A1A]">
+          className="flex-1 pr-3 font-heading text-xl font-semibold text-[#1A1A1A]">
           Your Activity
         </Text>
 
@@ -298,7 +263,7 @@ export default function YourSweatCard() {
               Lifetime {CATEGORY_LABEL[category]}
             </Text>
 
-            <Text className="font-heading text-xl font-bold text-primary-500">
+            <Text className="font-heading text-xl font-semibold text-primary-500">
               {formatPoints(lifetimeValue)}
             </Text>
           </View>

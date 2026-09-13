@@ -20,7 +20,7 @@ const Value = ({ label, value, icon, format = false, loading = false }: ValuePro
   const formattedValue = format ? formatPoints(Number(value)) : value;
 
   return (
-    <View className="flex-col items-center justify-center rounded-2xl bg-white px-4 py-4">
+    <View className="flex-col items-center justify-center rounded-xl bg-white px-4 py-4">
       {IconComponent && icon ? (
         <View>
           <IconComponent size={28} color={colors.primary} weight="fill" />

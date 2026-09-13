@@ -98,16 +98,12 @@ export default function Email() {
               marginTop: -30,
               borderTopLeftRadius: 32,
               borderTopRightRadius: 32,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: -5 },
-              shadowOpacity: 0.05,
-              shadowRadius: 12,
             }}>
             <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
               <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
                 Let&apos;s get you set up
               </Text>
-              <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+              <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
                 What&apos;s your email?
               </Text>
               <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
@@ -121,7 +117,7 @@ export default function Email() {
                 size="xl"
                 variant="outline"
                 isInvalid={!!error}
-                className="h-14 rounded-2xl border-[#E8DDD6] bg-white">
+                className="h-14 rounded-xl bg-white">
                 <InputSlot className="pl-4">
                   <Feather name="mail" size={19} color="#FF5C1A" />
                 </InputSlot>

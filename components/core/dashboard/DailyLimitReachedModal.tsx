@@ -47,7 +47,7 @@ export const DailyLimitReachedModal = ({
       }}
       size="md">
       <AlertDialogBackdrop />
-      <AlertDialogContent className="rounded-3xl p-8">
+      <AlertDialogContent className="rounded-xl p-8">
         <AlertDialogHeader>
           <View className="w-full items-center">
             <Image
@@ -55,7 +55,7 @@ export const DailyLimitReachedModal = ({
               style={{ width: 48, height: 48 }}
               contentFit="contain"
             />
-            <Text className="mt-3 font-heading font-bold text-[#1A1A1A]" size="2xl">
+            <Text className="mt-3 font-heading font-semibold text-[#1A1A1A]" size="2xl">
               You&apos;re on a roll!
             </Text>
             <View className="mt-2 flex-row items-center gap-x-1">
@@ -78,13 +78,15 @@ export const DailyLimitReachedModal = ({
               variant="solid"
               size="xl"
               action="primary"
-              className="h-16 w-full rounded-2xl"
+              className="h-16 w-full rounded-lg"
               onPress={() => {
                 persistSkipIfChecked();
                 handleUpgrade();
                 handleClose();
               }}>
-              <ButtonText className="text-lg font-bold text-white">Remove My Daily Limit</ButtonText>
+              <ButtonText className="text-lg font-bold text-white">
+                Remove My Daily Limit
+              </ButtonText>
             </Button>
             <TouchableOpacity
               onPress={() => {

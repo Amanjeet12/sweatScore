@@ -1,4 +1,4 @@
-import { Fire, PlusCircle, UsersThree, X } from 'phosphor-react-native';
+import { Fire, PlusCircle, X } from 'phosphor-react-native';
 import {
   ActivityIndicator,
   Dimensions,
@@ -23,11 +23,13 @@ export type TodayTourTarget = {
 const TOUR_STEPS = [
   {
     eyebrow: 'Today’s Check-in',
-    title: 'Complete your daily check-in',
-    description: 'Open this card, follow today’s move, and share your proof to earn Sweat Points.',
+    title: 'Jump straight into today’s check-in',
+    description:
+      'Tap the featured banner to open video capture immediately and record today’s movement.',
     icon: Fire,
     cornerRadius: 28,
   },
+  /* Group chat temporarily disabled.
   {
     eyebrow: 'Your Community',
     title: 'Stay close to your group',
@@ -36,11 +38,11 @@ const TOUR_STEPS = [
     icon: UsersThree,
     cornerRadius: 26,
   },
+  */
   {
-    eyebrow: 'Your Activity',
-    title: 'Log everyday wins',
-    description:
-      'Use Log activity to snap live proof of hydration, healthy meals, sleep, or 10,000 steps for extra points.',
+    eyebrow: 'Your Check-Ins',
+    title: 'Choose how you show up',
+    description: 'Choose a workout or switch to Habits for hydration, meals, sleep, and 10K steps.',
     icon: PlusCircle,
     cornerRadius: 20,
   },
@@ -150,19 +152,10 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
 
         {spotlight ? (
           <View
-            className="absolute left-5 right-5 rounded-[24px] bg-white p-5"
-            style={[
-              cardPosition,
-              {
-                shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 14 },
-                shadowOpacity: 0.22,
-                shadowRadius: 24,
-                elevation: 16,
-              },
-            ]}>
+            className="absolute left-5 right-5 rounded-xl bg-white p-5"
+            style={[cardPosition, {}]}>
             <View className="flex-row items-start justify-between">
-              <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
+              <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
                 <StepIcon size={23} color="#FF5C1A" weight="duotone" />
               </View>
               <TouchableOpacity
@@ -175,10 +168,10 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
               </TouchableOpacity>
             </View>
 
-            <Text className="mt-4 font-heading text-[10px] font-extrabold uppercase tracking-[1px] text-[#FF4B1F]">
+            <Text className="mt-4 font-heading text-[10px] font-semibold uppercase tracking-[1px] text-[#FF4B1F]">
               {currentStep.eyebrow}
             </Text>
-            <Text className="mt-1 font-heading text-[21px] font-extrabold leading-7 text-[#1A1A1A]">
+            <Text className="mt-1 font-heading text-[21px] font-semibold leading-7 text-[#1A1A1A]">
               {currentStep.title}
             </Text>
             <Text className="mt-2 font-body text-sm leading-5 text-[#77716D]">
@@ -207,8 +200,8 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
                 accessibilityRole="button"
                 accessibilityLabel={isLastStep ? 'Finish Today screen tour' : 'Next tour step'}
                 onPress={onNext}
-                className="h-12 min-w-[112px] items-center justify-center rounded-[17px] bg-primary-500 px-5">
-                <Text className="font-heading text-sm font-bold text-white">
+                className="h-12 min-w-[112px] items-center justify-center rounded-lg bg-primary-500 px-5">
+                <Text className="font-heading text-sm font-semibold text-white">
                   {isLastStep ? 'Got it' : 'Next'}
                 </Text>
               </TouchableOpacity>

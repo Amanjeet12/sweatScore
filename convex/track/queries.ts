@@ -1,8 +1,6 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import { Id } from '../_generated/dataModel';
-import { query, QueryCtx } from '../_generated/server';
 import {
   getUserTimezone,
   todayInTZ,
@@ -13,6 +11,9 @@ import {
   yearOf,
   mondayOf,
 } from './helpers';
+import { Id } from '../_generated/dataModel';
+import { query, QueryCtx } from '../_generated/server';
+import { getStreakEarnedDatesInRange } from '../utils/streak';
 
 type DayBucket = {
   date: string;
@@ -69,8 +70,15 @@ async function loadWeekDays(
     .collect();
 
   const byDate = new Map(rows.map((r) => [r.date, r]));
+  const weekDates = weekDateRange(weekStart);
+  const earnedDates = await getStreakEarnedDatesInRange(
+    ctx,
+    userId,
+    weekStart,
+    addDays(weekStart, 7)
+  );
 
-  return weekDateRange(weekStart).map((date) => {
+  return weekDates.map((date) => {
     const r = byDate.get(date);
 
     return {
@@ -79,7 +87,7 @@ async function loadWeekDays(
       activeMinutes: r?.activeMinutes ?? 0,
       moves: r?.moves ?? 0,
       points: r?.points ?? 0,
-      targetMet: r?.targetMet ?? false,
+      targetMet: earnedDates.has(date),
       dailyCheckIns: r?.dailyCheckIns ?? 0,
     };
   });

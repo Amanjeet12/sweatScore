@@ -1,19 +1,7 @@
 import { usePaginatedQuery } from 'convex/react';
-import {
-  router,
-  Stack,
-  useFocusEffect,
-} from 'expo-router';
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
-import {
-  FlatList,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { router, Stack, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
 import { HeaderButton } from '~/components/core/HeaderButton';
@@ -24,11 +12,7 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 
 export default function AdminViewChallenges() {
-  const {
-    results,
-    status,
-    loadMore,
-  } = usePaginatedQuery(
+  const { results, status, loadMore } = usePaginatedQuery(
     api.admin.listChallenges,
     {},
     {
@@ -44,8 +28,7 @@ export default function AdminViewChallenges() {
    * Update this value so challenge rows can
    * change from Next Day to Current Day.
    */
-  const [currentTime, setCurrentTime] =
-    useState(Date.now());
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -77,25 +60,17 @@ export default function AdminViewChallenges() {
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () => (
-            <Text className="text-center font-heading text-2xl font-bold text-[#1A1A1A]">
+            <Text className="text-center font-heading text-2xl font-semibold text-[#1A1A1A]">
               Challenges
             </Text>
           ),
           headerShadowVisible: false,
           headerRight: () => (
-            <HeaderButton
-              minWidth={72}
-              onPress={() =>
-                router.push('/challenge/new')
-              }>
-              <Text className="text-xl font-semibold text-primary-500">
-                + Add
-              </Text>
+            <HeaderButton minWidth={72} onPress={() => router.push('/challenge/new')}>
+              <Text className="text-xl font-semibold text-primary-500">+ Add</Text>
             </HeaderButton>
           ),
-          headerLeft: () => (
-            <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />
-          ),
+          headerLeft: () => <BackButton fallbackHref="/(tabs)/dashboard/settings/admin" />,
         }}
       />
 
@@ -106,36 +81,28 @@ export default function AdminViewChallenges() {
           <FlatList
             showsVerticalScrollIndicator={false}
             data={results}
-
             /*
              * FlatList can skip rerendering rows when
              * its data array has not changed.
              */
             extraData={currentTime}
-
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() =>
                   router.push({
-                    pathname:
-                      '/challenge/[challengeId]',
+                    pathname: '/challenge/[challengeId]',
                     params: {
                       challengeId: item._id,
                     },
                   })
                 }
                 className="mb-3">
-                <ChallengeRow
-                  challenge={item}
-                  currentTime={currentTime}
-                />
+                <ChallengeRow challenge={item} currentTime={currentTime} />
               </TouchableOpacity>
             )}
             keyExtractor={(item) => item._id}
             ListEmptyComponent={
-              <Text className="text-center text-xl text-gray-500">
-                No challenges yet
-              </Text>
+              <Text className="text-center text-xl text-gray-500">No challenges yet</Text>
             }
             onEndReached={() => {
               if (status === 'CanLoadMore') {

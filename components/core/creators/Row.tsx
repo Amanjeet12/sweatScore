@@ -42,7 +42,7 @@ export default function CreatorRow({
               top: 8,
               right: 8,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
+              borderRadius: 12,
               padding: 8,
             }}>
             <PencilSimple size={20} color="white" weight="bold" />

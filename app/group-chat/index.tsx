@@ -137,11 +137,9 @@ export default function GroupListScreen() {
           </TouchableOpacity>
 
           <View className="ml-3 flex-1">
-            <Text className="font-heading text-2xl font-bold text-[#1A1A1A]">Groups</Text>
+            <Text className="font-heading text-2xl font-semibold text-[#1A1A1A]">Groups</Text>
 
-            <Text className="mt-0.5 text-sm text-[#77716D]">
-              View messages and join groups
-            </Text>
+            <Text className="mt-0.5 text-sm text-[#77716D]">View messages and join groups</Text>
           </View>
 
           <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E7]">
@@ -150,7 +148,7 @@ export default function GroupListScreen() {
         </View>
 
         {groups && groups.length > 0 ? (
-          <View className="mt-5 flex-row items-center rounded-2xl bg-[#FFF7F2] px-4 py-3">
+          <View className="mt-5 flex-row items-center rounded-xl bg-[#FFF7F2] px-4 py-3">
             <View className="h-9 w-9 items-center justify-center rounded-full bg-[#FFE4D3]">
               <Ionicons name="people" size={19} color={COLORS.primary} />
             </View>
@@ -171,7 +169,7 @@ export default function GroupListScreen() {
       {/* Search */}
       {groups && groups.length > 0 ? (
         <View className="px-5 pb-2 pt-4">
-          <View className="h-12 flex-row items-center rounded-2xl border border-[#EDE7E2] bg-white px-4">
+          <View className="h-12 flex-row items-center rounded-xl bg-white px-4">
             <Ionicons name="search-outline" size={20} color={COLORS.mutedText} />
 
             <TextInput
@@ -285,7 +283,7 @@ export default function GroupListScreen() {
                   </Text>
 
                   <View className="mt-2.5 flex-row items-center">
-                    <View className="flex-row items-center rounded-full bg-[#F7F3F0] px-2.5 py-1">
+                    <View className="flex-row items-center rounded-lg bg-[#F7F3F0] px-2.5 py-1">
                       <Ionicons name="people-outline" size={14} color={COLORS.secondaryText} />
 
                       <Text className="ml-1 text-xs text-[#77716D]">
@@ -349,7 +347,7 @@ export default function GroupListScreen() {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setSearchText('')}
-                  className="mt-5 rounded-full bg-[#F76B1C] px-6 py-3">
+                  className="mt-5 rounded-lg bg-[#F76B1C] px-6 py-3">
                   <Text className="font-lsBold text-sm text-white">Clear Search</Text>
                 </TouchableOpacity>
               ) : null}
@@ -380,24 +378,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
 
-    borderRadius: 22,
-
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 12,
 
     backgroundColor: COLORS.white,
-
-    shadowColor: '#5E3E2B',
-
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-
-    elevation: 2,
   },
 
   imageContainer: {
@@ -468,12 +451,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 12,
 
-    borderWidth: 2,
-    borderColor: COLORS.white,
-
     backgroundColor: '#E5484D',
-
-    elevation: 4,
   },
 
   unreadText: {

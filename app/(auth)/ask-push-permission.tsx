@@ -112,10 +112,6 @@ export default function AskPushPermission() {
           marginTop: -30,
           borderTopLeftRadius: 32,
           borderTopRightRadius: 32,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -5 },
-          shadowOpacity: 0.05,
-          shadowRadius: 12,
         }}>
         <ScrollView
           className="flex-1"
@@ -128,7 +124,7 @@ export default function AskPushPermission() {
           <Text className="mt-3 font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
             A little nudge, right on time
           </Text>
-          <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+          <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
             Turn on notifications
           </Text>
           <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
@@ -177,8 +173,8 @@ export default function AskPushPermission() {
             activeOpacity={0.78}
             disabled={isLoading}
             onPress={handleSkip}
-            className="mt-2 h-14 items-center justify-center rounded-[17px] border border-[#E8DDD6] bg-white px-[22px]">
-            <Text className="font-heading text-base font-bold text-[#1A1A1A]">Maybe later</Text>
+            className="mt-2 h-14 items-center justify-center rounded-lg bg-white px-[22px]">
+            <Text className="font-heading text-base font-semibold text-[#1A1A1A]">Maybe later</Text>
           </TouchableOpacity>
 
           <Text className="mt-2 text-center font-body text-[11px] text-[#9A9A9A]">

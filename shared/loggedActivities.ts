@@ -1,7 +1,7 @@
 export const LOGGED_ACTIVITIES = [
   {
     key: 'hydration',
-    title: 'Morning Hydration',
+    title: 'Hydration',
     goal: 'Start the day right and work toward your 2.5-litre target.',
     proof:
       'Start the day right to hit a 2.5-litre target. Snap a photo of your morning water, lemon water, or herbal tea.',
@@ -52,7 +52,7 @@ export const LOGGED_ACTIVITIES = [
   },
   {
     key: 'sleep',
-    title: '7-Hours Sleep',
+    title: 'Sleep',
     goal: 'Meet your seven-hour sleep target.',
     proof:
       'Snap a close-up photo of your smartwatch screen showing you met your 7-hour sleep target.',
@@ -78,7 +78,7 @@ export const LOGGED_ACTIVITIES = [
   },
   {
     key: 'steps',
-    title: '10,000 Steps',
+    title: 'Steps',
     goal: 'Reach your 10,000-step target.',
     proof: 'Snap a live close-up picture of your smartwatch showing 10,000 step target.',
     basePoints: 5,

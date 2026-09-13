@@ -111,24 +111,15 @@ export default function TabDashboardCreatorVideo() {
                     }
                   }}
                   style={{
-                    borderRadius: 9999,
-                    ...(Platform.OS === 'ios'
-                      ? {
-                          shadowColor: '#000000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.08,
-                          shadowRadius: 4,
-                        }
-                      : {
-                          elevation: 3,
-                        }),
+                    borderRadius: 12,
+                    ...(Platform.OS === 'ios' ? {} : {}),
                   }}>
                   <LinearGradient
                     colors={['#FFA480', '#FF5C1A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={{
-                      borderRadius: 9999,
+                      borderRadius: 12,
                       paddingVertical: 16,
                       alignItems: 'center',
                       justifyContent: 'center',

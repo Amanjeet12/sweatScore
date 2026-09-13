@@ -186,7 +186,7 @@ export default function TabLayout() {
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Feed
+                Community
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
@@ -209,11 +209,6 @@ export default function TabLayout() {
                       borderWidth: 2,
                       borderColor: '#FFFFFF',
                       backgroundColor: '#EF4444',
-                      shadowColor: '#EF4444',
-                      shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.65,
-                      shadowRadius: 4,
-                      elevation: 4,
                     }}
                   />
                 ) : null}

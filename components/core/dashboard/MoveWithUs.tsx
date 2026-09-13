@@ -21,7 +21,7 @@ export default function MoveWithUs() {
     <View className="mx-screen-x rounded-card bg-white p-5" style={{ marginHorizontal: 20 }}>
       {/* Header row */}
       <View className="flex-row items-center justify-between">
-        <Text className="font-heading text-xl font-bold text-[#1A1A1A]">Your Progress</Text>
+        <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Progress</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard/challenges')}>
           <Text className="font-body text-sm font-medium text-primary-500">See all</Text>
         </TouchableOpacity>
@@ -35,9 +35,7 @@ export default function MoveWithUs() {
           data={displayChallenges}
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
-          renderItem={({ item }) => (
-            <ChallengeCardWithData challenge={item} isPremium={isPro} />
-          )}
+          renderItem={({ item }) => <ChallengeCardWithData challenge={item} isPremium={isPro} />}
         />
       </View>
     </View>
@@ -45,13 +43,7 @@ export default function MoveWithUs() {
 }
 
 // Wrapper that fetches cooldown + count per challenge
-function ChallengeCardWithData({
-  challenge,
-  isPremium,
-}: {
-  challenge: any;
-  isPremium: boolean;
-}) {
+function ChallengeCardWithData({ challenge, isPremium }: { challenge: any; isPremium: boolean }) {
   const cooldown = useQuery(api.challengeCompletions.getChallengeCooldown, {
     challengeId: challenge._id,
   });
@@ -69,7 +61,7 @@ function ChallengeCardWithData({
       challenge={challenge}
       completedToday={cooldown?.completedToday ?? false}
       lastCompletedAt={cooldown?.lastCompletedAt ?? null}
-      totalCompletions={challenge.userCompletedCount  ?? 0}
+      totalCompletions={challenge.userCompletedCount ?? 0}
       isPremium={isPremium}
       onPress={handlePress}
     />

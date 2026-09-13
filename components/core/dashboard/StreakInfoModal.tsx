@@ -30,7 +30,7 @@ export default function StreakInfoModal({
   return (
     <AlertDialog isOpen={isOpen} onClose={onClose} size="md">
       <AlertDialogBackdrop />
-      <AlertDialogContent className="rounded-3xl p-8">
+      <AlertDialogContent className="rounded-xl p-8">
         {/* Close button */}
         <TouchableOpacity
           onPress={onClose}
@@ -46,20 +46,18 @@ export default function StreakInfoModal({
               style={{ width: 40, height: 40 }}
               contentFit="contain"
             />
-            <Text className="mt-3 font-heading text-xl font-bold text-[#1A1A1A]">
+            <Text className="mt-3 font-heading text-xl font-semibold text-[#1A1A1A]">
               5-Day Streak Bonus
             </Text>
           </View>
         </AlertDialogHeader>
         <AlertDialogBody className="mt-3">
           <Text className="text-center font-body text-base text-[#313131]">
-            Complete a Move With Us or hit 10 pts, 5 days this week to build your streak and earn
-            a bonus.
+            Complete a Move With Us or hit 10 pts, 5 days this week to build your streak and earn a
+            bonus.
           </Text>
           <View className="mt-4 flex-row items-center justify-center gap-x-1">
-            <Text
-              className="text-base text-[#1A1A1A]"
-              style={{ fontFamily: 'Inter_700Bold' }}>
+            <Text className="text-base text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
               Earn +{bonusPoints} pts bonus
             </Text>
             <Check size={18} color="#1A1A1A" weight="bold" />

@@ -72,14 +72,20 @@ export default function PaywallOverlay() {
         className="min-h-[250px] items-center justify-center px-8 pb-7 pt-16"
         style={{ opacity: isNavigating ? 0.7 : 1 }}>
         <View pointerEvents="none" className="items-center justify-center">
-          <View className="items-center justify-center rounded-full bg-[#1A1A1A] px-4 py-1.5">
-            <Text className="font-body text-sm font-semibold text-white">Pro</Text>
+          <View className="items-center justify-center rounded-[20px] bg-[#1A1A1A] px-4 py-1.5">
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-white">
+              Pro
+            </Text>
           </View>
-          <Text className="mt-4 text-center font-heading text-lg font-bold text-[#1A1A1A]">
+          <Text
+            style={{ fontFamily: 'Inter_700Bold' }}
+            className="mt-4 text-center text-lg text-[#1A1A1A]">
             See where you rank today, this week and this month
           </Text>
           <View className="mt-4 flex-row items-center gap-x-2 px-2 py-1">
-            <Text className="font-heading text-sm font-bold text-[#F76B1C]">Unlock your rank</Text>
+            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#F76B1C]">
+              Unlock your rank
+            </Text>
             <ArrowRight size={16} color="#F76B1C" weight="bold" />
           </View>
         </View>

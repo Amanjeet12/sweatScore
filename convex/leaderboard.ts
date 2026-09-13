@@ -502,6 +502,8 @@ type RankedLeaderboardRow = {
 export const getLeaderboardForPeriod = query({
   args: {
     period: leaderboardPeriodValidator,
+    mode: v.optional(v.union(v.literal('points'), v.literal('streak'))),
+    refreshToken: v.optional(v.number()),
     startDate: v.string(),
     endDate: v.string(),
     yearMonth: v.string(),
@@ -520,7 +522,34 @@ export const getLeaderboardForPeriod = query({
     let rankedRows: RankedLeaderboardRow[] = [];
     let myPoints = 0;
 
-    if (args.period === 'month') {
+    const allUsers = await ctx.db.query('users').collect();
+    const eligibleUsers = allUsers.filter((user) => user.isPremium || user.isAdmin);
+    const eligibleIds = new Set(eligibleUsers.map((user) => user._id));
+    const isStreak = args.mode === 'streak';
+
+    if (isStreak) {
+      const scores = await Promise.all(
+        eligibleUsers.map(async (user) => {
+          const lifetime = await ctx.db
+            .query('trackLifetime')
+            .withIndex('by_user', (q) => q.eq('userId', user._id))
+            .unique();
+          return {
+            userId: user._id,
+            displayTotalPoints: lifetime?.longestWeeklyStreak ?? 0,
+            rank: 0,
+          };
+        })
+      );
+      myPoints = scores.find((row) => row.userId === userId)?.displayTotalPoints ?? 0;
+      rankedRows = scores
+        .filter((row) => row.displayTotalPoints > 0)
+        .sort(
+          (a, b) =>
+            b.displayTotalPoints - a.displayTotalPoints ||
+            String(a.userId).localeCompare(String(b.userId))
+        );
+    } else if (args.period === 'month') {
       const monthRows = await ctx.db
         .query('monthlyLeaderboard')
         .withIndex('by_year_month_and_rank', (q) => q.eq('yearMonth', args.yearMonth))
@@ -590,17 +619,14 @@ export const getLeaderboardForPeriod = query({
         }));
     }
 
-    // The client uses this total to render the "others are also participating"
-    // line beneath the visible leaderboard. Keep the ranked rows limited to
-    // users who earned points, but base the community count on every registered
-    // app user so the installed app can show the wider SweatScore community
-    // without requiring a new mobile bundle.
-    const allUsers = await ctx.db.query('users').collect();
-    const totalUsers = allUsers.length;
-    const completedCount = rankedRows.filter(
-      (row) => row.displayTotalPoints >= targetPoints
-    ).length;
-    const visibleLimit = access === 'admin' ? rankedRows.length : access === 'paid' ? 20 : 10;
+    rankedRows = rankedRows
+      .filter((row) => eligibleIds.has(row.userId))
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+    const totalUsers = rankedRows.length;
+    const completedCount = isStreak
+      ? 0
+      : rankedRows.filter((row) => row.displayTotalPoints >= targetPoints).length;
+    const visibleLimit = 20;
 
     const hydrate = async (row: RankedLeaderboardRow): Promise<LeaderboardEntry | null> => {
       const user = await ctx.db.get(row.userId);

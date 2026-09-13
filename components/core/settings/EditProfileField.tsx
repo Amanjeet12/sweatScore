@@ -175,7 +175,7 @@ export const EditProfileField = ({ field }: { field: PROFILE_FIELD }) => {
         <LoadingButton
           variant="solid"
           size="sm"
-          className="h-16 w-full rounded-3xl"
+          className="h-16 w-full rounded-lg"
           onPress={handleSubmit}
           disabled={!isFormValid || isLoading}
           loading={isLoading}>

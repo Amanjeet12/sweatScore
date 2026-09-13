@@ -168,7 +168,7 @@ export default function PostComments() {
                 showGoldBorder
                 name={currentUser?.name}
               />
-              <View className="flex-1 flex-row items-center rounded-full bg-background-50 px-4 py-2">
+              <View className="flex-1 flex-row items-center rounded-lg bg-background-50 px-4 py-2">
                 <TextInput
                   ref={inputRef}
                   value={commentText}

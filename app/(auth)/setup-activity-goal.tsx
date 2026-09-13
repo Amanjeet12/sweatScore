@@ -102,10 +102,6 @@ export default function SetupActivityGoal() {
           marginTop: -30,
           borderTopLeftRadius: 32,
           borderTopRightRadius: 32,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -5 },
-          shadowOpacity: 0.05,
-          shadowRadius: 12,
         }}>
         <ScrollView
           className="flex-1"
@@ -114,7 +110,7 @@ export default function SetupActivityGoal() {
           <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
             Your reason, your rhythm
           </Text>
-          <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+          <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
             What brings you here?
           </Text>
           <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
@@ -137,7 +133,7 @@ export default function SetupActivityGoal() {
                   activeOpacity={0.78}
                   disabled={isLoading}
                   onPress={() => handleSelect(goal)}
-                  className="h-[52px] flex-row items-center rounded-2xl border px-2.5"
+                  className="h-[52px] flex-row items-center rounded-lg  px-2.5"
                   style={{
                     width: '48.7%',
                     borderColor: selected ? '#FF5C1A' : '#E8DDD6',

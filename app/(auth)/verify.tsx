@@ -136,16 +136,12 @@ export default function Verify() {
               marginTop: -30,
               borderTopLeftRadius: 32,
               borderTopRightRadius: 32,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: -5 },
-              shadowOpacity: 0.05,
-              shadowRadius: 12,
             }}>
             <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
               <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
                 Check your inbox
               </Text>
-              <Text className="mt-2 font-heading text-3xl font-bold leading-9 text-[#1A1A1A]">
+              <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
                 We emailed you a code
               </Text>
               <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
@@ -172,9 +168,8 @@ export default function Verify() {
                     pinCodeContainerStyle: {
                       width: otpBoxSize,
                       height: Math.min(64, otpBoxSize),
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: '#E8DDD6',
+                      borderRadius: 12,
+
                       backgroundColor: '#FFF9F6',
                     },
                     focusedPinCodeContainerStyle: {

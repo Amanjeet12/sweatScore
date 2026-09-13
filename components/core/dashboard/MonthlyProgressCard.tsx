@@ -26,7 +26,7 @@ export default function MonthlyProgressCard({
 
   return (
     <View className="">
-      <View className="overflow-hidden rounded-[22px]">
+      <View className="overflow-hidden rounded-xl">
         {/* Cover Image */}
         <Image
           source={{ uri: coverImageUrl }}
@@ -64,12 +64,12 @@ export default function MonthlyProgressCard({
           {/* Title + Points row */}
           <View className="mb-3 flex-row items-end justify-between">
             <Text
-              className="font-heading text-xl font-bold text-white"
+              className="font-heading text-xl font-semibold text-white"
               style={{ flex: 1, marginRight: 12 }}>
               {title}
             </Text>
             <View className="flex-row items-baseline">
-              <Text className="font-heading font-bold text-white" style={{ fontSize: 18 }}>
+              <Text className="font-heading font-semibold text-white" style={{ fontSize: 18 }}>
                 {formatPoints(earnedPoints)}
               </Text>
               <Text className="font-body text-white" style={{ fontSize: 18 }}>

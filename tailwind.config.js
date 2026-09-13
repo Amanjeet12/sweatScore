@@ -176,7 +176,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        heading: ['Montserrat_700Bold', 'sans-serif'],
+        heading: ['Montserrat_600SemiBold', 'sans-serif'],
         body: ['Inter_400Regular', 'sans-serif'],
         mono: ['Inter_400Regular', 'sans-serif'],
       },
