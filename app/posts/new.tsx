@@ -466,7 +466,7 @@ export default function NewPost() {
                     Daily activity
                   </Text>
                   <Text className="mt-1 font-heading text-lg font-semibold text-[#1A1A1A]">
-                    {loggedActivity.title}
+                    {loggedActivity.detailTitle}
                   </Text>
                 </View>
                 <View className="items-end py-2">

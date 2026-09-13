@@ -26,6 +26,7 @@ export const getDashboard = query({
     const timezone = await getUserTimezone(ctx, userId);
     const today = todayInTZ(timezone);
     const yearMonth = yearMonthOf(today);
+    const nextYearMonth = addMonths(yearMonth, 1);
     const currentWeekStart = mondayOf(today);
     const currentYear = Number(yearMonth.slice(0, 4));
 
@@ -34,6 +35,7 @@ export const getDashboard = query({
       monthly,
       photos,
       completions,
+      habitLogs,
       banner,
       leaderboard,
       thisYear,
@@ -57,6 +59,13 @@ export const getDashboard = query({
         .query('challengeCompletions')
         .withIndex('by_user', (q) => q.eq('userId', userId))
         .filter((q) => q.neq(q.field('removed'), true))
+        .collect(),
+      ctx.db
+        .query('dailyActivities')
+        .withIndex('by_user_date', (q) =>
+          q.eq('userId', userId).gte('date', `${yearMonth}-01`).lt('date', `${nextYearMonth}-01`)
+        )
+        .filter((q) => q.eq(q.field('reviewStatus'), 'approved'))
         .collect(),
       ctx.db.query('rewardsBannerImage').first(),
       ctx.db
@@ -103,10 +112,14 @@ export const getDashboard = query({
         challenge: await challengeFor(completion.challengeId),
       }))
     );
-    const completedCheckIns = completionKinds.filter(
+    const completedWorkoutCheckIns = completionKinds.filter(
       ({ challenge }) =>
         challenge?.type === 'check_in' || challenge?.dailyChallengeType === 'check_in'
     ).length;
+    const completedHabitCheckIns = habitLogs.filter(
+      (activity) => activity.loggedActivityKey
+    ).length;
+    const completedCheckIns = completedWorkoutCheckIns + completedHabitCheckIns;
 
     const challengeCompletionsByMonth = new Map<string, number>();
     await Promise.all(
@@ -236,6 +249,12 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Unauthorized');
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new ConvexError('User not found');
+    if (!user.isPremium && !user.isAdmin) {
+      throw new ConvexError('Premium required');
+    }
 
     const timezone = await getUserTimezone(ctx, userId);
     const weekStart = mondayOf(todayInTZ(timezone));

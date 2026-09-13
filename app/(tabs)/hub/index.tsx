@@ -51,10 +51,7 @@ export default function ChallengesScreen() {
 
   const handleJoin = async (challenge: (typeof visibleChallenges)[number]) => {
     const redirectTo = `/challenge-view/${challenge._id}`;
-    if (
-      challenge.isLocked &&
-      !requireSubscription({ redirectTo, source: 'community_challenge_join' })
-    ) {
+    if (!requireSubscription({ redirectTo, source: 'community_challenge_join' })) {
       return;
     }
 

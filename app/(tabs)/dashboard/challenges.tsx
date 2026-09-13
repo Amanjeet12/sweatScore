@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
@@ -11,6 +11,7 @@ import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { CHALLENGE_TAGS } from '~/convex/challenges';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 
 const ALL_FILTERS = ['All', ...CHALLENGE_TAGS] as const;
 
@@ -43,10 +44,22 @@ function ChallengeCardWithData({ challenge, isPremium }: { challenge: any; isPre
 export default function ChallengesScreen() {
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const { isPro } = useRevenueCat();
+  const { requireSubscription } = useSubscriptionGuard();
 
-  const challenges = useQuery(api.challengeCompletions.getPublishedChallenges, {
-    tag: selectedTag === 'All' ? undefined : selectedTag,
-  });
+  const challenges = useQuery(
+    api.challengeCompletions.getPublishedChallenges,
+    isPro ? { tag: selectedTag === 'All' ? undefined : selectedTag } : 'skip'
+  );
+
+  useEffect(() => {
+    if (isPro) return;
+    requireSubscription({
+      redirectTo: '/(tabs)/dashboard/challenges',
+      source: 'progress_videos_screen',
+    });
+  }, [isPro, requireSubscription]);
+
+  if (!isPro) return <ScreenLoading />;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">

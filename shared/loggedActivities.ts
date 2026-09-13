@@ -1,36 +1,32 @@
 export const LOGGED_ACTIVITIES = [
   {
-    key: 'hydration',
-    title: 'Hydration',
-    goal: 'Start the day right and work toward your 2.5-litre target.',
-    proof:
-      'Start the day right to hit a 2.5-litre target. Snap a photo of your morning water, lemon water, or herbal tea.',
-    basePoints: 2,
-    icon: 'hydration',
+    key: 'gym_workout',
+    title: 'Gym',
+    detailTitle: 'Gym Workout',
+    goal: 'Snap a photo at the gym to prove you showed up.',
+    proof: 'Snap a photo at the gym to prove you showed up.',
+    basePoints: 4,
+    icon: 'gym',
     captions: [
-      'Start clean, finish strong 💧',
-      'Morning hydration locked in 🧊',
-      'H2O before the day takes over 🌊',
-      'First win of the morning, done ✔️',
-      'Fuelling the body right 🧘‍♀️',
-      'Sip, smile, repeat ✨',
-      'Cleansed and ready for the day ☀️',
-      'Prioritising my health early 🫖',
-      'Water first, excuses last 🚫',
-      'Hydrated and motivated 🔋',
-      'Giving my body what it needs 🤍',
-      'Cheers to a healthy day 🥂',
-      'Morning wellness ritual checked 📝',
-      'Clear mind, full glass 💎',
-      'Unbothered and fully hydrated 🧊',
+      'Gym workout complete 💪',
+      'Showed up and put the work in 🔥',
+      'Another session in the books ✅',
+      'Stronger with every workout 🏋️‍♀️',
+      'No excuses, just progress ✨',
+      'Today’s gym session is done 🙌',
+      'Consistency looks good on me 👑',
+      'Put in the work and earned the glow 💦',
+      'One workout closer to my goals 🎯',
+      'Training complete. Feeling strong 💪',
     ],
   },
   {
     key: 'healthy_meal',
-    title: 'Healthy Meal',
+    title: 'Meal',
+    detailTitle: 'Healthy Meal',
     goal: 'Choose a healthy breakfast, lunch, or dinner.',
     proof: 'Snap a photo of your healthy breakfast, lunch, or dinner plate.',
-    basePoints: 3,
+    basePoints: 2,
     icon: 'meal',
     captions: [
       'Fuelling the temple today 🥗✨',
@@ -53,10 +49,11 @@ export const LOGGED_ACTIVITIES = [
   {
     key: 'sleep',
     title: 'Sleep',
+    detailTitle: '7 Hours Sleep',
     goal: 'Meet your seven-hour sleep target.',
     proof:
       'Snap a close-up photo of your smartwatch screen showing you met your 7-hour sleep target.',
-    basePoints: 4,
+    basePoints: 3,
     icon: 'sleep',
     captions: [
       'Sleep target met. Recovery mode completed 🔋',
@@ -79,8 +76,9 @@ export const LOGGED_ACTIVITIES = [
   {
     key: 'steps',
     title: 'Steps',
-    goal: 'Reach your 10,000-step target.',
-    proof: 'Snap a live close-up picture of your smartwatch showing 10,000 step target.',
+    detailTitle: '8,000 Steps',
+    goal: 'Reach your 8,000-step target.',
+    proof: 'Snap a live close-up picture of your smartwatch showing your 8,000-step target.',
     basePoints: 5,
     icon: 'footprints',
     captions: [
@@ -103,6 +101,17 @@ export const LOGGED_ACTIVITIES = [
   },
 ] as const;
 
+const LEGACY_HYDRATION_ACTIVITY = {
+  key: 'hydration',
+  title: 'Morning Hydration',
+  detailTitle: 'Morning Hydration',
+  goal: 'Start the day right and work toward your 2.5-litre target.',
+  proof: 'Snap a photo of your morning water, lemon water, or herbal tea.',
+  basePoints: 2,
+  icon: 'hydration',
+  captions: ['Morning hydration locked in 💧'],
+} as const;
+
 export const ACTIVITY_SUBMISSION_OPTIONS = [
   {
     mode: 'take_photo',
@@ -116,6 +125,7 @@ export type LoggedActivityKey = (typeof LOGGED_ACTIVITIES)[number]['key'];
 export type ActivitySubmissionMode = (typeof ACTIVITY_SUBMISSION_OPTIONS)[number]['mode'];
 
 export function getLoggedActivity(key: string | undefined) {
+  if (key === LEGACY_HYDRATION_ACTIVITY.key) return LEGACY_HYDRATION_ACTIVITY;
   return LOGGED_ACTIVITIES.find((activity) => activity.key === key);
 }
 

@@ -8,6 +8,7 @@ import { internalMutation, query } from './_generated/server';
 import { calculatePoints } from './activities';
 import { appVersions } from './appVersions';
 import { notificationContents } from './pushNotification';
+import { countActiveWeeks } from './utils/activeStreak';
 import { getStreakEarnedDatesInRange } from './utils/streak';
 import { addDaysUTC, getMondayInTZ, ymdUTC } from './utils/timezone';
 
@@ -494,6 +495,14 @@ type RankedLeaderboardRow = {
   displayTotalPoints: number;
 };
 
+const DEFAULT_LEADERBOARD_VISIBLE_LIMIT = 20;
+
+function parseLeaderboardVisibleLimit(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_LEADERBOARD_VISIBLE_LIMIT;
+  return Math.min(parsed, 100);
+}
+
 /*
  * Returns the leaderboard for the selected reset window without creating
  * another persisted leaderboard table. Month reuses the existing ranked
@@ -516,8 +525,15 @@ export const getLeaderboardForPeriod = query({
     if (!viewer) throw new ConvexError('User not found');
 
     const access = viewer.isAdmin ? 'admin' : viewer.isPremium ? 'paid' : 'free';
-    const banner = await ctx.db.query('rewardsBannerImage').order('desc').first();
+    const [banner, visibleLimitConfig] = await Promise.all([
+      ctx.db.query('rewardsBannerImage').order('desc').first(),
+      ctx.db
+        .query('appConfig')
+        .withIndex('by_key', (q) => q.eq('key', 'leaderboardVisibleLimit'))
+        .unique(),
+    ]);
     const targetPoints = banner?.targetPoints ?? 500;
+    const visibleLimit = parseLeaderboardVisibleLimit(visibleLimitConfig?.value);
 
     let rankedRows: RankedLeaderboardRow[] = [];
     let myPoints = 0;
@@ -528,15 +544,18 @@ export const getLeaderboardForPeriod = query({
     const isStreak = args.mode === 'streak';
 
     if (isStreak) {
+      const now = new Date();
       const scores = await Promise.all(
         eligibleUsers.map(async (user) => {
-          const lifetime = await ctx.db
-            .query('trackLifetime')
-            .withIndex('by_user', (q) => q.eq('userId', user._id))
-            .unique();
+          const weeks = await ctx.db
+            .query('trackWeekly')
+            .withIndex('by_user_weekStart', (q) => q.eq('userId', user._id))
+            .collect();
+          const currentMonday = ymdUTC(getMondayInTZ(now, user.timezone));
+
           return {
             userId: user._id,
-            displayTotalPoints: lifetime?.longestWeeklyStreak ?? 0,
+            displayTotalPoints: countActiveWeeks(weeks, currentMonday),
             rank: 0,
           };
         })
@@ -626,8 +645,6 @@ export const getLeaderboardForPeriod = query({
     const completedCount = isStreak
       ? 0
       : rankedRows.filter((row) => row.displayTotalPoints >= targetPoints).length;
-    const visibleLimit = 20;
-
     const hydrate = async (row: RankedLeaderboardRow): Promise<LeaderboardEntry | null> => {
       const user = await ctx.db.get(row.userId);
       if (!user) return null;
@@ -671,6 +688,8 @@ export const getLeaderboardForPeriod = query({
       entries,
       totalUsers,
       completedCount,
+      visibleLimit,
+      listTitle: `Top ${visibleLimit}`,
     };
   },
 });

@@ -4,26 +4,39 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack } from 'expo-router';
 import { Camera, ImageSquare, Plus } from 'phosphor-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
+import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 
 type PickedPhoto = { uri: string; mimeType?: string | null; label: string };
 
 export default function ProgressPhotoScreen() {
+  const { isPro, requireSubscription } = useSubscriptionGuard();
   // Cast is temporary until the testing Convex deployment generates this API entry.
-  const progress = useQuery(api.progressPhotos.getDashboard);
+  const progress = useQuery(api.progressPhotos.getDashboard, isPro ? {} : 'skip');
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const createProgressPhoto = useMutation(api.progressPhotos.create);
   const [frontPhoto, setFrontPhoto] = useState<PickedPhoto | null>(null);
   const [sidePhoto, setSidePhoto] = useState<PickedPhoto | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (isPro) return;
+    requireSubscription({
+      redirectTo: '/progress-photo',
+      source: 'progress_photo_screen',
+    });
+  }, [isPro, requireSubscription]);
+
   const canLog = progress?.canLogCurrentWeek ?? true;
+
+  if (!isPro) return <ScreenLoading />;
 
   const pickPhoto = async (kind: 'front' | 'side', source: 'camera' | 'library') => {
     const permission =

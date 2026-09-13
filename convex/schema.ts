@@ -60,6 +60,7 @@ const schema = defineSchema({
     loggedActivityKey: v.optional(
       v.union(
         v.literal('hydration'),
+        v.literal('gym_workout'),
         v.literal('steps'),
         v.literal('walk'),
         v.literal('workout'),

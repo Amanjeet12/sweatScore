@@ -367,7 +367,7 @@ export const completeChallenge = mutation({
       throw new ConvexError('Challenge has ended');
     }
 
-    if (challenge.isLocked && !user.isPremium && !user.isAdmin) {
+    if (!user.isPremium && !user.isAdmin) {
       throw new ConvexError('Premium required');
     }
 
@@ -1080,7 +1080,7 @@ export const joinCommunityChallenge = mutation({
     ) {
       throw new ConvexError('Challenge is not available');
     }
-    if (challenge.isLocked && !user.isPremium && !user.isAdmin) {
+    if (!user.isPremium && !user.isAdmin) {
       throw new ConvexError('Premium required');
     }
 
@@ -1425,7 +1425,11 @@ export const getPublishedChallenge = query({
 });
 
 export const getAvailableCheckIns = query({
-  args: { openedChallengeId: v.optional(v.id('challenges')) },
+  args: {
+    openedChallengeId: v.optional(v.id('challenges')),
+    // Forces time-based daily state to refresh after foregrounding the app.
+    refreshToken: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     const user = userId ? await ctx.db.get(userId) : null;
@@ -1712,6 +1716,12 @@ export const getTodayDailyChallenge = query({
       .order('desc')
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
+    const localDateHabitLogs = await ctx.db
+      .query('dailyActivities')
+      .withIndex('by_date', (q) => q.eq('date', todayStr))
+      .order('desc')
+      .filter((q) => q.eq(q.field('reviewStatus'), 'approved'))
+      .collect();
 
     const challengeTypes = new Map<string, string | undefined>();
     const checkInCompletions: typeof localDateCompletions = [];
@@ -1730,18 +1740,22 @@ export const getTodayDailyChallenge = query({
       }
     }
 
-    const uniqueCompletions = checkInCompletions.filter(
-      (completion, index, completions) =>
-        completions.findIndex((item) => String(item.userId) === String(completion.userId)) === index
+    const checkInActions = [
+      ...checkInCompletions,
+      ...localDateHabitLogs.filter((activity) => Boolean(activity.loggedActivityKey)),
+    ].sort((first, second) => second._creationTime - first._creationTime);
+    const uniqueCheckInUsers = checkInActions.filter(
+      (action, index, actions) =>
+        actions.findIndex((item) => String(item.userId) === String(action.userId)) === index
     );
-    const actualCheckInCount = uniqueCompletions.length;
+    const actualCheckInCount = uniqueCheckInUsers.length;
     const recentCheckInUsers = await Promise.all(
-      uniqueCompletions.slice(0, 5).map(async (completion) => {
-        const user = await ctx.db.get(completion.userId);
+      uniqueCheckInUsers.slice(0, 5).map(async (action) => {
+        const user = await ctx.db.get(action.userId);
         const name = getSafeMemberName(user);
 
         return {
-          userId: completion.userId,
+          userId: action.userId,
           imageUrl: await getSafeUserImageUrl(ctx, user?.image),
           initial: Array.from(name)[0]?.toUpperCase() ?? '?',
         };

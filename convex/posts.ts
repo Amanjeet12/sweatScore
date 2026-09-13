@@ -463,6 +463,7 @@ export const createPost = mutation({
     activityKey: v.optional(
       v.union(
         v.literal('hydration'),
+        v.literal('gym_workout'),
         v.literal('steps'),
         v.literal('walk'),
         v.literal('workout'),
@@ -508,8 +509,13 @@ export const createPost = mutation({
         .query('dailyActivities')
         .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
         .collect();
+      const equivalentActivityKeys =
+        args.activityKey === 'gym_workout' || args.activityKey === 'hydration'
+          ? new Set(['gym_workout', 'hydration'])
+          : new Set([args.activityKey]);
       const alreadyLogged = activitiesForDate.some(
-        (activity) => activity.loggedActivityKey === args.activityKey
+        (activity) =>
+          activity.loggedActivityKey && equivalentActivityKeys.has(activity.loggedActivityKey)
       );
 
       if (alreadyLogged) {
@@ -571,7 +577,10 @@ export const createPost = mutation({
 });
 
 export const getLoggedActivityKeysToday = query({
-  args: {},
+  args: {
+    // Forces time-based daily state to refresh after foregrounding the app.
+    refreshToken: v.optional(v.number()),
+  },
   returns: v.array(v.string()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -588,7 +597,11 @@ export const getLoggedActivityKeysToday = query({
     return Array.from(
       new Set(
         activities
-          .map((activity) => activity.loggedActivityKey)
+          .map((activity) =>
+            activity.loggedActivityKey === 'hydration'
+              ? ('gym_workout' as const)
+              : activity.loggedActivityKey
+          )
           .filter((key): key is NonNullable<typeof key> => Boolean(key))
       )
     );

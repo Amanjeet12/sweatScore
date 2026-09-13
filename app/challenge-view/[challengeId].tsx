@@ -231,13 +231,10 @@ export default function ChallengeViewScreen() {
   const handleStartChallenge = () => {
     safePausePlayer();
 
-    const hasSubscription =
-      challenge?.isCommunityChallenge === true && !challenge.isLocked
-        ? true
-        : requireSubscription({
-            redirectTo: `/challenge-view/${challengeId}`,
-            source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
-          });
+    const hasSubscription = requireSubscription({
+      redirectTo: `/challenge-view/${challengeId}`,
+      source: isCheckIn ? 'challenge_check_in' : 'challenge_record_video',
+    });
 
     if (!hasSubscription) {
       return;
@@ -258,13 +255,10 @@ export default function ChallengeViewScreen() {
   };
 
   const handleJoinCommunityChallenge = async () => {
-    const allowed =
-      communityChallenge && !communityChallenge.isLocked
-        ? true
-        : requireSubscription({
-            redirectTo: `/challenge-view/${challengeId}`,
-            source: 'community_challenge_join',
-          });
+    const allowed = requireSubscription({
+      redirectTo: `/challenge-view/${challengeId}`,
+      source: 'community_challenge_join',
+    });
     if (!allowed) return;
 
     setJoiningCommunityChallenge(true);
@@ -570,7 +564,7 @@ export default function ChallengeViewScreen() {
               {isCheckIn ? (
                 <View
                   pointerEvents="none"
-                  className="absolute right-3 top-3 rounded-full bg-[#FF5C35] px-3 py-1.5"
+                  className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1.5"
                   style={{ zIndex: 2 }}>
                   <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-white">
                     +{selectedCheckIn?.points ?? challenge.points} pts

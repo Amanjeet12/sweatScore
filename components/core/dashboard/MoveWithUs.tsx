@@ -7,9 +7,11 @@ import ChallengeCard from './ChallengeCard';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 
 export default function MoveWithUs() {
   const { isPro } = useRevenueCat();
+  const { requireSubscription } = useSubscriptionGuard();
 
   const challenges = useQuery(api.challengeCompletions.getPublishedChallenges, {});
 
@@ -22,7 +24,12 @@ export default function MoveWithUs() {
       {/* Header row */}
       <View className="flex-row items-center justify-between">
         <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Progress</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard/challenges')}>
+        <TouchableOpacity
+          onPress={() => {
+            const redirectTo = '/(tabs)/dashboard/challenges';
+            if (!requireSubscription({ redirectTo, source: 'progress_videos' })) return;
+            router.push(redirectTo);
+          }}>
           <Text className="font-body text-sm font-medium text-primary-500">See all</Text>
         </TouchableOpacity>
       </View>

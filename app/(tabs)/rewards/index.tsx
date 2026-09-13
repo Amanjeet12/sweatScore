@@ -22,6 +22,7 @@ import SafeAreaView from '~/components/core/SafeAreaView';
 import TrendRangeDropdown from '~/components/core/track/TrendRangeDropdown';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { TARGETS, getBarColor } from '~/shared/activityGoals';
 import { useAuthStore } from '~/store/useAuthStore';
 
@@ -108,6 +109,18 @@ export default function TabTrack() {
   const [metric, setMetric] = useState<TrendMetric>('points');
   const [range, setRange] = useState<TrendRange>('year');
   const [sharing, setSharing] = useState(false);
+  const { requireSubscription } = useSubscriptionGuard();
+
+  const openProgressPhoto = () => {
+    if (
+      !requireSubscription({
+        redirectTo: '/progress-photo',
+        source: 'progress_photo_upload',
+      })
+    )
+      return;
+    router.push('/progress-photo');
+  };
 
   const photos = progress?.photos ?? [];
   const currentPhoto = photos[selectedWeekIndex] ?? photos[photos.length - 1];
@@ -151,6 +164,13 @@ export default function TabTrack() {
 
   const handleShare = () => {
     if (!comparisonLeft || !comparisonRight) return;
+    if (
+      !requireSubscription({
+        redirectTo: '/(tabs)/rewards',
+        source: 'progress_comparison_share',
+      })
+    )
+      return;
     Alert.alert('Share your journey', 'Choose how you would like to share this comparison.', [
       {
         text: 'Share to Feed',
@@ -338,7 +358,7 @@ export default function TabTrack() {
             ) : (
               <View className="mt-4 flex-row gap-x-3">
                 <TouchableOpacity
-                  onPress={() => router.push('/progress-photo')}
+                  onPress={openProgressPhoto}
                   className="h-[160px] flex-1 items-center justify-center rounded-[24px]    bg-[#FFF9F6]">
                   <Camera size={28} color={PRIMARY} />
                   <Text
@@ -360,7 +380,7 @@ export default function TabTrack() {
             )}
             <View className="mt-4 flex-row gap-x-2">
               <TouchableOpacity
-                onPress={() => router.push('/progress-photo')}
+                onPress={openProgressPhoto}
                 className="h-10 flex-1 flex-row items-center justify-center rounded-[20px] bg-white">
                 <Camera size={15} color={PRIMARY} />
                 <Text
@@ -391,7 +411,7 @@ export default function TabTrack() {
           </View>
 
           <View className="mt-4 rounded-[24px] bg-white px-4 pb-4 pt-5">
-            <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center justify-between" style={{ zIndex: 10 }}>
               <View>
                 <Text
                   style={{ fontFamily: 'Inter_700Bold' }}
@@ -404,10 +424,10 @@ export default function TabTrack() {
             <View className="mt-4 flex-row rounded-[24px] bg-[#F1EEEA] p-1">
               {(
                 [
-                  ['challenges', 'Challenges'],
-                  ['steps', 'Steps'],
-                  ['activeMinutes', 'Active min'],
                   ['points', 'Points'],
+                  ['steps', 'Steps'],
+                  ['activeMinutes', 'Active Minutes'],
+                  ['challenges', 'Challenges'],
                 ] as const
               ).map(([id, label]) => (
                 <Pressable

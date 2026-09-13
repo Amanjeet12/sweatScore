@@ -3,8 +3,8 @@ import { router } from 'expo-router';
 import {
   ArrowLeft,
   ArrowRight,
+  Barbell,
   Camera,
-  Drop,
   Footprints,
   ForkKnife,
   MoonStars,
@@ -34,6 +34,7 @@ import {
   getLoggedActivity,
   getRandomActivityCaption,
 } from '~/shared/loggedActivities';
+import { ensureHabitCameraPermission } from '~/utils/runtimePermissions';
 
 const PRIMARY = '#FF5C1A';
 
@@ -41,8 +42,8 @@ function ActivityIcon({ name, size = 22 }: { name: string; size?: number }) {
   const props = { size, color: PRIMARY, weight: 'duotone' as const };
 
   switch (name) {
-    case 'hydration':
-      return <Drop {...props} />;
+    case 'gym':
+      return <Barbell {...props} />;
     case 'footprints':
       return <Footprints {...props} />;
     case 'sleep':
@@ -86,11 +87,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
     setIsOpeningMedia(true);
 
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Camera access needed', 'Allow camera access to capture your activity proof.');
-        return;
-      }
+      if (!(await ensureHabitCameraPermission())) return;
 
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
@@ -208,7 +205,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                     <View className="min-w-0 flex-1">
                       <View className="flex-row items-center justify-between">
                         <Text className="font-heading text-sm font-semibold text-[#1A1A1A]">
-                          {selectedActivity.title}
+                          {selectedActivity.detailTitle}
                         </Text>
                         <Text className="font-heading text-xs font-semibold text-[#E94F12]">
                           +{selectedActivity.basePoints} pts

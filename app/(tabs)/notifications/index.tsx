@@ -181,7 +181,12 @@ export default function TabRank() {
   const ListHeader = (
     <View>
       <View style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-        <LeaderboardHeader mode={mode} timeLeft={timeLeft} onChangeMode={setMode} />
+        <LeaderboardHeader
+          title={leaderboard.listTitle}
+          mode={mode}
+          timeLeft={timeLeft}
+          onChangeMode={setMode}
+        />
       </View>
 
       <Podium podium={leaderboard.podium} onPressEntry={goToUser} mode={mode} />
@@ -215,7 +220,7 @@ export default function TabRank() {
             {otherParticipantCount === 1
               ? 'other is also participating'
               : 'others are also participating'}{' '}
-            {mode === 'streak' ? 'with a recorded streak.' : 'in this month’s League.'}
+            {mode === 'streak' ? 'with an active streak.' : 'in this month’s League.'}
           </Text>
         </View>
       ) : null}
@@ -249,7 +254,7 @@ export default function TabRank() {
         ListEmptyComponent={
           mode === 'streak' && entries.length === 0 ? (
             <Text className="px-5 py-6 text-center font-body text-sm text-[#817A76]">
-              No recorded streaks yet. Check in or log a habit on 5 days to earn your first week.
+              No active streaks yet. Check in or log a habit on 5 days to earn your first week.
             </Text>
           ) : null
         }

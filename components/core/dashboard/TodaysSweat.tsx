@@ -9,7 +9,6 @@ import {
   Camera,
   Check,
   CrownSimple,
-  Drop,
   Footprints,
   ForkKnife,
   Heartbeat,
@@ -47,11 +46,13 @@ import {
 } from '~/shared/loggedActivities';
 import { useAuthStore } from '~/store/useAuthStore';
 import { useTabStore } from '~/store/useTabStore';
+import { ensureHabitCameraPermission } from '~/utils/runtimePermissions';
 import { storage } from '~/utils/storage';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
 
 const PRIMARY = '#FF5C35';
 const CHECK_IN_CATEGORY_ORDER = ['strength', 'core', 'cardio', 'jump rope'] as const;
+const PENDING_HABIT_ACTIVITY_KEY = 'pending_habit_activity_key';
 
 type ActivityTab = 'check_in' | 'quick_log';
 type IconComponent = ComponentType<{ size?: number; color?: string; weight?: any }>;
@@ -66,7 +67,7 @@ function getCheckInIcon(name: string): IconComponent {
 }
 
 function getQuickLogIcon(key: LoggedActivityKey): IconComponent {
-  if (key === 'hydration') return Drop;
+  if (key === 'gym_workout') return Barbell;
   if (key === 'healthy_meal') return ForkKnife;
   if (key === 'sleep') return MoonStars;
   return Footprints;
@@ -76,12 +77,14 @@ function SelectableCard({
   title,
   selected,
   completed,
+  disabled = false,
   icon: Icon,
   onPress,
 }: {
   title: string;
   selected: boolean;
   completed?: boolean;
+  disabled?: boolean;
   icon: IconComponent;
   onPress: () => void;
 }) {
@@ -89,26 +92,29 @@ function SelectableCard({
     <TouchableOpacity
       activeOpacity={0.78}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={`${title}${completed ? ', completed' : ''}`}
+      disabled={disabled}
       onPress={onPress}
       className="min-h-[64px] flex-1 flex-row items-center rounded-[20px] px-3 py-2"
       style={{
         borderWidth: 1,
         borderColor: '#E3E1DE',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: disabled ? '#F6F4F2' : '#FFFFFF',
+        opacity: disabled ? 0.55 : 1,
       }}>
       <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
         {completed ? (
           <Check size={22} color={PRIMARY} weight="bold" />
         ) : (
-          <Icon size={24} color={PRIMARY} weight="regular" />
+          <Icon size={24} color={disabled ? '#8F8985' : PRIMARY} weight="regular" />
         )}
       </View>
       <View className="ml-2 min-w-0 flex-1">
         <Text
           numberOfLines={2}
-          className="font-heading text-[13px] font-semibold leading-[18px] text-[#1D1B1A]">
+          className="font-heading text-[13px] font-semibold leading-[18px]"
+          style={{ color: disabled ? '#8F8985' : '#1D1B1A' }}>
           {title}
         </Text>
       </View>
@@ -125,7 +131,6 @@ function NextStepRow({
   divider,
   compactTitle = false,
   disabled = false,
-  completed = false,
 }: {
   icon: IconComponent;
   title: string;
@@ -135,7 +140,6 @@ function NextStepRow({
   divider?: boolean;
   compactTitle?: boolean;
   disabled?: boolean;
-  completed?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -150,11 +154,7 @@ function NextStepRow({
         opacity: disabled ? 0.55 : 1,
       }}>
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
-        {completed ? (
-          <Check size={22} color={PRIMARY} weight="bold" />
-        ) : (
-          <Icon size={21} color={disabled ? '#807A76' : PRIMARY} weight="regular" />
-        )}
+        <Icon size={21} color={disabled ? '#807A76' : PRIMARY} weight="regular" />
       </View>
       <View className="ml-3 min-w-0 flex-1 pr-2">
         <Text
@@ -246,10 +246,20 @@ export default function TodaysSweat({
     },
     []
   );
-  const [selectedQuickLog, setSelectedQuickLog] = useState<LoggedActivityKey>('hydration');
+  const [selectedQuickLog, setSelectedQuickLog] = useState<LoggedActivityKey>('gym_workout');
   const [isOpeningCamera, setIsOpeningCamera] = useState(false);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
-  const [leaderboardViewed, setLeaderboardViewed] = useState(false);
+
+  const openProgressPhoto = () => {
+    if (
+      !requireSubscription({
+        redirectTo: '/progress-photo',
+        source: 'today_progress_photo',
+      })
+    )
+      return;
+    router.push('/progress-photo');
+  };
 
   const today = useMemo(
     () => formatDateYYYYMMDD(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone),
@@ -268,12 +278,16 @@ export default function TodaysSweat({
   );
   const availableCheckInsResult = useQuery(api.challengeCompletions.getAvailableCheckIns, {
     openedChallengeId: dailyChallenge?._id,
+    refreshToken: refreshKey,
   });
   const availableCheckIns = useRetainedQueryResult(
     availableCheckInsResult,
     String(currentUser?._id ?? 'guest')
   );
-  const loggedActivityKeys = useQuery(api.posts.getLoggedActivityKeysToday, canLoad ? {} : 'skip');
+  const loggedActivityKeys = useQuery(
+    api.posts.getLoggedActivityKeysToday,
+    canLoad ? { refreshToken: refreshKey } : 'skip'
+  );
   const weeklyProgress = useQuery(api.progressPhotos.getDashboard, canLoad ? {} : 'skip');
   const weeklyProgressLogged = weeklyProgress?.canLogCurrentWeek === false;
   const health = useQuery(api.activities.getPointsForDate, canLoad ? { date: today } : 'skip');
@@ -299,6 +313,8 @@ export default function TodaysSweat({
     [availableCheckIns]
   );
   const checkInCompleted = visibleCheckIns.some((item) => item.userCompletedToday);
+  const completedWorkoutFromServer =
+    availableCheckInsResult?.some((item) => item.userCompletedToday) ?? false;
   const completedCheckInId = visibleCheckIns.find(
     (item) => item.userCompletedThisCheckIn
   )?.challengeId;
@@ -308,13 +324,77 @@ export default function TodaysSweat({
   const SelectedHabitIcon = getQuickLogIcon(selectedQuickLog);
   const quickLogCompleted = loggedActivityKeys?.includes(selectedQuickLog) ?? false;
   const checkInPoints = pointsToday?.checkInPoints ?? 0;
-  const leaderboardViewedKey = `today_leaderboard_viewed_${currentUser?._id ?? 'guest'}_${today}`;
+
+  const openHabitPost = useCallback((activityKey: string, asset: ImagePicker.ImagePickerAsset) => {
+    const activity = getLoggedActivity(activityKey);
+    if (!activity) return;
+
+    router.push({
+      pathname: '/posts/new',
+      params: {
+        activityKey: activity.key,
+        activityMode: 'take_photo',
+        activityCaption: getRandomActivityCaption(activity.key),
+        activityMediaUri: asset.uri,
+        activityMediaType: 'image',
+        activityMediaWidth: String(asset.width ?? 0),
+        activityMediaHeight: String(asset.height ?? 0),
+        activityMediaMimeType: asset.mimeType ?? 'image/jpeg',
+        activityMediaFileName: asset.fileName ?? '',
+      },
+    });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setLeaderboardViewed(storage.getBoolean(leaderboardViewedKey) ?? false);
-    }, [leaderboardViewedKey])
+      if (Platform.OS !== 'android') return;
+
+      const pendingActivityKey = storage.getString(PENDING_HABIT_ACTIVITY_KEY);
+      if (!pendingActivityKey) return;
+
+      let cancelled = false;
+      ImagePicker.getPendingResultAsync()
+        .then((pendingResults) => {
+          if (cancelled) return;
+          if (!pendingResults.length) {
+            storage.delete(PENDING_HABIT_ACTIVITY_KEY);
+            return;
+          }
+          storage.delete(PENDING_HABIT_ACTIVITY_KEY);
+
+          const recovered = pendingResults.find(
+            (result): result is ImagePicker.ImagePickerSuccessResult =>
+              'assets' in result && !result.canceled && Boolean(result.assets[0])
+          );
+          if (recovered?.assets[0]) {
+            openHabitPost(pendingActivityKey, recovered.assets[0]);
+            return;
+          }
+
+          const failure = pendingResults.find((result) => 'message' in result);
+          Alert.alert(
+            'Could not recover photo',
+            failure && 'message' in failure
+              ? failure.message
+              : 'Please take your habit proof photo again.'
+          );
+        })
+        .catch((error) => {
+          console.warn('Unable to recover pending habit photo:', error);
+          storage.delete(PENDING_HABIT_ACTIVITY_KEY);
+          Alert.alert('Could not recover photo', 'Please take your habit proof photo again.');
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [openHabitPost])
   );
+
+  useEffect(() => {
+    if (availableCheckInsResult === undefined) return;
+    setActiveTab(completedWorkoutFromServer ? 'quick_log' : 'check_in');
+  }, [completedWorkoutFromServer, today, availableCheckInsResult]);
 
   useEffect(() => {
     if (!visibleCheckIns.length) return;
@@ -352,34 +432,20 @@ export default function TodaysSweat({
       return;
     setIsOpeningCamera(true);
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Camera access needed', 'Allow camera access to capture your activity proof.');
-        return;
-      }
+      if (!(await ensureHabitCameraPermission())) return;
+      storage.set(PENDING_HABIT_ACTIVITY_KEY, selectedActivity.key);
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.7,
         selectionLimit: 1,
       });
+      storage.delete(PENDING_HABIT_ACTIVITY_KEY);
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
-      router.push({
-        pathname: '/posts/new',
-        params: {
-          activityKey: selectedActivity.key,
-          activityMode: 'take_photo',
-          activityCaption: getRandomActivityCaption(selectedActivity.key),
-          activityMediaUri: asset.uri,
-          activityMediaType: 'image',
-          activityMediaWidth: String(asset.width ?? 0),
-          activityMediaHeight: String(asset.height ?? 0),
-          activityMediaMimeType: asset.mimeType ?? 'image/jpeg',
-          activityMediaFileName: asset.fileName ?? '',
-        },
-      });
+      openHabitPost(selectedActivity.key, asset);
     } catch (error) {
+      storage.delete(PENDING_HABIT_ACTIVITY_KEY);
       console.warn('Unable to open activity proof camera:', error);
       Alert.alert('Could not open camera', 'Please try capturing your activity proof again.');
     } finally {
@@ -415,14 +481,19 @@ export default function TodaysSweat({
             ] as const
           ).map(([value, label]) => {
             const selected = activeTab === value;
+            const disabled = value === 'check_in' && checkInCompleted;
             return (
               <TouchableOpacity
                 key={value}
                 activeOpacity={0.8}
+                accessibilityRole="tab"
+                accessibilityState={{ selected, disabled }}
+                disabled={disabled}
                 onPress={() => setActiveTab(value)}
                 className="flex-1 items-center justify-center rounded-[20px]"
                 style={{
                   backgroundColor: selected ? '#FFFFFF' : 'transparent',
+                  opacity: disabled ? 0.45 : 1,
                 }}>
                 <Text
                   className="font-heading text-sm font-semibold"
@@ -448,6 +519,7 @@ export default function TodaysSweat({
                         icon={getCheckInIcon(checkIn.categoryName)}
                         selected={selectedCheckIn?.challengeId === checkIn.challengeId}
                         completed={completedCheckInId === checkIn.challengeId}
+                        disabled={checkInCompleted}
                         onPress={() => openCheckIn(checkIn.challengeId)}
                       />
                     ))}
@@ -466,19 +538,23 @@ export default function TodaysSweat({
           ) : (
             [0, 2].map((start) => (
               <View key={start} className="flex-row gap-x-3">
-                {LOGGED_ACTIVITIES.slice(start, start + 2).map((activity) => (
-                  <SelectableCard
-                    key={activity.key}
-                    title={activity.title}
-                    icon={getQuickLogIcon(activity.key)}
-                    selected={selectedQuickLog === activity.key}
-                    completed={loggedActivityKeys?.includes(activity.key)}
-                    onPress={() => {
-                      setSelectedQuickLog(activity.key);
-                      setShowHabitDetails(true);
-                    }}
-                  />
-                ))}
+                {LOGGED_ACTIVITIES.slice(start, start + 2).map((activity) => {
+                  const completed = loggedActivityKeys?.includes(activity.key) ?? false;
+                  return (
+                    <SelectableCard
+                      key={activity.key}
+                      title={activity.title}
+                      icon={getQuickLogIcon(activity.key)}
+                      selected={selectedQuickLog === activity.key}
+                      completed={completed}
+                      disabled={completed}
+                      onPress={() => {
+                        setSelectedQuickLog(activity.key);
+                        setShowHabitDetails(true);
+                      }}
+                    />
+                  );
+                })}
               </View>
             ))
           )}
@@ -497,7 +573,6 @@ export default function TodaysSweat({
           detail="Earn more points"
           action="Open"
           onPress={() => router.push('/(tabs)/hub')}
-          completed={pointsToday?.challengeCompleted ?? false}
           divider
         />
         <NextStepRow
@@ -505,10 +580,7 @@ export default function TodaysSweat({
           title="View the leaderboard"
           detail="See where you rank"
           action="View"
-          completed={leaderboardViewed}
           onPress={() => {
-            storage.set(leaderboardViewedKey, true);
-            setLeaderboardViewed(true);
             router.push('/(tabs)/notifications');
           }}
           divider
@@ -519,8 +591,7 @@ export default function TodaysSweat({
           detail={weeklyProgressLogged ? 'This week is logged' : 'Track your progress weekly'}
           action={weeklyProgressLogged ? 'Logged' : weeklyProgress === undefined ? '…' : 'Add'}
           disabled={weeklyProgress === undefined || weeklyProgressLogged}
-          completed={weeklyProgressLogged}
-          onPress={() => router.push('/progress-photo')}
+          onPress={openProgressPhoto}
           compactTitle
         />
       </View>
@@ -614,7 +685,7 @@ export default function TodaysSweat({
                 <View className="min-w-0 flex-1">
                   <View className="flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
                     <Text className="font-heading text-[13px] font-semibold text-[#1A1A1A]">
-                      {selectedActivity?.title}
+                      {selectedActivity?.detailTitle}
                     </Text>
                     <Text className="font-heading text-xs font-semibold text-[#FF4B1F]">
                       +{selectedActivity?.basePoints} pts

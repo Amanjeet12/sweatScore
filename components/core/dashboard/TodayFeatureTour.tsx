@@ -42,7 +42,8 @@ const TOUR_STEPS = [
   {
     eyebrow: 'Your Check-Ins',
     title: 'Choose how you show up',
-    description: 'Choose a workout or switch to Habits for hydration, meals, sleep, and 10K steps.',
+    description:
+      'Choose a workout or switch to Habits for gym sessions, meals, sleep, and 8K steps.',
     icon: PlusCircle,
     cornerRadius: 20,
   },

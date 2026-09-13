@@ -69,7 +69,7 @@ export default function ChallengeCard({
       })()
     : 0;
 
-  const isLocked = challenge.isLocked && !isPremium;
+  const isLocked = !isPremium;
   const lastDoneText = formatLastDone(lastCompletedAt);
 
   // 0–29 completions: goal is 30 days

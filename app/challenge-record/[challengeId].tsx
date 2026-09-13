@@ -46,6 +46,7 @@ import {
   getRandomBackgroundMusicTrack,
 } from '~/utils/backgroundMusic';
 import { getErrorMessage } from '~/utils/error-message';
+import { ensureRuntimePermission } from '~/utils/runtimePermissions';
 
 const COUNTDOWN_SECONDS = 5;
 const MIN_STOP_RECORDING_SECONDS = 1;
@@ -197,6 +198,23 @@ function SingleVideoPreview({
 }
 
 export default function DuetRecordingScreen() {
+  const { challengeId } = useLocalSearchParams<{ challengeId: string }>();
+  const { isPro, requireSubscription } = useSubscriptionGuard();
+
+  useEffect(() => {
+    if (isPro) return;
+    requireSubscription({
+      redirectTo: `/challenge-view/${challengeId}`,
+      source: 'challenge_record_screen',
+    });
+  }, [challengeId, isPro, requireSubscription]);
+
+  if (!isPro) return <ScreenLoading />;
+
+  return <DuetRecordingContent />;
+}
+
+function DuetRecordingContent() {
   useKeepAwake();
 
   const { challengeId, checkInMode } = useLocalSearchParams<{
@@ -270,9 +288,28 @@ export default function DuetRecordingScreen() {
   const backgroundMusicRef = useRef<Audio.Sound | null>(null);
   const backgroundMusicLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
 
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [cameraPermission, requestCameraPermission, getCameraPermission] = useCameraPermissions();
 
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [micPermission, requestMicPermission, getMicPermission] = useMicrophonePermissions();
+
+  const permissionPromptStartedRef = useRef(false);
+
+  const requestRecordingPermissions = useCallback(async () => {
+    const cameraGranted = await ensureRuntimePermission({
+      current: cameraPermission,
+      request: requestCameraPermission,
+      name: 'Camera',
+      purpose: 'Camera access is needed to record your workout proof.',
+    });
+    if (!cameraGranted) return false;
+
+    return ensureRuntimePermission({
+      current: micPermission,
+      request: requestMicPermission,
+      name: 'Microphone',
+      purpose: 'Microphone access is needed to record sound with your workout proof.',
+    });
+  }, [cameraPermission, micPermission, requestCameraPermission, requestMicPermission]);
 
   const challenge = useQuery(api.challengeCompletions.getPublishedChallenge, {
     challengeId: challengeId as Id<'challenges'>,
@@ -528,21 +565,31 @@ export default function DuetRecordingScreen() {
       return;
     }
 
-    if (!cameraPermission?.granted) {
-      requestCameraPermission();
-    }
+    if (cameraPermission?.granted && micPermission?.granted) return;
+    if (permissionPromptStartedRef.current) return;
 
-    if (!micPermission?.granted) {
-      requestMicPermission();
-    }
+    permissionPromptStartedRef.current = true;
+    requestRecordingPermissions().catch((error) => {
+      console.warn('Unable to request recording permissions:', error);
+    });
   }, [
     cameraPermission?.granted,
     micPermission?.granted,
-    requestCameraPermission,
-    requestMicPermission,
+    requestRecordingPermissions,
     challenge?.type,
     isVideoRecorderOpen,
   ]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      Promise.all([getCameraPermission(), getMicPermission()]).catch((error) => {
+        console.warn('Unable to refresh recording permissions:', error);
+      });
+    });
+
+    return () => subscription.remove();
+  }, [getCameraPermission, getMicPermission]);
 
   useEffect(() => {
     return () => {
@@ -1440,10 +1487,7 @@ export default function DuetRecordingScreen() {
           variant="solid"
           size="lg"
           action="primary"
-          onPress={async () => {
-            await requestCameraPermission();
-            await requestMicPermission();
-          }}>
+          onPress={requestRecordingPermissions}>
           <ButtonText>Grant Permissions</ButtonText>
         </LoadingButton>
 
