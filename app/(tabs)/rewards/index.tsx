@@ -63,6 +63,16 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(Math.max(0, Math.round(value)));
 }
 
+function formatCompactNumber(value: number) {
+  const roundedValue = Math.max(0, Math.round(value));
+  if (roundedValue < 1000) return formatNumber(roundedValue);
+
+  const thousands = roundedValue / 1000;
+  return `${new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: thousands < 10 ? 1 : 0,
+  }).format(thousands)}k`;
+}
+
 function monthName(yearMonth: string) {
   const [year, month] = yearMonth.split('-').map(Number);
   return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(
@@ -134,14 +144,20 @@ export default function TabTrack() {
   const nextWeekNumber = photos.length + 1;
 
   const trend = useMemo(() => {
-    return progress?.trend?.[range] ?? [];
-  }, [progress?.trend, range]);
+    const selectedTrend = progress?.trend?.[range] ?? [];
+    if (range !== 'year' || !progress?.currentMonth) return selectedTrend;
+
+    const currentYear = progress.currentMonth.slice(0, 4);
+    return selectedTrend.filter(
+      (item) => item.key >= `${currentYear}-01` && item.key <= progress.currentMonth
+    );
+  }, [progress?.currentMonth, progress?.trend, range]);
   const trendValue = (item: TrendDatum) => item[metric];
   const goalCategory = metric === 'challenges' ? 'moves' : metric;
   const trendTarget = TARGETS[range][goalCategory];
   const maxTrend = Math.max(1, trendTarget, ...trend.map(trendValue)) * 1.18;
   const periodTotal = trend.reduce((total, item) => total + trendValue(item), 0);
-  const periodLabel = range === 'year' ? 'over the last 12 months' : `this ${range}`;
+  const periodLabel = `this ${range}`;
   const trendLabel =
     metric === 'activeMinutes' ? 'active min' : metric === 'challenges' ? 'challenges' : metric;
 
@@ -180,7 +196,7 @@ export default function TabTrack() {
             const uri = await captureComparison();
             const media = await uploadComparison(uri);
             await createPost({
-              body: `My progress journey — Week 1 to Week ${currentWeekNumber}.`,
+              body: `My progress journey so far.`,
               media,
               mediaType: 'image',
             });
@@ -224,9 +240,9 @@ export default function TabTrack() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}>
         <View
-          style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}
-          className="bg-[#F9F9F9] px-5 pt-5">
-          <View className="flex-row items-end justify-between">
+          style={Platform.OS === 'android' ? { paddingTop: insets.top + 12 } : undefined}
+          className="bg-[#F9F9F9] px-5">
+          <View className="mt-3 flex-row items-end justify-between">
             <View>
               <Text
                 style={{ fontFamily: 'Inter_700Bold' }}
@@ -419,7 +435,7 @@ export default function TabTrack() {
                 [
                   ['points', 'Points'],
                   ['steps', 'Steps'],
-                  ['activeMinutes', 'Active Minutes'],
+                  ['activeMinutes', 'Active Mins'],
                   ['challenges', 'Challenges'],
                 ] as const
               ).map(([id, label]) => (
@@ -482,7 +498,7 @@ export default function TabTrack() {
                         adjustsFontSizeToFit
                         style={{ fontFamily: 'Inter_600SemiBold' }}
                         className="mb-1 w-full text-center text-[8px] text-[#5A5551]">
-                        {formatNumber(trendValue(item))}
+                        {formatCompactNumber(trendValue(item))}
                       </Text>
                       {trendValue(item) > 0 ? (
                         <View

@@ -442,7 +442,13 @@ export default function NewPost() {
             />
           ),
           headerTitle: () => (
-            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">
+            <Text
+              className={
+                isActivityPost
+                  ? 'text-xl text-[#1A1A1A]'
+                  : 'font-heading text-xl font-semibold text-[#1A1A1A]'
+              }
+              style={isActivityPost ? { fontFamily: 'Inter_700Bold' } : undefined}>
               {isActivityPost ? 'Log Activity' : 'New Post'}
             </Text>
           ),
@@ -459,28 +465,38 @@ export default function NewPost() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {loggedActivity && activitySubmission ? (
-            <View className="mx-4 mt-4 rounded-xl bg-white p-4">
+            <View className="mx-4 mt-4 rounded-[24px] bg-white p-4">
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1 pr-3">
-                  <Text className="font-heading text-[10px] font-semibold uppercase tracking-[1px] text-[#FF4B1F]">
+                  <Text
+                    className="text-[10px] uppercase tracking-[1px] text-[#FF4B1F]"
+                    style={{ fontFamily: 'Inter_600SemiBold' }}>
                     Daily activity
                   </Text>
-                  <Text className="mt-1 font-heading text-lg font-semibold text-[#1A1A1A]">
+                  <Text
+                    className="mt-1 text-lg text-[#1A1A1A]"
+                    style={{ fontFamily: 'Inter_600SemiBold' }}>
                     {loggedActivity.detailTitle}
                   </Text>
                 </View>
                 <View className="items-end py-2">
-                  <Text className="font-heading text-base font-semibold text-[#E94F12]">
+                  <Text
+                    className="text-base text-[#E94F12]"
+                    style={{ fontFamily: 'Inter_600SemiBold' }}>
                     +{activityPoints} pts
                   </Text>
                 </View>
               </View>
 
               <View className="mb-2 mt-4 flex-row items-center justify-between">
-                <Text className="font-body text-xs font-bold text-[#5F5955]">Caption</Text>
+                <Text
+                  className="text-xs text-[#5F5955]"
+                  style={{ fontFamily: 'Inter_600SemiBold' }}>
+                  Caption
+                </Text>
                 <Text className="font-body text-[10px] text-[#9A928D]">{body.length}/150</Text>
               </View>
-              <Input className="h-auto min-h-[96px] w-full rounded-xl bg-[#F8F8F8]">
+              <Input className="h-auto min-h-[96px] w-full rounded-[24px] bg-[#F8F8F8]">
                 <InputField
                   multiline
                   maxLength={150}
@@ -576,12 +592,14 @@ export default function NewPost() {
 
           <View className="mt-4 px-4">
             {mediaLoading ? (
-              <View className="h-28 items-center justify-center rounded-xl bg-white">
+              <View
+                className={`h-28 items-center justify-center bg-white ${isActivityPost ? 'rounded-[24px]' : 'rounded-xl'}`}>
                 <ActivityIndicator color={colors.primary} />
                 <Text className="mt-2 font-body text-sm text-[#838383]">Preparing media...</Text>
               </View>
             ) : media && mediaUri ? (
-              <View className="overflow-hidden rounded-xl bg-white">
+              <View
+                className={`overflow-hidden bg-white ${isActivityPost ? 'rounded-[24px]' : 'rounded-xl'}`}>
                 <View className="relative">
                   {media.type === 'video' ? (
                     <View>
@@ -693,7 +711,7 @@ export default function NewPost() {
             variant="solid"
             size="xl"
             action="primary"
-            className="h-14 w-full rounded-lg px-[22px]"
+            className={`h-14 w-full px-[22px] ${isActivityPost ? 'rounded-[20px]' : 'rounded-lg'}`}
             style={{
               backgroundColor: canSubmit ? '#FF5C1A' : '#F5D5C8',
             }}
@@ -701,8 +719,8 @@ export default function NewPost() {
             disabled={!canSubmit}
             onPress={handlePost}>
             <ButtonText
-              className="flex-1 text-left text-base text-white"
-              style={{ fontFamily: 'Inter_700Bold' }}>
+              className={`flex-1 text-left text-white ${isActivityPost ? 'text-lg' : 'text-base'}`}
+              style={{ fontFamily: isActivityPost ? 'Inter_600SemiBold' : 'Inter_700Bold' }}>
               {isActivityPost ? 'Share activity' : 'Post'}
             </ButtonText>
             <ArrowRight size={23} color="#FFFFFF" weight="bold" />

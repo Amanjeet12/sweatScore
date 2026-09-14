@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { CaretRight } from 'phosphor-react-native';
+import { CaretRight, CheckCircle } from 'phosphor-react-native';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import ParticipantAvatars from '~/components/core/challenges/ParticipantAvatars';
@@ -16,6 +16,7 @@ export default function CommunityChallengeCard({
   onJoin: () => void;
   joining: boolean;
 }) {
+  const completedToday = challenge.isJoined && challenge.completedToday;
   const progress = Math.min(
     100,
     challenge.durationDays > 0 ? (challenge.completedDays / challenge.durationDays) * 100 : 0
@@ -28,7 +29,14 @@ export default function CommunityChallengeCard({
       : `Day ${Math.max(1, challenge.currentDay)}`;
 
   return (
-    <Pressable onPress={onPress} className="overflow-hidden rounded-[24px] bg-white">
+    <Pressable
+      onPress={onPress}
+      disabled={completedToday}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: completedToday }}
+      accessibilityLabel={`${challenge.name}${completedToday ? ', completed today' : ''}`}
+      className={`overflow-hidden rounded-[24px] ${completedToday ? 'bg-[#F1EFED]' : 'bg-white'}`}
+      style={{ opacity: completedToday ? 0.62 : 1 }}>
       <View className="relative h-[158px] overflow-hidden bg-[#E9DDD5]">
         {challenge.coverImageUrl ? (
           <Image
@@ -56,7 +64,7 @@ export default function CommunityChallengeCard({
           </Text>
           <Text
             style={{ fontFamily: 'Inter_600SemiBold' }}
-            className="pt-1 text-[10px] text-[#FF5C35]">
+            className={`pt-1 text-[10px] ${completedToday ? 'text-[#6F6A66]' : 'text-[#FF5C35]'}`}>
             {statusLabel}
           </Text>
         </View>
@@ -79,7 +87,7 @@ export default function CommunityChallengeCard({
             </View>
             <View className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#EEEAE7]">
               <View
-                className="h-full rounded-full bg-[#FF5C35]"
+                className={`h-full rounded-full ${completedToday ? 'bg-[#9A9490]' : 'bg-[#FF5C35]'}`}
                 style={{ width: `${progress}%` }}
               />
             </View>
@@ -104,7 +112,18 @@ export default function CommunityChallengeCard({
           </View>
 
           {challenge.isJoined ? (
-            <CaretRight size={18} color="#FF5C35" weight="bold" />
+            completedToday ? (
+              <View className="flex-row items-center gap-x-1.5">
+                <CheckCircle size={18} color="#6F6A66" weight="fill" />
+                <Text
+                  style={{ fontFamily: 'Inter_600SemiBold' }}
+                  className="text-[10px] text-[#6F6A66]">
+                  Done today
+                </Text>
+              </View>
+            ) : (
+              <CaretRight size={18} color="#FF5C35" weight="bold" />
+            )
           ) : (
             <Pressable
               onPress={(event) => {

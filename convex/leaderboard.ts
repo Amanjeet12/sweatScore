@@ -539,7 +539,7 @@ export const getLeaderboardForPeriod = query({
     let myPoints = 0;
 
     const allUsers = await ctx.db.query('users').collect();
-    const eligibleUsers = allUsers.filter((user) => user.isPremium || user.isAdmin);
+    const eligibleUsers = allUsers;
     const eligibleIds = new Set(eligibleUsers.map((user) => user._id));
     const isStreak = args.mode === 'streak';
 
@@ -657,9 +657,13 @@ export const getLeaderboardForPeriod = query({
       };
     };
 
-    const entries = (await Promise.all(rankedRows.slice(0, visibleLimit).map(hydrate))).filter(
-      (entry): entry is LeaderboardEntry => entry !== null
-    );
+    const visibleRankedRows = (
+      access === 'free' ? rankedRows.filter((row) => row.userId !== userId) : rankedRows
+    ).map((row, index) => ({ ...row, rank: index + 1 }));
+
+    const entries = (
+      await Promise.all(visibleRankedRows.slice(0, visibleLimit).map(hydrate))
+    ).filter((entry): entry is LeaderboardEntry => entry !== null);
 
     const podium: [LeaderboardEntry | null, LeaderboardEntry | null, LeaderboardEntry | null] = [
       entries.find((entry) => entry.rank === 1) ?? null,

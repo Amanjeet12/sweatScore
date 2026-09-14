@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from 'convex/react';
-import { router, Stack } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, Stack, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,11 +22,26 @@ export default function ChallengesScreen() {
   const [selectedTab, setSelectedTab] = useState<ChallengeListTab>('not_joined');
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(() => Math.floor(Date.now() / 60000));
+  const [defaultSelectionPending, setDefaultSelectionPending] = useState(true);
   const userId = useAuthStore((state) => state.currentUser?._id);
   const queryResult = useQuery(api.challengeCompletions.getCommunityChallenges, { refreshToken });
   const result = useRetainedQueryResult(queryResult, String(userId ?? 'guest'));
   const joinChallenge = useMutation(api.challengeCompletions.joinCommunityChallenge);
   const { requireSubscription } = useSubscriptionGuard();
+
+  useFocusEffect(
+    useCallback(() => {
+      // Force a current participation snapshot whenever this tab is opened.
+      setDefaultSelectionPending(true);
+      setRefreshToken(Date.now());
+    }, [])
+  );
+
+  useEffect(() => {
+    if (!defaultSelectionPending || queryResult === undefined) return;
+    setSelectedTab(queryResult.summary.joinedCount > 0 ? 'joined' : 'not_joined');
+    setDefaultSelectionPending(false);
+  }, [defaultSelectionPending, queryResult]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -37,12 +52,15 @@ export default function ChallengesScreen() {
 
   const visibleChallenges = useMemo(() => {
     if (!result) return [];
-    return result.challenges.filter((challenge) =>
-      selectedTab === 'joined' ? challenge.isJoined : !challenge.isJoined
-    );
+    return result.challenges
+      .filter((challenge) => (selectedTab === 'joined' ? challenge.isJoined : !challenge.isJoined))
+      .sort((a, b) => Number(a.completedToday) - Number(b.completedToday));
   }, [result, selectedTab]);
 
   const openChallenge = (challengeId: Id<'challenges'>) => {
+    const redirectTo = `/challenge-view/${challengeId}`;
+    if (!requireSubscription({ redirectTo, source: 'community_challenge_view' })) return;
+
     router.push({
       pathname: '/challenge-view/[challengeId]',
       params: { challengeId },

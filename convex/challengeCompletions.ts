@@ -1122,7 +1122,7 @@ export const joinCommunityChallenge = mutation({
 
     if (overlappingJoinedChallenges >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
       throw new ConvexError(
-        `You can join up to ${MAX_DAILY_CHALLENGE_COMPLETIONS} overlapping challenges`
+        `You can only join up to ${MAX_DAILY_CHALLENGE_COMPLETIONS} challenges running at the same time.`
       );
     }
 
@@ -1227,6 +1227,7 @@ export const getCommunityChallenges = query({
     }
 
     results.sort((a, b) => {
+      if (a.completedToday !== b.completedToday) return a.completedToday ? 1 : -1;
       if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
       if (a.isJoined !== b.isJoined) return a.isJoined ? -1 : 1;
       return a.startAt - b.startAt;
@@ -1534,6 +1535,9 @@ export const getPointsEarnedToday = query({
         earned: 0,
         checkInPoints: 0,
         challengeCompleted: false,
+        dailyChallengeCompletionCount: 0,
+        dailyChallengeLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
+        dailyChallengeLimitReached: false,
         cap: 10,
         isCapped: false,
         isPremium: false,
@@ -1574,6 +1578,9 @@ export const getPointsEarnedToday = query({
         activity.loggedActivityKey ? sum + (activity.displayTotalPoints ?? 0) : sum,
       0
     );
+    const dailyChallengeCompletionCount = completedChallenges.filter(
+      (challenge) => challenge?.isCommunityChallenge === true
+    ).length;
 
     return {
       earned,
@@ -1581,6 +1588,9 @@ export const getPointsEarnedToday = query({
       challengeCompleted: completedChallenges.some(
         (challenge) => challenge !== null && challenge.type !== 'check_in'
       ),
+      dailyChallengeCompletionCount,
+      dailyChallengeLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
+      dailyChallengeLimitReached: dailyChallengeCompletionCount >= MAX_DAILY_CHALLENGE_COMPLETIONS,
       cap: dailyCap,
       isCapped: !isPremium && earned >= dailyCap,
       isPremium,

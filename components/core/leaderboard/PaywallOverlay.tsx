@@ -1,26 +1,14 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { ArrowRight } from 'phosphor-react-native';
-import { useCallback, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
 
 export default function PaywallOverlay() {
-  const [isNavigating, setIsNavigating] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      setIsNavigating(false);
-    }, [])
-  );
-
   const handlePress = () => {
-    setIsNavigating(true);
-    requestAnimationFrame(() => {
-      router.push('/(tabs)/notifications/paywall');
-    });
+    router.push('/(tabs)/notifications/paywall');
   };
 
   return (
@@ -66,11 +54,9 @@ export default function PaywallOverlay() {
       />
 
       <Pressable
-        disabled={isNavigating}
         onPress={handlePress}
         android_ripple={{ color: 'transparent' }}
-        className="min-h-[250px] items-center justify-center px-8 pb-7 pt-16"
-        style={{ opacity: isNavigating ? 0.7 : 1 }}>
+        className="min-h-[250px] items-center justify-center px-8 pb-7 pt-16">
         <View pointerEvents="none" className="items-center justify-center">
           <View className="items-center justify-center rounded-[20px] bg-[#1A1A1A] px-4 py-1.5">
             <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-white">

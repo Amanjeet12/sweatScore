@@ -1833,7 +1833,7 @@ function DuetRecordingContent() {
               variant="solid"
               size="xl"
               action="primary"
-              className="mt-5 h-14 w-full"
+              className="mt-5 h-14 w-full rounded-[20px]"
               disabled={dailyLimitReached}
               onPress={startCountdown}>
               <View className="flex-row items-center gap-x-2">

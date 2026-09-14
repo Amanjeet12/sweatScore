@@ -819,21 +819,23 @@ export default function PostRow({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleSharePost}
-            disabled={mediaBusy}
-            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
-            {sharing ? (
-              <ActivityIndicator size="small" color="#77716D" />
-            ) : (
-              <Icon.ShareNetwork size={17} color="#77716D" weight="regular" />
-            )}
-            <Text
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-              className="text-[11px] text-[#5A5652]">
-              Share
-            </Text>
-          </TouchableOpacity>
+          {post.user.isAuthor || currentUser?.isAdmin ? (
+            <TouchableOpacity
+              onPress={handleSharePost}
+              disabled={mediaBusy}
+              className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
+              {sharing ? (
+                <ActivityIndicator size="small" color="#77716D" />
+              ) : (
+                <Icon.ShareNetwork size={17} color="#77716D" weight="regular" />
+              )}
+              <Text
+                style={{ fontFamily: 'Inter_600SemiBold' }}
+                className="text-[11px] text-[#5A5652]">
+                Share
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {post.challengeId && post.challenge?.isCheckIn === false ? (

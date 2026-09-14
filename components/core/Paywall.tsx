@@ -79,8 +79,9 @@ function PlanCard({
         position: 'relative',
         minHeight: 132,
         borderRadius: 12,
-
-        backgroundColor: '#FFFFFF',
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? '#FF5C1A' : '#E8E3DF',
+        backgroundColor: selected ? '#FFF8F4' : '#FFFFFF',
         paddingHorizontal: 10,
         paddingTop: 28,
         paddingBottom: 16,
@@ -352,20 +353,22 @@ export default function Paywall() {
         paddingHorizontal: 24,
         paddingBottom: 18,
       }}>
-      <View className="items-center pt-5">
+      <View className="items-center pt-10">
         <Image
           accessibilityLabel="SweatScore"
           source={require('~/assets/paywall/logo.png')}
           contentFit="contain"
-          style={{ width: 230, height: 45 }}
+          style={{ width: 190, height: 38 }}
         />
       </View>
 
-      <View className="mt-9 items-center">
-        <Text className="text-center font-heading text-[32px] font-semibold leading-10 text-[#111111]">
+      <View className="mt-7 items-center">
+        <Text className="max-w-[310px] text-center font-heading text-[28px] font-semibold leading-[34px] text-[#111111]">
           Start your consistency journey.
         </Text>
-        <Text className="mt-2 max-w-[330px] text-center font-body text-lg font-semibold leading-7 text-[#5F6270]">
+        <Text
+          className="mt-3 max-w-[250px] text-center text-sm leading-5 text-[#1A1A1A]"
+          style={{ fontFamily: 'Inter_400Regular' }}>
           Connect with a community and coaches for daily progress, and get help with your goals.
         </Text>
       </View>
@@ -414,6 +417,7 @@ export default function Paywall() {
 
       <OnboardingPrimaryButton
         className="mt-3"
+        borderRadius={20}
         label={isPackagesLoading ? 'Loading plans...' : 'Start My Plan'}
         onPress={handlePurchase}
         disabled={isCtaDisabled}

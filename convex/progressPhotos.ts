@@ -39,7 +39,6 @@ export const getDashboard = query({
       banner,
       leaderboard,
       thisYear,
-      lastYear,
       currentMonthDays,
       currentWeekDays,
     ] = await Promise.all([
@@ -77,12 +76,6 @@ export const getDashboard = query({
       ctx.db
         .query('trackMonthly')
         .withIndex('by_user_year', (q) => q.eq('userId', userId).eq('year', String(currentYear)))
-        .collect(),
-      ctx.db
-        .query('trackMonthly')
-        .withIndex('by_user_year', (q) =>
-          q.eq('userId', userId).eq('year', String(currentYear - 1))
-        )
         .collect(),
       ctx.db
         .query('trackDaily')
@@ -136,9 +129,11 @@ export const getDashboard = query({
       })
     );
 
-    const monthlyByKey = new Map([...lastYear, ...thisYear].map((row) => [row.yearMonth, row]));
-    const trendMonths = Array.from({ length: 12 }, (_, index) =>
-      addMonths(yearMonth, index - 11)
+    const monthlyByKey = new Map(thisYear.map((row) => [row.yearMonth, row]));
+    const currentMonthNumber = Number(yearMonth.slice(5, 7));
+    const trendMonths = Array.from(
+      { length: currentMonthNumber },
+      (_, index) => `${currentYear}-${String(index + 1).padStart(2, '0')}`
     ).map((month) => {
       const row = monthlyByKey.get(month);
       return {

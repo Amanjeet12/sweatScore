@@ -96,10 +96,7 @@ export default function ProgressPhotoScreen() {
         frontPhoto: frontStorageId,
         ...(sideStorageId ? { sidePhoto: sideStorageId } : {}),
       });
-      Alert.alert(
-        'Week logged',
-        'Your private progress photos have been added to Your Progress Pics.'
-      );
+      Alert.alert('Week logged', 'Your progress photos have been added to your profile.');
       router.back();
     } catch (error) {
       Alert.alert(
@@ -138,8 +135,7 @@ export default function ProgressPhotoScreen() {
             Log this week’s progress
           </Text>
           <Text className="mt-2 font-body text-sm leading-5 text-[#77716D]">
-            Add one front view and, if you like, a side view. These photos stay private in Your
-            Progress Pics.
+            These photos stay private in your account.
           </Text>
         </View>
 
@@ -193,7 +189,7 @@ export default function ProgressPhotoScreen() {
               This week is logged
             </Text>
             <Text className="mt-1 text-center font-body text-sm text-[#77716D]">
-              Your next private progress entry opens on Monday.
+              Your next progress entry opens on Monday.
             </Text>
           </View>
         )}
@@ -203,7 +199,7 @@ export default function ProgressPhotoScreen() {
           activeOpacity={0.84}
           disabled={!frontPhoto || saving || !canLog}
           onPress={save}
-          className="h-[54px] items-center justify-center rounded-[12px]"
+          className="h-[54px] items-center justify-center rounded-[20px]"
           style={{ backgroundColor: frontPhoto && canLog ? '#FF5C35' : '#DED9D5' }}>
           {saving ? (
             <ActivityIndicator color="#FFFFFF" />

@@ -103,17 +103,13 @@ function SelectableCard({
         opacity: disabled ? 0.55 : 1,
       }}>
       <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
-        {completed ? (
-          <Check size={22} color={PRIMARY} weight="bold" />
-        ) : (
-          <Icon size={24} color={disabled ? '#8F8985' : PRIMARY} weight="regular" />
-        )}
+        <Icon size={24} color={completed || disabled ? '#8F8985' : PRIMARY} weight="regular" />
       </View>
       <View className="ml-2 min-w-0 flex-1">
         <Text
           numberOfLines={2}
           className="font-heading text-[13px] font-semibold leading-[18px]"
-          style={{ color: disabled ? '#8F8985' : '#1D1B1A' }}>
+          style={{ color: completed || disabled ? '#8F8985' : '#1D1B1A' }}>
           {title}
         </Text>
       </View>
@@ -192,16 +188,11 @@ function HealthProgressRow({
   unit: string;
 }) {
   const percent = Math.min(100, Math.max(0, Math.round((value / target) * 100)));
-  const completed = value >= target;
   const roundedValue = Math.round(value);
   return (
     <View className="mt-5 flex-row items-center">
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
-        {completed ? (
-          <Check size={22} color={PRIMARY} weight="bold" />
-        ) : (
-          <Icon size={20} color={PRIMARY} weight="regular" />
-        )}
+        <Icon size={20} color={PRIMARY} weight="regular" />
       </View>
       <View className="ml-3 flex-1">
         <View className="flex-row items-center justify-between">
@@ -212,8 +203,8 @@ function HealthProgressRow({
             {Math.floor(points)} {Math.floor(points) === 1 ? 'pt' : 'pts'}
           </Text>
         </View>
-        <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#EAE6E3]">
-          <View className="h-full rounded-full bg-[#FF542A]" style={{ width: `${percent}%` }} />
+        <View className="mt-3 h-[3px] overflow-hidden rounded-full bg-[#EFEAE4]">
+          <View className="h-full rounded-full bg-[#F76B1C]" style={{ width: `${percent}%` }} />
         </View>
       </View>
     </View>
@@ -307,7 +298,13 @@ export default function TodaysSweat({
   const selectedActivity = getLoggedActivity(selectedQuickLog);
   const SelectedHabitIcon = getQuickLogIcon(selectedQuickLog);
   const quickLogCompleted = loggedActivityKeys?.includes(selectedQuickLog) ?? false;
+  const allHabitsCompleted =
+    loggedActivityKeys !== undefined &&
+    LOGGED_ACTIVITIES.every((activity) => loggedActivityKeys.includes(activity.key));
   const checkInPoints = pointsToday?.checkInPoints ?? 0;
+  const dailyChallengeLimitReached = pointsToday?.dailyChallengeLimitReached ?? false;
+  const dailyChallengeCompletionCount = pointsToday?.dailyChallengeCompletionCount ?? 0;
+  const dailyChallengeLimit = pointsToday?.dailyChallengeLimit ?? 3;
 
   const openHabitDetails = useCallback((activityKey: LoggedActivityKey) => {
     setSelectedQuickLog(activityKey);
@@ -479,6 +476,8 @@ export default function TodaysSweat({
           ).map(([value, label]) => {
             const selected = activeTab === value;
             const disabled = value === 'check_in' && checkInCompleted;
+            const completed =
+              value === 'check_in' ? completedWorkoutFromServer : allHabitsCompleted;
             return (
               <TouchableOpacity
                 key={value}
@@ -492,11 +491,14 @@ export default function TodaysSweat({
                   backgroundColor: selected ? '#FFFFFF' : 'transparent',
                   opacity: disabled ? 0.45 : 1,
                 }}>
-                <Text
-                  className="font-heading text-sm font-semibold"
-                  style={{ color: selected ? '#1D1B1A' : '#807A76' }}>
-                  {label}
-                </Text>
+                <View className="flex-row items-center gap-x-1.5">
+                  <Text
+                    className="font-heading text-sm font-semibold"
+                    style={{ color: selected ? '#1D1B1A' : '#807A76' }}>
+                    {label}
+                  </Text>
+                  {completed ? <Check size={17} color="#8F8985" weight="bold" /> : null}
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -566,8 +568,13 @@ export default function TodaysSweat({
         <NextStepRow
           icon={Trophy}
           title="Complete a challenge"
-          detail="Earn more points"
-          action="Open"
+          detail={
+            dailyChallengeLimitReached
+              ? `${dailyChallengeCompletionCount}/${dailyChallengeLimit} completed`
+              : 'Earn more points'
+          }
+          action={dailyChallengeLimitReached ? 'Limit reached' : 'Open'}
+          disabled={pointsToday === undefined || dailyChallengeLimitReached}
           onPress={() => router.push('/(tabs)/hub')}
           divider
         />

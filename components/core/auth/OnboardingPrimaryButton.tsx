@@ -9,6 +9,7 @@ type OnboardingPrimaryButtonProps = {
   isLoading?: boolean;
   disabled?: boolean;
   className?: string;
+  borderRadius?: number;
 };
 
 export function OnboardingPrimaryButton({
@@ -17,6 +18,7 @@ export function OnboardingPrimaryButton({
   isLoading = false,
   disabled = false,
   className,
+  borderRadius = 12,
 }: OnboardingPrimaryButtonProps) {
   const isDisabled = disabled || isLoading;
 
@@ -30,7 +32,7 @@ export function OnboardingPrimaryButton({
       style={{
         height: 56,
         backgroundColor: '#FF5C1A',
-        borderRadius: 12,
+        borderRadius,
         paddingHorizontal: 22,
         flexDirection: 'row',
         alignItems: 'center',
