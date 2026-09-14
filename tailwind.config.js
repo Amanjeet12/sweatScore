@@ -176,7 +176,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        heading: ['Montserrat_600SemiBold', 'sans-serif'],
+        // Today/Home is the design-system source of truth: headings use Inter.
+        heading: ['Inter_600SemiBold', 'sans-serif'],
         body: ['Inter_400Regular', 'sans-serif'],
         mono: ['Inter_400Regular', 'sans-serif'],
       },
@@ -187,7 +188,8 @@ module.exports = {
         '2xs': '10px',
       },
       borderRadius: {
-        card: '35px',
+        // Match the 24px card geometry used by the current Today/Home UI.
+        card: '24px',
         modal: '25px',
         pill: '100px',
       },

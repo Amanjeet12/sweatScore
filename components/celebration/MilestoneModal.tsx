@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 16,
     color: '#1A1A1A',
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 24,
     textAlign: 'center',
   },

@@ -239,11 +239,11 @@ export default function Paywall() {
     isPackagesLoading;
 
   const paywallBullets = [
-    'Jump rope and sculpt challenges',
-    'A simple plan to stay consistent',
-    'Daily checklist to maintain habits',
-    'Auto-tracked steps and workouts',
-    'A community to keep you motivated',
+    'Monthly Guided Challenges',
+    'Daily Check-Ins & Habits',
+    'Community Accountability',
+    'Direct Feedback From Coaches',
+    'Workouts & Guides',
   ];
 
   const handlePurchase = async () => {
@@ -363,10 +363,10 @@ export default function Paywall() {
 
       <View className="mt-9 items-center">
         <Text className="text-center font-heading text-[32px] font-semibold leading-10 text-[#111111]">
-          Choose your plan
+          Start your consistency journey.
         </Text>
         <Text className="mt-2 max-w-[330px] text-center font-body text-lg font-semibold leading-7 text-[#5F6270]">
-          Everything you need to stay consistent and see results
+          Connect with a community and coaches for daily progress, and get help with your goals.
         </Text>
       </View>
 
@@ -414,7 +414,7 @@ export default function Paywall() {
 
       <OnboardingPrimaryButton
         className="mt-3"
-        label={isPackagesLoading ? 'Loading plans...' : 'Start Premium'}
+        label={isPackagesLoading ? 'Loading plans...' : 'Start My Plan'}
         onPress={handlePurchase}
         disabled={isCtaDisabled}
         isLoading={isLoading}

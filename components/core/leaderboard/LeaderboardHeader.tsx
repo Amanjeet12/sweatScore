@@ -12,7 +12,9 @@ export default function LeaderboardHeader({ title, mode, timeLeft, onChangeMode 
   return (
     <View className="px-5 pb-4 pt-5">
       <View className="mb-1 flex-row items-center justify-between gap-x-3">
-        <Text className="font-body text-[10px] uppercase tracking-[0.5px] text-[#C65D32]">
+        <Text
+          style={{ fontFamily: 'Inter_600SemiBold' }}
+          className="text-[11px] uppercase tracking-[1.8px] text-[#FF4B1F]">
           {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())}
         </Text>
         <Text className="font-body text-[13px] text-[#817A76]">

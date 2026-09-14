@@ -1,5 +1,6 @@
 import { useQuery } from 'convex/react';
 import { Fire } from 'phosphor-react-native';
+import type { RefObject } from 'react';
 import { View } from 'react-native';
 
 import { Text } from '~/components/ui/text';
@@ -9,18 +10,23 @@ export default function TodayWeeklyStreak({
   daysEarned = 0,
   target = 5,
   currentWeeklyStreak = 0,
+  tourTargetRef,
 }: {
   daysEarned?: number;
   target?: number;
   currentWeeklyStreak?: number;
+  tourTargetRef?: RefObject<View>;
 }) {
   const week = useQuery(api.challengeCompletions.getUserCompletionsForWeek);
 
   return (
-    <View className="mx-5 mb-4 rounded-[26px] bg-white px-4 py-4">
+    <View
+      ref={tourTargetRef}
+      collapsable={false}
+      className="mx-5 mb-4 rounded-[24px] bg-white px-4 py-4">
       <View className="flex-row items-center justify-between">
         <Text className="font-heading text-[11px] font-semibold uppercase tracking-[1.8px] text-[#FF4B1F]">
-          Weekly streak
+          Streak
         </Text>
         <Text className="font-heading text-[13px] font-semibold text-[#1A1918]">
           {Math.min(daysEarned, target)} of {target} days

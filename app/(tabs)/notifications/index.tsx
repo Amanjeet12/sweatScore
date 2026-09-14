@@ -18,6 +18,7 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useHealthSync } from '~/hooks/useHealthSync';
+import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
@@ -112,12 +113,16 @@ export default function TabRank() {
   const periodWindow = useMemo(() => getPeriodWindow(period, now), [now, period]);
   const timeLeft = useMemo(() => getTimeLeft(period, now), [now, period]);
 
-  const leaderboard = useQuery(api.leaderboard.getLeaderboardForPeriod, {
+  const leaderboardResult = useQuery(api.leaderboard.getLeaderboardForPeriod, {
     period,
     mode,
     refreshToken: Math.floor(now.getTime() / 60000),
     ...periodWindow,
   });
+  const leaderboard = useRetainedQueryResult(
+    leaderboardResult,
+    `${currentUser?._id ?? 'guest'}:${period}:${mode}`
+  );
 
   const hasFullAccess =
     isPro ||
@@ -168,11 +173,13 @@ export default function TabRank() {
   }
 
   const entries = leaderboard.entries as Entry[];
-  const visibleEntries = entries;
+  const visibleEntries = currentUser?._id
+    ? entries.filter((entry) => entry.userId !== currentUser._id)
+    : entries;
   const myRank = leaderboard.me?.rank || undefined;
   const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
 
-  const shownParticipantIds = new Set(entries.map((entry) => entry.userId));
+  const shownParticipantIds = new Set(visibleEntries.map((entry) => entry.userId));
   if (hasFullAccess && (leaderboard.me?.displayTotalPoints ?? 0) > 0 && currentUser?._id) {
     shownParticipantIds.add(currentUser._id);
   }
@@ -252,7 +259,7 @@ export default function TabRank() {
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         ListEmptyComponent={
-          mode === 'streak' && entries.length === 0 ? (
+          mode === 'streak' && visibleEntries.length === 0 ? (
             <Text className="px-5 py-6 text-center font-body text-sm text-[#817A76]">
               No active streaks yet. Check in or log a habit on 5 days to earn your first week.
             </Text>

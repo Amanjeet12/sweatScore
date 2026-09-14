@@ -96,7 +96,10 @@ export default function ProgressPhotoScreen() {
         frontPhoto: frontStorageId,
         ...(sideStorageId ? { sidePhoto: sideStorageId } : {}),
       });
-      Alert.alert('Week logged', 'Your private progress photos have been added to Your Journey.');
+      Alert.alert(
+        'Week logged',
+        'Your private progress photos have been added to Your Progress Pics.'
+      );
       router.back();
     } catch (error) {
       Alert.alert(
@@ -116,20 +119,27 @@ export default function ProgressPhotoScreen() {
           headerTitle: 'Weekly progress',
           headerShadowVisible: false,
           headerStyle: { backgroundColor: '#F9F9F9' },
+          headerTitleStyle: {
+            fontFamily: 'Inter_700Bold',
+            fontSize: 20,
+            color: '#1A1A1A',
+          },
           headerLeft: () => <BackButton />,
         }}
       />
       <View className="flex-1 px-5 pb-7 pt-5">
-        <View className="rounded-xl bg-white px-5 py-6">
+        <View className="rounded-[24px] bg-white px-5 py-6">
           <View className="h-14 w-14 items-center justify-center rounded-full bg-[#FFF0E9]">
             <Camera size={27} color="#FF5C35" weight="duotone" />
           </View>
-          <Text className="mt-4 font-heading text-[22px] font-semibold text-[#1D1B1A]">
+          <Text
+            className="mt-4 text-[22px] leading-7 text-[#1D1B1A]"
+            style={{ fontFamily: 'Inter_700Bold' }}>
             Log this week’s progress
           </Text>
           <Text className="mt-2 font-body text-sm leading-5 text-[#77716D]">
             Add one front view and, if you like, a side view. These photos stay private in Your
-            Journey.
+            Progress Pics.
           </Text>
         </View>
 
@@ -145,7 +155,7 @@ export default function ProgressPhotoScreen() {
                 key={kind}
                 activeOpacity={0.8}
                 onPress={() => openPicker(kind)}
-                className="h-[210px] flex-1 overflow-hidden rounded-xl bg-white">
+                className="h-[210px] flex-1 overflow-hidden rounded-[20px] bg-white">
                 {photo ? (
                   <Image
                     source={{ uri: photo.uri }}
@@ -161,7 +171,9 @@ export default function ProgressPhotoScreen() {
                         <Plus size={20} color="#FF5C35" />
                       )}
                     </View>
-                    <Text className="mt-3 text-center font-heading text-sm font-semibold text-[#1D1B1A]">
+                    <Text
+                      className="mt-3 text-center text-sm text-[#1D1B1A]"
+                      style={{ fontFamily: 'Inter_600SemiBold' }}>
                       {label}
                     </Text>
                     <Text className="mt-1 text-center font-body text-[11px] text-[#77716D]">
@@ -173,9 +185,11 @@ export default function ProgressPhotoScreen() {
             ))}
           </View>
         ) : (
-          <View className="mt-5 items-center rounded-xl bg-white px-5 py-8">
+          <View className="mt-5 items-center rounded-[24px] bg-white px-5 py-8">
             <ImageSquare size={28} color="#A09A96" />
-            <Text className="mt-3 font-heading text-base font-semibold text-[#1D1B1A]">
+            <Text
+              className="mt-3 text-base text-[#1D1B1A]"
+              style={{ fontFamily: 'Inter_600SemiBold' }}>
               This week is logged
             </Text>
             <Text className="mt-1 text-center font-body text-sm text-[#77716D]">
@@ -189,12 +203,12 @@ export default function ProgressPhotoScreen() {
           activeOpacity={0.84}
           disabled={!frontPhoto || saving || !canLog}
           onPress={save}
-          className="h-[54px] items-center justify-center rounded-lg"
+          className="h-[54px] items-center justify-center rounded-[12px]"
           style={{ backgroundColor: frontPhoto && canLog ? '#FF5C35' : '#DED9D5' }}>
           {saving ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text className="font-heading text-base font-semibold text-white">
+            <Text className="text-base text-white" style={{ fontFamily: 'Inter_600SemiBold' }}>
               Save weekly progress
             </Text>
           )}

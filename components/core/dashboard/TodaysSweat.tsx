@@ -51,7 +51,6 @@ import { storage } from '~/utils/storage';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
 
 const PRIMARY = '#FF5C35';
-const CHECK_IN_CATEGORY_ORDER = ['strength', 'core', 'cardio', 'jump rope'] as const;
 const PENDING_HABIT_ACTIVITY_KEY = 'pending_habit_activity_key';
 
 type ActivityTab = 'check_in' | 'quick_log';
@@ -209,7 +208,7 @@ function HealthProgressRow({
           <Text className="font-body text-sm text-[#282522]">
             {roundedValue.toLocaleString()} / {target.toLocaleString()} {unit}
           </Text>
-          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-[#FF4B1F]">
+          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[13px] text-[#FF4B1F]">
             {Math.floor(points)} {Math.floor(points) === 1 ? 'pt' : 'pts'}
           </Text>
         </View>
@@ -224,11 +223,15 @@ function HealthProgressRow({
 export default function TodaysSweat({
   refreshKey,
   activityLogTourRef,
+  nextStepsTourRef,
+  activityTourRef,
 }: {
   refreshKey: number;
   streakDays?: number;
   streakTarget?: number;
   activityLogTourRef?: RefObject<View>;
+  nextStepsTourRef?: RefObject<View>;
+  activityTourRef?: RefObject<View>;
 }) {
   const { requireSubscription } = useSubscriptionGuard();
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -292,26 +295,7 @@ export default function TodaysSweat({
   const weeklyProgressLogged = weeklyProgress?.canLogCurrentWeek === false;
   const health = useQuery(api.activities.getPointsForDate, canLoad ? { date: today } : 'skip');
 
-  const visibleCheckIns = useMemo(
-    () =>
-      (availableCheckIns ?? [])
-        .filter((checkIn) =>
-          CHECK_IN_CATEGORY_ORDER.some(
-            (category) => checkIn.categoryName.trim().toLowerCase() === category
-          )
-        )
-        .sort(
-          (first, second) =>
-            CHECK_IN_CATEGORY_ORDER.indexOf(
-              first.categoryName.trim().toLowerCase() as (typeof CHECK_IN_CATEGORY_ORDER)[number]
-            ) -
-            CHECK_IN_CATEGORY_ORDER.indexOf(
-              second.categoryName.trim().toLowerCase() as (typeof CHECK_IN_CATEGORY_ORDER)[number]
-            )
-        )
-        .slice(0, 4),
-    [availableCheckIns]
-  );
+  const visibleCheckIns = useMemo(() => (availableCheckIns ?? []).slice(0, 4), [availableCheckIns]);
   const checkInCompleted = visibleCheckIns.some((item) => item.userCompletedToday);
   const completedWorkoutFromServer =
     availableCheckInsResult?.some((item) => item.userCompletedToday) ?? false;
@@ -324,6 +308,19 @@ export default function TodaysSweat({
   const SelectedHabitIcon = getQuickLogIcon(selectedQuickLog);
   const quickLogCompleted = loggedActivityKeys?.includes(selectedQuickLog) ?? false;
   const checkInPoints = pointsToday?.checkInPoints ?? 0;
+
+  const openHabitDetails = useCallback((activityKey: LoggedActivityKey) => {
+    setSelectedQuickLog(activityKey);
+
+    // Let Android commit the selected habit before mounting its native modal.
+    // This avoids a blank/non-opening sheet seen on newer Pixel devices.
+    if (Platform.OS === 'android') {
+      requestAnimationFrame(() => setShowHabitDetails(true));
+      return;
+    }
+
+    setShowHabitDetails(true);
+  }, []);
 
   const openHabitPost = useCallback((activityKey: string, asset: ImagePicker.ImagePickerAsset) => {
     const activity = getLoggedActivity(activityKey);
@@ -547,11 +544,7 @@ export default function TodaysSweat({
                       icon={getQuickLogIcon(activity.key)}
                       selected={selectedQuickLog === activity.key}
                       completed={completed}
-                      disabled={completed}
-                      onPress={() => {
-                        setSelectedQuickLog(activity.key);
-                        setShowHabitDetails(true);
-                      }}
+                      onPress={() => openHabitDetails(activity.key)}
                     />
                   );
                 })}
@@ -561,7 +554,10 @@ export default function TodaysSweat({
         </View>
       </View>
 
-      <View className="mt-5 rounded-[24px] bg-white px-5">
+      <View
+        ref={nextStepsTourRef}
+        collapsable={false}
+        className="mt-5 rounded-[24px] bg-white px-5">
         <View className="flex-row items-center justify-between border-b border-[#E9E3DF] py-4">
           <Text className="text-[18px] text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
             Your Next Steps
@@ -596,7 +592,10 @@ export default function TodaysSweat({
         />
       </View>
 
-      <View className="mt-5 rounded-[24px] bg-white px-5 pb-5 pt-4">
+      <View
+        ref={activityTourRef}
+        collapsable={false}
+        className="mt-5 rounded-[24px] bg-white px-5 pb-5 pt-4">
         <Text className="text-[18px] text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
           Your Activity
         </Text>
@@ -619,7 +618,10 @@ export default function TodaysSweat({
       <Modal
         transparent
         visible={showHabitDetails}
-        animationType="fade"
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        hardwareAccelerated
+        statusBarTranslucent
         onRequestClose={() => setShowHabitDetails(false)}
         onDismiss={() => {
           if (launchHabitAfterDismiss.current) {

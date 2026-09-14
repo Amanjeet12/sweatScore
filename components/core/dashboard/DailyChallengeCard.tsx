@@ -1,25 +1,23 @@
 import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { Check, Clock } from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import type { RefObject } from 'react';
-import { AppState, ImageBackground, Platform, TouchableOpacity, View } from 'react-native';
+import { AppState, ImageBackground, Platform, View } from 'react-native';
 
 import { Avatar } from '~/components/core/Avatar';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
-import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { getData, storeData } from '~/utils/storage';
 
 const DAILY_CHALLENGE_CACHE_KEY = 'daily_challenge_card_cache';
 const SWEAT_BADGES = [
-  { letter: 'S', color: '#C96B4B' },
-  { letter: 'W', color: '#8347B8' },
-  { letter: 'E', color: '#2E987D' },
-  { letter: 'A', color: '#DE5D91' },
-  { letter: 'T', color: '#B9343A' },
+  { letter: 'S', color: '#FF5C1A' },
+  { letter: 'W', color: '#F47C48' },
+  { letter: 'E', color: '#E8956F' },
+  { letter: 'A', color: '#F3AE8E' },
+  { letter: 'T', color: '#D96B3D' },
 ];
 
 function formatRemainingTime(seconds: number) {
@@ -31,7 +29,6 @@ function formatRemainingTime(seconds: number) {
 }
 
 export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: RefObject<View> }) {
-  const { requireSubscription } = useSubscriptionGuard();
   const authenticatedUserId = useAuthStore((state) => state.currentUser?._id);
   const cacheKey = `${DAILY_CHALLENGE_CACHE_KEY}_${authenticatedUserId ?? 'user'}`;
   const [refreshToken, setRefreshToken] = useState(0);
@@ -91,7 +88,7 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
       <View
         ref={tourTargetRef}
         collapsable={false}
-        className="mx-5 h-[240px] overflow-hidden rounded-[30px] bg-[#D9D2CE]">
+        className="mx-5 h-[240px] overflow-hidden rounded-[24px] bg-[#D9D2CE]">
         <View className="h-full px-5 py-5">
           <View className="h-3 w-32 rounded-full bg-white/60" />
           <View className="flex-1" />
@@ -107,7 +104,7 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
       <View
         ref={tourTargetRef}
         collapsable={false}
-        className="mx-5 h-[240px] overflow-hidden rounded-[30px] bg-[#302822] px-5 py-5">
+        className="mx-5 h-[240px] overflow-hidden rounded-[24px] bg-[#302822] px-5 py-5">
         <View className="flex-1" />
         <Text className="font-heading text-[26px] font-semibold text-white">
           Preparing Next Check-In
@@ -120,36 +117,17 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
   }
 
   const isCompleted = challenge.userCompletedToday ?? false;
-  const disabled = isCompleted || secondsRemaining <= 0;
   const count = Math.max(challenge.actualCheckInCount ?? 0, isCompleted ? 1 : 0);
   const recentCheckInUsers = (challenge.recentCheckInUsers ?? []).slice(0, SWEAT_BADGES.length);
   const remainingBadges = SWEAT_BADGES.slice(recentCheckInUsers.length);
 
-  const fastTrack = () => {
-    if (disabled) return;
-    const redirectTo = `/challenge-record/${challenge._id}`;
-    if (!requireSubscription({ redirectTo, source: 'today_featured_check_in' })) return;
-    router.push({
-      pathname: '/challenge-record/[challengeId]',
-      params: { challengeId: challenge._id, checkInMode: 'record_video' },
-    });
-  };
-
   return (
     <View ref={tourTargetRef} collapsable={false} className="mx-5">
-      <TouchableOpacity
-        activeOpacity={disabled ? 1 : 0.88}
-        disabled={disabled}
-        onPress={fastTrack}
-        accessibilityRole="button"
-        accessibilityLabel={
-          isCompleted
-            ? 'Today check-in completed'
-            : disabled
-              ? 'Today check-in ended'
-              : `Record ${challenge.name}`
-        }
-        className="h-[240px] overflow-hidden rounded-[30px] bg-black">
+      <View
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`${challenge.name}. ${timerText}`}
+        className="h-[240px] overflow-hidden rounded-[24px] bg-black">
         <ImageBackground
           source={{ uri: challenge.coverImageUrl ?? undefined }}
           resizeMode="cover"
@@ -173,7 +151,8 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
             <View className="flex-1" />
             <Text
               numberOfLines={2}
-              className="font-heading text-[28px] font-semibold leading-[34px] text-white">
+              className="text-[24px] leading-[30px] text-white"
+              style={{ fontFamily: 'Montserrat_600SemiBold' }}>
               {challenge.name}
             </Text>
             <Text numberOfLines={1} className="mt-1 font-body text-sm text-white/90">
@@ -210,13 +189,13 @@ export default function DailyChallengeCard({ tourTargetRef }: { tourTargetRef?: 
                   className={`${isCompleted ? 'ml-1.5 ' : ''}min-w-0 flex-1 font-body text-xs leading-4 text-white`}>
                   {count > 0
                     ? `${count} ${count === 1 ? 'sister' : 'sisters'} checked in today`
-                    : 'Be the first to check-in'}
+                    : 'Be the first to check in'}
                 </Text>
               </View>
             </View>
           </LinearGradient>
         </ImageBackground>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 }

@@ -80,7 +80,7 @@ export default function PaywallOverlay() {
           <Text
             style={{ fontFamily: 'Inter_700Bold' }}
             className="mt-4 text-center text-lg text-[#1A1A1A]">
-            See where you rank today, this week and this month
+            See where you rank on our leaderboards
           </Text>
           <View className="mt-4 flex-row items-center gap-x-2 px-2 py-1">
             <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#F76B1C]">

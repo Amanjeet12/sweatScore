@@ -8,11 +8,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import {
-  Montserrat_600SemiBold,
-  Montserrat_700Bold,
-  Montserrat_800ExtraBold,
-} from '@expo-google-fonts/montserrat';
+import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConvexReactClient } from 'convex/react';
 import { router, Stack, useRootNavigationState } from 'expo-router';
@@ -72,17 +68,12 @@ export default function Layout() {
   const { backgroundNotification } = usePushNotifications();
   const insets = useSafeAreaInsets();
 
-  const [montserratLoaded, montserratError] = useFonts({
-    Montserrat_600SemiBold,
-    Montserrat_700Bold,
-    Montserrat_800ExtraBold,
-  });
-
   const [interLoaded, interError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Montserrat_600SemiBold,
   });
 
   useEffect(() => {
@@ -174,7 +165,7 @@ export default function Layout() {
     }
   }, [backgroundNotification?.request?.content?.data, currentUser?._id, rootNavigationState?.key]);
 
-  if (!montserratLoaded && !montserratError && !interLoaded && !interError) {
+  if (!interLoaded && !interError) {
     return null;
   }
 

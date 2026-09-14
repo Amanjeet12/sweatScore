@@ -2,7 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
-import { Camera, ShareNetwork } from 'phosphor-react-native';
+import { Camera, LockSimple, ShareNetwork } from 'phosphor-react-native';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -83,7 +83,7 @@ function Stat({ label, value, unit }: { label: string; value: string | number; u
         numberOfLines={1}
         adjustsFontSizeToFit
         className="my-1 text-lg leading-6 text-[#1D1B1A]"
-        style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+        style={{ fontFamily: 'Inter_600SemiBold' }}>
         {value}
       </Text>
       {unit ? (
@@ -269,17 +269,12 @@ export default function TabTrack() {
                 <Text
                   style={{ fontFamily: 'Inter_700Bold' }}
                   className="mt-1 text-lg text-[#1D1B1A]">
-                  Your journey
+                  Your Progress Pics
                 </Text>
               </View>
-              <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="text-[10px] text-[#FF4B1F]">
-                Week {currentWeekNumber} of 16
-              </Text>
             </View>
             <Text className="mt-2 font-body text-[11px] leading-4 text-[#77716D]">
-              Compare your consistency over time.
+              Compare your progress over time.
             </Text>
 
             {photos.length ? (
@@ -369,9 +364,7 @@ export default function TabTrack() {
                   <Text className="mt-1 font-body text-[10px] text-[#77716D]">Add a photo</Text>
                 </TouchableOpacity>
                 <View className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#F3F0ED]">
-                  <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#B4AEA9]">
-                    🔒
-                  </Text>
+                  <LockSimple size={22} color={PRIMARY} weight="regular" />
                   <Text className="mt-2 font-body text-[10px] text-[#817A76]">
                     Unlocks after Week 1
                   </Text>
@@ -484,11 +477,18 @@ export default function TabTrack() {
                 <View className="h-full flex-row items-end gap-x-1">
                   {trend.map((item) => (
                     <View key={item.key} className="h-full flex-1 items-center justify-end">
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        style={{ fontFamily: 'Inter_600SemiBold' }}
+                        className="mb-1 w-full text-center text-[8px] text-[#5A5551]">
+                        {formatNumber(trendValue(item))}
+                      </Text>
                       {trendValue(item) > 0 ? (
                         <View
                           className="w-4 rounded-t-[7px]"
                           style={{
-                            height: `${(trendValue(item) / maxTrend) * 100}%`,
+                            height: `${(trendValue(item) / maxTrend) * 82}%`,
                             backgroundColor: getBarColor(range, goalCategory, trendValue(item)),
                           }}
                         />
@@ -536,41 +536,6 @@ export default function TabTrack() {
               />
             </View>
           </View>
-
-          {progress?.monthlyGoal ? (
-            <View className="mt-4 rounded-[24px] bg-white px-4 py-5">
-              <View className="flex-row items-center justify-between">
-                <View className="min-w-0 flex-1 pr-3">
-                  <Text
-                    style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="text-[10px] uppercase tracking-[1.1px] text-[#FF4B1F]">
-                    Monthly goal
-                  </Text>
-                  <Text
-                    style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="mt-1 text-base text-[#1D1B1A]">
-                    {progress.monthlyGoal.title}
-                  </Text>
-                </View>
-                <View className="rounded-[20px] bg-[#FFF0E8] px-3 py-1.5">
-                  <Text
-                    style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="text-[10px] text-[#FF4B1F]">
-                    {formatNumber(progress.monthlyGoal.earnedPoints)} /{' '}
-                    {formatNumber(progress.monthlyGoal.targetPoints)} pts
-                  </Text>
-                </View>
-              </View>
-              <View className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#EEE8E3]">
-                <View
-                  className="h-full rounded-full bg-[#FF5C35]"
-                  style={{
-                    width: `${Math.min(100, (progress.monthlyGoal.earnedPoints / Math.max(1, progress.monthlyGoal.targetPoints)) * 100)}%`,
-                  }}
-                />
-              </View>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>

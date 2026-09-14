@@ -19,7 +19,7 @@ type ChallengeListTab = 'joined' | 'not_joined';
 
 export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedTab, setSelectedTab] = useState<ChallengeListTab>('joined');
+  const [selectedTab, setSelectedTab] = useState<ChallengeListTab>('not_joined');
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(() => Math.floor(Date.now() / 60000));
   const userId = useAuthStore((state) => state.currentUser?._id);
@@ -102,7 +102,7 @@ export default function ChallengesScreen() {
                   <Text className="font-body text-xs text-[#77716D]">Today&apos;s Progress</Text>
                   <Text
                     style={{ fontFamily: 'Inter_700Bold' }}
-                    className="mt-1 text-lg text-[#1A1A1A]">
+                    className="mt-1 text-base text-[#1A1A1A]">
                     {result.summary.completedToday}{' '}
                     {result.summary.completedToday === 1 ? 'challenge' : 'challenges'} completed
                   </Text>

@@ -50,9 +50,9 @@ function getHealthConnect() {
  * app updates, so users who have seen an older version will receive this tour
  * once, while users who finish this version will not see it on every launch.
  */
-const TODAY_FEATURE_TOUR_VERSION = 4;
+const TODAY_FEATURE_TOUR_VERSION = 5;
 const TODAY_FEATURE_TOUR_STORAGE_KEY = 'today_feature_tour_seen_version';
-const TODAY_FEATURE_TOUR_STEP_COUNT = 2;
+const TODAY_FEATURE_TOUR_STEP_COUNT = 6;
 
 function getTodayFeatureTourStorageKey(userId: string) {
   return `${TODAY_FEATURE_TOUR_STORAGE_KEY}_${userId}`;
@@ -87,9 +87,13 @@ export default function TabDashboard() {
   const isFocused = useIsFocused();
   const dashboardScrollRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
+  const pointsTourRef = useRef<View>(null);
+  const streakTourRef = useRef<View>(null);
   const checkInTourRef = useRef<View>(null);
   // const communityTourRef = useRef<View>(null);
   const activityLogTourRef = useRef<View>(null);
+  const nextStepsTourRef = useRef<View>(null);
+  const activityTourRef = useRef<View>(null);
   // const sectionOffsetsRef = useRef({ community: 0 });
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const refreshKey = useRefreshStore((state) => state.refreshKey);
@@ -290,12 +294,19 @@ export default function TabDashboard() {
 
     let cancelled = false;
     let measureTimer: ReturnType<typeof setTimeout> | undefined;
-    const targetRefs = [checkInTourRef, activityLogTourRef];
+    const targetRefs = [
+      pointsTourRef,
+      streakTourRef,
+      checkInTourRef,
+      activityLogTourRef,
+      nextStepsTourRef,
+      activityTourRef,
+    ];
     const targetRef = targetRefs[todayTourStep];
 
     setTodayTourTarget(null);
 
-    if (todayTourStep === 0) {
+    if (todayTourStep <= 2) {
       dashboardScrollRef.current?.scrollTo({ y: 0, animated: true });
     } else {
       dashboardScrollRef.current?.scrollToEnd({ animated: true });
@@ -390,7 +401,7 @@ export default function TabDashboard() {
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
             <View className="px-5 pb-4 pt-4">
               <View className="flex-row items-center justify-between">
-                <View className="min-w-0 flex-1 pr-4">
+                <View ref={pointsTourRef} collapsable={false} className="min-w-0 flex-1 pr-4">
                   <Text className="font-heading text-[10px] font-semibold tracking-[1.1px] text-[#FF4B1F]">
                     TODAY · {displayedPointsToday} PTS
                   </Text>
@@ -412,6 +423,7 @@ export default function TabDashboard() {
               daysEarned={streakData?.currentWeekDays ?? 0}
               target={streakData?.currentWeekTarget ?? 5}
               currentWeeklyStreak={trackOverview?.lifetime.currentWeeklyStreak ?? 0}
+              tourTargetRef={streakTourRef}
             />
             <View
               className="bg-[#F9F9F9] pt-1"
@@ -435,6 +447,8 @@ export default function TabDashboard() {
                 streakDays={streakData?.currentWeekDays ?? 0}
                 streakTarget={streakData?.currentWeekTarget ?? 5}
                 activityLogTourRef={activityLogTourRef}
+                nextStepsTourRef={nextStepsTourRef}
+                activityTourRef={activityTourRef}
               />
             </View>
             {/* <View className="mb-10 mt-4 bg-[#F9F9F9]">

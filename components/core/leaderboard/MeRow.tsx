@@ -99,7 +99,7 @@ export default function MeRow({
             </Text>
 
             {rank || mode === 'points' ? (
-              <View className="rounded bg-transparent px-0.5 py-0.5">
+              <View className="rounded-full bg-white px-2 py-1">
                 <Text
                   style={{ fontFamily: 'Inter_600SemiBold' }}
                   className="text-xs text-[#F76B1C]">
@@ -123,6 +123,14 @@ export default function MeRow({
                 style={{ width: `${pctLabel}%` }}
               />
             </View>
+            <Text className="w-9 text-right font-body text-[11px] text-[#817A76]">{pctLabel}%</Text>
+            {displayTotalPoints >= 500 ? (
+              <Image
+                source={require('~/assets/icons/500points.png')}
+                style={{ width: 18, height: 18 }}
+                contentFit="contain"
+              />
+            ) : null}
           </View>
         )}
       </View>

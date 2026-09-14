@@ -1,4 +1,4 @@
-import { Fire, PlusCircle, X } from 'phosphor-react-native';
+import { Fire, Heartbeat, PlusCircle, Target, Trophy, UsersThree, X } from 'phosphor-react-native';
 import {
   ActivityIndicator,
   Dimensions,
@@ -22,12 +22,25 @@ export type TodayTourTarget = {
 
 const TOUR_STEPS = [
   {
-    eyebrow: 'Today’s Check-in',
-    title: 'Jump straight into today’s check-in',
-    description:
-      'Tap the featured banner to open video capture immediately and record today’s movement.',
+    eyebrow: 'Today’s Points',
+    title: 'Your Points Today',
+    description: 'Added up from all daily activity, challenges and check-ins.',
+    icon: Trophy,
+    cornerRadius: 12,
+  },
+  {
+    eyebrow: 'Weekly Streak',
+    title: 'Build Your Streak',
+    description: 'Check in 5 days a week to keep it going.',
     icon: Fire,
-    cornerRadius: 28,
+    cornerRadius: 24,
+  },
+  {
+    eyebrow: 'Today’s Check-in',
+    title: 'See Who’s Showing Up',
+    description: 'See who’s checked in and get in before the day runs out.',
+    icon: UsersThree,
+    cornerRadius: 24,
   },
   /* Group chat temporarily disabled.
   {
@@ -41,11 +54,24 @@ const TOUR_STEPS = [
   */
   {
     eyebrow: 'Your Check-Ins',
-    title: 'Choose how you show up',
-    description:
-      'Choose a workout or switch to Habits for gym sessions, meals, sleep, and 8K steps.',
+    title: 'Log Your Check-In',
+    description: 'Log a workout or a quick habit to build your streak.',
     icon: PlusCircle,
     cornerRadius: 20,
+  },
+  {
+    eyebrow: 'Your Next Steps',
+    title: 'Keep Showing Up',
+    description: 'Earn more points this month and track your progress.',
+    icon: Target,
+    cornerRadius: 24,
+  },
+  {
+    eyebrow: 'Your Activity',
+    title: 'Track Your Activity',
+    description: 'Hit your steps and active minutes target.',
+    icon: Heartbeat,
+    cornerRadius: 24,
   },
 ] as const;
 
