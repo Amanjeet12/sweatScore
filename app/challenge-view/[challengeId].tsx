@@ -568,7 +568,8 @@ export default function ChallengeViewScreen() {
                   className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1.5"
                   style={{ zIndex: 2 }}>
                   <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-white">
-                    +{selectedCheckIn?.points ?? challenge.points} pts
+                    +{selectedCheckIn?.points ?? challenge.points}{' '}
+                    {(selectedCheckIn?.points ?? challenge.points) === 1 ? 'pt' : 'pts'}
                   </Text>
                 </View>
               ) : null}

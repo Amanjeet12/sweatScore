@@ -41,19 +41,10 @@ export default function CommunityChallengeDetail({
       className="flex-1 bg-[#F9F9F9]"
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 36 }}>
-      <View className="mb-4 mt-2 flex-row items-center justify-between">
-        <Text
-          style={{ fontFamily: 'Inter_600SemiBold' }}
-          className="text-[10px] uppercase tracking-[1px] text-[#FF4B1F]">
-          {challenge.durationDays}-day challenge
-        </Text>
+      <View className="mb-4 mt-2 flex-row items-center justify-end">
         <View className="rounded-[20px] bg-[#FFF1E9] px-3 py-2">
           <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-[#FF5C35]">
-            {challenge.status === 'upcoming'
-              ? `Starts in ${challenge.daysUntilStart}d`
-              : challenge.status === 'ended'
-                ? 'Ended'
-                : `Day ${Math.max(1, challenge.currentDay)}`}
+            {challenge.totalAvailablePoints} {challenge.totalAvailablePoints === 1 ? 'pt' : 'pts'}
           </Text>
         </View>
       </View>
@@ -81,14 +72,6 @@ export default function CommunityChallengeDetail({
               </View>
             </Pressable>
           ) : null}
-
-          {challenge.videoDuration ? (
-            <View className="absolute bottom-3 left-3 rounded-[20px] bg-black/65 px-3 py-2">
-              <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[10px] text-white">
-                Form guide · {Math.round(challenge.videoDuration)} sec
-              </Text>
-            </View>
-          ) : null}
         </View>
       ) : null}
 
@@ -98,8 +81,12 @@ export default function CommunityChallengeDetail({
           className="text-[10px] uppercase tracking-[1px] text-[#FF4B1F]">
           {challenge.durationDays}-day challenge
         </Text>
-        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#77716D]">
-          {challenge.totalAvailablePoints} pts
+        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#FF5C35]">
+          {challenge.status === 'upcoming'
+            ? `Starts in ${challenge.daysUntilStart}d`
+            : challenge.status === 'ended'
+              ? 'Ended'
+              : `Day ${Math.max(1, challenge.currentDay)}`}
         </Text>
       </View>
 
@@ -131,7 +118,7 @@ export default function CommunityChallengeDetail({
           <View className="flex-row items-center justify-between">
             <Text className="font-body text-xs text-[#77716D]">Your progress</Text>
             <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-[#313131]">
-              Day {challenge.completedDays} of {challenge.durationDays}
+              {challenge.completedDays} of {challenge.durationDays}
             </Text>
           </View>
           <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E5DFDB]">

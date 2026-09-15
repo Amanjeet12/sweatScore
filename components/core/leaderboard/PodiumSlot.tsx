@@ -53,7 +53,7 @@ export default function PodiumSlot({
     <Wrapper
       {...wrapperProps}
       accessible={!entry}
-      accessibilityLabel={!entry ? `Rank ${rank}: up for grabs` : undefined}
+      accessibilityLabel={!entry ? `Rank ${rank}: empty` : undefined}
       className="items-center"
       style={{ width: isHero ? 116 : 92 }}>
       <View
@@ -108,17 +108,28 @@ export default function PodiumSlot({
         )}
       </View>
 
-      <Text
-        style={{ fontFamily: 'Inter_600SemiBold' }}
-        className="mt-2 text-[11px] text-[#1A1A1A]"
-        numberOfLines={1}>
-        {entry ? formatName(entry.name) : 'Up for grabs'}
-      </Text>
-      <Text className="mt-0.5 font-body text-[10px] text-[#817A76]">
-        {entry
-          ? `${entry.displayTotalPoints.toLocaleString()} ${mode === 'streak' ? (entry.displayTotalPoints === 1 ? 'week' : 'weeks') : 'pts'}`
-          : '—'}
-      </Text>
+      {entry ? (
+        <>
+          <Text
+            style={{ fontFamily: 'Inter_600SemiBold' }}
+            className="mt-2 text-[11px] text-[#1A1A1A]"
+            numberOfLines={1}>
+            {formatName(entry.name)}
+          </Text>
+          <Text className="mt-0.5 font-body text-[10px] text-[#817A76]">
+            {entry.displayTotalPoints.toLocaleString()}{' '}
+            {mode === 'streak'
+              ? entry.displayTotalPoints === 1
+                ? 'week'
+                : 'weeks'
+              : entry.displayTotalPoints === 1
+                ? 'pt'
+                : 'pts'}
+          </Text>
+        </>
+      ) : (
+        <View className="h-[30px]" />
+      )}
     </Wrapper>
   );
 }

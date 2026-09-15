@@ -2010,7 +2010,7 @@ function DuetRecordingContent() {
                 className="text-lg text-white">
                 {isCheckIn
                   ? `Submit Check-In for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`
-                  : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} pts`}
+                  : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`}
               </ButtonText>
             </LoadingButton>
 

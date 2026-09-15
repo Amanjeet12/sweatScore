@@ -465,14 +465,17 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
             showToast(
-              `+${result.pointsEarned} pts added successfully. Your post will be live soon.`,
+              `+${result.pointsEarned} ${result.pointsEarned === 1 ? 'pt' : 'pts'} added successfully. Your post will be live soon.`,
               'success'
             );
           } else {
             showToast('Progress saved successfully.', 'success');
           }
         } else if (result?.pointsEarned > 0) {
-          showToast(`+${result.pointsEarned} pts added. Your post will be live soon.`, 'success');
+          showToast(
+            `+${result.pointsEarned} ${result.pointsEarned === 1 ? 'pt' : 'pts'} added. Your post will be live soon.`,
+            'success'
+          );
         } else {
           showToast('Progress submitted successfully. Your post will be live soon.', 'success');
         }

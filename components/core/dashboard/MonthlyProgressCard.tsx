@@ -74,7 +74,7 @@ export default function MonthlyProgressCard({
               </Text>
               <Text className="font-body text-white" style={{ fontSize: 18 }}>
                 {' '}
-                /{formatPoints(targetPoints)} pts
+                /{formatPoints(targetPoints)} {targetPoints === 1 ? 'pt' : 'pts'}
               </Text>
             </View>
           </View>

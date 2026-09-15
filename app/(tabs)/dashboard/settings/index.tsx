@@ -1,47 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack } from 'expo-router';
-import { ArrowRight } from 'phosphor-react-native';
-import {
-  Alert,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
 import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import MyActivities from '~/components/core/settings/MyActivities';
-import { Button, ButtonText } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
 import { useAuthStore } from '~/store/useAuthStore';
-import { colors, externalLinks } from '~/utils/constants';
-import { formatDateToLocaleString } from '~/utils/formatter';
+import { colors } from '~/utils/constants';
 
 export default function TabSettings() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const isIOS = Platform.OS === 'ios';
-
-  const openWhatsApp = async () => {
-    const url = externalLinks.whatsappSupport;
-
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        const webUrl = url.replace('api.whatsapp.com', 'wa.me');
-        await Linking.openURL(webUrl);
-      }
-    } catch {
-      Alert.alert('Error', 'Unable to open WhatsApp. Please make sure WhatsApp is installed.');
-    }
-  };
 
   const openSettings = () => {
     router.push({
@@ -136,18 +108,22 @@ export default function TabSettings() {
               </View>
             </View>
 
-            <View className="mx-4 mt-4">
-              <Button
-                variant="outline"
-                size="md"
-                className="w-full rounded-full"
+            <View className="mt-4 items-center">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                accessibilityRole="link"
+                hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
                 onPress={() => {
                   router.push({
                     pathname: '/(tabs)/dashboard/settings/profile/edit',
                   });
                 }}>
-                <ButtonText className="text-primary-500">Edit Profile</ButtonText>
-              </Button>
+                <Text
+                  className="text-sm text-primary-500"
+                  style={{ fontFamily: 'Inter_600SemiBold' }}>
+                  Edit Profile
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* <View className="mx-4 mt-4">

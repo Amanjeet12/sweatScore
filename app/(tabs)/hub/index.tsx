@@ -19,10 +19,9 @@ type ChallengeListTab = 'joined' | 'not_joined';
 
 export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedTab, setSelectedTab] = useState<ChallengeListTab>('not_joined');
+  const [selectedTab, setSelectedTab] = useState<ChallengeListTab>('joined');
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(() => Math.floor(Date.now() / 60000));
-  const [defaultSelectionPending, setDefaultSelectionPending] = useState(true);
   const userId = useAuthStore((state) => state.currentUser?._id);
   const queryResult = useQuery(api.challengeCompletions.getCommunityChallenges, { refreshToken });
   const result = useRetainedQueryResult(queryResult, String(userId ?? 'guest'));
@@ -32,16 +31,9 @@ export default function ChallengesScreen() {
   useFocusEffect(
     useCallback(() => {
       // Force a current participation snapshot whenever this tab is opened.
-      setDefaultSelectionPending(true);
       setRefreshToken(Date.now());
     }, [])
   );
-
-  useEffect(() => {
-    if (!defaultSelectionPending || queryResult === undefined) return;
-    setSelectedTab(queryResult.summary.joinedCount > 0 ? 'joined' : 'not_joined');
-    setDefaultSelectionPending(false);
-  }, [defaultSelectionPending, queryResult]);
 
   useEffect(() => {
     const interval = setInterval(() => {

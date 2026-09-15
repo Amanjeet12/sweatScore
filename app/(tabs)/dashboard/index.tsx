@@ -274,7 +274,9 @@ export default function TabDashboard() {
       return;
     }
 
-    const timer = setTimeout(() => setTodayTourStep(0), 250);
+    // Let the first Today layout settle without making the tour wait on
+    // queries or cards farther down the screen.
+    const timer = setTimeout(() => setTodayTourStep(0), 80);
     return () => clearTimeout(timer);
   }, [
     currentUser?._id,
@@ -307,7 +309,7 @@ export default function TabDashboard() {
     setTodayTourTarget(null);
 
     if (todayTourStep <= 2) {
-      dashboardScrollRef.current?.scrollTo({ y: 0, animated: true });
+      dashboardScrollRef.current?.scrollTo({ y: 0, animated: false });
     } else {
       dashboardScrollRef.current?.scrollToEnd({ animated: true });
     }
@@ -347,7 +349,7 @@ export default function TabDashboard() {
             setTodayTourTarget({ x, y, width, height });
           });
         },
-        attempt === 0 ? 480 : 240
+        attempt === 0 ? 80 : 120
       );
     };
 
@@ -374,6 +376,7 @@ export default function TabDashboard() {
       return;
     }
 
+    setTodayTourTarget(null);
     setTodayTourStep(todayTourStep + 1);
   };
 
@@ -398,6 +401,7 @@ export default function TabDashboard() {
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}>
           <View
             className="flex-1 flex-col bg-[#F9F9F9]"
+            onLayout={() => setDashboardReady(true)}
             style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
             <View className="px-5 pb-4 pt-4">
               <View className="flex-row items-center justify-between">
@@ -425,11 +429,7 @@ export default function TabDashboard() {
               currentWeeklyStreak={trackOverview?.lifetime.currentWeeklyStreak ?? 0}
               tourTargetRef={streakTourRef}
             />
-            <View
-              className="bg-[#F9F9F9] pt-1"
-              onLayout={() => {
-                setDashboardReady(true);
-              }}>
+            <View className="bg-[#F9F9F9] pt-1">
               <DailyChallengeCard tourTargetRef={checkInTourRef} />
             </View>
             {/* Group chat temporarily disabled.

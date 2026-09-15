@@ -103,7 +103,7 @@ const UserCard = ({
             className={cn('text-xl', {
               'text-white': rank === 1,
             })}>
-            {formatPoints(totalPoints)} pts
+            {formatPoints(totalPoints)} {totalPoints === 1 ? 'pt' : 'pts'}
           </Text>
         </View>
       </View>

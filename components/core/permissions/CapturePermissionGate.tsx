@@ -9,6 +9,7 @@ type Props = {
   onCancel: () => void;
   paddingTop: number;
   loading?: boolean;
+  actionLabel?: string;
 };
 
 /** The Challenge permission screen, shared with photo-based habit proof. */
@@ -18,6 +19,7 @@ export default function CapturePermissionGate({
   onCancel,
   paddingTop,
   loading = false,
+  actionLabel = 'Grant Permissions',
 }: Props) {
   return (
     <View className="flex-1 items-center justify-center bg-[#F9F9F9] px-8" style={{ paddingTop }}>
@@ -31,7 +33,7 @@ export default function CapturePermissionGate({
         style={{ borderRadius: 20 }}
         loading={loading}
         onPress={onGrant}>
-        <ButtonText>Grant Permissions</ButtonText>
+        <ButtonText>{actionLabel}</ButtonText>
       </LoadingButton>
 
       <TouchableOpacity className="mt-4" onPress={onCancel}>

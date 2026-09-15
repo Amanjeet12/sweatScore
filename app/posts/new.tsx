@@ -408,7 +408,7 @@ export default function NewPost() {
             <ToastMessage
               message={
                 response.pointsEarned > 0
-                  ? `+${response.pointsEarned} pts added. Your activity post is live.`
+                  ? `+${response.pointsEarned} ${response.pointsEarned === 1 ? 'pt' : 'pts'} added. Your activity post is live.`
                   : 'Activity posted. You reached today’s points cap.'
               }
               action="success"
@@ -483,7 +483,7 @@ export default function NewPost() {
                   <Text
                     className="text-base text-[#E94F12]"
                     style={{ fontFamily: 'Inter_600SemiBold' }}>
-                    +{activityPoints} pts
+                    +{activityPoints} {activityPoints === 1 ? 'pt' : 'pts'}
                   </Text>
                 </View>
               </View>

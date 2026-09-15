@@ -123,7 +123,9 @@ export default function ChallengeCard({
       />
 
       <View className="absolute right-3 top-3 rounded-lg bg-black/75 px-3 py-1">
-        <Text className="font-body text-xs font-semibold text-white">+{challenge.points} pts</Text>
+        <Text className="font-body text-xs font-semibold text-white">
+          +{challenge.points} {challenge.points === 1 ? 'pt' : 'pts'}
+        </Text>
       </View>
 
       {isLocked && (

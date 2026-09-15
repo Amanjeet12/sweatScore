@@ -563,7 +563,8 @@ export default function TabTrack() {
             <View className="mt-3 flex-row rounded-[24px] bg-white px-3 py-3">
               <View className="flex-1">
                 <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1D1B1A]">
-                  {formatNumber(periodTotal)} {metric === 'points' ? 'pts' : ''}
+                  {formatNumber(periodTotal)}{' '}
+                  {metric === 'points' ? (periodTotal === 1 ? 'pt' : 'pts') : ''}
                 </Text>
                 <Text className="mt-1 font-body text-[10px] text-[#817A76]">
                   {trendLabel} total {periodLabel}
@@ -598,13 +599,15 @@ export default function TabTrack() {
                 <View className="h-full flex-row items-end gap-x-1">
                   {trend.map((item) => (
                     <View key={item.key} className="h-full flex-1 items-center justify-end">
-                      <Text
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        style={{ fontFamily: 'Inter_600SemiBold' }}
-                        className="mb-1 w-full text-center text-[8px] text-[#5A5551]">
-                        {formatCompactNumber(trendValue(item))}
-                      </Text>
+                      {trendValue(item) > 0 ? (
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          style={{ fontFamily: 'Inter_600SemiBold' }}
+                          className="mb-1 w-full text-center text-[8px] text-[#5A5551]">
+                          {formatCompactNumber(trendValue(item))}
+                        </Text>
+                      ) : null}
                       {trendValue(item) > 0 ? (
                         <View
                           className="w-4 rounded-t-[7px]"

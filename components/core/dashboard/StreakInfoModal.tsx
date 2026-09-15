@@ -58,7 +58,7 @@ export default function StreakInfoModal({
           </Text>
           <View className="mt-4 flex-row items-center justify-center gap-x-1">
             <Text className="text-base text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
-              Earn +{bonusPoints} pts bonus
+              Earn +{bonusPoints} {bonusPoints === 1 ? 'pt' : 'pts'} bonus
             </Text>
             <Check size={18} color="#1A1A1A" weight="bold" />
           </View>

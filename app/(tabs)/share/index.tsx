@@ -57,12 +57,14 @@ const TabShare = () => {
     );
   };
 
-  useEffect(() => {
-    const communityGuidelinesShown = storage.getBoolean('communityGuidelinesShown');
-    if (!communityGuidelinesShown && isPro) {
-      router.push({ pathname: '/legals/community-guidelines' });
-    }
-  }, [isPro]);
+  useFocusEffect(
+    useCallback(() => {
+      const communityGuidelinesShown = storage.getBoolean('communityGuidelinesShown');
+      if (!communityGuidelinesShown && isPro) {
+        router.push({ pathname: '/legals/community-guidelines' });
+      }
+    }, [isPro])
+  );
 
   useEffect(() => {
     const selectedPostId = Array.isArray(postId) ? postId[0] : postId;

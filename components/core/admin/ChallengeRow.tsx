@@ -98,7 +98,7 @@ export default function ChallengeRow({ challenge, currentTime }: ChallengeRowPro
               ? `${challenge.points}/day · ${
                   challenge.points * challenge.durationDays + (challenge.completionBankPoints ?? 0)
                 } total`
-              : `${challenge.points} pts`}
+              : `${challenge.points} ${challenge.points === 1 ? 'pt' : 'pts'}`}
           </Text>
         </View>
 

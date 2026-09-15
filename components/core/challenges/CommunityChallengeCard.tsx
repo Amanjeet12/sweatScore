@@ -77,7 +77,7 @@ export default function CommunityChallengeCard({
           <>
             <View className="mt-3 flex-row items-center justify-between">
               <Text className="font-body text-[10px] text-[#77716D]">
-                {challenge.completedDays} days complete
+                {challenge.completedDays} {challenge.completedDays === 1 ? 'day' : 'days'} complete
               </Text>
               <Text
                 style={{ fontFamily: 'Inter_600SemiBold' }}

@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, RefObject } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -50,7 +51,6 @@ import {
 } from '~/shared/loggedActivities';
 import { useAuthStore } from '~/store/useAuthStore';
 import { useTabStore } from '~/store/useTabStore';
-import { ensureRuntimePermission } from '~/utils/runtimePermissions';
 import { storage } from '~/utils/storage';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
 
@@ -208,10 +208,16 @@ function HealthProgressRow({
       </View>
       <View className="ml-3 flex-1">
         <View className="flex-row items-center justify-between">
-          <Text className="font-body text-sm text-[#282522]">
-            <Text style={{ fontFamily: 'Inter_700Bold' }}>{roundedValue.toLocaleString()}</Text>
-            {` / ${target.toLocaleString()} ${unit}`}
-          </Text>
+          <View className="min-w-0 flex-1 flex-row items-baseline pr-2">
+            <Text
+              className="font-heading text-sm font-semibold text-[#1D1B1A]"
+              style={{ fontFamily: 'Inter_600SemiBold' }}>
+              {roundedValue.toLocaleString()}
+            </Text>
+            <Text className="font-body text-xs text-[#807A76]">
+              {` / ${target.toLocaleString()} ${unit}`}
+            </Text>
+          </View>
           <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[13px] text-[#FF4B1F]">
             {Math.floor(points)} {Math.floor(points) === 1 ? 'pt' : 'pts'}
           </Text>
@@ -536,15 +542,31 @@ export default function TodaysSweat({
     if (isRequestingHabitPermission) return;
     setIsRequestingHabitPermission(true);
     try {
-      const granted = await ensureRuntimePermission({
-        current: habitCameraPermission,
-        request: ImagePicker.requestCameraPermissionsAsync,
-        name: 'Camera',
-        purpose: 'Camera access is needed to take a photo for your habit proof.',
-      });
-      const latest = await ImagePicker.getCameraPermissionsAsync();
+      const current = await ImagePicker.getCameraPermissionsAsync();
+      if (current.granted) {
+        setHabitCameraPermission(current);
+        setShowHabitPermission(false);
+        if (Platform.OS === 'ios') {
+          launchHabitAfterPermissionDismiss.current = true;
+        } else {
+          if (habitLaunchTimer.current) clearTimeout(habitLaunchTimer.current);
+          habitLaunchTimer.current = setTimeout(() => {
+            habitLaunchTimer.current = null;
+            launchQuickLogCamera();
+          }, 350);
+        }
+        return;
+      }
+
+      if (current.status === 'denied' && current.canAskAgain === false) {
+        setHabitCameraPermission(current);
+        await Linking.openSettings();
+        return;
+      }
+
+      const latest = await ImagePicker.requestCameraPermissionsAsync();
       setHabitCameraPermission(latest);
-      if (!granted || habitPermissionCancelled.current) return;
+      if (!latest.granted || habitPermissionCancelled.current) return;
 
       setShowHabitPermission(false);
       if (Platform.OS === 'ios') {
@@ -568,6 +590,9 @@ export default function TodaysSweat({
     habitPermissionCancelled.current = true;
     setShowHabitPermission(false);
   };
+
+  const habitPermissionPermanentlyDenied =
+    habitCameraPermission?.status === 'denied' && habitCameraPermission.canAskAgain === false;
 
   return (
     <View className="px-5 pb-5 pt-2">
@@ -743,7 +768,7 @@ export default function TodaysSweat({
           value={health?.totalZone2Minutes ?? 0}
           target={30}
           points={health?.zone2Points ?? 0}
-          unit="active min"
+          unit="active mins"
         />
       </View>
 
@@ -822,7 +847,8 @@ export default function TodaysSweat({
                       {selectedActivity?.detailTitle}
                     </Text>
                     <Text className="font-heading text-xs font-semibold text-[#FF4B1F]">
-                      +{selectedActivity?.basePoints} pts
+                      +{selectedActivity?.basePoints}{' '}
+                      {selectedActivity?.basePoints === 1 ? 'pt' : 'pts'}
                     </Text>
                   </View>
                   <Text className="mt-1 font-body text-xs leading-[18px] text-[#77716D]">
@@ -886,11 +912,16 @@ export default function TodaysSweat({
           }
         }}>
         <CapturePermissionGate
-          description="Camera permission is required to take a photo for your habit proof."
+          description={
+            habitPermissionPermanentlyDenied
+              ? 'Camera access is turned off. Enable it in Settings to take a photo for your habit proof.'
+              : 'Camera permission is required to take a photo for your habit proof.'
+          }
           onGrant={grantHabitPermission}
           onCancel={cancelHabitPermission}
           paddingTop={insets.top}
           loading={isRequestingHabitPermission}
+          actionLabel={habitPermissionPermanentlyDenied ? 'Open Settings' : 'Grant Permissions'}
         />
       </Modal>
 

@@ -258,13 +258,7 @@ export default function TabRank() {
         )}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
-        ListEmptyComponent={
-          mode === 'streak' && visibleEntries.length === 0 ? (
-            <Text className="px-5 py-6 text-center font-body text-sm text-[#817A76]">
-              No active streaks yet. Check in or log a habit on 5 days to earn your first week.
-            </Text>
-          ) : null
-        }
+        ListEmptyComponent={null}
         estimatedItemSize={72}
         contentContainerStyle={{ paddingBottom: 0 }}
         showsVerticalScrollIndicator={false}
