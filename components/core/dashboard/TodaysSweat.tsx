@@ -524,11 +524,23 @@ export default function TodaysSweat({
       return;
 
     try {
-      const permission = await ImagePicker.getCameraPermissionsAsync();
+      let permission = await ImagePicker.getCameraPermissionsAsync();
       if (permission.granted) {
         await launchQuickLogCamera();
         return;
       }
+
+      // Ask for the native camera permission on the first attempt. Previously we
+      // always showed our permission gate first, so the OS prompt only appeared
+      // after a second tap on "Grant Permissions".
+      if (permission.status === 'undetermined' || permission.canAskAgain !== false) {
+        permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (permission.granted) {
+          await launchQuickLogCamera();
+          return;
+        }
+      }
+
       setHabitCameraPermission(permission);
       habitPermissionCancelled.current = false;
       setShowHabitPermission(true);
