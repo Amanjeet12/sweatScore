@@ -36,17 +36,22 @@ export async function ensureRuntimePermission({
   try {
     let permission = current;
 
-    if (!permission?.granted && permission?.canAskAgain !== false) {
+    if (
+      !permission?.granted &&
+      (permission?.canAskAgain !== false || permission?.status === 'undetermined')
+    ) {
       permission = await request();
     }
 
     if (permission?.granted) return true;
 
-    showPermissionSettingsAlert(name, purpose);
+    if (permission?.status === 'denied' && permission.canAskAgain === false) {
+      showPermissionSettingsAlert(name, purpose);
+    }
     return false;
   } catch (error) {
     console.warn(`Unable to request ${name.toLowerCase()} permission:`, error);
-    showPermissionSettingsAlert(name, purpose);
+    Alert.alert('Permission request failed', 'Please try granting access again.');
     return false;
   }
 }

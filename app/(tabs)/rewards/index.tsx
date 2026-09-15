@@ -81,6 +81,17 @@ function monthName(yearMonth: string) {
   );
 }
 
+function formatWeekStart(weekStart: string) {
+  const [year, month, day] = weekStart.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 function Stat({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
     <View className="min-w-0 flex-1 px-2">
@@ -115,11 +126,13 @@ export default function TabTrack() {
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const createPost = useMutation(api.posts.createPost);
   const comparisonRef = useRef<View>(null);
-  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState<number | null>(null);
   const [view, setView] = useState<'front' | 'side'>('front');
   const [metric, setMetric] = useState<TrendMetric>('points');
   const [range, setRange] = useState<TrendRange>('year');
   const [sharing, setSharing] = useState(false);
+  const [shareLoadedUrls, setShareLoadedUrls] = useState<string[]>([]);
+  const [shareLogoLoaded, setShareLogoLoaded] = useState(false);
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
     writeOnly: true,
   });
@@ -137,7 +150,8 @@ export default function TabTrack() {
   };
 
   const photos = progress?.photos ?? [];
-  const currentPhoto = photos[selectedWeekIndex] ?? photos[photos.length - 1];
+  const currentWeekIndex = selectedWeekIndex ?? photos.length - 1;
+  const currentPhoto = photos[currentWeekIndex] ?? photos[photos.length - 1];
   const baselinePhoto = photos[0];
   const showSide = view === 'side' && Boolean(baselinePhoto?.sideUrl && currentPhoto?.sideUrl);
   const comparisonLeft = showSide ? baselinePhoto?.sideUrl : baselinePhoto?.frontUrl;
@@ -167,7 +181,21 @@ export default function TabTrack() {
 
   const captureComparison = async () => {
     if (!comparisonRef.current) throw new Error('Your comparison is still loading.');
-    return captureRef(comparisonRef, { format: 'png', quality: 0.92, result: 'tmpfile' });
+    if (
+      !comparisonLeft ||
+      !comparisonRight ||
+      !shareLoadedUrls.includes(comparisonLeft) ||
+      !shareLoadedUrls.includes(comparisonRight) ||
+      !shareLogoLoaded
+    ) {
+      throw new Error('Your comparison is still loading. Please try again in a moment.');
+    }
+    return captureRef(comparisonRef, {
+      format: 'png',
+      quality: 0.92,
+      result: 'tmpfile',
+      useRenderInContext: Platform.OS === 'ios',
+    });
   };
 
   const uploadComparison = async (uri: string) => {
@@ -260,6 +288,60 @@ export default function TabTrack() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      {/* Capture-only canvas. Keep the on-page preview compact while exporting a square comparison. */}
+      <View
+        ref={comparisonRef}
+        collapsable={false}
+        pointerEvents="none"
+        importantForAccessibility="no-hide-descendants"
+        style={{
+          position: 'absolute',
+          left: -10000,
+          top: 0,
+          width: 360,
+          height: 360,
+          flexDirection: 'row',
+          backgroundColor: '#1D1B1A',
+        }}>
+        {[comparisonLeft, comparisonRight].map((uri, index) => (
+          <View
+            key={`share-${uri}-${index}`}
+            className="h-full flex-1 overflow-hidden bg-[#282522]">
+            {uri ? (
+              <Image
+                source={{ uri }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                onLoad={() =>
+                  setShareLoadedUrls((loaded) => (loaded.includes(uri) ? loaded : [...loaded, uri]))
+                }
+              />
+            ) : null}
+            <View
+              className="absolute bottom-0 left-0 right-0 px-2 pb-2 pt-1.5"
+              style={{ backgroundColor: 'rgba(0, 0, 0, 0.42)' }}>
+              <Text
+                style={{ fontFamily: 'Inter_700Bold' }}
+                className="text-[10px] uppercase text-[#FF7048]">
+                Week {index === 0 ? 1 : currentWeekNumber}
+              </Text>
+              <Text className="mt-0.5 font-body text-[9px] text-white">
+                Week of{' '}
+                {formatWeekStart(
+                  index === 0 ? (baselinePhoto?.weekStart ?? '') : (currentPhoto?.weekStart ?? '')
+                )}
+              </Text>
+            </View>
+          </View>
+        ))}
+        {/* The supplied square PNG has transparent padding; these offsets align its artwork. */}
+        <Image
+          source={require('~/assets/logos/progress-share.png')}
+          style={{ position: 'absolute', top: -31, left: 5, width: 105, height: 105 }}
+          contentFit="contain"
+          onLoad={() => setShareLogoLoaded(true)}
+        />
+      </View>
       <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
       <ScrollView
         className="flex-1"
@@ -332,14 +414,14 @@ export default function TabTrack() {
                       onPress={() => setSelectedWeekIndex(index)}
                       className="rounded-[20px] px-3 py-1.5"
                       style={{
-                        borderColor: index === selectedWeekIndex ? PRIMARY : '#E4DED9',
-                        backgroundColor: index === selectedWeekIndex ? PRIMARY : '#FFFFFF',
+                        borderColor: index === currentWeekIndex ? PRIMARY : '#E4DED9',
+                        backgroundColor: index === currentWeekIndex ? PRIMARY : '#FFFFFF',
                       }}>
                       <Text
                         className="text-[10px] font-semibold"
                         style={{
                           fontFamily: 'Inter_600SemiBold',
-                          color: index === selectedWeekIndex ? '#FFFFFF' : '#77716D',
+                          color: index === currentWeekIndex ? '#FFFFFF' : '#77716D',
                         }}>
                         W{index + 1}
                       </Text>
@@ -366,10 +448,7 @@ export default function TabTrack() {
                     ))}
                   </View>
                 ) : null}
-                <View
-                  ref={comparisonRef}
-                  collapsable={false}
-                  className="mt-3 flex-row gap-x-2 bg-white">
+                <View className="mt-3 flex-row gap-x-2 bg-white">
                   {[comparisonLeft, comparisonRight].map((uri, index) => (
                     <View
                       key={`${uri}-${index}`}

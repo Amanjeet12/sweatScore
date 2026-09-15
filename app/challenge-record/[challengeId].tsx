@@ -32,6 +32,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CompositeVideoPlayer from '~/components/core/dashboard/CompositeVideoPlayer';
+import CapturePermissionGate from '~/components/core/permissions/CapturePermissionGate';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Switch } from '~/components/ui/switch';
@@ -1474,27 +1475,12 @@ function DuetRecordingContent() {
     (!cameraPermission?.granted || !micPermission?.granted)
   ) {
     return (
-      <View
-        className="flex-1 items-center justify-center bg-[#F9F9F9] px-8"
-        style={{
-          paddingTop: insets.top,
-        }}>
-        <Text className="mb-4 text-center text-base text-[#313131]">
-          Camera and microphone permissions are required to record your challenge.
-        </Text>
-
-        <LoadingButton
-          variant="solid"
-          size="lg"
-          action="primary"
-          onPress={requestRecordingPermissions}>
-          <ButtonText>Grant Permissions</ButtonText>
-        </LoadingButton>
-
-        <TouchableOpacity className="mt-4" onPress={() => router.back()}>
-          <Text className="font-body text-sm font-medium text-[#838383]">Cancel</Text>
-        </TouchableOpacity>
-      </View>
+      <CapturePermissionGate
+        description="Camera and microphone permissions are required to record your challenge."
+        onGrant={requestRecordingPermissions}
+        onCancel={() => router.back()}
+        paddingTop={insets.top}
+      />
     );
   }
 

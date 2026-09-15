@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import * as ImagePicker from 'expo-image-picker';
+import type { PermissionResponse } from 'expo-modules-core';
 import { router, useFocusEffect } from 'expo-router';
 import {
   CaretRight,
@@ -35,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DailyLimitReachedModal, SKIP_DAILY_LIMIT_POPUP_KEY } from './DailyLimitReachedModal';
 
+import CapturePermissionGate from '~/components/core/permissions/CapturePermissionGate';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -48,7 +50,7 @@ import {
 } from '~/shared/loggedActivities';
 import { useAuthStore } from '~/store/useAuthStore';
 import { useTabStore } from '~/store/useTabStore';
-import { ensureHabitCameraPermission } from '~/utils/runtimePermissions';
+import { ensureRuntimePermission } from '~/utils/runtimePermissions';
 import { storage } from '~/utils/storage';
 import { formatDateYYYYMMDD } from '~/utils/timezone';
 
@@ -246,7 +248,14 @@ export default function TodaysSweat({
   const [selectedCheckInId, setSelectedCheckInId] = useState<Id<'challenges'> | null>(null);
   const insets = useSafeAreaInsets();
   const [showHabitDetails, setShowHabitDetails] = useState(false);
+  const [showHabitPermission, setShowHabitPermission] = useState(false);
+  const [habitCameraPermission, setHabitCameraPermission] = useState<PermissionResponse | null>(
+    null
+  );
+  const [isRequestingHabitPermission, setIsRequestingHabitPermission] = useState(false);
   const launchHabitAfterDismiss = useRef(false);
+  const launchHabitAfterPermissionDismiss = useRef(false);
+  const habitPermissionCancelled = useRef(false);
   const habitLaunchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -479,13 +488,10 @@ export default function TodaysSweat({
     });
   };
 
-  const continueQuickLog = async () => {
+  const launchQuickLogCamera = async () => {
     if (!selectedActivity || quickLogCompleted || isOpeningCamera) return;
-    if (!requireSubscription({ redirectTo: '/(tabs)/dashboard', source: 'activity_log_proof' }))
-      return;
     setIsOpeningCamera(true);
     try {
-      if (!(await ensureHabitCameraPermission())) return;
       storage.set(PENDING_HABIT_ACTIVITY_KEY, selectedActivity.key);
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
@@ -504,6 +510,63 @@ export default function TodaysSweat({
     } finally {
       setIsOpeningCamera(false);
     }
+  };
+
+  const continueQuickLog = async () => {
+    if (!selectedActivity || quickLogCompleted || isOpeningCamera) return;
+    if (!requireSubscription({ redirectTo: '/(tabs)/dashboard', source: 'activity_log_proof' }))
+      return;
+
+    try {
+      const permission = await ImagePicker.getCameraPermissionsAsync();
+      if (permission.granted) {
+        await launchQuickLogCamera();
+        return;
+      }
+      setHabitCameraPermission(permission);
+      habitPermissionCancelled.current = false;
+      setShowHabitPermission(true);
+    } catch (error) {
+      console.warn('Unable to check habit camera permission:', error);
+      Alert.alert('Could not check camera access', 'Please try taking your habit photo again.');
+    }
+  };
+
+  const grantHabitPermission = async () => {
+    if (isRequestingHabitPermission) return;
+    setIsRequestingHabitPermission(true);
+    try {
+      const granted = await ensureRuntimePermission({
+        current: habitCameraPermission,
+        request: ImagePicker.requestCameraPermissionsAsync,
+        name: 'Camera',
+        purpose: 'Camera access is needed to take a photo for your habit proof.',
+      });
+      const latest = await ImagePicker.getCameraPermissionsAsync();
+      setHabitCameraPermission(latest);
+      if (!granted || habitPermissionCancelled.current) return;
+
+      setShowHabitPermission(false);
+      if (Platform.OS === 'ios') {
+        launchHabitAfterPermissionDismiss.current = true;
+      } else {
+        if (habitLaunchTimer.current) clearTimeout(habitLaunchTimer.current);
+        habitLaunchTimer.current = setTimeout(() => {
+          habitLaunchTimer.current = null;
+          launchQuickLogCamera();
+        }, 350);
+      }
+    } catch (error) {
+      console.warn('Unable to grant habit camera permission:', error);
+      Alert.alert('Could not request camera access', 'Please try again.');
+    } finally {
+      setIsRequestingHabitPermission(false);
+    }
+  };
+
+  const cancelHabitPermission = () => {
+    habitPermissionCancelled.current = true;
+    setShowHabitPermission(false);
   };
 
   return (
@@ -807,6 +870,28 @@ export default function TodaysSweat({
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={showHabitPermission}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        hardwareAccelerated
+        statusBarTranslucent
+        onRequestClose={cancelHabitPermission}
+        onDismiss={() => {
+          if (launchHabitAfterPermissionDismiss.current) {
+            launchHabitAfterPermissionDismiss.current = false;
+            launchQuickLogCamera();
+          }
+        }}>
+        <CapturePermissionGate
+          description="Camera permission is required to take a photo for your habit proof."
+          onGrant={grantHabitPermission}
+          onCancel={cancelHabitPermission}
+          paddingTop={insets.top}
+          loading={isRequestingHabitPermission}
+        />
       </Modal>
 
       <DailyLimitReachedModal
