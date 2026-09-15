@@ -208,8 +208,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                           {selectedActivity.detailTitle}
                         </Text>
                         <Text className="font-heading text-xs font-semibold text-[#E94F12]">
-                          +{selectedActivity.basePoints}{' '}
-                          {selectedActivity.basePoints === 1 ? 'pt' : 'pts'}
+                          +{selectedActivity.basePoints} pts
                         </Text>
                       </View>
                       <Text className="mt-1 font-body text-xs leading-4 text-[#77716D]">
@@ -270,7 +269,7 @@ export default function LogActivityButton({ tourTargetRef }: { tourTargetRef?: R
                             {activity.title}
                           </Text>
                           <Text className="font-heading text-[11px] font-semibold text-[#E94F12]">
-                            +{activity.basePoints} {activity.basePoints === 1 ? 'pt' : 'pts'}
+                            +{activity.basePoints} pts
                           </Text>
                         </View>
                         <Text className="mt-1 font-body text-[11px] leading-4 text-[#6F6864]">

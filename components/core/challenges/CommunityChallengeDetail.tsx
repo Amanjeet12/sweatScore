@@ -95,7 +95,7 @@ export default function CommunityChallengeDetail({
         className="mt-3 text-[24px] leading-[30px] text-[#1A1A1A]">
         {challenge.name}
       </Text>
-      <Text className="mt-2 font-body text-sm leading-[21px] text-[#77716D]">
+      <Text className="font-body text-sm leading-[21px] text-[#77716D]">
         {challenge.description}
       </Text>
 

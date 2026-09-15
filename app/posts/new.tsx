@@ -483,7 +483,7 @@ export default function NewPost() {
                   <Text
                     className="text-base text-[#E94F12]"
                     style={{ fontFamily: 'Inter_600SemiBold' }}>
-                    +{activityPoints} {activityPoints === 1 ? 'pt' : 'pts'}
+                    +{activityPoints} pts
                   </Text>
                 </View>
               </View>

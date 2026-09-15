@@ -847,8 +847,7 @@ export default function TodaysSweat({
                       {selectedActivity?.detailTitle}
                     </Text>
                     <Text className="font-heading text-xs font-semibold text-[#FF4B1F]">
-                      +{selectedActivity?.basePoints}{' '}
-                      {selectedActivity?.basePoints === 1 ? 'pt' : 'pts'}
+                      +{selectedActivity?.basePoints} pts
                     </Text>
                   </View>
                   <Text className="mt-1 font-body text-xs leading-[18px] text-[#77716D]">

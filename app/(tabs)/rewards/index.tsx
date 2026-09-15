@@ -457,7 +457,7 @@ export default function TabTrack() {
                         <Image
                           source={{ uri }}
                           style={{ width: '100%', height: '100%' }}
-                          contentFit="contain"
+                          contentFit="cover"
                         />
                       ) : null}
                       <View className="absolute left-2 top-2 rounded-[20px] bg-[#382C25] px-2 py-1">
