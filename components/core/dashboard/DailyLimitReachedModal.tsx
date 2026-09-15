@@ -78,7 +78,7 @@ export const DailyLimitReachedModal = ({
               variant="solid"
               size="xl"
               action="primary"
-              className="h-16 w-full rounded-lg"
+              className="h-16 w-full rounded-[20px]"
               onPress={() => {
                 persistSkipIfChecked();
                 handleUpgrade();

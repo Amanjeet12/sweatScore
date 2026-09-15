@@ -92,7 +92,8 @@ export default function TabLayout() {
         backBehavior="history"
         screenOptions={{
           lazy: false,
-          freezeOnBlur: true,
+          // Keep mounted tabs reactive so Today does not thaw with stale completion UI.
+          freezeOnBlur: false,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: '#878787',
           headerShown: false,

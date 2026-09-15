@@ -169,11 +169,11 @@ const TabShare = () => {
                           onPress={() => handleCreatePost()}
                           accessibilityRole="button"
                           accessibilityLabel="Write a community post"
-                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] bg-[#FFF0E8]">
+                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
                           <NotePencil size={17} color="#FF5C35" weight="bold" />
                           <Text
                             style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="text-[11px] text-[#F05A28]">
+                            className="text-[11px] text-[#4D4946]">
                             Write
                           </Text>
                         </TouchableOpacity>

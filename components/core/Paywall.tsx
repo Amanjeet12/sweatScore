@@ -241,7 +241,7 @@ export default function Paywall() {
 
   const paywallBullets = [
     'Monthly Guided Challenges',
-    'Daily Check-Ins & Habits',
+    'Daily Check-ins & Habits',
     'Community Accountability',
     'Direct Feedback From Coaches',
     'Workouts & Guides',

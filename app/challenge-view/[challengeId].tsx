@@ -35,6 +35,7 @@ import type { Id } from '~/convex/_generated/dataModel';
 import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useTabStore } from '~/store/useTabStore';
+import { getErrorMessage } from '~/utils/error-message';
 
 type CheckItOutLinkProps = {
   url?: string | null;
@@ -157,7 +158,7 @@ export default function ChallengeViewScreen() {
     player.replace(selectedVideoUrl);
   }, [player, selectedVideoUrl]);
 
-  const dailyLimitReached = progress?.dailyLimitReached === true;
+  const dailyLimitReached = challenge?.type !== 'check_in' && progress?.dailyLimitReached === true;
 
   const dailyLimit = progress?.dailyLimit ?? 5;
 
@@ -265,7 +266,7 @@ export default function ChallengeViewScreen() {
     try {
       await joinCommunityChallenge({ challengeId: challengeId as Id<'challenges'> });
     } catch (error) {
-      Alert.alert('Unable to join', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert('Unable to join', getErrorMessage(error));
     } finally {
       setJoiningCommunityChallenge(false);
     }

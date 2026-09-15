@@ -53,8 +53,8 @@ const TOUR_STEPS = [
   },
   */
   {
-    eyebrow: 'Your Check-Ins',
-    title: 'Log Your Check-In',
+    eyebrow: 'Your Check-ins',
+    title: 'Log Your Check-in',
     description: 'Log a workout or a quick habit to build your streak.',
     icon: PlusCircle,
     cornerRadius: 20,

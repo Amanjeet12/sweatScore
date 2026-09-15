@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
@@ -15,6 +16,7 @@ import {
   MoonStars,
   PersonArmsSpread,
   PersonSimpleRun,
+  SneakerMove,
   Trophy,
   X,
 } from 'phosphor-react-native';
@@ -52,16 +54,24 @@ import { formatDateYYYYMMDD } from '~/utils/timezone';
 
 const PRIMARY = '#FF5C35';
 const PENDING_HABIT_ACTIVITY_KEY = 'pending_habit_activity_key';
+const TODAY_WORKOUT_COMPLETED_CACHE_PREFIX = 'today_workout_completed';
+const TODAY_HABIT_COMPLETED_CACHE_PREFIX = 'today_habit_completed';
+const TODAY_ACTIVITY_TAB_PREFIX = 'today_activity_tab';
 
 type ActivityTab = 'check_in' | 'quick_log';
 type IconComponent = ComponentType<{ size?: number; color?: string; weight?: any }>;
 
+function StrengthIcon({ size = 18, color = PRIMARY }: { size?: number; color?: string }) {
+  return <MaterialCommunityIcons name="arm-flex-outline" size={size} color={color} />;
+}
+
 function getCheckInIcon(name: string): IconComponent {
   const normalized = name.toLowerCase();
-  if (normalized.includes('strength')) return Barbell;
+  if (normalized.includes('strength')) return StrengthIcon;
   if (normalized.includes('core')) return Heartbeat;
   if (normalized.includes('cardio')) return PersonSimpleRun;
   if (normalized.includes('jump') || normalized.includes('rope')) return PersonArmsSpread;
+  if (normalized.includes('dance')) return SneakerMove;
   return PersonSimpleRun;
 }
 
@@ -103,7 +113,7 @@ function SelectableCard({
         opacity: disabled ? 0.55 : 1,
       }}>
       <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
-        <Icon size={24} color={completed || disabled ? '#8F8985' : PRIMARY} weight="regular" />
+        <Icon size={18} color={completed || disabled ? '#8F8985' : PRIMARY} weight="regular" />
       </View>
       <View className="ml-2 min-w-0 flex-1">
         <Text
@@ -192,12 +202,13 @@ function HealthProgressRow({
   return (
     <View className="mt-5 flex-row items-center">
       <View className="h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFF0E8]">
-        <Icon size={20} color={PRIMARY} weight="regular" />
+        <Icon size={18} color={PRIMARY} weight="regular" />
       </View>
       <View className="ml-3 flex-1">
         <View className="flex-row items-center justify-between">
           <Text className="font-body text-sm text-[#282522]">
-            {roundedValue.toLocaleString()} / {target.toLocaleString()} {unit}
+            <Text style={{ fontFamily: 'Inter_700Bold' }}>{roundedValue.toLocaleString()}</Text>
+            {` / ${target.toLocaleString()} ${unit}`}
           </Text>
           <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[13px] text-[#FF4B1F]">
             {Math.floor(points)} {Math.floor(points) === 1 ? 'pt' : 'pts'}
@@ -228,7 +239,10 @@ export default function TodaysSweat({
   const currentUser = useAuthStore((state) => state.currentUser);
   const currentTab = useTabStore((state) => state.currentTab);
   const canLoad = Boolean(currentUser?._id);
-  const [activeTab, setActiveTab] = useState<ActivityTab>('check_in');
+  const [selectedActivityTab, setSelectedActivityTab] = useState<{
+    scope: string;
+    tab: ActivityTab;
+  } | null>(null);
   const [selectedCheckInId, setSelectedCheckInId] = useState<Id<'challenges'> | null>(null);
   const insets = useSafeAreaInsets();
   const [showHabitDetails, setShowHabitDetails] = useState(false);
@@ -259,6 +273,20 @@ export default function TodaysSweat({
     () => formatDateYYYYMMDD(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone),
     [refreshKey]
   );
+  const dailyCompletionCacheScope = `${currentUser?._id ?? 'guest'}_${today}`;
+  const activityTabStorageKey = `${TODAY_ACTIVITY_TAB_PREFIX}_${dailyCompletionCacheScope}`;
+  const workoutCompletedCacheKey = `${TODAY_WORKOUT_COMPLETED_CACHE_PREFIX}_${dailyCompletionCacheScope}`;
+  const cachedWorkoutCompleted = storage.getBoolean(workoutCompletedCacheKey) ?? false;
+  const cachedLoggedActivityKeys = useMemo(
+    () =>
+      LOGGED_ACTIVITIES.filter(
+        (activity) =>
+          storage.getBoolean(
+            `${TODAY_HABIT_COMPLETED_CACHE_PREFIX}_${dailyCompletionCacheScope}_${activity.key}`
+          ) === true
+      ).map((activity) => activity.key),
+    [dailyCompletionCacheScope]
+  );
   const pointsToday = useQuery(
     api.challengeCompletions.getPointsEarnedToday,
     canLoad ? {} : 'skip'
@@ -266,30 +294,40 @@ export default function TodaysSweat({
   const dailyChallengeResult = useQuery(api.challengeCompletions.getTodayDailyChallenge, {
     refreshToken: refreshKey,
   });
-  const dailyChallenge = useRetainedQueryResult(
-    dailyChallengeResult,
-    String(currentUser?._id ?? 'guest')
-  );
+  const dailyChallenge = useRetainedQueryResult(dailyChallengeResult, dailyCompletionCacheScope);
   const availableCheckInsResult = useQuery(api.challengeCompletions.getAvailableCheckIns, {
     openedChallengeId: dailyChallenge?._id,
     refreshToken: refreshKey,
   });
   const availableCheckIns = useRetainedQueryResult(
     availableCheckInsResult,
-    String(currentUser?._id ?? 'guest')
+    dailyCompletionCacheScope
   );
-  const loggedActivityKeys = useQuery(
+  const loggedActivityKeysResult = useQuery(
     api.posts.getLoggedActivityKeysToday,
     canLoad ? { refreshToken: refreshKey } : 'skip'
   );
+  const loggedActivityKeys = useRetainedQueryResult(
+    loggedActivityKeysResult,
+    dailyCompletionCacheScope
+  );
+  const displayedLoggedActivityKeys = loggedActivityKeys ?? cachedLoggedActivityKeys;
   const weeklyProgress = useQuery(api.progressPhotos.getDashboard, canLoad ? {} : 'skip');
   const weeklyProgressLogged = weeklyProgress?.canLogCurrentWeek === false;
   const health = useQuery(api.activities.getPointsForDate, canLoad ? { date: today } : 'skip');
 
   const visibleCheckIns = useMemo(() => (availableCheckIns ?? []).slice(0, 4), [availableCheckIns]);
-  const checkInCompleted = visibleCheckIns.some((item) => item.userCompletedToday);
   const completedWorkoutFromServer =
-    availableCheckInsResult?.some((item) => item.userCompletedToday) ?? false;
+    availableCheckIns?.some((item) => item.userCompletedToday) ?? cachedWorkoutCompleted;
+  const checkInCompleted = completedWorkoutFromServer;
+  const savedActivityTab = storage.getString(activityTabStorageKey);
+  const activeTab: ActivityTab = completedWorkoutFromServer
+    ? 'quick_log'
+    : selectedActivityTab?.scope === dailyCompletionCacheScope
+      ? selectedActivityTab.tab
+      : savedActivityTab === 'quick_log'
+        ? 'quick_log'
+        : 'check_in';
   const completedCheckInId = visibleCheckIns.find(
     (item) => item.userCompletedThisCheckIn
   )?.challengeId;
@@ -297,10 +335,10 @@ export default function TodaysSweat({
     visibleCheckIns.find((item) => item.challengeId === selectedCheckInId) ?? visibleCheckIns[0];
   const selectedActivity = getLoggedActivity(selectedQuickLog);
   const SelectedHabitIcon = getQuickLogIcon(selectedQuickLog);
-  const quickLogCompleted = loggedActivityKeys?.includes(selectedQuickLog) ?? false;
+  const quickLogCompleted = displayedLoggedActivityKeys.includes(selectedQuickLog);
   const allHabitsCompleted =
-    loggedActivityKeys !== undefined &&
-    LOGGED_ACTIVITIES.every((activity) => loggedActivityKeys.includes(activity.key));
+    displayedLoggedActivityKeys.length > 0 &&
+    LOGGED_ACTIVITIES.every((activity) => displayedLoggedActivityKeys.includes(activity.key));
   const checkInPoints = pointsToday?.checkInPoints ?? 0;
   const dailyChallengeLimitReached = pointsToday?.dailyChallengeLimitReached ?? false;
   const dailyChallengeCompletionCount = pointsToday?.dailyChallengeCompletionCount ?? 0;
@@ -387,8 +425,29 @@ export default function TodaysSweat({
 
   useEffect(() => {
     if (availableCheckInsResult === undefined) return;
-    setActiveTab(completedWorkoutFromServer ? 'quick_log' : 'check_in');
-  }, [completedWorkoutFromServer, today, availableCheckInsResult]);
+    const completed = availableCheckInsResult.some((item) => item.userCompletedToday);
+    if (currentUser?._id) storage.set(workoutCompletedCacheKey, completed);
+    if (completed) {
+      storage.set(activityTabStorageKey, 'quick_log');
+      setSelectedActivityTab({ scope: dailyCompletionCacheScope, tab: 'quick_log' });
+    }
+  }, [
+    activityTabStorageKey,
+    availableCheckInsResult,
+    currentUser?._id,
+    dailyCompletionCacheScope,
+    workoutCompletedCacheKey,
+  ]);
+
+  useEffect(() => {
+    if (!currentUser?._id || loggedActivityKeysResult === undefined) return;
+    LOGGED_ACTIVITIES.forEach((activity) => {
+      storage.set(
+        `${TODAY_HABIT_COMPLETED_CACHE_PREFIX}_${dailyCompletionCacheScope}_${activity.key}`,
+        loggedActivityKeysResult.includes(activity.key)
+      );
+    });
+  }, [currentUser?._id, dailyCompletionCacheScope, loggedActivityKeysResult]);
 
   useEffect(() => {
     if (!visibleCheckIns.length) return;
@@ -455,7 +514,7 @@ export default function TodaysSweat({
         className="rounded-[24px] bg-white px-4 py-4">
         <View className="flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <Text className="text-[18px] text-[#1A1A1A]" style={{ fontFamily: 'Inter_700Bold' }}>
-            Your Check-Ins
+            Your Check-ins
           </Text>
           <View className="flex-row items-baseline">
             <Text className="font-heading text-[13px] font-semibold text-[#FF4B1F]">
@@ -485,7 +544,10 @@ export default function TodaysSweat({
                 accessibilityRole="tab"
                 accessibilityState={{ selected, disabled }}
                 disabled={disabled}
-                onPress={() => setActiveTab(value)}
+                onPress={() => {
+                  storage.set(activityTabStorageKey, value);
+                  setSelectedActivityTab({ scope: dailyCompletionCacheScope, tab: value });
+                }}
                 className="flex-1 items-center justify-center rounded-[20px]"
                 style={{
                   backgroundColor: selected ? '#FFFFFF' : 'transparent',
@@ -538,7 +600,7 @@ export default function TodaysSweat({
             [0, 2].map((start) => (
               <View key={start} className="flex-row gap-x-3">
                 {LOGGED_ACTIVITIES.slice(start, start + 2).map((activity) => {
-                  const completed = loggedActivityKeys?.includes(activity.key) ?? false;
+                  const completed = displayedLoggedActivityKeys.includes(activity.key);
                   return (
                     <SelectableCard
                       key={activity.key}
@@ -573,7 +635,7 @@ export default function TodaysSweat({
               ? `${dailyChallengeCompletionCount}/${dailyChallengeLimit} completed`
               : 'Earn more points'
           }
-          action={dailyChallengeLimitReached ? 'Limit reached' : 'Open'}
+          action={dailyChallengeLimitReached ? 'Done today' : 'Open'}
           disabled={pointsToday === undefined || dailyChallengeLimitReached}
           onPress={() => router.push('/(tabs)/hub')}
           divider

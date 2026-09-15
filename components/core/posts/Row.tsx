@@ -465,32 +465,60 @@ export default function PostRow({
     setShowBlockModal(true);
   };
 
+  const downloadableVideoUrl =
+    post.challenge?.compositeVideoUrl?.trim() ||
+    (post.mediaType === 'video' ? post.mediaUrl?.trim() : undefined);
+
   const handleSharePost = async () => {
     if (mediaBusy) return;
     setSharing(true);
     try {
-      if (post.challenge?.compositeVideoUrl) {
-        const localUri = FileSystem.cacheDirectory + 'share_video_' + Date.now() + '.mp4';
-        await FileSystem.downloadAsync(post.challenge.compositeVideoUrl, localUri);
+      if (downloadableVideoUrl) {
+        if (!FileSystem.cacheDirectory) throw new Error('Video cache is unavailable');
+        const destination = `${FileSystem.cacheDirectory}share_video_${Date.now()}.mp4`;
+        const download = await FileSystem.downloadAsync(downloadableVideoUrl, destination);
+        const file = await FileSystem.getInfoAsync(download.uri);
+        if (download.status < 200 || download.status >= 300 || !file.exists || !file.size) {
+          throw new Error('Video download did not produce a valid file');
+        }
         await Share.open({
-          url: localUri,
+          url: download.uri,
           message: buildCaption(post.body ?? ''),
           type: 'video/mp4',
+          failOnCancel: false,
+          useInternalStorage: true,
         });
-      } else {
+      } else if (post.mediaType === 'video') {
+        Alert.alert('Video unavailable', 'This video is not ready to share yet. Please try again.');
+      } else if (post.mediaUrl) {
+        if (!FileSystem.cacheDirectory) throw new Error('Media cache is unavailable');
+        const destination = `${FileSystem.cacheDirectory}share_image_${Date.now()}.jpg`;
+        const download = await FileSystem.downloadAsync(post.mediaUrl, destination);
+        const file = await FileSystem.getInfoAsync(download.uri);
+        if (download.status < 200 || download.status >= 300 || !file.exists || !file.size) {
+          throw new Error('Image download did not produce a valid file');
+        }
         await Share.open({
-          message: [buildCaption(post.body ?? ''), post.mediaUrl].filter(Boolean).join('\n\n'),
+          url: download.uri,
+          message: buildCaption(post.body ?? ''),
+          type: 'image/*',
+          failOnCancel: false,
+          useInternalStorage: true,
         });
+      } else if (post.media) {
+        Alert.alert('Media unavailable', 'This media is not ready to share yet. Please try again.');
+      } else {
+        await Share.open({ message: buildCaption(post.body ?? '') });
       }
-    } catch {
-      // User cancelled or error
+    } catch (error) {
+      if (downloadableVideoUrl || post.mediaUrl || post.mediaType === 'video') {
+        console.error('Media sharing failed:', error);
+        Alert.alert('Share failed', 'Could not prepare the media for sharing. Please try again.');
+      }
+    } finally {
+      setSharing(false);
     }
-    setSharing(false);
   };
-
-  const downloadableVideoUrl =
-    post.challenge?.compositeVideoUrl?.trim() ||
-    (post.mediaType === 'video' ? post.mediaUrl?.trim() : undefined);
 
   const handleDownloadVideo = async () => {
     if (!downloadableVideoUrl || mediaBusy) {

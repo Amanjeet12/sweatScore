@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
+import * as MediaLibrary from 'expo-media-library';
 import { router, Stack } from 'expo-router';
 import { Camera, LockSimple, ShareNetwork } from 'phosphor-react-native';
 import { useMemo, useRef, useState } from 'react';
@@ -119,6 +120,9 @@ export default function TabTrack() {
   const [metric, setMetric] = useState<TrendMetric>('points');
   const [range, setRange] = useState<TrendRange>('year');
   const [sharing, setSharing] = useState(false);
+  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
+    writeOnly: true,
+  });
   const { requireSubscription } = useSubscriptionGuard();
 
   const openProgressPhoto = () => {
@@ -218,11 +222,33 @@ export default function TabTrack() {
         text: 'Save to Phone / Share',
         onPress: async () => {
           setSharing(true);
+          let savedToGallery = false;
           try {
             const uri = await captureComparison();
-            await Share.open({ url: uri, type: 'image/png', failOnCancel: false });
-          } catch {
-            // Native share sheets may reject when a member cancels.
+            const permission = mediaPermission?.granted
+              ? mediaPermission
+              : await requestMediaPermission();
+            if (!permission.granted) {
+              Alert.alert('Photo access needed', 'Allow photo access to save this comparison.');
+              return;
+            }
+            await MediaLibrary.saveToLibraryAsync(uri);
+            savedToGallery = true;
+            await Share.open({
+              url: uri,
+              type: 'image/png',
+              failOnCancel: false,
+              useInternalStorage: true,
+            });
+          } catch (error) {
+            Alert.alert(
+              savedToGallery ? 'Saved to your gallery' : 'Could not save comparison',
+              savedToGallery
+                ? 'The comparison was saved, but the share sheet did not open.'
+                : error instanceof Error
+                  ? error.message
+                  : 'Please try again.'
+            );
           } finally {
             setSharing(false);
           }
@@ -352,7 +378,7 @@ export default function TabTrack() {
                         <Image
                           source={{ uri }}
                           style={{ width: '100%', height: '100%' }}
-                          contentFit="cover"
+                          contentFit="contain"
                         />
                       ) : null}
                       <View className="absolute left-2 top-2 rounded-[20px] bg-[#382C25] px-2 py-1">

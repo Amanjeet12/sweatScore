@@ -454,18 +454,20 @@ export const completeChallenge = mutation({
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
 
-    let completionsTowardDailyLimit = todayCompletions.length;
-    if (isCommunityChallenge) {
-      completionsTowardDailyLimit = 0;
+    let completionsTowardDailyLimit = 0;
+    if (!isCheckIn) {
       for (const completion of todayCompletions) {
         const completedChallenge = await ctx.db.get(completion.challengeId);
-        if (completedChallenge?.isCommunityChallenge === true) {
+        if (
+          completedChallenge?.type !== 'check_in' &&
+          (!isCommunityChallenge || completedChallenge?.isCommunityChallenge === true)
+        ) {
           completionsTowardDailyLimit += 1;
         }
       }
     }
 
-    if (completionsTowardDailyLimit >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
+    if (!isCheckIn && completionsTowardDailyLimit >= MAX_DAILY_CHALLENGE_COMPLETIONS) {
       throw new ConvexError('Daily challenge limit reached');
     }
 
@@ -1629,13 +1631,17 @@ export const getChallengeProgress = query({
       .collect();
 
     const selectedChallenge = await ctx.db.get(args.challengeId);
-    let dailyCompletionCount = todayCompletions.length;
+    let dailyCompletionCount = 0;
 
-    if (selectedChallenge?.isCommunityChallenge) {
-      dailyCompletionCount = 0;
+    if (selectedChallenge?.type !== 'check_in') {
       for (const completion of todayCompletions) {
         const completedChallenge = await ctx.db.get(completion.challengeId);
-        if (completedChallenge?.isCommunityChallenge) dailyCompletionCount += 1;
+        if (
+          completedChallenge?.type !== 'check_in' &&
+          (!selectedChallenge?.isCommunityChallenge || completedChallenge?.isCommunityChallenge)
+        ) {
+          dailyCompletionCount += 1;
+        }
       }
     }
 
@@ -1674,7 +1680,9 @@ export const getChallengeProgress = query({
       lastVideoUrl,
       dailyCompletionCount,
       dailyLimit: MAX_DAILY_CHALLENGE_COMPLETIONS,
-      dailyLimitReached: dailyCompletionCount >= MAX_DAILY_CHALLENGE_COMPLETIONS,
+      dailyLimitReached:
+        selectedChallenge?.type !== 'check_in' &&
+        dailyCompletionCount >= MAX_DAILY_CHALLENGE_COMPLETIONS,
     };
   },
 });

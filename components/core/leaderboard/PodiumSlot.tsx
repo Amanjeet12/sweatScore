@@ -18,7 +18,7 @@ export type PodiumSlotProps = {
   onPress?: (userId: string) => void;
 };
 
-const RANK_COLORS = { 1: '#F1C56F', 2: '#AAA6A3', 3: '#FF5C35' } as const;
+const RANK_COLORS = { 1: '#F1C56F', 2: '#AAA6A3', 3: '#B87333' } as const;
 const AVATAR_COLORS = { 1: '#FF5C35', 2: '#B4522E', 3: '#D77845' } as const;
 
 export default function PodiumSlot({

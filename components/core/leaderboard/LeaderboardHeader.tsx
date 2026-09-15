@@ -18,7 +18,7 @@ export default function LeaderboardHeader({ title, mode, timeLeft, onChangeMode 
           {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())}
         </Text>
         <Text className="font-body text-[13px] text-[#817A76]">
-          {mode === 'points' ? timeLeft : 'Active Streak'}
+          {mode === 'points' ? timeLeft : 'Current Streak'}
         </Text>
       </View>
       <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-[25px] text-[#1A1A1A]">

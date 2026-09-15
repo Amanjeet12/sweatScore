@@ -394,7 +394,7 @@ function DuetRecordingContent() {
 
   const existingUploadJob = getJobForChallenge(challengeId ?? '');
 
-  const dailyLimitReached = progress?.dailyLimitReached === true;
+  const dailyLimitReached = !isCheckIn && progress?.dailyLimitReached === true;
 
   const dailyLimit = progress?.dailyLimit ?? 3;
 
@@ -1739,9 +1739,12 @@ function DuetRecordingContent() {
               top: insets.top + 14,
               left: 16,
               zIndex: 20,
-              padding: 8,
-              borderRadius: 12,
-              backgroundColor: 'rgba(0,0,0,0.35)',
+              width: 46,
+              height: 46,
+              borderRadius: 23,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.45)',
             }}>
             <X size={28} color="#FFFFFF" weight="bold" />
           </TouchableOpacity>
