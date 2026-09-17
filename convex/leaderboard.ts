@@ -641,7 +641,10 @@ export const getLeaderboardForPeriod = query({
     rankedRows = rankedRows
       .filter((row) => eligibleIds.has(row.userId))
       .map((row, index) => ({ ...row, rank: index + 1 }));
-    const totalUsers = rankedRows.length;
+    // The points League footer includes all registered users, even those who
+    // have not earned points yet. Clients subtract the users already shown.
+    // Streak mode explicitly describes active streaks, so keep its active count.
+    const totalUsers = isStreak ? rankedRows.length : allUsers.length;
     const completedCount = isStreak
       ? 0
       : rankedRows.filter((row) => row.displayTotalPoints >= targetPoints).length;
@@ -761,7 +764,8 @@ export const getMonthlyLeaderboardHeader = query({
       .query('monthlyLeaderboard')
       .withIndex('by_year_month_and_points', (q) => q.eq('yearMonth', args.yearMonth))
       .take(5000);
-    const totalUsers = allRows.filter((r) => r.totalPoints >= 1).length;
+    // Keep older monthly-League clients consistent with the points League.
+    const totalUsers = (await ctx.db.query('users').collect()).length;
     const completedCount = allRows.filter(
       (r) => (r.displayTotalPoints ?? 0) >= targetPoints
     ).length;
