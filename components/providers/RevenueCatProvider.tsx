@@ -54,7 +54,6 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const convex = useConvex();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
-  const [isReady, setIsReady] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [isPro, setIsPro] = useState(false);
 
@@ -129,8 +128,6 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         await loadOfferings();
       } catch (error) {
         console.warn('[RevenueCat] initialization failed', error);
-      } finally {
-        if (!cancelled) setIsReady(true);
       }
     };
 
@@ -244,8 +241,6 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     () => ({ restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl }),
     [restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl]
   );
-
-  if (!isReady) return null;
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;
 };

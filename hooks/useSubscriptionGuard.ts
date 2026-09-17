@@ -6,6 +6,7 @@ import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 type SubscriptionGuardOptions = {
   redirectTo?: string;
   source?: string;
+  paywallPath?: '/subscription' | '/(tabs)/dashboard/paywall';
 };
 
 export function useSubscriptionGuard() {
@@ -15,7 +16,7 @@ export function useSubscriptionGuard() {
   const openingPaywallRef = useRef(false);
 
   const requireSubscription = useCallback(
-    ({ redirectTo, source }: SubscriptionGuardOptions = {}) => {
+    ({ redirectTo, source, paywallPath = '/subscription' }: SubscriptionGuardOptions = {}) => {
       if (isPro) {
         return true;
       }
@@ -31,7 +32,7 @@ export function useSubscriptionGuard() {
       openingPaywallRef.current = true;
 
       router.push({
-        pathname: '/subscription',
+        pathname: paywallPath,
         params: {
           redirectTo: redirectTo || pathname || '/(tabs)/dashboard',
           ...(source ? { source } : {}),

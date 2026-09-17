@@ -29,6 +29,7 @@ import {
 import { healthPermissionsAndroid } from '~/utils/constants';
 import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
 import { storeData } from '~/utils/storage';
+import { hasActiveSubscription } from '~/utils/subscription';
 
 function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -181,10 +182,24 @@ export default function AskHealthPermission() {
       return;
     }
 
+    const isSubscribed = await hasActiveSubscription(user);
+
     router.dismissAll();
+
+    if (isSubscribed) {
+      router.replace({
+        pathname: '/(tabs)/dashboard',
+        params: { showSuccess },
+      });
+      return;
+    }
+
     router.replace({
-      pathname: '/(tabs)/dashboard',
-      params: { showSuccess },
+      pathname: '/subscription',
+      params: {
+        redirectTo: '/(tabs)/dashboard',
+        showBackToLogin: 'true',
+      },
     });
   };
 
@@ -201,8 +216,22 @@ export default function AskHealthPermission() {
       return;
     }
 
+    const isSubscribed = await hasActiveSubscription(user);
+
     router.dismissAll();
-    router.replace('/(tabs)/dashboard');
+
+    if (isSubscribed) {
+      router.replace('/(tabs)/dashboard');
+      return;
+    }
+
+    router.replace({
+      pathname: '/subscription',
+      params: {
+        redirectTo: '/(tabs)/dashboard',
+        showBackToLogin: 'true',
+      },
+    });
   };
 
   useEffect(() => {

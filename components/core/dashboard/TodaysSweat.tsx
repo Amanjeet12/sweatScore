@@ -243,7 +243,7 @@ export default function TodaysSweat({
   nextStepsTourRef?: RefObject<View>;
   activityTourRef?: RefObject<View>;
 }) {
-  const { requireSubscription } = useSubscriptionGuard();
+  const { isPro, requireSubscription } = useSubscriptionGuard();
   const currentUser = useAuthStore((state) => state.currentUser);
   const currentTab = useTabStore((state) => state.currentTab);
   const canLoad = Boolean(currentUser?._id);
@@ -261,6 +261,7 @@ export default function TodaysSweat({
   const [isRequestingHabitPermission, setIsRequestingHabitPermission] = useState(false);
   const launchHabitAfterDismiss = useRef(false);
   const launchHabitAfterPermissionDismiss = useRef(false);
+  const openPaywallAfterHabitDismiss = useRef(false);
   const habitPermissionCancelled = useRef(false);
   const habitLaunchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -487,7 +488,14 @@ export default function TodaysSweat({
     setSelectedCheckInId(challengeId);
     if (checkInCompleted) return;
     const redirectTo = `/challenge-view/${challengeId}`;
-    if (!requireSubscription({ redirectTo, source: 'today_check_in_category' })) return;
+    if (
+      !requireSubscription({
+        redirectTo,
+        source: 'today_check_in_category',
+        paywallPath: '/(tabs)/dashboard/paywall',
+      })
+    )
+      return;
     router.push({
       pathname: '/challenge-view/[challengeId]',
       params: { challengeId },
@@ -520,7 +528,13 @@ export default function TodaysSweat({
 
   const continueQuickLog = async () => {
     if (!selectedActivity || quickLogCompleted || isOpeningCamera) return;
-    if (!requireSubscription({ redirectTo: '/(tabs)/dashboard', source: 'activity_log_proof' }))
+    if (
+      !requireSubscription({
+        redirectTo: '/(tabs)/dashboard',
+        source: 'activity_log_proof',
+        paywallPath: '/(tabs)/dashboard/paywall',
+      })
+    )
       return;
 
     try {
@@ -548,6 +562,17 @@ export default function TodaysSweat({
       console.warn('Unable to check habit camera permission:', error);
       Alert.alert('Could not check camera access', 'Please try taking your habit photo again.');
     }
+  };
+
+  const openPendingHabitPaywall = () => {
+    if (!openPaywallAfterHabitDismiss.current) return;
+
+    openPaywallAfterHabitDismiss.current = false;
+    requireSubscription({
+      redirectTo: '/(tabs)/dashboard',
+      source: 'activity_log_proof',
+      paywallPath: '/(tabs)/dashboard/paywall',
+    });
   };
 
   const grantHabitPermission = async () => {
@@ -793,6 +818,11 @@ export default function TodaysSweat({
         statusBarTranslucent
         onRequestClose={() => setShowHabitDetails(false)}
         onDismiss={() => {
+          if (openPaywallAfterHabitDismiss.current) {
+            openPendingHabitPaywall();
+            return;
+          }
+
           if (launchHabitAfterDismiss.current) {
             launchHabitAfterDismiss.current = false;
             continueQuickLog();
@@ -874,12 +904,34 @@ export default function TodaysSweat({
                 }
                 disabled={isOpeningCamera}
                 onPress={() => {
+                  if (quickLogCompleted) {
+                    setShowHabitDetails(false);
+                    return;
+                  }
+
+                  if (!isPro) {
+                    openPaywallAfterHabitDismiss.current = true;
+                    setShowHabitDetails(false);
+
+                    // React Native does not emit Modal.onDismiss on Android.
+                    // Reuse the existing post-dismiss delay used by the camera flow.
+                    if (Platform.OS === 'android') {
+                      if (habitLaunchTimer.current) clearTimeout(habitLaunchTimer.current);
+                      habitLaunchTimer.current = setTimeout(() => {
+                        habitLaunchTimer.current = null;
+                        openPendingHabitPaywall();
+                      }, 350);
+                    }
+                    return;
+                  }
+
                   setShowHabitDetails(false);
-                  if (quickLogCompleted) return;
                   if (Platform.OS === 'ios') {
                     launchHabitAfterDismiss.current = true;
                   } else {
+                    if (habitLaunchTimer.current) clearTimeout(habitLaunchTimer.current);
                     habitLaunchTimer.current = setTimeout(() => {
+                      habitLaunchTimer.current = null;
                       continueQuickLog();
                     }, 350);
                   }

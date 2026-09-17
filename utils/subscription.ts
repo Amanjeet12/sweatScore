@@ -1,6 +1,7 @@
 import Purchases from 'react-native-purchases';
 
 type SubscriptionUser = {
+  _id?: string;
   isAdmin?: boolean;
 };
 
@@ -11,6 +12,10 @@ export async function hasActiveSubscription(
   if (user.isAdmin) return true;
 
   try {
+    if (user._id) {
+      await Purchases.logIn(user._id.toString());
+    }
+
     const customerInfo = await Purchases.getCustomerInfo();
 
     return Boolean(

@@ -14,6 +14,7 @@ export default function DashboardPaywallScreen() {
         options={{
           headerShown: false,
           headerShadowVisible: false,
+          animation: 'none',
         }}
       />
       <View

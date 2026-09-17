@@ -189,6 +189,15 @@ export default function Layout() {
                       }>
                       <Stack>
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen
+                          name="subscription"
+                          options={{
+                            headerShown: false,
+                            gestureEnabled: false,
+                            presentation: 'card',
+                            animation: 'none',
+                          }}
+                        />
 
                         <Stack.Screen name="group-chat" options={{ headerShown: false }} />
                         <Stack.Screen
