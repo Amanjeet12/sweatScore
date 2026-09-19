@@ -13,6 +13,7 @@ import {
 } from './helpers';
 import { Id } from '../_generated/dataModel';
 import { query, QueryCtx } from '../_generated/server';
+import { countActiveWeeks } from '../utils/activeStreak';
 import { getStreakEarnedDatesInRange } from '../utils/streak';
 
 type DayBucket = {
@@ -168,7 +169,7 @@ export const getTrackOverview = query({
     const currentWeekStart = mondayOf(today);
     const currentYearWeek = yearWeekOf(today);
 
-    const [lifetime, days, weeks, months] = await Promise.all([
+    const [lifetime, days, weeks, months, streakWeeks] = await Promise.all([
       ctx.db
         .query('trackLifetime')
         .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -176,6 +177,10 @@ export const getTrackOverview = query({
       loadWeekDays(ctx, userId, currentWeekStart),
       loadMonthWeeks(ctx, userId, currentYearMonth),
       loadYearMonths(ctx, userId, currentYear),
+      ctx.db
+        .query('trackWeekly')
+        .withIndex('by_user_weekStart', (q) => q.eq('userId', userId))
+        .collect(),
     ]);
 
     return {
@@ -185,7 +190,12 @@ export const getTrackOverview = query({
         moves: lifetime?.moves ?? 0,
         points: lifetime?.points ?? 0,
         longestWeeklyStreak: lifetime?.longestWeeklyStreak ?? 0,
-        currentWeeklyStreak: lifetime?.currentWeeklyStreak ?? 0,
+        // Match League directly; the persisted lifetime total can be stale.
+        currentWeeklyStreak: countActiveWeeks(
+          streakWeeks,
+          currentWeekStart,
+          lifetime?.streakAdjustment
+        ),
       },
       currentWeek: {
         yearWeek: currentYearWeek,

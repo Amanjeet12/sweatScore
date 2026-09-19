@@ -552,10 +552,14 @@ export const getLeaderboardForPeriod = query({
             .withIndex('by_user_weekStart', (q) => q.eq('userId', user._id))
             .collect();
           const currentMonday = ymdUTC(getMondayInTZ(now, user.timezone));
+          const lifetime = await ctx.db
+            .query('trackLifetime')
+            .withIndex('by_user', (q) => q.eq('userId', user._id))
+            .unique();
 
           return {
             userId: user._id,
-            displayTotalPoints: countActiveWeeks(weeks, currentMonday),
+            displayTotalPoints: countActiveWeeks(weeks, currentMonday, lifetime?.streakAdjustment),
             rank: 0,
           };
         })

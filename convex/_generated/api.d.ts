@@ -43,6 +43,7 @@ import type * as track_backfill from "../track/backfill.js";
 import type * as track_helpers from "../track/helpers.js";
 import type * as track_queries from "../track/queries.js";
 import type * as track_recompute from "../track/recompute.js";
+import type * as track_streakAdjustments from "../track/streakAdjustments.js";
 import type * as track_yourMoves from "../track/yourMoves.js";
 import type * as triggerMerge from "../triggerMerge.js";
 import type * as upload from "../upload.js";
@@ -94,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   "track/helpers": typeof track_helpers;
   "track/queries": typeof track_queries;
   "track/recompute": typeof track_recompute;
+  "track/streakAdjustments": typeof track_streakAdjustments;
   "track/yourMoves": typeof track_yourMoves;
   triggerMerge: typeof triggerMerge;
   upload: typeof upload;

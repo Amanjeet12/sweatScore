@@ -10,6 +10,7 @@ import {
 } from './helpers';
 import { Id } from '../_generated/dataModel';
 import { internalMutation, MutationCtx } from '../_generated/server';
+import { countActiveWeeks } from '../utils/activeStreak';
 import { formatDateInTZ } from '../utils/timezone';
 
 const DAILY_CHECK_IN_TARGET = 1;
@@ -502,41 +503,6 @@ async function recomputeStreaksHandler(ctx: MutationCtx, userId: Id<'users'>) {
 
   const currentMonday = mondayOf(formatDateInTZ(new Date(), timezone));
 
-  const descendingRows = [...rows].reverse();
-
-  let currentStreak = 0;
-
-  let expectedWeekStart: string | null = null;
-
-  for (let index = 0; index < descendingRows.length; index += 1) {
-    const row = descendingRows[index];
-
-    /*
-     * Do not reset an existing streak
-     * while the current week is still
-     * in progress.
-     */
-    if (index === 0 && row.weekStart === currentMonday && !row.streakWeek) {
-      continue;
-    }
-
-    if (expectedWeekStart !== null && row.weekStart !== expectedWeekStart) {
-      break;
-    }
-
-    if (!row.streakWeek) {
-      break;
-    }
-
-    currentStreak += 1;
-
-    const previousWeek = new Date(`${row.weekStart}T00:00:00.000Z`);
-
-    previousWeek.setUTCDate(previousWeek.getUTCDate() - 7);
-
-    expectedWeekStart = previousWeek.toISOString().slice(0, 10);
-  }
-
   const lifetimeExisting = await ctx.db
     .query('trackLifetime')
     .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -544,6 +510,18 @@ async function recomputeStreaksHandler(ctx: MutationCtx, userId: Id<'users'>) {
 
   if (!lifetimeExisting) {
     return;
+  }
+
+  const adjustment = lifetimeExisting.streakAdjustment;
+  const currentStreak = countActiveWeeks(rows, currentMonday, adjustment);
+  if (adjustment) {
+    // Retain the adjusted personal best even after a later streak break.
+    longest = Math.max(longest, adjustment.weeks);
+    for (const row of rows) {
+      if (row.streakWeek && row.weekStart >= adjustment.weekStart) {
+        longest = Math.max(longest, countActiveWeeks(rows, row.weekStart, adjustment));
+      }
+    }
   }
 
   await ctx.db.patch(lifetimeExisting._id, {

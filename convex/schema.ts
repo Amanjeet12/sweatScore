@@ -396,27 +396,25 @@ const schema = defineSchema({
     .index('by_user_yearMonth', ['userId', 'yearMonth'])
     .index('by_user_year', ['userId', 'year']),
   trackLifetime: defineTable({
-  userId: v.id('users'),
-  steps: v.number(),
-  activeMinutes: v.number(),
-  moves: v.number(),
-  points: v.number(),
-  longestWeeklyStreak: v.number(),
-  currentWeeklyStreak: v.number(),
-  firstActiveDate: v.optional(v.string()),
-  lastActiveDate: v.optional(v.string()),
-
-  streakAdjustment: v.optional(
-    v.object({
-      grantedAt: v.number(),
-      reason: v.string(),
-      weekStart: v.string(),
-      weeks: v.number(),
-    }),
-  ),
-
-  updatedAt: v.number(),
-}).index('by_user', ['userId']),
+    userId: v.id('users'),
+    steps: v.number(),
+    activeMinutes: v.number(),
+    moves: v.number(),
+    points: v.number(),
+    longestWeeklyStreak: v.number(),
+    currentWeeklyStreak: v.number(),
+    streakAdjustment: v.optional(
+      v.object({
+        weekStart: v.string(),
+        weeks: v.number(),
+        reason: v.string(),
+        grantedAt: v.number(),
+      })
+    ),
+    firstActiveDate: v.optional(v.string()),
+    lastActiveDate: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
   progressPhotos: defineTable({
     userId: v.id('users'),
     // Monday in the member's timezone. One private entry is allowed per week.
