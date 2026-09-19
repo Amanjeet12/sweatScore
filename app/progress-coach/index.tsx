@@ -1,7 +1,7 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { ArrowLeft, Sparkle } from 'phosphor-react-native';
-import { TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
@@ -48,15 +48,29 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
 export default function ProgressCoachEntry() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const coachHome = useQuery(api.progressCoach.getCoachHome, currentUser?._id ? {} : 'skip');
+  if (currentUser === undefined || coachHome === undefined) return <ScreenLoading />;
 
-  if (currentUser === undefined || coachHome === undefined) {
-    return <ScreenLoading />;
-  }
+  const hasProfile = coachHome?.enabled && coachHome.state !== 'needs_profile';
+  const planState = coachHome?.enabled ? coachHome.state : 'disabled';
+  const primary =
+    planState === 'ready_to_check_in'
+      ? { label: 'Start today’s check-in', route: '/progress-coach/check-in' }
+      : planState === 'generating'
+        ? { label: 'Open today’s plan', route: '/progress-coach/plan' }
+        : planState === 'plan_ready' || planState === 'fallback'
+          ? { label: 'View today’s plan', route: '/progress-coach/plan' }
+          : null;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <Stack.Screen options={{ headerShown: false }} />
-      <View className="flex-1 px-5 pb-8 pt-4">
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 32,
+          paddingTop: 16,
+        }}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Back to Today"
@@ -64,8 +78,7 @@ export default function ProgressCoachEntry() {
           className="h-12 w-12 items-center justify-center rounded-full bg-white">
           <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
-
-        <View className="flex-1 justify-center">
+        <View className="flex-1 justify-center py-8">
           <View className="mb-5 h-14 w-14 items-center justify-center rounded-full bg-[#FFF0E8]">
             <Sparkle size={28} color="#FF5C35" weight="fill" />
           </View>
@@ -75,24 +88,17 @@ export default function ProgressCoachEntry() {
             className="font-heading text-[28px] font-semibold leading-9 text-[#1A1A1A]">
             Progress Coach
           </Text>
-
           {!coachHome?.enabled ? (
             <View className="mt-5 rounded-[24px] bg-white p-5">
-              <Text
-                allowFontScaling
-                maxFontSizeMultiplier={1.4}
-                className="font-body text-base leading-6 text-[#5A5551]">
+              <Text className="font-body text-base leading-6 text-[#5A5551]">
                 Progress Coach is not available for this account yet.
               </Text>
             </View>
           ) : coachHome.state === 'needs_profile' ? (
             <>
-              <Text
-                allowFontScaling
-                maxFontSizeMultiplier={1.4}
-                className="mt-4 font-body text-base leading-6 text-[#5A5551]">
+              <Text className="mt-4 font-body text-base leading-6 text-[#5A5551]">
                 Answer a few short questions so your daily guidance can reflect your goals and
-                routine. You can retake this profile whenever you choose.
+                routine.
               </Text>
               <View className="mt-8">
                 <ActionButton
@@ -101,38 +107,70 @@ export default function ProgressCoachEntry() {
                 />
               </View>
             </>
-          ) : (
+          ) : coachHome.state === 'failed' ? (
             <>
               <View className="mt-5 rounded-[24px] bg-white p-5">
-                <Text
-                  allowFontScaling
-                  maxFontSizeMultiplier={1.4}
-                  className="font-heading text-lg font-semibold text-[#1A1A1A]">
-                  Your profile is ready
+                <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">
+                  Today’s plan is unavailable
                 </Text>
-                <Text
-                  allowFontScaling
-                  maxFontSizeMultiplier={1.4}
-                  className="mt-2 font-body text-sm leading-5 text-[#5A5551]">
-                  The daily check-in will be added in the next implementation step. No plan has been
-                  submitted.
+                <Text className="mt-2 font-body text-sm leading-5 text-[#5A5551]">
+                  Your coach could not prepare today’s guidance. You can safely return to Today.
                 </Text>
               </View>
               <View className="mt-8">
                 <ActionButton
-                  label="Retake profile"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/progress-coach/profile' as any,
-                      params: { mode: 'retake' },
-                    })
-                  }
+                  label="Return to Today"
+                  onPress={() => router.replace('/(tabs)/dashboard' as any)}
                 />
               </View>
             </>
+          ) : (
+            <>
+              <View className="mt-5 rounded-[24px] bg-white p-5">
+                <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">
+                  {planState === 'ready_to_check_in'
+                    ? 'Ready for today’s check-in'
+                    : planState === 'generating'
+                      ? 'Today’s plan is being prepared'
+                      : 'Today’s plan is ready'}
+                </Text>
+                <Text className="mt-2 font-body text-sm leading-5 text-[#5A5551]">
+                  A quick five-question check-in helps shape guidance for your day.
+                </Text>
+              </View>
+              {primary ? (
+                <View className="mt-8">
+                  <ActionButton
+                    label={primary.label}
+                    onPress={() => router.push(primary.route as any)}
+                  />
+                </View>
+              ) : null}
+            </>
           )}
+          {hasProfile ? (
+            <View className="mt-4">
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: '/progress-coach/profile' as any,
+                    params: { mode: 'retake' },
+                  })
+                }
+                className="min-h-14 items-center justify-center rounded-[20px] border border-[#E3E1DE] bg-white px-5 py-3">
+                <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
+                  Retake profile
+                </Text>
+              </TouchableOpacity>
+              <Text className="mt-3 text-center font-body text-xs leading-5 text-[#807A76]">
+                Profile changes apply to future plans and will not replace a plan already created
+                today.
+              </Text>
+            </View>
+          ) : null}
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

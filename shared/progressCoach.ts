@@ -46,6 +46,58 @@ export const COACH_BODY_CONDITIONS = [
   'pain_or_unwell',
 ] as const;
 
+export const COACH_DAILY_QUESTIONS = [
+  {
+    key: 'sleep',
+    title: 'How did you sleep?',
+    options: [
+      { value: 'barely_rested', label: 'Barely rested' },
+      { value: 'some_rest', label: 'Some rest, not enough' },
+      { value: 'rested', label: 'Rested enough' },
+      { value: 'restored', label: 'Rested and restored' },
+    ],
+  },
+  {
+    key: 'energy',
+    title: 'How is your energy today?',
+    options: [
+      { value: 'gentle_day', label: 'I need a gentle day' },
+      { value: 'little_to_give', label: 'I have a little to give' },
+      { value: 'ready_to_move', label: 'I feel ready to move' },
+    ],
+  },
+  {
+    key: 'mood',
+    title: 'How is your mood?',
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'okay', label: 'Okay' },
+      { value: 'good', label: 'Good' },
+      { value: 'motivated', label: 'Motivated' },
+    ],
+  },
+  {
+    key: 'availableTime',
+    title: 'How much time do you have today?',
+    options: [
+      { value: 'wide_open', label: 'Wide open' },
+      { value: 'window', label: 'I have a window' },
+      { value: 'squeezed', label: 'Squeezed' },
+      { value: 'one_minute', label: 'Barely a minute' },
+    ],
+  },
+  {
+    key: 'bodyCondition',
+    title: 'How does your body feel?',
+    options: [
+      { value: 'fine', label: 'Feeling fine' },
+      { value: 'sore_upper', label: 'Sore upper body' },
+      { value: 'sore_lower', label: 'Sore lower body' },
+      { value: 'pain_or_unwell', label: 'In pain or feeling unwell' },
+    ],
+  },
+] as const;
+
 export const COACH_PROFILE_QUESTIONS = [
   {
     key: 'goal',
@@ -149,6 +201,13 @@ export type CoachDailyInputs = {
 };
 
 export type CoachCheckInType = 'strength' | 'cardio' | 'core' | 'gentle_movement' | 'rest';
+export const COACH_CHECK_IN_LABELS: Record<CoachCheckInType, string> = {
+  strength: 'Strength',
+  cardio: 'Cardio',
+  core: 'Core',
+  gentle_movement: 'Gentle movement',
+  rest: 'Rest',
+};
 export type CoachSafetyState = 'normal' | 'reduced' | 'pain_or_unwell';
 export type CoachPlanStatus = 'pending' | 'ready' | 'fallback' | 'failed';
 
