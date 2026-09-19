@@ -71,6 +71,46 @@ function fallbackCheckInLabel(type: CoachComputedTargets['checkIn']['type']): st
   }
 }
 
+export function buildDeterministicCoachFallback(
+  computedTargets: CoachComputedTargets,
+  verified: CoachContextSummary
+): CoachPlanOutput {
+  if (computedTargets.safetyState === 'pain_or_unwell') {
+    return {
+      headline: COACH_PAIN_FALLBACK_COPY.headline,
+      checkIn: {
+        type: 'rest',
+        durationMinutes: 0,
+        label: COACH_PAIN_FALLBACK_COPY.checkInLabel,
+      },
+      nutrition: {
+        carbServings: 1,
+        message: COACH_PAIN_FALLBACK_COPY.nutritionMessage,
+      },
+      steps: {},
+      hydration: { litres: COACH_REST_HYDRATION_LITRES },
+      why: COACH_PAIN_FALLBACK_COPY.why,
+      safetyNotice: COACH_PAIN_FALLBACK_COPY.safetyNotice,
+    };
+  }
+
+  const carbServings = computedTargets.nutrition.carbServings;
+  return {
+    headline: 'Your plan for today',
+    checkIn: {
+      ...computedTargets.checkIn,
+      label: fallbackCheckInLabel(computedTargets.checkIn.type),
+    },
+    nutrition: {
+      carbServings,
+      message: `Have ${carbServings} carbohydrate ${carbServings === 1 ? 'serving' : 'servings'} today, with protein and vegetables at meals.`,
+    },
+    steps: computedTargets.steps,
+    hydration: computedTargets.hydration,
+    why: `This plan reflects today’s check-in and ${verified.usableDays} usable recent tracking days.`,
+  };
+}
+
 function getStepTarget(daily: CoachDailyInputs, verified: CoachContextSummary): number {
   if (verified.usableDays < COACH_MIN_USABLE_DAYS || verified.averageSteps === undefined) {
     return COACH_DEFAULT_STEP_TARGET;
@@ -152,30 +192,7 @@ export function applyCoachPolicy(input: CoachPolicyInput): CoachPolicyResult {
     hydration: { litres: hydrationLitres },
   };
 
-  const fallback: CoachPlanOutput = painOrUnwell
-    ? {
-        headline: COACH_PAIN_FALLBACK_COPY.headline,
-        checkIn: { type: 'rest', durationMinutes: 0, label: COACH_PAIN_FALLBACK_COPY.checkInLabel },
-        nutrition: { carbServings: 1, message: COACH_PAIN_FALLBACK_COPY.nutritionMessage },
-        steps: {},
-        hydration: { litres: COACH_REST_HYDRATION_LITRES },
-        why: COACH_PAIN_FALLBACK_COPY.why,
-        safetyNotice: COACH_PAIN_FALLBACK_COPY.safetyNotice,
-      }
-    : {
-        headline: 'Your plan for today',
-        checkIn: {
-          ...computedTargets.checkIn,
-          label: fallbackCheckInLabel(computedTargets.checkIn.type),
-        },
-        nutrition: {
-          carbServings,
-          message: `Have ${carbServings} carbohydrate ${carbServings === 1 ? 'serving' : 'servings'} today, with protein and vegetables at meals.`,
-        },
-        steps: computedTargets.steps,
-        hydration: computedTargets.hydration,
-        why: `This plan reflects today’s check-in and ${verified.usableDays} usable recent tracking days.`,
-      };
+  const fallback = buildDeterministicCoachFallback(computedTargets, verified);
 
   return { computedTargets, fallback };
 }

@@ -506,6 +506,8 @@ const schema = defineSchema({
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
     latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
     errorCode: v.optional(
       v.union(
         v.literal('provider_timeout'),

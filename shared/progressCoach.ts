@@ -130,3 +130,10 @@ export type CoachPlanOutput = {
   why: string;
   safetyNotice?: string;
 };
+
+export type CoachGeneratedCopy = {
+  headline: string;
+  checkInLabel: string;
+  nutritionMessage: string;
+  why: string;
+};

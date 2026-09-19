@@ -1,6 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import {
   internalMutation,
@@ -429,6 +430,12 @@ export const startTodayPlan = mutation({
         updatedAt: now,
         errorCode: undefined,
       });
+      if (!terminalFallback) {
+        await ctx.scheduler.runAfter(0, internal.progressCoachActions.generateCoachPlan, {
+          planId: existing._id,
+          generationAttempt,
+        });
+      }
       return {
         planId: existing._id,
         date,
@@ -445,9 +452,6 @@ export const startTodayPlan = mutation({
     });
     const terminalFallback = policy.computedTargets.mayCallClaude === false;
 
-    // Normal plans intentionally remain pending in this local foundation. The next
-    // integration step will schedule the internal generation action. Do not deploy
-    // this commit independently to the shared development environment.
     const planId = await ctx.db.insert('coachDailyPlans', {
       userId: access.userId,
       date,
@@ -464,6 +468,12 @@ export const startTodayPlan = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    if (!terminalFallback) {
+      await ctx.scheduler.runAfter(0, internal.progressCoachActions.generateCoachPlan, {
+        planId,
+        generationAttempt: 1,
+      });
+    }
 
     return {
       planId,
@@ -529,6 +539,8 @@ export const saveCoachPlan = internalMutation({
     model: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
     errorCode: v.optional(errorCodeValidator),
   },
   handler: async (ctx, args) => {
@@ -547,6 +559,14 @@ export const saveCoachPlan = internalMutation({
       throw new ConvexError(
         'A completed coach plan requires targets, context, output, and completedAt'
       );
+    }
+    for (const tokenCount of [args.inputTokens, args.outputTokens]) {
+      if (
+        tokenCount !== undefined &&
+        (!Number.isFinite(tokenCount) || !Number.isInteger(tokenCount) || tokenCount < 0)
+      ) {
+        throw new ConvexError('Coach token usage must be a non-negative integer');
+      }
     }
 
     const { planId: _planId, generationAttempt: _attempt, ...patch } = args;

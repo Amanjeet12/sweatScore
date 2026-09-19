@@ -37,6 +37,8 @@ import type * as mailerlite from "../mailerlite.js";
 import type * as notifications from "../notifications.js";
 import type * as posts from "../posts.js";
 import type * as progressPhotos from "../progressPhotos.js";
+import type * as progressCoach from "../progressCoach.js";
+import type * as progressCoachActions from "../progressCoachActions.js";
 import type * as pushNotification from "../pushNotification.js";
 import type * as services_enduranceZone from "../services/enduranceZone.js";
 import type * as track_backfill from "../track/backfill.js";
@@ -89,6 +91,8 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   posts: typeof posts;
   progressPhotos: typeof progressPhotos;
+  progressCoach: typeof progressCoach;
+  progressCoachActions: typeof progressCoachActions;
   pushNotification: typeof pushNotification;
   "services/enduranceZone": typeof services_enduranceZone;
   "track/backfill": typeof track_backfill;
