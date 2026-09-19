@@ -73,6 +73,7 @@ const lastRealProgressValidator = v.union(
 const profileArgs = {
   currentWeight: v.optional(v.number()),
   weightUnit: v.optional(v.union(v.literal('lb'), v.literal('kg'))),
+  clearWeight: v.optional(v.boolean()),
   goal: goalValidator,
   bodyFeeling: bodyFeelingValidator,
   routineFeeling: routineFeelingValidator,
@@ -334,6 +335,12 @@ export const upsertCoachProfile = mutation({
     requireCoachEnabled(access);
 
     if (
+      args.clearWeight === true &&
+      (args.currentWeight !== undefined || args.weightUnit !== undefined)
+    ) {
+      throw new ConvexError('Cannot clear and supply current weight together');
+    }
+    if (
       args.currentWeight !== undefined &&
       (!Number.isFinite(args.currentWeight) || args.currentWeight <= 0)
     ) {
@@ -351,11 +358,17 @@ export const upsertCoachProfile = mutation({
       .query('coachProfiles')
       .withIndex('by_user', (q) => q.eq('userId', access.userId))
       .unique();
-    const values = { ...args, updatedAt: now };
+    const { clearWeight, currentWeight, weightUnit, ...profileAnswers } = args;
+    const values = {
+      ...profileAnswers,
+      ...(currentWeight === undefined ? {} : { currentWeight, weightUnit }),
+      updatedAt: now,
+    };
 
     if (existing) {
       await ctx.db.patch(existing._id, {
         ...values,
+        ...(clearWeight === true ? { currentWeight: undefined, weightUnit: undefined } : {}),
         profileVersion: existing.profileVersion + 1,
       });
       return {

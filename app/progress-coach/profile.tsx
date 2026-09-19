@@ -125,8 +125,8 @@ export default function ProgressCoachProfile() {
       await upsertProfile({
         ...answers,
         ...(weight.trim() === ''
-          ? { currentWeight: undefined, weightUnit: undefined }
-          : { currentWeight: parsedWeight, weightUnit }),
+          ? { clearWeight: true }
+          : { currentWeight: parsedWeight, weightUnit, clearWeight: false }),
       });
       router.replace('/progress-coach' as any);
     } catch (caught) {
@@ -251,7 +251,10 @@ export default function ProgressCoachProfile() {
                 <TextInput
                   accessibilityLabel="Current weight"
                   value={weight}
-                  onChangeText={setWeight}
+                  onChangeText={(value) => {
+                    setWeight(value);
+                    if (value.trim() === '') setWeightUnit(undefined);
+                  }}
                   keyboardType="decimal-pad"
                   placeholder="Enter weight or leave blank"
                   placeholderTextColor="#9B9591"
