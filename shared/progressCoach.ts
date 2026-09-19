@@ -46,6 +46,90 @@ export const COACH_BODY_CONDITIONS = [
   'pain_or_unwell',
 ] as const;
 
+export const COACH_PROFILE_QUESTIONS = [
+  {
+    key: 'goal',
+    title: "What's your goal?",
+    options: [
+      { value: 'lose_weight', label: 'Lose weight' },
+      {
+        value: 'maintain_weight_body_recomp',
+        label: 'Maintain weight and improve body composition',
+      },
+      { value: 'improve_fitness', label: 'Improve fitness' },
+    ],
+  },
+  {
+    key: 'bodyFeeling',
+    title: 'How do you feel about your body right now?',
+    options: [
+      { value: 'feel_good_refining', label: 'I feel good and want to refine things' },
+      { value: 'little_insecure', label: 'A little insecure, with areas I want to work on' },
+      { value: 'quite_insecure', label: 'Quite insecure and ready to change how I feel' },
+    ],
+  },
+  {
+    key: 'routineFeeling',
+    title: 'How do you feel about your workout routine?',
+    options: [
+      { value: 'enjoy_it', label: 'I enjoy it' },
+      { value: 'okay_could_be_better', label: 'It is okay, but could be better' },
+      { value: 'do_not_enjoy', label: 'I do not enjoy it' },
+      { value: 'no_routine_yet', label: 'I do not really have one yet' },
+    ],
+  },
+  {
+    key: 'foodRelationship',
+    title: 'How would you describe your relationship with food?',
+    options: [
+      { value: 'balanced_most_days', label: 'Balanced most days' },
+      { value: 'swing_back_to_old_habits', label: 'I do well, then swing back to old habits' },
+      { value: 'restrict_then_overeat', label: 'I restrict, then end up overeating' },
+      { value: 'do_not_think_about_it', label: 'I do not really think about it' },
+    ],
+  },
+  {
+    key: 'usualSleep',
+    title: 'How would you describe your sleep?',
+    options: [
+      { value: 'regular_restful', label: 'Regular and restful' },
+      { value: 'okay_inconsistent', label: 'Okay, but inconsistent' },
+      { value: 'poor_often_tired', label: 'Poor, I am often tired' },
+    ],
+  },
+  {
+    key: 'biggestStruggle',
+    title: 'What is your biggest struggle right now?',
+    options: [
+      { value: 'time', label: 'Time' },
+      { value: 'motivation', label: 'Motivation' },
+      { value: 'food', label: 'Food' },
+      { value: 'something_else', label: 'Something else' },
+    ],
+  },
+  {
+    key: 'upcomingEvent',
+    title: 'Do you have any events coming up?',
+    options: [
+      { value: 'birthday', label: 'Birthday' },
+      { value: 'holiday', label: 'Holiday' },
+      { value: 'wedding', label: 'Wedding' },
+      { value: 'other', label: 'Other' },
+      { value: 'none', label: 'None' },
+    ],
+  },
+  {
+    key: 'lastRealProgress',
+    title: 'When did you last see real progress?',
+    options: [
+      { value: 'recently', label: 'Recently' },
+      { value: 'a_while_ago', label: 'A while ago' },
+      { value: 'cannot_remember', label: "I can't remember" },
+      { value: 'never', label: 'Never' },
+    ],
+  },
+] as const;
+
 export type CoachProfileGoal = (typeof COACH_PROFILE_GOALS)[number];
 export type CoachBodyFeeling = (typeof COACH_BODY_FEELINGS)[number];
 export type CoachRoutineFeeling = (typeof COACH_ROUTINE_FEELINGS)[number];

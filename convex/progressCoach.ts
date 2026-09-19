@@ -309,6 +309,21 @@ export const getCoachHome = query({
   },
 });
 
+export const getCoachProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const access = await getCoachAccess(ctx);
+    requireCoachEnabled(access);
+
+    const profile = await ctx.db
+      .query('coachProfiles')
+      .withIndex('by_user', (q) => q.eq('userId', access.userId))
+      .unique();
+
+    return profile ? profileValues(profile) : null;
+  },
+});
+
 export const upsertCoachProfile = mutation({
   args: profileArgs,
   handler: async (ctx, args) => {

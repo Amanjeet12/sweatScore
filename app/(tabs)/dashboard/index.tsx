@@ -13,6 +13,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -103,6 +104,7 @@ export default function TabDashboard() {
   const [todayTourStep, setTodayTourStep] = useState<number | null>(null);
   const [todayTourTarget, setTodayTourTarget] = useState<TodayTourTarget | null>(null);
   const currentUser = useQuery(api.users.current);
+  const coachHome = useQuery(api.progressCoach.getCoachHome, currentUser?._id ? {} : 'skip');
   const rewardsBanner = useQuery(api.admin.getRewardsBanner);
   const yearMonth = useMemo(() => {
     const today = new Date();
@@ -495,6 +497,34 @@ export default function TabDashboard() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {isFocused && coachHome?.enabled && todayTourStep === null ? (
+        <TouchableOpacity
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel="Open Progress Coach"
+          onPress={() => router.push('/progress-coach' as any)}
+          className="absolute right-5 min-h-12 flex-row items-center rounded-full bg-[#FF5C35] px-4 py-3"
+          style={{
+            bottom: Math.max(16, insets.bottom + 12),
+            maxWidth: Dimensions.get('window').width - 40,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.18,
+            shadowRadius: 6,
+            elevation: 7,
+            zIndex: 20,
+          }}>
+          <Icon.Sparkle size={19} color="white" weight="fill" />
+          <Text
+            allowFontScaling
+            maxFontSizeMultiplier={1.4}
+            numberOfLines={1}
+            className="ml-2 font-heading text-sm font-semibold text-white">
+            Progress Coach
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       <TodayFeatureTour
         step={todayTourStep}
