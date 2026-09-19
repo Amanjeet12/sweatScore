@@ -76,9 +76,10 @@ export default function ProgressCoachProfile() {
     if (!isRetake || existingProfile === undefined || hydrated.current) return;
     hydrated.current = true;
     if (!existingProfile) return;
-    setAnswers(existingProfile);
-    setWeight(existingProfile.currentWeight?.toString() ?? '');
-    setWeightUnit(existingProfile.weightUnit);
+    const { currentWeight, weightUnit: savedWeightUnit, ...profileAnswers } = existingProfile;
+    setAnswers(profileAnswers);
+    setWeight(currentWeight?.toString() ?? '');
+    setWeightUnit(savedWeightUnit);
   }, [existingProfile, isRetake]);
 
   const goBack = useCallback(() => {
