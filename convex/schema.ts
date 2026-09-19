@@ -346,9 +346,180 @@ const schema = defineSchema({
   }).index('by_key', ['key']),
   featureFlags: defineTable({
     userId: v.id('users'),
-    featureFlag: v.union(v.literal('mission')),
+    featureFlag: v.union(v.literal('mission'), v.literal('progress_coach')),
     enabled: v.boolean(),
   }).index('by_user_feature_flag', ['userId', 'featureFlag']),
+  coachProfiles: defineTable({
+    userId: v.id('users'),
+    currentWeight: v.optional(v.number()),
+    weightUnit: v.optional(v.union(v.literal('lb'), v.literal('kg'))),
+    goal: v.union(
+      v.literal('lose_weight'),
+      v.literal('maintain_weight_body_recomp'),
+      v.literal('improve_fitness')
+    ),
+    bodyFeeling: v.union(
+      v.literal('feel_good_refining'),
+      v.literal('little_insecure'),
+      v.literal('quite_insecure')
+    ),
+    routineFeeling: v.union(
+      v.literal('enjoy_it'),
+      v.literal('okay_could_be_better'),
+      v.literal('do_not_enjoy'),
+      v.literal('no_routine_yet')
+    ),
+    foodRelationship: v.union(
+      v.literal('balanced_most_days'),
+      v.literal('swing_back_to_old_habits'),
+      v.literal('restrict_then_overeat'),
+      v.literal('do_not_think_about_it')
+    ),
+    usualSleep: v.union(
+      v.literal('regular_restful'),
+      v.literal('okay_inconsistent'),
+      v.literal('poor_often_tired')
+    ),
+    biggestStruggle: v.union(
+      v.literal('time'),
+      v.literal('motivation'),
+      v.literal('food'),
+      v.literal('something_else')
+    ),
+    upcomingEvent: v.union(
+      v.literal('birthday'),
+      v.literal('holiday'),
+      v.literal('wedding'),
+      v.literal('other'),
+      v.literal('none')
+    ),
+    lastRealProgress: v.union(
+      v.literal('recently'),
+      v.literal('a_while_ago'),
+      v.literal('cannot_remember'),
+      v.literal('never')
+    ),
+    profileVersion: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+  coachDailyPlans: defineTable({
+    userId: v.id('users'),
+    date: v.string(),
+    inputs: v.object({
+      sleep: v.union(
+        v.literal('barely_rested'),
+        v.literal('some_rest'),
+        v.literal('rested'),
+        v.literal('restored')
+      ),
+      energy: v.union(
+        v.literal('gentle_day'),
+        v.literal('little_to_give'),
+        v.literal('ready_to_move')
+      ),
+      mood: v.union(v.literal('low'), v.literal('okay'), v.literal('good'), v.literal('motivated')),
+      availableTime: v.union(
+        v.literal('wide_open'),
+        v.literal('window'),
+        v.literal('squeezed'),
+        v.literal('one_minute')
+      ),
+      bodyCondition: v.union(
+        v.literal('fine'),
+        v.literal('sore_upper'),
+        v.literal('sore_lower'),
+        v.literal('pain_or_unwell')
+      ),
+    }),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('ready'),
+      v.literal('fallback'),
+      v.literal('failed')
+    ),
+    safetyState: v.union(v.literal('normal'), v.literal('reduced'), v.literal('pain_or_unwell')),
+    computedTargets: v.optional(
+      v.object({
+        safetyState: v.union(
+          v.literal('normal'),
+          v.literal('reduced'),
+          v.literal('pain_or_unwell')
+        ),
+        mayCallClaude: v.boolean(),
+        checkIn: v.object({
+          type: v.union(
+            v.literal('strength'),
+            v.literal('cardio'),
+            v.literal('core'),
+            v.literal('gentle_movement'),
+            v.literal('rest')
+          ),
+          durationMinutes: v.number(),
+        }),
+        nutrition: v.object({
+          carbServings: v.union(v.literal(1), v.literal(2)),
+          proteinWithMeals: v.literal(true),
+          vegetablesWithMeals: v.literal(true),
+        }),
+        steps: v.object({ target: v.optional(v.number()) }),
+        hydration: v.object({ litres: v.number() }),
+      })
+    ),
+    contextSummary: v.optional(
+      v.object({
+        usableDays: v.number(),
+        averageSteps: v.optional(v.number()),
+        averageActiveMinutes: v.optional(v.number()),
+        activeDays: v.number(),
+      })
+    ),
+    output: v.optional(
+      v.object({
+        headline: v.string(),
+        checkIn: v.object({
+          type: v.union(
+            v.literal('strength'),
+            v.literal('cardio'),
+            v.literal('core'),
+            v.literal('gentle_movement'),
+            v.literal('rest')
+          ),
+          durationMinutes: v.number(),
+          label: v.string(),
+        }),
+        nutrition: v.object({
+          carbServings: v.union(v.literal(1), v.literal(2)),
+          message: v.string(),
+        }),
+        steps: v.object({ target: v.optional(v.number()) }),
+        hydration: v.object({ litres: v.number() }),
+        why: v.string(),
+        safetyNotice: v.optional(v.string()),
+      })
+    ),
+    provider: v.optional(v.literal('anthropic')),
+    model: v.optional(v.string()),
+    promptVersion: v.string(),
+    generationAttempt: v.number(),
+    attemptCount: v.number(),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    errorCode: v.optional(
+      v.union(
+        v.literal('provider_timeout'),
+        v.literal('provider_rate_limited'),
+        v.literal('provider_invalid_response'),
+        v.literal('provider_unavailable'),
+        v.literal('generation_failed')
+      )
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_date', ['userId', 'date'])
+    .index('by_status', ['status']),
   trackDaily: defineTable({
     userId: v.id('users'),
     date: v.string(),
