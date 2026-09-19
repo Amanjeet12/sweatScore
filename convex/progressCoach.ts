@@ -180,7 +180,10 @@ async function getCoachAccess(ctx: QueryCtx | MutationCtx): Promise<CoachAccess>
     )
     .unique();
 
-  return { userId, user, enabled: flag?.enabled === true };
+  const eligible = user.isAdmin === true || user.isPremium === true;
+  const enabled = eligible && flag?.enabled === true;
+
+  return { userId, user, enabled };
 }
 
 function requireCoachEnabled(access: CoachAccess) {
