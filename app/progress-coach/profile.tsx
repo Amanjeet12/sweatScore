@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { goBackOrReplace } from '~/components/core/BackButton';
+import { CoachProgress } from '~/components/core/CoachPresentation';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
@@ -37,8 +38,8 @@ function hasRequiredAnswers(
 
 export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <View className="flex-1 justify-center px-6">
+    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
           Your profile could not load
         </Text>
@@ -51,7 +52,7 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
           className="mt-6 min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5">
           <Text className="font-heading text-base font-semibold text-white">Try again</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -149,9 +150,9 @@ export default function ProgressCoachProfile() {
 
   if (isRetake && existingProfile === null) {
     return (
-      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      <SafeAreaView className="flex-1 bg-[#FBF8F4]">
         <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-        <View className="flex-1 justify-center px-6">
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
           <Text className="text-center font-body text-base text-[#5A5551]">
             Your coach profile could not be loaded.
           </Text>
@@ -161,13 +162,13 @@ export default function ProgressCoachProfile() {
             className="mt-6 min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5">
             <Text className="font-heading text-base font-semibold text-white">Return to coach</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <KeyboardAvoidingView
         className="flex-1"
@@ -190,25 +191,26 @@ export default function ProgressCoachProfile() {
           </View>
         </View>
 
-        <View className="mx-5 h-1.5 overflow-hidden rounded-full bg-[#E9E3DF]">
-          <View
-            className="h-full rounded-full bg-[#FF5C35]"
-            style={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
-          />
-        </View>
+        <CoachProgress step={step} total={TOTAL_STEPS} />
 
         <ScrollView
           className="flex-1"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 }}>
-          <View className="flex-1 pt-8">
+          <View className="flex-1 pb-8 pt-8">
+            <Text className="mb-3 font-heading text-xs font-semibold uppercase tracking-widest text-[#A7371C]">
+              A little about you
+            </Text>
             {question ? (
               <>
                 <Text
                   allowFontScaling
-                  maxFontSizeMultiplier={1.4}
-                  className="font-heading text-2xl font-semibold leading-8 text-[#1A1A1A]">
+                  className="font-heading text-[28px] font-semibold text-[#1A1A1A]">
                   {question.title}
+                </Text>
+                <Text className="mt-3 font-body text-sm text-[#625B55]">
+                  Choose what feels closest to your experience. You can go back to review your
+                  answers.
                 </Text>
                 <View className="mt-7 gap-y-3">
                   {question.options.map((option) => {
@@ -227,16 +229,17 @@ export default function ProgressCoachProfile() {
                         }
                         className="min-h-16 flex-row items-center rounded-[20px] border px-4 py-3"
                         style={{
-                          borderColor: selected ? '#FF5C35' : '#E3E1DE',
+                          borderColor: selected ? '#C74420' : '#E9E3DD',
                           backgroundColor: selected ? '#FFF0E8' : '#FFFFFF',
                         }}>
                         <Text
                           allowFontScaling
-                          maxFontSizeMultiplier={1.4}
-                          className="min-w-0 flex-1 font-body text-base leading-6 text-[#1A1A1A]">
+                          className="min-w-0 flex-1 font-body text-base text-[#1A1A1A]">
                           {option.label}
                         </Text>
-                        {selected ? <Check size={20} color="#FF5C35" weight="bold" /> : null}
+                        <View className="ml-3 h-7 w-7 items-center justify-center rounded-full border border-[#E9E3DD] bg-white">
+                          {selected ? <Check size={18} color="#A7371C" weight="bold" /> : null}
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -246,8 +249,7 @@ export default function ProgressCoachProfile() {
               <>
                 <Text
                   allowFontScaling
-                  maxFontSizeMultiplier={1.4}
-                  className="font-heading text-2xl font-semibold leading-8 text-[#1A1A1A]">
+                  className="font-heading text-[28px] font-semibold text-[#1A1A1A]">
                   What is your current weight?
                 </Text>
                 <Text className="mt-2 font-body text-sm leading-5 text-[#807A76]">
@@ -304,11 +306,10 @@ export default function ProgressCoachProfile() {
             accessibilityState={{ disabled: !canContinue || isSubmitting }}
             disabled={!canContinue || isSubmitting}
             onPress={handleContinue}
-            className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-3"
+            className="min-h-14 items-center justify-center rounded-[20px] bg-[#C74420] px-5 py-4"
             style={{ opacity: !canContinue || isSubmitting ? 0.45 : 1 }}>
             <Text
               allowFontScaling
-              maxFontSizeMultiplier={1.4}
               className="text-center font-heading text-base font-semibold text-white">
               {isSubmitting ? 'Saving…' : step === TOTAL_STEPS - 1 ? 'Save profile' : 'Continue'}
             </Text>

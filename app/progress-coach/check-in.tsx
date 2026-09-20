@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { BackHandler, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { goBackOrReplace } from '~/components/core/BackButton';
+import { CoachProgress } from '~/components/core/CoachPresentation';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -65,7 +66,7 @@ export default function ProgressCoachCheckIn() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <View className="flex-row items-center px-5 pb-3 pt-3">
         <TouchableOpacity
@@ -84,21 +85,19 @@ export default function ProgressCoachCheckIn() {
           </Text>
         </View>
       </View>
-      <View className="mx-5 h-1.5 overflow-hidden rounded-full bg-[#E9E3DF]">
-        <View
-          className="h-full rounded-full bg-[#FF5C35]"
-          style={{ width: `${((step + 1) / COACH_DAILY_QUESTIONS.length) * 100}%` }}
-        />
-      </View>
+      <CoachProgress step={step} total={COACH_DAILY_QUESTIONS.length} />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 }}>
-        <View className="flex-1 pt-8">
-          <Text
-            allowFontScaling
-            maxFontSizeMultiplier={1.4}
-            className="font-heading text-2xl font-semibold leading-8 text-[#1A1A1A]">
+        <View className="flex-1 pb-8 pt-8">
+          <Text className="mb-3 font-heading text-xs font-semibold uppercase tracking-widest text-[#A7371C]">
+            Today’s readiness
+          </Text>
+          <Text allowFontScaling className="font-heading text-[28px] font-semibold text-[#1A1A1A]">
             {question.title}
+          </Text>
+          <Text className="mt-3 font-body text-sm text-[#625B55]">
+            Choose what feels most accurate today. Your answers help shape one saved daily focus.
           </Text>
           <View className="mt-7 gap-y-3">
             {question.options.map((option) => {
@@ -114,16 +113,17 @@ export default function ProgressCoachCheckIn() {
                   }
                   className="min-h-16 flex-row items-center rounded-[20px] border px-4 py-3"
                   style={{
-                    borderColor: selected ? '#FF5C35' : '#E3E1DE',
+                    borderColor: selected ? '#C74420' : '#E9E3DD',
                     backgroundColor: selected ? '#FFF0E8' : '#FFFFFF',
                   }}>
                   <Text
                     allowFontScaling
-                    maxFontSizeMultiplier={1.4}
-                    className="min-w-0 flex-1 font-body text-base leading-6 text-[#1A1A1A]">
+                    className="min-w-0 flex-1 font-body text-base text-[#1A1A1A]">
                     {option.label}
                   </Text>
-                  {selected ? <Check size={20} color="#FF5C35" weight="bold" /> : null}
+                  <View className="ml-3 h-7 w-7 items-center justify-center rounded-full border border-[#E9E3DD] bg-white">
+                    {selected ? <Check size={18} color="#A7371C" weight="bold" /> : null}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -138,13 +138,13 @@ export default function ProgressCoachCheckIn() {
           accessibilityState={{ disabled: !selectedValue || isSubmitting }}
           disabled={!selectedValue || isSubmitting}
           onPress={handleContinue}
-          className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-3"
+          className="min-h-14 items-center justify-center rounded-[20px] bg-[#C74420] px-5 py-4"
           style={{ opacity: !selectedValue || isSubmitting ? 0.45 : 1 }}>
           <Text className="text-center font-heading text-base font-semibold text-white">
             {isSubmitting
-              ? 'Creating today’s plan…'
+              ? 'Saving today’s focus…'
               : step === COACH_DAILY_QUESTIONS.length - 1
-                ? 'Create today’s plan'
+                ? 'Create today’s focus'
                 : 'Continue'}
           </Text>
         </TouchableOpacity>

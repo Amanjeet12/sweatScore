@@ -1,37 +1,26 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
-import { ArrowLeft, Sparkle } from 'phosphor-react-native';
+import { ArrowLeft, ChartLineUp, Clock, Sparkle } from 'phosphor-react-native';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { goBackOrReplace } from '~/components/core/BackButton';
+import {
+  CoachButton as ActionButton,
+  CoachCard,
+  CoachFocusHero,
+  CoachMark,
+  CoachSaved,
+} from '~/components/core/CoachPresentation';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 
-function ActionButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.82}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      className="min-h-14 w-full items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-3">
-      <Text
-        allowFontScaling
-        maxFontSizeMultiplier={1.4}
-        className="text-center font-heading text-base font-semibold text-white">
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
 export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <View className="flex-1 justify-center px-6">
+    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
           Progress Coach could not load
         </Text>
@@ -41,7 +30,7 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
         <View className="mt-6">
           <ActionButton label="Try again" onPress={retry} />
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -49,6 +38,14 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
 export default function ProgressCoachEntry() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const coachHome = useQuery(api.progressCoach.getCoachHome, currentUser?._id ? {} : 'skip');
+  const savedPlan = useQuery(
+    api.progressCoach.getTodayPlan,
+    currentUser?._id &&
+      coachHome?.enabled &&
+      (coachHome.state === 'plan_ready' || coachHome.state === 'fallback')
+      ? {}
+      : 'skip'
+  );
   if (currentUser === undefined || coachHome === undefined) return <ScreenLoading />;
 
   const hasProfile = coachHome?.enabled && coachHome.state !== 'needs_profile';
@@ -57,13 +54,13 @@ export default function ProgressCoachEntry() {
     planState === 'ready_to_check_in'
       ? { label: 'Start today’s check-in', route: '/progress-coach/check-in' }
       : planState === 'generating'
-        ? { label: 'Open today’s plan', route: '/progress-coach/plan' }
+        ? { label: 'Open today’s focus', route: '/progress-coach/plan' }
         : planState === 'plan_ready' || planState === 'fallback'
-          ? { label: 'View today’s plan', route: '/progress-coach/plan' }
+          ? { label: 'View today’s focus', route: '/progress-coach/plan' }
           : null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
         contentContainerStyle={{
@@ -79,15 +76,17 @@ export default function ProgressCoachEntry() {
           className="h-12 w-12 items-center justify-center rounded-full bg-white">
           <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
-        <View className="flex-1 justify-center py-8">
-          <View className="mb-5 h-14 w-14 items-center justify-center rounded-full bg-[#FFF0E8]">
-            <Sparkle size={28} color="#FF5C35" weight="fill" />
+        <View className="flex-1 py-8">
+          <View className="mb-6">
+            <CoachMark />
           </View>
-          <Text
-            allowFontScaling
-            maxFontSizeMultiplier={1.4}
-            className="font-heading text-[28px] font-semibold leading-9 text-[#1A1A1A]">
-            Progress Coach
+          <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#A7371C]">
+            Your daily direction
+          </Text>
+          <Text className="mt-3 font-heading text-[30px] font-semibold text-[#1A1A1A]">
+            {coachHome?.enabled && coachHome.state === 'needs_profile'
+              ? 'Meet your SweatScore AI Coach'
+              : 'Your daily Coach'}
           </Text>
           {!coachHome?.enabled ? (
             <View className="mt-5 rounded-[24px] bg-white p-5">
@@ -98,25 +97,52 @@ export default function ProgressCoachEntry() {
           ) : coachHome.state === 'needs_profile' ? (
             <>
               <Text className="mt-4 font-body text-base leading-6 text-[#5A5551]">
-                Answer a few short questions so your daily guidance can reflect your goals and
-                routine.
+                One clear focus, shaped by your readiness, your goals and the recent tracking
+                progress SweatScore can verify.
               </Text>
-              <View className="mt-8">
+              <View className="my-6 gap-y-3">
+                <CoachCard
+                  title="Quick daily readiness check"
+                  icon={<Clock size={21} color="#A7371C" />}>
+                  <Text className="font-body text-sm text-[#625B55]">
+                    Five questions about sleep, energy, mood, time and how your body feels.
+                  </Text>
+                </CoachCard>
+                <CoachCard
+                  title="Verified SweatScore progress"
+                  icon={<ChartLineUp size={21} color="#A7371C" />}>
+                  <Text className="font-body text-sm text-[#625B55]">
+                    Recent tracked steps and active minutes help put your answers in context.
+                  </Text>
+                </CoachCard>
+                <CoachCard
+                  title="One clear daily focus—not a chat"
+                  icon={<Sparkle size={21} color="#A7371C" />}>
+                  <Text className="font-body text-sm text-[#625B55]">
+                    Movement and supporting wellness targets, saved for your day.
+                  </Text>
+                </CoachCard>
+              </View>
+              <Text className="mb-5 font-body text-xs text-[#625B55]">
+                General wellness guidance only. Your Coach cannot assess symptoms or replace medical
+                advice.
+              </Text>
+              <View>
                 <ActionButton
-                  label="Plan my routine"
+                  label="Set up my profile"
                   onPress={() => router.push('/progress-coach/profile' as any)}
                 />
               </View>
             </>
           ) : coachHome.state === 'failed' ? (
             <>
-              <View className="mt-5 rounded-[24px] bg-white p-5">
-                <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">
-                  Today’s plan is unavailable
-                </Text>
-                <Text className="mt-2 font-body text-sm leading-5 text-[#5A5551]">
-                  Your coach could not prepare today’s guidance. You can safely return to Today.
-                </Text>
+              <View className="mt-6">
+                <CoachCard title="Today’s focus is unavailable" quiet>
+                  <Text className="font-body text-sm text-[#625B55]">
+                    We couldn’t prepare today’s guidance. No conflicting focus was created. You can
+                    safely return to Today.
+                  </Text>
+                </CoachCard>
               </View>
               <View className="mt-8">
                 <ActionButton
@@ -127,17 +153,42 @@ export default function ProgressCoachEntry() {
             </>
           ) : (
             <>
-              <View className="mt-5 rounded-[24px] bg-white p-5">
-                <Text className="font-heading text-lg font-semibold text-[#1A1A1A]">
-                  {planState === 'ready_to_check_in'
-                    ? 'Ready for today’s check-in'
-                    : planState === 'generating'
-                      ? 'Today’s plan is being prepared'
-                      : 'Today’s plan is ready'}
-                </Text>
-                <Text className="mt-2 font-body text-sm leading-5 text-[#5A5551]">
-                  A quick five-question check-in helps shape guidance for your day.
-                </Text>
+              <View className="mt-6">
+                {savedPlan?.output ? (
+                  <>
+                    <CoachFocusHero
+                      output={savedPlan.output}
+                      recovery={savedPlan.safetyState === 'pain_or_unwell'}
+                      summary
+                    />
+                    {savedPlan.safetyState !== 'pain_or_unwell' &&
+                    typeof savedPlan.output.steps.target === 'number' &&
+                    Number.isFinite(savedPlan.output.steps.target) &&
+                    savedPlan.output.steps.target > 0 ? (
+                      <Text className="mt-4 font-body text-sm text-[#625B55]">
+                        Step target · {savedPlan.output.steps.target.toLocaleString()} steps
+                      </Text>
+                    ) : null}
+                    <CoachSaved recovery={savedPlan.safetyState === 'pain_or_unwell'} />
+                  </>
+                ) : (
+                  <CoachCard
+                    title={
+                      planState === 'ready_to_check_in'
+                        ? 'Your profile is ready'
+                        : planState === 'generating'
+                          ? 'Shaping today’s focus'
+                          : 'Your focus is ready'
+                    }>
+                    <Text className="font-body text-base text-[#625B55]">
+                      {planState === 'ready_to_check_in'
+                        ? 'Take a quick five-question readiness check to create one saved focus for today.'
+                        : planState === 'generating'
+                          ? 'Your readiness and verified progress are coming together. Open your focus to follow along.'
+                          : 'Open your saved focus for today. It will stay the same when you return.'}
+                    </Text>
+                  </CoachCard>
+                )}
               </View>
               {primary ? (
                 <View className="mt-8">
@@ -151,19 +202,16 @@ export default function ProgressCoachEntry() {
           )}
           {hasProfile ? (
             <View className="mt-4">
-              <TouchableOpacity
-                accessibilityRole="button"
+              <ActionButton
+                label="Retake profile"
+                secondary
                 onPress={() =>
                   router.push({
                     pathname: '/progress-coach/profile' as any,
                     params: { mode: 'retake' },
                   })
                 }
-                className="min-h-14 items-center justify-center rounded-[20px] border border-[#E3E1DE] bg-white px-5 py-3">
-                <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
-                  Retake profile
-                </Text>
-              </TouchableOpacity>
+              />
               <Text className="mt-3 text-center font-body text-xs leading-5 text-[#807A76]">
                 Profile changes apply to future plans and will not replace a plan already created
                 today.
