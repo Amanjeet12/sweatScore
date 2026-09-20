@@ -493,38 +493,35 @@ export default function TabDashboard() {
               <MoveWithUs />
             </View> */}
 
+            {isFocused && coachHome?.enabled && todayTourStep === null ? (
+              <View className="items-end px-5 pt-4">
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Progress Coach"
+                  onPress={() => router.push('/progress-coach' as any)}
+                  className="min-h-12 max-w-full flex-row items-center rounded-full bg-[#FF5C35] px-4 py-3"
+                  style={{
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.18,
+                    shadowRadius: 6,
+                    elevation: 7,
+                  }}>
+                  <Icon.Sparkle size={19} color="white" weight="fill" />
+                  <Text
+                    allowFontScaling
+                    className="ml-2 shrink font-heading text-sm font-semibold text-white">
+                    Progress Coach
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             <View style={{ height: showUpdateBanner ? 96 : 52 }} />
           </View>
         </ScrollView>
       </SafeAreaView>
-
-      {isFocused && coachHome?.enabled && todayTourStep === null ? (
-        <TouchableOpacity
-          activeOpacity={0.82}
-          accessibilityRole="button"
-          accessibilityLabel="Open Progress Coach"
-          onPress={() => router.push('/progress-coach' as any)}
-          className="absolute right-5 min-h-12 flex-row items-center rounded-full bg-[#FF5C35] px-4 py-3"
-          style={{
-            bottom: Math.max(16, insets.bottom + 12),
-            maxWidth: Dimensions.get('window').width - 40,
-            shadowColor: '#000000',
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.18,
-            shadowRadius: 6,
-            elevation: 7,
-            zIndex: 20,
-          }}>
-          <Icon.Sparkle size={19} color="white" weight="fill" />
-          <Text
-            allowFontScaling
-            maxFontSizeMultiplier={1.4}
-            numberOfLines={1}
-            className="ml-2 font-heading text-sm font-semibold text-white">
-            Progress Coach
-          </Text>
-        </TouchableOpacity>
-      ) : null}
 
       <TodayFeatureTour
         step={todayTourStep}
