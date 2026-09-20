@@ -11,7 +11,7 @@ import {
   query,
   QueryCtx,
 } from './_generated/server';
-import { applyCoachPolicy } from './progressCoachPolicy';
+import { applyCoachPolicy, buildDeterministicCoachFallback } from './progressCoachPolicy';
 import { addDaysToDateKey, formatDateInTZ } from './utils/timezone';
 import type {
   CoachContextSummary,
@@ -21,6 +21,7 @@ import type {
 
 const DEFAULT_TIMEZONE = 'UTC';
 const MIN_STALE_PLAN_MS = 120_000;
+const WATCHDOG_GRACE_MS = 1_000;
 const MAX_GENERATION_ATTEMPTS = 2;
 const RECENT_TRACKING_DAYS = 7;
 const PROGRESS_COACH_GLOBAL_CONFIG_KEY = 'progressCoachGlobalEnabled';
@@ -233,6 +234,26 @@ function getStaleThresholdMs(): number {
   return Math.max(safeTimeout * 2, MIN_STALE_PLAN_MS);
 }
 
+type CoachGenerationScheduler = Pick<MutationCtx, 'scheduler'>;
+
+async function scheduleCoachGenerationAttempt(
+  ctx: CoachGenerationScheduler,
+  planId: Id<'coachDailyPlans'>,
+  generationAttempt: number
+): Promise<void> {
+  await Promise.all([
+    ctx.scheduler.runAfter(0, internal.progressCoachActions.generateCoachPlan, {
+      planId,
+      generationAttempt,
+    }),
+    ctx.scheduler.runAfter(
+      getStaleThresholdMs() + WATCHDOG_GRACE_MS,
+      internal.progressCoach.recoverStaleCoachPlan,
+      { planId, generationAttempt }
+    ),
+  ]);
+}
+
 function profileValues(profile: Doc<'coachProfiles'>): CoachProfileValues {
   return {
     ...(profile.currentWeight === undefined ? {} : { currentWeight: profile.currentWeight }),
@@ -437,64 +458,7 @@ export const startTodayPlan = mutation({
       ) {
         return { planId: existing._id, date, status: existing.status, reused: true };
       }
-      if (now - existing.startedAt < getStaleThresholdMs()) {
-        return { planId: existing._id, date, status: existing.status, reused: true };
-      }
-
-      const contextSummary = await loadTrackingSummary(ctx, access.userId, date);
-      const policy = applyCoachPolicy({
-        profile: profileValues(profile),
-        daily: existing.inputs,
-        verified: contextSummary,
-      });
-      const generationAttempt = existing.generationAttempt + 1;
-
-      if (existing.attemptCount >= MAX_GENERATION_ATTEMPTS) {
-        await ctx.db.patch(existing._id, {
-          status: 'fallback',
-          safetyState: policy.computedTargets.safetyState,
-          computedTargets: policy.computedTargets,
-          contextSummary,
-          output: policy.fallback,
-          completedAt: now,
-          generationAttempt,
-          updatedAt: now,
-          errorCode: 'generation_failed',
-        });
-        return {
-          planId: existing._id,
-          date,
-          status: 'fallback' as const,
-          reused: true,
-        };
-      }
-
-      const terminalFallback = policy.computedTargets.mayCallClaude === false;
-      await ctx.db.patch(existing._id, {
-        status: terminalFallback ? 'fallback' : 'pending',
-        safetyState: policy.computedTargets.safetyState,
-        computedTargets: policy.computedTargets,
-        contextSummary,
-        ...(terminalFallback ? { output: policy.fallback, completedAt: now } : {}),
-        promptVersion: getPromptVersion(),
-        generationAttempt,
-        attemptCount: existing.attemptCount + 1,
-        startedAt: now,
-        updatedAt: now,
-        errorCode: undefined,
-      });
-      if (!terminalFallback) {
-        await ctx.scheduler.runAfter(0, internal.progressCoachActions.generateCoachPlan, {
-          planId: existing._id,
-          generationAttempt,
-        });
-      }
-      return {
-        planId: existing._id,
-        date,
-        status: terminalFallback ? ('fallback' as const) : ('pending' as const),
-        reused: true,
-      };
+      return { planId: existing._id, date, status: existing.status, reused: true };
     }
 
     const contextSummary = await loadTrackingSummary(ctx, access.userId, date);
@@ -522,10 +486,7 @@ export const startTodayPlan = mutation({
       updatedAt: now,
     });
     if (!terminalFallback) {
-      await ctx.scheduler.runAfter(0, internal.progressCoachActions.generateCoachPlan, {
-        planId,
-        generationAttempt: 1,
-      });
+      await scheduleCoachGenerationAttempt(ctx, planId, 1);
     }
 
     return {
@@ -535,6 +496,78 @@ export const startTodayPlan = mutation({
       reused: false,
     };
   },
+});
+
+export async function recoverStaleCoachPlanHandler(
+  ctx: MutationCtx,
+  args: { planId: Id<'coachDailyPlans'>; generationAttempt: number },
+  now = Date.now()
+): Promise<
+  | { outcome: 'ignored' }
+  | { outcome: 'rescheduled_watchdog' }
+  | { outcome: 'retried'; generationAttempt: number }
+  | { outcome: 'fallback' }
+  | { outcome: 'failed' }
+> {
+  const plan = await ctx.db.get(args.planId);
+  if (!plan || plan.status !== 'pending' || plan.generationAttempt !== args.generationAttempt) {
+    return { outcome: 'ignored' };
+  }
+
+  const staleThresholdMs = getStaleThresholdMs();
+  const elapsedMs = Math.max(0, now - plan.startedAt);
+  if (elapsedMs < staleThresholdMs) {
+    await ctx.scheduler.runAfter(
+      staleThresholdMs - elapsedMs + WATCHDOG_GRACE_MS,
+      internal.progressCoach.recoverStaleCoachPlan,
+      args
+    );
+    return { outcome: 'rescheduled_watchdog' };
+  }
+
+  if (!plan.computedTargets || !plan.contextSummary) {
+    await ctx.db.patch(plan._id, {
+      status: 'failed',
+      completedAt: now,
+      updatedAt: now,
+      errorCode: 'generation_failed',
+    });
+    return { outcome: 'failed' };
+  }
+
+  if (plan.attemptCount >= MAX_GENERATION_ATTEMPTS) {
+    await ctx.db.patch(plan._id, {
+      status: 'fallback',
+      output: buildDeterministicCoachFallback(plan.computedTargets, plan.contextSummary),
+      completedAt: now,
+      updatedAt: now,
+      errorCode: 'generation_failed',
+    });
+    return { outcome: 'fallback' };
+  }
+
+  const generationAttempt = plan.generationAttempt + 1;
+  await ctx.db.patch(plan._id, {
+    generationAttempt,
+    attemptCount: plan.attemptCount + 1,
+    startedAt: now,
+    updatedAt: now,
+    output: undefined,
+    provider: undefined,
+    model: undefined,
+    completedAt: undefined,
+    latencyMs: undefined,
+    inputTokens: undefined,
+    outputTokens: undefined,
+    errorCode: undefined,
+  });
+  await scheduleCoachGenerationAttempt(ctx, plan._id, generationAttempt);
+  return { outcome: 'retried', generationAttempt };
+}
+
+export const recoverStaleCoachPlan = internalMutation({
+  args: { planId: v.id('coachDailyPlans'), generationAttempt: v.number() },
+  handler: recoverStaleCoachPlanHandler,
 });
 
 export const getTodayPlan = query({
