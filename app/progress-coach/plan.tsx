@@ -1,3 +1,5 @@
+import { convexQuery } from '@convex-dev/react-query';
+import { useQuery as useTanStackQuery } from '@tanstack/react-query';
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { ArrowLeft, Sparkle } from 'phosphor-react-native';
@@ -10,6 +12,10 @@ import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { COACH_CHECK_IN_LABELS } from '~/shared/progressCoach';
+import {
+  getCoachChallengeMapping,
+  selectCoachChallengeCandidate,
+} from '~/shared/progressCoachChallenges';
 import { useAuthStore } from '~/store/useAuthStore';
 
 export function formatCoachStepTarget(target: number | undefined): string {
@@ -77,6 +83,18 @@ export function ErrorBoundary() {
 export default function ProgressCoachPlan() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const plan = useQuery(api.progressCoach.getTodayPlan, currentUser?._id ? {} : 'skip');
+  const challengeMapping = getCoachChallengeMapping(plan?.output?.checkIn.type);
+  const challengeQuery = useTanStackQuery({
+    ...convexQuery(api.challengeCompletions.getPublishedChallenges, {
+      tag: challengeMapping?.tag ?? 'Full Body',
+    }),
+    enabled: challengeMapping !== undefined,
+  });
+  const suggestedChallenge = selectCoachChallengeCandidate(
+    challengeQuery.data,
+    challengeMapping,
+    plan?.date
+  );
   if (currentUser === undefined || plan === undefined) return <ScreenLoading />;
   if (plan === null)
     return (
@@ -188,6 +206,36 @@ export default function ProgressCoachPlan() {
           <PlanCard title="Why">
             <Text className="font-body text-base leading-6 text-[#5A5551]">{output.why}</Text>
           </PlanCard>
+          {suggestedChallenge && challengeMapping ? (
+            <PlanCard title="Continue in SweatScore">
+              <Text className="font-body text-sm leading-5 text-[#5A5551]">
+                A related existing challenge is available if you would like to explore it.
+              </Text>
+              <Text
+                allowFontScaling
+                className="mt-3 font-heading text-base font-semibold leading-6 text-[#1A1A1A]">
+                {suggestedChallenge.name}
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={challengeMapping.actionLabel}
+                activeOpacity={0.82}
+                onPress={() =>
+                  router.push({
+                    pathname: '/challenge-view/[challengeId]',
+                    params: { challengeId: suggestedChallenge._id },
+                  })
+                }
+                className="mt-4 min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-3">
+                <Text
+                  allowFontScaling
+                  maxFontSizeMultiplier={1.4}
+                  className="text-center font-heading text-base font-semibold text-white">
+                  {challengeMapping.actionLabel}
+                </Text>
+              </TouchableOpacity>
+            </PlanCard>
+          ) : null}
         </View>
         {output.safetyNotice ? (
           <View className="mt-4 rounded-[18px] border border-[#F2C7B8] bg-[#FFF8F4] p-4">
