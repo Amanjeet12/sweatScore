@@ -23,6 +23,7 @@ const DEFAULT_TIMEZONE = 'UTC';
 const MIN_STALE_PLAN_MS = 120_000;
 const MAX_GENERATION_ATTEMPTS = 2;
 const RECENT_TRACKING_DAYS = 7;
+const PROGRESS_COACH_GLOBAL_CONFIG_KEY = 'progressCoachGlobalEnabled';
 
 const goalValidator = v.union(
   v.literal('lose_weight'),
@@ -167,6 +168,17 @@ type CoachAccess = {
   enabled: boolean;
 };
 
+export function isCoachAccessEnabled(args: {
+  isAdmin?: boolean;
+  isPremium?: boolean;
+  globalValue?: string;
+  pilotEnabled?: boolean;
+}): boolean {
+  const eligible = args.isAdmin === true || args.isPremium === true;
+  const rolloutAllowed = args.globalValue === 'true' || args.pilotEnabled === true;
+  return eligible && rolloutAllowed;
+}
+
 async function getCoachAccess(ctx: QueryCtx | MutationCtx): Promise<CoachAccess> {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new ConvexError('Unauthorized');
@@ -174,15 +186,25 @@ async function getCoachAccess(ctx: QueryCtx | MutationCtx): Promise<CoachAccess>
   const user = await ctx.db.get(userId);
   if (!user) throw new ConvexError('Unauthorized');
 
-  const flag = await ctx.db
-    .query('featureFlags')
-    .withIndex('by_user_feature_flag', (q) =>
-      q.eq('userId', userId).eq('featureFlag', 'progress_coach')
-    )
-    .unique();
+  const [flag, globalConfig] = await Promise.all([
+    ctx.db
+      .query('featureFlags')
+      .withIndex('by_user_feature_flag', (q) =>
+        q.eq('userId', userId).eq('featureFlag', 'progress_coach')
+      )
+      .unique(),
+    ctx.db
+      .query('appConfig')
+      .withIndex('by_key', (q) => q.eq('key', PROGRESS_COACH_GLOBAL_CONFIG_KEY))
+      .unique(),
+  ]);
 
-  const eligible = user.isAdmin === true || user.isPremium === true;
-  const enabled = eligible && flag?.enabled === true;
+  const enabled = isCoachAccessEnabled({
+    isAdmin: user.isAdmin,
+    isPremium: user.isPremium,
+    globalValue: globalConfig?.value,
+    pilotEnabled: flag?.enabled,
+  });
 
   return { userId, user, enabled };
 }
