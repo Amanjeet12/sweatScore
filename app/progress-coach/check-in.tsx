@@ -4,6 +4,7 @@ import { ArrowLeft, Check } from 'phosphor-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { BackHandler, Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 
+import { goBackOrReplace } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -26,7 +27,7 @@ export default function ProgressCoachCheckIn() {
 
   const goBack = useCallback(() => {
     if (step > 0) setStep((current) => current - 1);
-    else router.back();
+    else goBackOrReplace('/progress-coach');
     setError(null);
     return true;
   }, [step]);
@@ -65,7 +66,7 @@ export default function ProgressCoachCheckIn() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <View className="flex-row items-center px-5 pb-3 pt-3">
         <TouchableOpacity
           accessibilityRole="button"

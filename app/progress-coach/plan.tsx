@@ -4,12 +4,19 @@ import { ArrowLeft, Sparkle } from 'phosphor-react-native';
 import { ReactNode } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
+import { goBackOrReplace } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { COACH_CHECK_IN_LABELS } from '~/shared/progressCoach';
 import { useAuthStore } from '~/store/useAuthStore';
+
+export function formatCoachStepTarget(target: number | undefined): string {
+  return typeof target === 'number' && Number.isFinite(target) && target > 0
+    ? `${target.toLocaleString()} steps`
+    : 'No step target today.';
+}
 
 function ReturnButton({ coach = false }: { coach?: boolean }) {
   return (
@@ -94,7 +101,7 @@ export default function ProgressCoachPlan() {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Back to Progress Coach"
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace('/progress-coach')}
             className="h-12 w-12 items-center justify-center rounded-full bg-white">
             <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
           </TouchableOpacity>
@@ -132,7 +139,7 @@ export default function ProgressCoachPlan() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Back to Progress Coach"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace('/progress-coach')}
           className="h-12 w-12 items-center justify-center rounded-full bg-white">
           <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
@@ -169,15 +176,9 @@ export default function ProgressCoachPlan() {
             </Text>
           </PlanCard>
           <PlanCard title="Steps">
-            {output.steps.target === undefined ? (
-              <Text className="font-body text-base leading-6 text-[#5A5551]">
-                No step target today.
-              </Text>
-            ) : (
-              <Text className="font-body text-base leading-6 text-[#5A5551]">
-                {output.steps.target.toLocaleString()} steps
-              </Text>
-            )}
+            <Text className="font-body text-base leading-6 text-[#5A5551]">
+              {formatCoachStepTarget(output.steps.target)}
+            </Text>
           </PlanCard>
           <PlanCard title="Hydration">
             <Text className="font-body text-base leading-6 text-[#5A5551]">

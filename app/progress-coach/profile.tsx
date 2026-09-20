@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { goBackOrReplace } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
@@ -70,6 +71,7 @@ export default function ProgressCoachProfile() {
   const [weight, setWeight] = useState('');
   const [weightUnit, setWeightUnit] = useState<CoachWeightUnit | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function ProgressCoachProfile() {
       setStep((current) => current - 1);
       return true;
     }
-    router.back();
+    goBackOrReplace('/progress-coach');
     return true;
   }, [step]);
 
@@ -109,7 +111,7 @@ export default function ProgressCoachProfile() {
     : weightIsValid && (weight.trim() === '' || weightUnit !== undefined);
 
   const handleContinue = async () => {
-    if (!canContinue || isSubmitting) return;
+    if (!canContinue || submittingRef.current) return;
     setError(null);
     if (step < TOTAL_STEPS - 1) {
       setStep((current) => current + 1);
@@ -121,6 +123,7 @@ export default function ProgressCoachProfile() {
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       await upsertProfile({
@@ -129,12 +132,13 @@ export default function ProgressCoachProfile() {
           ? { clearWeight: true }
           : { currentWeight: parsedWeight, weightUnit, clearWeight: false }),
       });
-      router.replace('/progress-coach' as any);
+      goBackOrReplace('/progress-coach');
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : 'We could not save your profile. Try again.'
       );
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -146,7 +150,7 @@ export default function ProgressCoachProfile() {
   if (isRetake && existingProfile === null) {
     return (
       <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <View className="flex-1 justify-center px-6">
           <Text className="text-center font-body text-base text-[#5A5551]">
             Your coach profile could not be loaded.
@@ -164,7 +168,7 @@ export default function ProgressCoachProfile() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

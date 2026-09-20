@@ -3,6 +3,7 @@ import { router, Stack } from 'expo-router';
 import { ArrowLeft, Sparkle } from 'phosphor-react-native';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
+import { goBackOrReplace } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
@@ -74,7 +75,7 @@ export default function ProgressCoachEntry() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Back to Today"
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace('/(tabs)/dashboard')}
           className="h-12 w-12 items-center justify-center rounded-full bg-white">
           <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
