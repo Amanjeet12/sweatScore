@@ -16,6 +16,7 @@ export const COACH_DURATION_MINUTES = {
 export const COACH_DURATION_LEVELS = [1, 10, 20, 30] as const;
 export const COACH_STEP_ROUNDING_INCREMENT = 500;
 export const COACH_DEFAULT_STEP_TARGET = 5000;
+export const COACH_ZERO_BASELINE_STEP_TARGET = 2000;
 export const COACH_MIN_USABLE_DAYS = 3;
 export const COACH_NORMAL_STEP_INCREASE = 500;
 export const COACH_LOW_READINESS_STEP_REDUCTION = 500;
@@ -95,6 +96,12 @@ export function buildDeterministicCoachFallback(
   }
 
   const carbServings = computedTargets.nutrition.carbServings;
+  const usesZeroBaselineStarter =
+    verified.usableDays >= COACH_MIN_USABLE_DAYS &&
+    verified.averageSteps !== undefined &&
+    verified.averageSteps <= 0 &&
+    computedTargets.steps.target === COACH_ZERO_BASELINE_STEP_TARGET;
+
   return {
     headline: 'Your plan for today',
     checkIn: {
@@ -107,13 +114,19 @@ export function buildDeterministicCoachFallback(
     },
     steps: computedTargets.steps,
     hydration: computedTargets.hydration,
-    why: `This plan reflects today’s check-in and ${verified.usableDays} usable recent tracking days.`,
+    why: usesZeroBaselineStarter
+      ? 'Today’s step target is a gentle starting point based on the available activity data and today’s check-in.'
+      : `This plan reflects today’s check-in and ${verified.usableDays} usable recent tracking days.`,
   };
 }
 
 function getStepTarget(daily: CoachDailyInputs, verified: CoachContextSummary): number {
   if (verified.usableDays < COACH_MIN_USABLE_DAYS || verified.averageSteps === undefined) {
     return COACH_DEFAULT_STEP_TARGET;
+  }
+
+  if (verified.averageSteps <= 0) {
+    return COACH_ZERO_BASELINE_STEP_TARGET;
   }
 
   const average = Math.max(0, verified.averageSteps);
