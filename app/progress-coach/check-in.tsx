@@ -6,7 +6,7 @@ import { BackHandler, Platform, ScrollView, TouchableOpacity, View } from 'react
 
 import { goBackOrReplace } from '~/components/core/BackButton';
 import { CoachProgress } from '~/components/core/CoachPresentation';
-import SafeAreaView from '~/components/core/SafeAreaView';
+import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { COACH_DAILY_QUESTIONS, CoachDailyInputs } from '~/shared/progressCoach';

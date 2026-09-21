@@ -14,7 +14,7 @@ import {
 
 import { goBackOrReplace } from '~/components/core/BackButton';
 import { CoachProgress } from '~/components/core/CoachPresentation';
-import SafeAreaView from '~/components/core/SafeAreaView';
+import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
