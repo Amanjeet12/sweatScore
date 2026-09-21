@@ -92,18 +92,36 @@ export default function ProgressCoachEntry() {
           className="h-12 w-12 items-center justify-center rounded-full bg-white">
           <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
         </TouchableOpacity>
-        <View className="flex-1 py-8">
-          <View className="mb-6">
-            <CoachMark />
-          </View>
-          <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#FF4B1F]">
-            Your daily direction
-          </Text>
-          <Text className="mt-3 font-heading text-[30px] font-semibold text-[#1A1A1A]">
-            {coachHome?.enabled && coachHome.state === 'needs_profile'
-              ? 'Meet your SweatScore AI Coach'
-              : 'Your daily Coach'}
-          </Text>
+        <View className={hasProfile ? 'flex-1 py-4' : 'flex-1 py-8'}>
+          {hasProfile ? (
+            <View className="flex-row items-center">
+              <View className="mr-3 h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#FF5C35]">
+                <Sparkle size={25} color="white" weight="fill" />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#FF4B1F]">
+                  Your daily direction
+                </Text>
+                <Text className="mt-1 font-heading text-2xl font-semibold text-[#1A1A1A]">
+                  Your daily Coach
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <>
+              <View className="mb-6">
+                <CoachMark />
+              </View>
+              <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#FF4B1F]">
+                Your daily direction
+              </Text>
+              <Text className="mt-3 font-heading text-[30px] font-semibold text-[#1A1A1A]">
+                {coachHome?.enabled && coachHome.state === 'needs_profile'
+                  ? 'Meet your SweatScore AI Coach'
+                  : 'Your daily Coach'}
+              </Text>
+            </>
+          )}
           {!coachHome?.enabled ? (
             <View className="mt-5 rounded-[24px] bg-white p-5">
               <Text className="font-body text-base leading-6 text-[#5A5551]">
@@ -207,7 +225,7 @@ export default function ProgressCoachEntry() {
                 )}
               </View>
               {primary ? (
-                <View className="mt-8">
+                <View className="mt-3">
                   <ActionButton
                     label={primary.label}
                     onPress={() => router.push(primary.route as any)}
