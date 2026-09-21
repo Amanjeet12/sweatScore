@@ -16,6 +16,9 @@
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_CONVEX_URL": "https://beloved-stoat-88.convex.cloud"
+      },
       "android": {
         "buildType": "apk"
       },

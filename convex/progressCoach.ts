@@ -217,10 +217,9 @@ function requireCoachEnabled(access: CoachAccess) {
 // Temporary test tooling: fail closed outside the one approved development deployment.
 function canResetCoachTestData(access: CoachAccess): boolean {
   return (
+    Boolean(access.userId) &&
     process.env.CONVEX_CLOUD_URL === 'https://beloved-stoat-88.convex.cloud' &&
-    process.env.PROGRESS_COACH_TEST_RESET_ENABLED === 'true' &&
-    access.user.isAdmin === true &&
-    access.enabled
+    process.env.PROGRESS_COACH_TEST_RESET_ENABLED === 'true'
   );
 }
 
@@ -367,7 +366,12 @@ export const getCoachHome = query({
   args: {},
   handler: async (ctx) => {
     const access = await getCoachAccess(ctx);
-    if (!access.enabled) return { enabled: false as const, state: 'disabled' as const };
+    if (!access.enabled)
+      return {
+        enabled: false as const,
+        state: 'disabled' as const,
+        testResetAllowed: canResetCoachTestData(access),
+      };
 
     const profile = await ctx.db
       .query('coachProfiles')

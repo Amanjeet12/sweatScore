@@ -1,5 +1,6 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { ArrowLeft, ChartLineUp, Clock, Sparkle } from 'phosphor-react-native';
 import { useRef } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
@@ -18,8 +19,13 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 
-// Temporary test tooling: Metro can remove this module from production builds.
-const DevelopmentCoachTools = __DEV__
+// Temporary test tooling for development and the client-testing preview APK only.
+// The server independently restricts resets to the approved development deployment.
+const showCoachTestTools =
+  __DEV__ ||
+  (Updates.channel === 'preview' &&
+    process.env.EXPO_PUBLIC_CONVEX_URL === 'https://beloved-stoat-88.convex.cloud');
+const DevelopmentCoachTools = showCoachTestTools
   ? // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
     (require('~/components/core/DevelopmentCoachTools')
       .default as typeof import('~/components/core/DevelopmentCoachTools').default)
@@ -228,7 +234,7 @@ export default function ProgressCoachEntry() {
               </Text>
             </View>
           ) : null}
-          {__DEV__ && coachHome?.enabled && coachHome.testResetAllowed && DevelopmentCoachTools ? (
+          {showCoachTestTools && coachHome?.testResetAllowed && DevelopmentCoachTools ? (
             <DevelopmentCoachTools
               onReset={() => scrollRef.current?.scrollTo({ y: 0, animated: false })}
             />

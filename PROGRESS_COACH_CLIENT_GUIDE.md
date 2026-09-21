@@ -10,7 +10,7 @@ Progress Coach gives an eligible member one saved wellness focus for each local 
 4. Submit once. The Coach prepares and saves the day's focus.
 5. Reopen the saved focus whenever needed that day. Opening it again does not request a new recommendation.
 
-Access depends on the existing rollout controls: the member must be an administrator or premium member, and either the individual Coach pilot flag or the global Coach rollout setting must permit access. Signing in or being an administrator alone does not bypass those controls.
+The development rollout is enabled for all administrators and premium members through the existing global Coach switch. Individual pilot flags are not needed while that switch is enabled. Free non-admin accounts do not receive Coach recommendations.
 
 ## Profile setup and retakes
 
@@ -87,7 +87,9 @@ Coach does not automatically modify activities, ordinary app check-ins, challeng
 
 ## Temporary development testing tools
 
-The development build can show a **Development testing** panel on the Coach entry screen. It requires an authenticated eligible administrator, the private reset flag set to exactly `true`, and the approved `beloved-stoat-88` development deployment. It is excluded from production UI through a development-only module guard, with server-side authorization as an additional safeguard.
+Development builds and preview builds connected to `beloved-stoat-88` can show a **Development testing** panel on the Coach entry screen. Any authenticated account can reset its own Coach test data when the private reset flag is exactly `true`. Administrator or premium status is not required for resetting test data; it remains required for receiving Coach recommendations. Production builds hide the panel, and the server rejects reset requests outside the approved development deployment regardless of client modifications.
+
+The `preview` APK profile explicitly connects to this development deployment. An existing APK must be rebuilt to include the preview reset controls. This does not change the production deployment or grant development accounts access to production data.
 
 Two separate confirmed actions are available:
 

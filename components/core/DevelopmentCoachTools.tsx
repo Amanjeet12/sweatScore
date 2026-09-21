@@ -7,7 +7,7 @@ import { CoachCard } from './CoachPresentation';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 
-// Temporary development tooling. Loaded only through the entry screen's __DEV__ guard.
+// Temporary tooling for development and preview testers; the server enforces deployment isolation.
 export default function DevelopmentCoachTools({ onReset }: { onReset: () => void }) {
   const reset = useMutation(api.progressCoach.resetProgressCoachTestData);
   const busy = useRef(false);
@@ -65,8 +65,8 @@ export default function DevelopmentCoachTools({ onReset }: { onReset: () => void
     <View className="mt-8">
       <CoachCard title="Development testing" quiet>
         <Text className="font-body text-sm text-[#5A5551]">
-          Temporary tools for testing Progress Coach scenarios. These controls are not included in
-          production builds.
+          Temporary tools for testing your own Progress Coach scenarios in the development or
+          preview app. Other SweatScore data will not be reset.
         </Text>
         <View className="mt-4 gap-y-3">
           {(['today', 'all'] as const).map((scope) => (
