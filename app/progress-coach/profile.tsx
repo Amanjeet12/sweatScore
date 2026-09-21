@@ -67,6 +67,7 @@ export default function ProgressCoachProfile() {
   );
   const upsertProfile = useMutation(api.progressCoach.upsertCoachProfile);
   const hydrated = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Partial<CoachProfileValues>>({});
   const [weight, setWeight] = useState('');
@@ -194,6 +195,7 @@ export default function ProgressCoachProfile() {
         <CoachProgress step={step} total={TOTAL_STEPS} />
 
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 }}>
@@ -209,7 +211,7 @@ export default function ProgressCoachProfile() {
                   {question.title}
                 </Text>
                 <Text className="mt-3 font-body text-sm text-[#5A5551]">
-                  Choose what feels closest to your experience. You can go back to review your
+                  Tap an answer to move to the next question. You can go back to review your
                   answers.
                 </Text>
                 <View className="mt-7 gap-y-3">
@@ -221,12 +223,18 @@ export default function ProgressCoachProfile() {
                         activeOpacity={0.78}
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
-                        onPress={() =>
+                        accessibilityHint="Selects this answer and opens the next question"
+                        onPress={() => {
+                          if (submittingRef.current) return;
                           setAnswers((current) => ({
                             ...current,
                             [question.key]: option.value,
-                          }))
-                        }
+                          }));
+                          setError(null);
+                          // Use this screen's step so repeated taps cannot skip a question.
+                          setStep(step + 1);
+                          scrollRef.current?.scrollTo({ y: 0, animated: false });
+                        }}
                         className="min-h-16 flex-row items-center rounded-[20px] border px-4 py-3"
                         style={{
                           borderColor: selected ? '#FF5C35' : '#E3E1DE',
@@ -300,20 +308,22 @@ export default function ProgressCoachProfile() {
           {error ? (
             <Text className="mb-3 text-center font-body text-sm text-red-600">{error}</Text>
           ) : null}
-          <TouchableOpacity
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !canContinue || isSubmitting }}
-            disabled={!canContinue || isSubmitting}
-            onPress={handleContinue}
-            className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-4"
-            style={{ opacity: !canContinue || isSubmitting ? 0.45 : 1 }}>
-            <Text
-              allowFontScaling
-              className="text-center font-heading text-base font-semibold text-white">
-              {isSubmitting ? 'Saving…' : step === TOTAL_STEPS - 1 ? 'Save profile' : 'Continue'}
-            </Text>
-          </TouchableOpacity>
+          {!question ? (
+            <TouchableOpacity
+              activeOpacity={0.82}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canContinue || isSubmitting }}
+              disabled={!canContinue || isSubmitting}
+              onPress={handleContinue}
+              className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-4"
+              style={{ opacity: !canContinue || isSubmitting ? 0.45 : 1 }}>
+              <Text
+                allowFontScaling
+                className="text-center font-heading text-base font-semibold text-white">
+                {isSubmitting ? 'Saving…' : 'Save profile'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

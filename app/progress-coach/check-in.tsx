@@ -22,6 +22,7 @@ export default function ProgressCoachCheckIn() {
   const [answers, setAnswers] = useState<Partial<CoachDailyInputs>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
   const [error, setError] = useState<string | null>(null);
   const question = COACH_DAILY_QUESTIONS[step];
   const selectedValue = answers[question.key];
@@ -87,6 +88,7 @@ export default function ProgressCoachCheckIn() {
       </View>
       <CoachProgress step={step} total={COACH_DAILY_QUESTIONS.length} />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 }}>
         <View className="flex-1 pb-8 pt-8">
@@ -97,7 +99,9 @@ export default function ProgressCoachCheckIn() {
             {question.title}
           </Text>
           <Text className="mt-3 font-body text-sm text-[#5A5551]">
-            Choose what feels most accurate today. Your answers help shape one saved daily focus.
+            {step < COACH_DAILY_QUESTIONS.length - 1
+              ? 'Tap an answer to move to the next question.'
+              : 'Choose how your body feels, then create today’s focus when you’re ready.'}
           </Text>
           <View className="mt-7 gap-y-3">
             {question.options.map((option) => {
@@ -107,10 +111,22 @@ export default function ProgressCoachCheckIn() {
                   key={option.value}
                   activeOpacity={0.78}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() =>
-                    setAnswers((current) => ({ ...current, [question.key]: option.value }))
+                  accessibilityState={{ selected, disabled: isSubmitting }}
+                  disabled={isSubmitting}
+                  accessibilityHint={
+                    step < COACH_DAILY_QUESTIONS.length - 1
+                      ? 'Selects this answer and opens the next question'
+                      : 'Selects this answer for your daily focus'
                   }
+                  onPress={() => {
+                    if (submittingRef.current) return;
+                    setAnswers((current) => ({ ...current, [question.key]: option.value }));
+                    setError(null);
+                    if (step < COACH_DAILY_QUESTIONS.length - 1) {
+                      setStep(step + 1);
+                      scrollRef.current?.scrollTo({ y: 0, animated: false });
+                    }
+                  }}
                   className="min-h-16 flex-row items-center rounded-[20px] border px-4 py-3"
                   style={{
                     borderColor: selected ? '#FF5C35' : '#E3E1DE',
@@ -132,22 +148,20 @@ export default function ProgressCoachCheckIn() {
         {error ? (
           <Text className="mb-3 text-center font-body text-sm text-red-600">{error}</Text>
         ) : null}
-        <TouchableOpacity
-          activeOpacity={0.82}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !selectedValue || isSubmitting }}
-          disabled={!selectedValue || isSubmitting}
-          onPress={handleContinue}
-          className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-4"
-          style={{ opacity: !selectedValue || isSubmitting ? 0.45 : 1 }}>
-          <Text className="text-center font-heading text-base font-semibold text-white">
-            {isSubmitting
-              ? 'Saving today’s focus…'
-              : step === COACH_DAILY_QUESTIONS.length - 1
-                ? 'Create today’s focus'
-                : 'Continue'}
-          </Text>
-        </TouchableOpacity>
+        {step === COACH_DAILY_QUESTIONS.length - 1 ? (
+          <TouchableOpacity
+            activeOpacity={0.82}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !selectedValue || isSubmitting }}
+            disabled={!selectedValue || isSubmitting}
+            onPress={handleContinue}
+            className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-4"
+            style={{ opacity: !selectedValue || isSubmitting ? 0.45 : 1 }}>
+            <Text className="text-center font-heading text-base font-semibold text-white">
+              {isSubmitting ? 'Saving today’s focus…' : 'Create today’s focus'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

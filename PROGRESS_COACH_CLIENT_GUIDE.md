@@ -17,6 +17,7 @@ The development rollout is enabled for all administrators and premium members th
 The profile asks about the member's goal, body confidence, workout routine, relationship with food, usual sleep, biggest struggle, upcoming events, and when they last saw progress. The ninth step is optional current weight and its unit.
 
 - Back returns to the previous question and keeps the current answers.
+- Tapping a profile answer advances immediately; there is no Continue button. The optional weight step retains **Save profile**.
 - Retaking the profile preselects saved answers.
 - Weight may be left blank. Clearing a previously saved weight removes it when the profile is saved.
 - Weight is stored with the profile but does not change today's targets.
@@ -28,7 +29,7 @@ The screen's Back control moves through questions. iOS swipe dismissal is disabl
 
 There are five questions: sleep, energy, mood, available time, and body condition. The last includes pain or feeling unwell. There is no extra safety questionnaire, free-text prompt, voice input, or chat.
 
-Required answers must be selected before continuing. The final submission creates or reuses a plan for the authenticated member's current Coach-local date, using their saved timezone with a UTC fallback. The Coach reads recent tracking history; it does not treat a recommendation as a completed activity.
+Tapping an answer advances through the daily questions without a Continue button. On the final body-condition question, select an answer and tap **Create today's focus** to submit explicitly. The final submission creates or reuses a plan for the authenticated member's current Coach-local date, using their saved timezone with a UTC fallback. The Coach reads recent tracking history; it does not treat a recommendation as a completed activity.
 
 ## What application rules decide
 
