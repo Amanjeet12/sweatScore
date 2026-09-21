@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { ArrowLeft, ChartLineUp, Clock, Sparkle } from 'phosphor-react-native';
+import { useRef } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { goBackOrReplace } from '~/components/core/BackButton';
@@ -17,9 +18,16 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 
+// Temporary test tooling: Metro can remove this module from production builds.
+const DevelopmentCoachTools = __DEV__
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    (require('~/components/core/DevelopmentCoachTools')
+      .default as typeof import('~/components/core/DevelopmentCoachTools').default)
+  : null;
+
 export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
           Progress Coach could not load
@@ -36,6 +44,7 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
 }
 
 export default function ProgressCoachEntry() {
+  const scrollRef = useRef<ScrollView>(null);
   const currentUser = useAuthStore((state) => state.currentUser);
   const coachHome = useQuery(api.progressCoach.getCoachHome, currentUser?._id ? {} : 'skip');
   const savedPlan = useQuery(
@@ -60,9 +69,10 @@ export default function ProgressCoachEntry() {
           : null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{
           flexGrow: 1,
           paddingHorizontal: 20,
@@ -80,7 +90,7 @@ export default function ProgressCoachEntry() {
           <View className="mb-6">
             <CoachMark />
           </View>
-          <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#A7371C]">
+          <Text className="font-heading text-xs font-semibold uppercase tracking-widest text-[#FF4B1F]">
             Your daily direction
           </Text>
           <Text className="mt-3 font-heading text-[30px] font-semibold text-[#1A1A1A]">
@@ -103,27 +113,27 @@ export default function ProgressCoachEntry() {
               <View className="my-6 gap-y-3">
                 <CoachCard
                   title="Quick daily readiness check"
-                  icon={<Clock size={21} color="#A7371C" />}>
-                  <Text className="font-body text-sm text-[#625B55]">
+                  icon={<Clock size={21} color="#FF4B1F" />}>
+                  <Text className="font-body text-sm text-[#5A5551]">
                     Five questions about sleep, energy, mood, time and how your body feels.
                   </Text>
                 </CoachCard>
                 <CoachCard
                   title="Verified SweatScore progress"
-                  icon={<ChartLineUp size={21} color="#A7371C" />}>
-                  <Text className="font-body text-sm text-[#625B55]">
+                  icon={<ChartLineUp size={21} color="#FF4B1F" />}>
+                  <Text className="font-body text-sm text-[#5A5551]">
                     Recent tracked steps and active minutes help put your answers in context.
                   </Text>
                 </CoachCard>
                 <CoachCard
                   title="One clear daily focus—not a chat"
-                  icon={<Sparkle size={21} color="#A7371C" />}>
-                  <Text className="font-body text-sm text-[#625B55]">
+                  icon={<Sparkle size={21} color="#FF4B1F" />}>
+                  <Text className="font-body text-sm text-[#5A5551]">
                     Movement and supporting wellness targets, saved for your day.
                   </Text>
                 </CoachCard>
               </View>
-              <Text className="mb-5 font-body text-xs text-[#625B55]">
+              <Text className="mb-5 font-body text-xs text-[#5A5551]">
                 General wellness guidance only. Your Coach cannot assess symptoms or replace medical
                 advice.
               </Text>
@@ -138,7 +148,7 @@ export default function ProgressCoachEntry() {
             <>
               <View className="mt-6">
                 <CoachCard title="Today’s focus is unavailable" quiet>
-                  <Text className="font-body text-sm text-[#625B55]">
+                  <Text className="font-body text-sm text-[#5A5551]">
                     We couldn’t prepare today’s guidance. No conflicting focus was created. You can
                     safely return to Today.
                   </Text>
@@ -165,7 +175,7 @@ export default function ProgressCoachEntry() {
                     typeof savedPlan.output.steps.target === 'number' &&
                     Number.isFinite(savedPlan.output.steps.target) &&
                     savedPlan.output.steps.target > 0 ? (
-                      <Text className="mt-4 font-body text-sm text-[#625B55]">
+                      <Text className="mt-4 font-body text-sm text-[#5A5551]">
                         Step target · {savedPlan.output.steps.target.toLocaleString()} steps
                       </Text>
                     ) : null}
@@ -180,7 +190,7 @@ export default function ProgressCoachEntry() {
                           ? 'Shaping today’s focus'
                           : 'Your focus is ready'
                     }>
-                    <Text className="font-body text-base text-[#625B55]">
+                    <Text className="font-body text-base text-[#5A5551]">
                       {planState === 'ready_to_check_in'
                         ? 'Take a quick five-question readiness check to create one saved focus for today.'
                         : planState === 'generating'
@@ -217,6 +227,11 @@ export default function ProgressCoachEntry() {
                 today.
               </Text>
             </View>
+          ) : null}
+          {__DEV__ && coachHome?.enabled && coachHome.testResetAllowed && DevelopmentCoachTools ? (
+            <DevelopmentCoachTools
+              onReset={() => scrollRef.current?.scrollTo({ y: 0, animated: false })}
+            />
           ) : null}
         </View>
       </ScrollView>

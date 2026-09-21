@@ -38,7 +38,7 @@ function hasRequiredAnswers(
 
 export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <Text className="text-center font-heading text-xl font-semibold text-[#1A1A1A]">
           Your profile could not load
@@ -150,7 +150,7 @@ export default function ProgressCoachProfile() {
 
   if (isRetake && existingProfile === null) {
     return (
-      <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
         <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
           <Text className="text-center font-body text-base text-[#5A5551]">
@@ -168,7 +168,7 @@ export default function ProgressCoachProfile() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <KeyboardAvoidingView
         className="flex-1"
@@ -198,7 +198,7 @@ export default function ProgressCoachProfile() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 }}>
           <View className="flex-1 pb-8 pt-8">
-            <Text className="mb-3 font-heading text-xs font-semibold uppercase tracking-widest text-[#A7371C]">
+            <Text className="mb-3 font-heading text-xs font-semibold uppercase tracking-widest text-[#FF4B1F]">
               A little about you
             </Text>
             {question ? (
@@ -208,7 +208,7 @@ export default function ProgressCoachProfile() {
                   className="font-heading text-[28px] font-semibold text-[#1A1A1A]">
                   {question.title}
                 </Text>
-                <Text className="mt-3 font-body text-sm text-[#625B55]">
+                <Text className="mt-3 font-body text-sm text-[#5A5551]">
                   Choose what feels closest to your experience. You can go back to review your
                   answers.
                 </Text>
@@ -229,7 +229,7 @@ export default function ProgressCoachProfile() {
                         }
                         className="min-h-16 flex-row items-center rounded-[20px] border px-4 py-3"
                         style={{
-                          borderColor: selected ? '#C74420' : '#E9E3DD',
+                          borderColor: selected ? '#FF5C35' : '#E3E1DE',
                           backgroundColor: selected ? '#FFF0E8' : '#FFFFFF',
                         }}>
                         <Text
@@ -237,8 +237,8 @@ export default function ProgressCoachProfile() {
                           className="min-w-0 flex-1 font-body text-base text-[#1A1A1A]">
                           {option.label}
                         </Text>
-                        <View className="ml-3 h-7 w-7 items-center justify-center rounded-full border border-[#E9E3DD] bg-white">
-                          {selected ? <Check size={18} color="#A7371C" weight="bold" /> : null}
+                        <View className="ml-3 h-7 w-7 items-center justify-center rounded-full border border-[#E3E1DE] bg-white">
+                          {selected ? <Check size={18} color="#FF4B1F" weight="bold" /> : null}
                         </View>
                       </TouchableOpacity>
                     );
@@ -306,7 +306,7 @@ export default function ProgressCoachProfile() {
             accessibilityState={{ disabled: !canContinue || isSubmitting }}
             disabled={!canContinue || isSubmitting}
             onPress={handleContinue}
-            className="min-h-14 items-center justify-center rounded-[20px] bg-[#C74420] px-5 py-4"
+            className="min-h-14 items-center justify-center rounded-[20px] bg-[#FF5C35] px-5 py-4"
             style={{ opacity: !canContinue || isSubmitting ? 0.45 : 1 }}>
             <Text
               allowFontScaling

@@ -214,6 +214,49 @@ function requireCoachEnabled(access: CoachAccess) {
   if (!access.enabled) throw new ConvexError('Progress Coach is not available');
 }
 
+// Temporary test tooling: fail closed outside the one approved development deployment.
+function canResetCoachTestData(access: CoachAccess): boolean {
+  return (
+    process.env.CONVEX_CLOUD_URL === 'https://beloved-stoat-88.convex.cloud' &&
+    process.env.PROGRESS_COACH_TEST_RESET_ENABLED === 'true' &&
+    access.user.isAdmin === true &&
+    access.enabled
+  );
+}
+
+export const resetProgressCoachTestData = mutation({
+  args: { scope: v.union(v.literal('today'), v.literal('all')) },
+  handler: async (ctx, { scope }) => {
+    const access = await getCoachAccess(ctx);
+    if (!canResetCoachTestData(access)) throw new ConvexError('Coach test reset is not authorized');
+
+    // Bound both indexed reads before deleting anything. Oversized test accounts fail atomically.
+    const limit = 1000;
+    const plans = await ctx.db
+      .query('coachDailyPlans')
+      .withIndex('by_user_date', (q) =>
+        scope === 'today'
+          ? q.eq('userId', access.userId).eq('date', getLocalDate(access.user.timezone))
+          : q.eq('userId', access.userId)
+      )
+      .take(limit + 1);
+    const profiles =
+      scope === 'all'
+        ? await ctx.db
+            .query('coachProfiles')
+            .withIndex('by_user', (q) => q.eq('userId', access.userId))
+            .take(limit + 1)
+        : [];
+    if (plans.length > limit || profiles.length > limit) {
+      throw new ConvexError('Too many Coach test records to reset safely');
+    }
+
+    for (const plan of plans) await ctx.db.delete(plan._id);
+    for (const profile of profiles) await ctx.db.delete(profile._id);
+    return { scope, plansDeleted: plans.length, profileDeleted: profiles.length > 0 };
+  },
+});
+
 function getLocalDate(timezone?: string): string {
   const candidate = timezone || DEFAULT_TIMEZONE;
   try {
@@ -330,7 +373,9 @@ export const getCoachHome = query({
       .query('coachProfiles')
       .withIndex('by_user', (q) => q.eq('userId', access.userId))
       .unique();
-    if (!profile) return { enabled: true as const, state: 'needs_profile' as const };
+    const testResetAllowed = canResetCoachTestData(access);
+    if (!profile)
+      return { enabled: true as const, state: 'needs_profile' as const, testResetAllowed };
 
     const date = getLocalDate(access.user.timezone);
     const plan = await ctx.db
@@ -339,7 +384,12 @@ export const getCoachHome = query({
       .unique();
 
     if (!plan)
-      return { enabled: true as const, state: 'ready_to_check_in' as const, localDate: date };
+      return {
+        enabled: true as const,
+        state: 'ready_to_check_in' as const,
+        localDate: date,
+        testResetAllowed,
+      };
 
     const state =
       plan.status === 'pending'
@@ -349,6 +399,7 @@ export const getCoachHome = query({
           : plan.status;
     return {
       enabled: true as const,
+      testResetAllowed,
       state,
       localDate: date,
       plan: { id: plan._id, status: plan.status, updatedAt: plan.updatedAt },

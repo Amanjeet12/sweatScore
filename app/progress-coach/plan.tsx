@@ -59,7 +59,7 @@ function MessageScreen({
   coach?: boolean;
 }) {
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="mb-8 items-center">
@@ -119,7 +119,7 @@ export default function ProgressCoachPlan() {
     );
   if (plan.status === 'pending') {
     return (
-      <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
         <Stack.Screen options={{ headerShown: false }} />
         <View className="px-5 pt-4">
           <TouchableOpacity
@@ -149,7 +149,7 @@ export default function ProgressCoachPlan() {
   const duration =
     output.checkIn.durationMinutes > 0 ? `${output.checkIn.durationMinutes} minutes` : null;
   return (
-    <SafeAreaView className="flex-1 bg-[#FBF8F4]">
+    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 16 }}>
@@ -163,9 +163,9 @@ export default function ProgressCoachPlan() {
         <View className="mt-6">
           <CoachFocusHero output={output} recovery={recovery} />
         </View>
-        <Text className="mt-3 font-body text-xs text-[#625B55]">Saved focus · {plan.date}</Text>
+        <Text className="mt-3 font-body text-xs text-[#5A5551]">Saved focus · {plan.date}</Text>
         {plan.status === 'fallback' && !recovery ? (
-          <View className="mt-5 rounded-[18px] bg-[#F3EEE8] p-4">
+          <View className="mt-5 rounded-[18px] bg-[#F6F4F2] p-4">
             <Text className="font-body text-sm leading-5 text-[#5A5551]">
               Personalized wording was unavailable today. Your saved guidance is still ready.
             </Text>
@@ -175,7 +175,7 @@ export default function ProgressCoachPlan() {
           <PlanCard
             title={recovery ? 'Movement direction' : 'One clear priority'}
             icon={
-              recovery ? <Heart size={21} color="#A7371C" /> : <Sparkle size={21} color="#A7371C" />
+              recovery ? <Heart size={21} color="#FF4B1F" /> : <Sparkle size={21} color="#FF4B1F" />
             }>
             <Text className="font-heading text-2xl font-semibold text-[#1A1A1A]">
               {COACH_CHECK_IN_LABELS[output.checkIn.type]}
@@ -187,7 +187,7 @@ export default function ProgressCoachPlan() {
               <Text className="mt-1 font-body text-sm text-[#807A76]">{duration}</Text>
             ) : null}
           </PlanCard>
-          <PlanCard title="Nutrition" icon={<ForkKnife size={21} color="#A7371C" />}>
+          <PlanCard title="Nutrition" icon={<ForkKnife size={21} color="#FF4B1F" />}>
             <Text className="font-body text-base leading-6 text-[#5A5551]">
               {output.nutrition.message}
             </Text>
@@ -196,12 +196,12 @@ export default function ProgressCoachPlan() {
               {output.nutrition.carbServings === 1 ? 'serving' : 'servings'}
             </Text>
           </PlanCard>
-          <PlanCard title="Steps" icon={<Footprints size={21} color="#A7371C" />}>
+          <PlanCard title="Steps" icon={<Footprints size={21} color="#FF4B1F" />}>
             <Text className="font-body text-base leading-6 text-[#5A5551]">
               {formatCoachStepTarget(output.steps.target)}
             </Text>
           </PlanCard>
-          <PlanCard title="Hydration" icon={<Drop size={21} color="#A7371C" />}>
+          <PlanCard title="Hydration" icon={<Drop size={21} color="#FF4B1F" />}>
             <Text className="font-body text-base leading-6 text-[#5A5551]">
               Aim for {output.hydration.litres} litres as general wellness guidance.
             </Text>

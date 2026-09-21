@@ -9,7 +9,7 @@ import { CoachPlanOutput } from '~/shared/progressCoach';
 export function CoachMark() {
   return (
     <LinearGradient
-      colors={['#F47742', '#C74420']}
+      colors={['#FF5C35', '#FF5C35']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: 80, height: 80, borderRadius: 28, padding: 8 }}>
@@ -37,8 +37,8 @@ export function CoachButton({
       onPress={onPress}
       className="min-h-14 w-full items-center justify-center rounded-[20px] border px-5 py-4"
       style={{
-        backgroundColor: secondary ? '#FFFFFF' : '#C74420',
-        borderColor: secondary ? '#E9E3DD' : '#C74420',
+        backgroundColor: secondary ? '#FFFFFF' : '#FF5C35',
+        borderColor: secondary ? '#E3E1DE' : '#FF5C35',
       }}>
       <Text
         allowFontScaling
@@ -63,8 +63,8 @@ export function CoachCard({
 }) {
   return (
     <View
-      className="rounded-[24px] border border-[#E9E3DD] p-5"
-      style={{ backgroundColor: quiet ? '#F3EEE8' : '#FFFFFF' }}>
+      className="rounded-[24px] border border-[#E3E1DE] p-5"
+      style={{ backgroundColor: quiet ? '#F6F4F2' : '#FFFFFF' }}>
       <View className="flex-row items-center">
         {icon ? (
           <View className="mr-3 h-10 w-10 items-center justify-center rounded-[14px] bg-[#FFF0E8]">
@@ -91,7 +91,7 @@ export function CoachFocusHero({
 }) {
   return (
     <LinearGradient
-      colors={recovery ? ['#393530', '#575049'] : ['#AC371B', '#CE4B23']}
+      colors={recovery ? ['#313131', '#1A1A1A'] : ['#FF5C35', '#FF5C1A']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ borderRadius: 28, padding: 24 }}>
@@ -113,7 +113,7 @@ export function CoachFocusHero({
       </Text>
       {!recovery && output.checkIn.durationMinutes > 0 ? (
         <View className="mt-5 self-start rounded-full bg-white px-3 py-2">
-          <Text className="font-heading text-sm font-semibold text-[#A7371C]">
+          <Text className="font-heading text-sm font-semibold text-[#FF4B1F]">
             {output.checkIn.durationMinutes} minutes
           </Text>
         </View>
@@ -134,7 +134,7 @@ export function CoachProgress({ step, total }: { step: number; total: number }) 
         <View
           key={index}
           className="h-1.5 flex-1 rounded-full"
-          style={{ backgroundColor: index <= step ? '#C74420' : '#E9E3DD' }}
+          style={{ backgroundColor: index <= step ? '#FF5C35' : '#E3E1DE' }}
         />
       ))}
     </View>
@@ -144,8 +144,8 @@ export function CoachProgress({ step, total }: { step: number; total: number }) 
 export function CoachSaved({ recovery = false }: { recovery?: boolean }) {
   return (
     <View className="my-5 flex-row items-center justify-center px-2">
-      <Check size={18} color="#A7371C" weight="bold" />
-      <Text className="ml-2 shrink text-center font-body text-xs text-[#625B55]">
+      <Check size={18} color="#FF4B1F" weight="bold" />
+      <Text className="ml-2 shrink text-center font-body text-xs text-[#5A5551]">
         {recovery
           ? 'This recovery direction remains saved for today.'
           : 'Saved for the rest of today · one focus only'}
@@ -180,21 +180,21 @@ export function CoachLoading() {
       <Text className="mt-8 text-center font-heading text-[28px] font-semibold text-[#1A1A1A]">
         Shaping today’s focus
       </Text>
-      <Text className="mt-3 text-center font-body text-base text-[#625B55]">
+      <Text className="mt-3 text-center font-body text-base text-[#5A5551]">
         Combining your readiness with verified progress…
       </Text>
       <View className="my-7 min-h-8 justify-center" accessibilityElementsHidden>
         {reduceMotion ? (
           <View className="flex-row gap-x-2">
             {[0, 1, 2].map((key) => (
-              <View key={key} className="h-2 w-2 rounded-full bg-[#C74420]" />
+              <View key={key} className="h-2 w-2 rounded-full bg-[#FF5C35]" />
             ))}
           </View>
         ) : (
-          <ActivityIndicator color="#C74420" />
+          <ActivityIndicator color="#FF5C35" />
         )}
       </View>
-      <Text className="text-center font-body text-sm text-[#625B55]">
+      <Text className="text-center font-body text-sm text-[#5A5551]">
         Your focus will appear automatically. You can leave safely and open this same focus again.
       </Text>
     </View>
