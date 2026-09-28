@@ -12,6 +12,8 @@ export function resumePath(screen: ResumeScreen) {
       return '/coach-onboarding' as const;
     case 'health':
       return '/(auth)/ask-health-permission' as const;
+    case 'setup':
+      return '/coach-setup' as const;
     case 'paywall':
       return '/subscription' as const;
     case 'today':
@@ -19,8 +21,25 @@ export function resumePath(screen: ResumeScreen) {
   }
 }
 
+export function resumePathForDecision(decision: {
+  screen: ResumeScreen;
+  requestStatus: 'none' | 'pending' | 'ready' | 'failed';
+  completedOnboarding?: boolean;
+  returningMember?: boolean;
+}) {
+  // A new member who just submitted her first answers may resume the result
+  // screen. Returning members always reopen Today and choose when to view it.
+  if (
+    decision.screen === 'today' &&
+    !decision.returningMember &&
+    (decision.requestStatus === 'pending' || decision.requestStatus === 'failed')
+  )
+    return '/coach-plan-loading' as const;
+  return resumePath(decision.screen);
+}
+
 export async function resumeMember(convex: ConvexReactClient) {
   const decision = await convex.query(api.coachResume.myDecision, {});
-  router.replace(resumePath(decision.screen));
+  router.replace(resumePathForDecision(decision));
   return decision;
 }

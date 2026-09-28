@@ -422,13 +422,13 @@ describe('daily-plan source and policy', () => {
     }
   });
 
-  test('remaining undefined combined-readiness cases are flagged', () => {
+  test('approved conservative readiness precedence does not block generation', () => {
     expect(
       dailyPolicy(
         snapshot({ daily: { ...base.daily, upFor: 'full_session', energy: 'flat' } }),
         day
       ).unresolved
-    ).toBe('full_plus_poor_readiness');
+    ).toBeUndefined();
     const highSteps = snapshot({
       health: {
         steps: [
@@ -438,7 +438,7 @@ describe('daily-plan source and policy', () => {
         workouts: [],
       },
     });
-    expect(dailyPolicy(highSteps, day).unresolved).toBe('high_steps_threshold');
+    expect(dailyPolicy(highSteps, day).unresolved).toBeUndefined();
   });
 });
 
@@ -709,7 +709,7 @@ describe('request lifecycle', () => {
 
   test('deliberate retry keeps frozen inputs and duplicate retries reuse one row', async () => {
     const store = fakeDb({
-      users: [{ _id: 'member_a', timezone: 'UTC' }],
+      users: [{ _id: 'member_a', timezone: 'UTC', isAdmin: true }],
       coachPlanRequestsV1: [
         {
           _id: 'failed',
@@ -761,7 +761,7 @@ describe('request lifecycle', () => {
     expect(canRetryFailedPlan(null, DAILY_PLAN_PROMPT_VERSION)).toBe(false);
 
     const store = fakeDb({
-      users: [{ _id: 'member_a', timezone: 'UTC' }],
+      users: [{ _id: 'member_a', timezone: 'UTC', isAdmin: true }],
       coachPlanRequestsV1: [
         {
           _id: 'blocked',
@@ -785,7 +785,7 @@ describe('request lifecycle', () => {
       daily: { ...base.daily, upFor: 'something_light', body: 'sore_lower' },
     });
     const store = fakeDb({
-      users: [{ _id: 'member_a', timezone: 'UTC' }],
+      users: [{ _id: 'member_a', timezone: 'UTC', isAdmin: true }],
       coachPlanRequestsV1: [
         {
           _id: 'blocked',

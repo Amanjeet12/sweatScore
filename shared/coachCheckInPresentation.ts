@@ -1,5 +1,9 @@
 import type { CoachCategory } from './coachFoundation';
 
+export function checkInPostRoute(category: CoachCategory) {
+  return `/coach-check-in/post/${category}` as const;
+}
+
 type GuideSource = {
   label?: string;
   recommendation: string;

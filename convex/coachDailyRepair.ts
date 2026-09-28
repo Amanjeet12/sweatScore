@@ -34,7 +34,12 @@ export async function generateV2WithRepair(args: {
   const second = await args.call({ previousCandidate: first.ok ? first.output : undefined });
   const latencyMs = first.latencyMs + second.latencyMs;
   if (!valid(second, args.snapshot, args.day, args.recentPlans))
-    return { ok: false, code: second.ok ? 'invalid_output' : second.code, latencyMs };
+    return {
+      ok: false,
+      code: second.ok ? 'invalid_output' : second.code,
+      formatCode: second.ok ? 'plan_validation' : second.formatCode,
+      latencyMs,
+    };
   if (!second.ok) return second;
   return {
     ...second,

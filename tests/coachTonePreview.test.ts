@@ -362,7 +362,7 @@ test('daily preview repairs one invalid provider candidate without member state'
         expect(request.messages[0].content).toContain('revision_instruction');
         expect(request.messages[0].content).toContain('Never use an em dash');
         expect(request.messages[0].content).toContain(
-          'Why must include the exact numeric Steps target'
+          'Why must include the same numeric Steps target'
         );
       }
       return new Response(

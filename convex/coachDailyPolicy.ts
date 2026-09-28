@@ -84,41 +84,39 @@ export type DailyPolicy = {
 export function dailyPolicy(snapshot: DailySnapshot, day: string): DailyPolicy {
   const today = snapshot.daily;
   const pain = today.body === 'pain_unwell';
-  const rest = pain || today.upFor === 'rest_day';
   const recovery = consecutiveCompletedWorkoutDays(snapshot, day) >= 3;
   const poor = today.sleep === 'barely_rested' || today.energy === 'flat';
   const sore = today.body === 'sore_upper' || today.body === 'sore_lower';
+  // Completed-workout recovery takes precedence over an opposite-body soreness
+  // suggestion. On a full-session request with poor readiness, use the already
+  // established short-session duration instead of requiring a new threshold.
+  const rest = pain || today.upFor === 'rest_day' || (recovery && sore);
   const stepAverage = verifiedStepAverage(snapshot);
-  const observed = new Map(observedSteps(snapshot).map((row) => [row.day, row.count]));
-  const highStepCandidate =
-    stepAverage !== undefined &&
-    [1, 2, 3].every((offset) => (observed.get(addDaysToDateKey(day, -offset)) ?? 0) > stepAverage);
-  const unresolved =
-    !rest && recovery && sore
-      ? 'recovery_plus_soreness'
-      : !rest && today.upFor === 'full_session' && poor && !recovery
-        ? 'full_plus_poor_readiness'
-        : !rest && highStepCandidate && !recovery
-          ? 'high_steps_threshold'
-          : undefined;
+  // "Well above average" has no approved numeric threshold. Observed high
+  // steps alone therefore never block generation or assert recovery. The
+  // verified average and its +2,000 cap still constrain the target.
   const headline = pain
     ? HEADLINES.pain
     : today.upFor === 'rest_day'
       ? HEADLINES.rest
-      : today.upFor === 'something_light'
-        ? HEADLINES.light
-        : poor || recovery
-          ? HEADLINES.ease
-          : HEADLINES.push;
+      : rest && recovery
+        ? HEADLINES.ease
+        : today.upFor === 'something_light'
+          ? HEADLINES.light
+          : poor || recovery
+            ? HEADLINES.ease
+            : HEADLINES.push;
   const duration: DailyPolicy['duration'] = rest
     ? 'rest'
     : recovery
       ? 'recovery'
-      : today.upFor === 'something_light'
-        ? 'light'
-        : today.upFor === 'short_session'
-          ? 'short'
-          : 'full';
+      : poor && today.upFor === 'full_session'
+        ? 'short'
+        : today.upFor === 'something_light'
+          ? 'light'
+          : today.upFor === 'short_session'
+            ? 'short'
+            : 'full';
   return {
     headline,
     sleep: SLEEP_COPY[today.sleep],
@@ -127,7 +125,6 @@ export function dailyPolicy(snapshot: DailySnapshot, day: string): DailyPolicy {
     stepAverage,
     missingHistoryTarget: headline === HEADLINES.push ? 7000 : 5000,
     duration,
-    unresolved,
   };
 }
 
@@ -219,7 +216,9 @@ export function validateDailyPlanOutput(
     !/\b\d(?:\.\d)? litres? of water\b/i.test(output.meals) ||
     !/\b(snap|log)\b.{0,30}\bmeal/i.test(output.meals) ||
     /\b(calories|grams|macros|carb servings?)\b/i.test(output.meals) ||
-    /\b(you trained today|you completed|you logged a workout today)\b/i.test(output.why)
+    /\b(you trained today|you completed[^.!?]{0,50}today|you logged a workout today)\b/i.test(
+      output.why
+    )
   ) {
     throw new Error('invalid_output');
   }
@@ -281,6 +280,7 @@ export function buildDailyProviderInput(
       workout: requiredWorkout,
       workout_type: sorenessWorkoutType,
       duration_minutes: policy.duration === 'light' ? 10 : policy.duration === 'short' ? 20 : null,
+      recovery_max_duration_minutes: policy.duration === 'recovery' ? 20 : null,
       steps:
         average === undefined
           ? `${policy.missingHistoryTarget.toLocaleString('en-US')} steps`

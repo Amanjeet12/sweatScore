@@ -67,10 +67,10 @@ describe('Stage 7 Today model', () => {
       expect(planBannerLabel(state)).toBe(label);
     }
   });
-  test('first paid arrival reopens the saved plan; an entitled no-plan member can use Get plan', () => {
+  test('first paid arrival reopens the saved plan; an entitled no-plan member answers today’s questions', () => {
     expect(resumeDecision(base)).toMatchObject({ screen: 'today', requestStatus: 'ready' });
     expect(resumeDecision({ ...base, hasTodayRequest: false, hasTodayPlan: false })).toMatchObject({
-      screen: 'today',
+      screen: 'daily',
       requestStatus: 'none',
     });
     expect(

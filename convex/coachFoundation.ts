@@ -21,7 +21,7 @@ import {
   DEFAULT_COACH_TONE,
 } from '../shared/coachFoundation';
 import { addDaysToDateKey, formatDateInTZ } from './utils/timezone';
-import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
 import { validateDailyPlanOutput } from './coachDailyPolicy';
 import {
   validateDailyPlanOutputV2,
@@ -219,16 +219,68 @@ async function planSnapshot(
   };
 }
 
-// Development-only scenario testing for the signed-in administrator. Do not delete proof or rewards.
+// Development-only scenario testing for the signed-in member. Do not delete proof or rewards.
+async function todayResetInventory(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
+  const day = await localDay(ctx, userId);
+  const [requests, revisions, assignments, answers, proofs, slots, meals, scans] =
+    await Promise.all([
+      ctx.db
+        .query('coachPlanRequestsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachPlanRevisionsV1')
+        .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachAssignmentsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachDailyAnswersV1')
+        .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachProofSubmissionsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachRewardSlotsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachMealDraftsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+      ctx.db
+        .query('coachMealScansV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+        .take(101),
+    ]);
+  const tooMany = [requests, revisions, assignments, answers, proofs, slots, meals, scans].some(
+    (rows) => rows.length > 100
+  );
+  const reason = tooMany
+    ? 'Too many records to reset safely'
+    : requests.some((item) => item.status === 'pending')
+      ? 'Wait for plan generation to finish before resetting'
+      : proofs.length || slots.length || meals.length || scans.length
+        ? 'Today has check-in or reward records and cannot be reset safely'
+        : !requests.length && !revisions.length && !assignments.length && !answers.length
+          ? 'There is no plan or daily answers to reset today'
+          : null;
+  return { day, requests, revisions, assignments, answers, reason };
+}
+
 export const canResetMyTodayPlanForTesting = query({
   args: {},
-  returns: v.boolean(),
+  returns: v.object({ available: v.boolean(), reason: v.optional(v.string()) }),
   handler: async (ctx) => {
     const userId = await member(ctx);
-    const user = await ctx.db.get(userId);
-    return Boolean(
-      user?.isAdmin && process.env.CONVEX_CLOUD_URL === 'https://beloved-stoat-88.convex.cloud'
-    );
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      return { available: false, reason: 'Available only on the development deployment.' };
+    const inventory = await todayResetInventory(ctx, userId);
+    return { available: !inventory.reason, reason: inventory.reason ?? undefined };
   },
 });
 
@@ -237,55 +289,13 @@ export const resetMyTodayPlanForTesting = mutation({
   returns: v.object({ day: v.string(), plansDeleted: v.number() }),
   handler: async (ctx) => {
     const userId = await member(ctx);
-    const user = await ctx.db.get(userId);
-    if (!user?.isAdmin || process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
-      throw new ConvexError('Admin plan reset is available only in development');
-    const day = await localDay(ctx, userId);
-    const [requests, revisions, assignments, answers, proofs, slots, meals, scans] =
-      await Promise.all([
-        ctx.db
-          .query('coachPlanRequestsV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachPlanRevisionsV1')
-          .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachAssignmentsV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachDailyAnswersV1')
-          .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachProofSubmissionsV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachRewardSlotsV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachMealDraftsV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-        ctx.db
-          .query('coachMealScansV1')
-          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
-          .take(101),
-      ]);
-    if (
-      [requests, revisions, assignments, answers, proofs, slots, meals, scans].some(
-        (rows) => rows.length > 100
-      )
-    )
-      throw new ConvexError('Too many records to reset safely');
-    if (requests.some((item) => item.status === 'pending'))
-      throw new ConvexError('Wait for plan generation to finish before resetting');
-    if (proofs.length || slots.length || meals.length || scans.length)
-      throw new ConvexError('Today has check-in or reward records and cannot be reset safely');
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      throw new ConvexError('Plan reset is available only on the development deployment');
+    const { day, requests, revisions, assignments, answers, reason } = await todayResetInventory(
+      ctx,
+      userId
+    );
+    if (reason) throw new ConvexError(reason);
     for (const item of assignments) await ctx.db.delete(item._id);
     for (const item of revisions) await ctx.db.delete(item._id);
     for (const item of requests) await ctx.db.delete(item._id);
@@ -304,6 +314,164 @@ export const resetMyTodayPlanForTesting = mutation({
   },
 });
 
+// A protected proof/meal cannot be deleted with its plan. This development-only
+// path records fresh daily answers and a later revision while retaining the
+// original recommendation, media, scan ledger, and stable reward slots.
+export const beginMyTodayReanswerForTesting = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await member(ctx);
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      throw new ConvexError('Daily re-answer is available only on the development deployment');
+    if (!(await hasVerifiedPremium(ctx, userId))) throw new ConvexError('Verified access required');
+    const day = await localDay(ctx, userId);
+    const state = await progress(ctx, userId);
+    if (!state?.profileRevisionId) throw new ConvexError('Coach profile required');
+    const latestPlan = await ctx.db
+      .query('coachPlanRevisionsV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    if (!latestPlan) throw new ConvexError('A ready plan is required to re-answer today');
+    const latestRequest = await ctx.db
+      .query('coachPlanRequestsV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    if (latestRequest?.status === 'pending')
+      throw new ConvexError('Wait for the current plan request to finish');
+    if (state.testReanswerDay === day && state.testReanswerKey) {
+      const existing = await ctx.db
+        .query('coachPlanRequestsV1')
+        .withIndex('by_user_day_key', (q) =>
+          q.eq('userId', userId).eq('day', day).eq('requestKey', state.testReanswerKey!)
+        )
+        .unique();
+      if (!existing) return { day, requestKey: state.testReanswerKey };
+    }
+    const requestKey = `reanswer_${day.replaceAll('-', '')}_${crypto.randomUUID().replaceAll('-', '')}`;
+    await ctx.db.patch(state._id, {
+      testReanswerDay: day,
+      testReanswerKey: requestKey,
+      testReanswerDraft: {},
+      updatedAt: Date.now(),
+    });
+    return { day, requestKey };
+  },
+});
+
+export const saveMyTodayReanswerDraftForTesting = mutation({
+  args: dailyDraftFields,
+  handler: async (ctx, args) => {
+    const userId = await member(ctx);
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      throw new ConvexError('Daily re-answer is available only on the development deployment');
+    if (!(await hasVerifiedPremium(ctx, userId))) throw new ConvexError('Verified access required');
+    const state = await progress(ctx, userId);
+    const day = await localDay(ctx, userId);
+    if (!state?.testReanswerKey || state.testReanswerDay !== day)
+      throw new ConvexError('Start a new daily re-answer first');
+    const existing = await ctx.db
+      .query('coachPlanRequestsV1')
+      .withIndex('by_user_day_key', (q) =>
+        q.eq('userId', userId).eq('day', day).eq('requestKey', state.testReanswerKey!)
+      )
+      .unique();
+    if (existing) throw new ConvexError('These answers are already reserved');
+    const fields = Object.fromEntries(
+      Object.entries(args).filter(([, value]) => value !== undefined)
+    );
+    await ctx.db.patch(state._id, {
+      testReanswerDraft: { ...state.testReanswerDraft, ...fields },
+      updatedAt: Date.now(),
+    });
+    return { day };
+  },
+});
+
+export const finishMyTodayReanswerForTesting = mutation({
+  args: { body: dailyAnswers.fields.body },
+  returns: v.id('coachPlanRequestsV1'),
+  handler: async (ctx, { body }) => {
+    const userId = await member(ctx);
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      throw new ConvexError('Daily re-answer is available only on the development deployment');
+    if (!(await hasVerifiedPremium(ctx, userId))) throw new ConvexError('Verified access required');
+    const state = await progress(ctx, userId);
+    const day = await localDay(ctx, userId);
+    if (!state?.testReanswerKey || state.testReanswerDay !== day || !state.profileRevisionId)
+      throw new ConvexError('Start a new daily re-answer first');
+    const existing = await ctx.db
+      .query('coachPlanRequestsV1')
+      .withIndex('by_user_day_key', (q) =>
+        q.eq('userId', userId).eq('day', day).eq('requestKey', state.testReanswerKey!)
+      )
+      .unique();
+    if (existing) return existing._id;
+    const latestRequest = await ctx.db
+      .query('coachPlanRequestsV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    if (latestRequest?.status === 'pending')
+      throw new ConvexError('Wait for the current plan request to finish');
+    const previousPlan = await ctx.db
+      .query('coachPlanRevisionsV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    if (!previousPlan) throw new ConvexError('A ready plan is required to re-answer today');
+    const answers = completeDaily({ ...state.testReanswerDraft, body });
+    const previousAnswers = await ctx.db
+      .get(previousPlan.requestId)
+      .then((request) => (request ? ctx.db.get(request.dailyAnswerId) : null));
+    if (previousAnswers && JSON.stringify(previousAnswers.answers) === JSON.stringify(answers))
+      throw new ConvexError('Change at least one answer to prepare a new plan');
+    const profile = await ctx.db.get(state.profileRevisionId);
+    if (!profile || profile.userId !== userId) throw new ConvexError('Coach profile missing');
+    const latestAnswers = await ctx.db
+      .query('coachDailyAnswersV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    const now = Date.now();
+    const dailyAnswerId = await ctx.db.insert('coachDailyAnswersV1', {
+      userId,
+      day,
+      version: (latestAnswers?.version ?? 0) + 1,
+      answers,
+      source: 'member',
+      createdAt: now,
+    });
+    const daily = await ctx.db.get(dailyAnswerId);
+    if (!daily) throw new ConvexError('Daily answers missing');
+    const inputSnapshot = await planSnapshot(ctx, userId, day, profile, daily);
+    const toneSetting = await ctx.db
+      .query('coachToneSettingsV1')
+      .withIndex('by_version')
+      .order('desc')
+      .first();
+    const requestId = await ctx.db.insert('coachPlanRequestsV1', {
+      userId,
+      day,
+      requestKey: state.testReanswerKey,
+      kind: 'daily',
+      profileRevisionId: profile._id,
+      dailyAnswerId,
+      inputSnapshot,
+      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+      toneVersion: toneSetting?.version ?? 1,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      queuedAt: now,
+    });
+    await ctx.db.patch(state._id, { dailyAnswerId, testReanswerDraft: answers, updatedAt: now });
+    await ctx.scheduler.runAfter(0, internal.coachDailyService.generateReserved, { requestId });
+    return requestId;
+  },
+});
+
 export const getMyFoundation = query({
   args: {},
   handler: async (ctx) => {
@@ -315,6 +483,46 @@ export const getMyFoundation = query({
       : null;
     // Before entitlement verification, expose status and saved answers, never pre-payment plan output.
     return { day, state, firstPlanStatus: request?.status ?? null };
+  },
+});
+
+// An explicit Today action opens plan setup for a returning member. This
+// persists the returning-home classification through partial profile drafts;
+// it does not reserve a plan, dispatch generation or award anything.
+export const beginReturningPlanSetup = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await member(ctx);
+    if (!(await hasVerifiedPremium(ctx, userId))) throw new ConvexError('Verified access required');
+    const user = await ctx.db.get(userId);
+    if (!user?.name?.trim() || !user.birthdate) throw new ConvexError('Basic profile required');
+    const existing = await progress(ctx, userId);
+    const earlierPlan =
+      existing?.returningMember || existing?.stage === 'complete'
+        ? null
+        : await ctx.db
+            .query('coachPlanRevisionsV1')
+            .withIndex('by_user', (q) => q.eq('userId', userId))
+            .first();
+    // Incomplete new-member onboarding still follows its server resume path.
+    if (
+      existing &&
+      existing.stage !== 'complete' &&
+      !existing.returningMember &&
+      !earlierPlan &&
+      !user.onboarded
+    )
+      throw new ConvexError('Complete onboarding first');
+    const day = await localDay(ctx, userId);
+    const request = await ctx.db
+      .query('coachPlanRequestsV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .first();
+    if (request) throw new ConvexError('Today already has a plan request');
+    const state = existing ?? (await getOrCreateProgress(ctx, userId));
+    if (!state.returningMember)
+      await ctx.db.patch(state._id, { returningMember: true, updatedAt: Date.now() });
+    return { needsProfile: !state.profileRevisionId };
   },
 });
 
@@ -471,12 +679,30 @@ export const continueAfterHealth = mutation({
     const userId = await member(ctx);
     const state = await getOrCreateProgress(ctx, userId);
     if (!state.profileRevisionId) throw new ConvexError('Complete profile first');
+    if (state.healthContinuation && state.stage !== 'health') return state._id;
     if (state.firstPlanRequestId) return state._id;
     await ctx.db.patch(state._id, {
       healthContinuation: result,
-      stage: 'daily',
+      stage: 'setup',
       updatedAt: Date.now(),
     });
+    return state._id;
+  },
+});
+
+// The profile loading screen marks only the end of setup. It never reserves a plan.
+export const finishCoachSetup = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await member(ctx);
+    const state = await getOrCreateProgress(ctx, userId);
+    if (!state.profileRevisionId || !state.healthContinuation)
+      throw new ConvexError('Profile and health continuation required');
+    if (state.stage === 'setup')
+      await ctx.db.patch(state._id, {
+        stage: (await hasVerifiedPremium(ctx, userId)) ? 'daily' : 'paywall',
+        updatedAt: Date.now(),
+      });
     return state._id;
   },
 });
@@ -486,7 +712,9 @@ export const saveDailyDraft = mutation({
   handler: async (ctx, args) => {
     const userId = await member(ctx);
     const state = await getOrCreateProgress(ctx, userId);
-    if (!state.profileRevisionId || !state.healthContinuation)
+    const verified = await hasVerifiedPremium(ctx, userId);
+    const healthContinuation = state.healthContinuation ?? (verified ? 'unavailable' : undefined);
+    if (!state.profileRevisionId || !healthContinuation)
       throw new ConvexError('Profile and health continuation required');
     const day = await localDay(ctx, userId);
     assertDay(day);
@@ -495,6 +723,7 @@ export const saveDailyDraft = mutation({
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
       .first();
     if (reserved) throw new ConvexError('Daily answers are already reserved for today');
+    if (!verified) throw new ConvexError('Verified access required for daily questions');
     const fields = Object.fromEntries(
       Object.entries(args).filter(([, value]) => value !== undefined)
     );
@@ -502,6 +731,7 @@ export const saveDailyDraft = mutation({
     await ctx.db.patch(state._id, {
       dailyDraft: { ...draft, ...fields },
       dailyDraftDay: day,
+      healthContinuation,
       updatedAt: Date.now(),
     });
     return { day };
@@ -521,6 +751,8 @@ export const finishDailyAnswers = mutation({
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
       .first();
     if (reserved) return reserved.dailyAnswerId;
+    if (!(await hasVerifiedPremium(ctx, userId)))
+      throw new ConvexError('Verified access required for daily questions');
     const answers = completeDaily(state.dailyDraft);
     const latest = await ctx.db
       .query('coachDailyAnswersV1')
@@ -545,7 +777,7 @@ export const finishDailyAnswers = mutation({
 });
 
 // The fifth answer, immutable answer row, plan reservation and scheduled job commit
-// together. Navigation to the paywall happens after this transaction returns.
+// together. Payment verification precedes this transaction; navigation shows the saved request.
 export const finishDailyAndReserveFirst = mutation({
   args: { body: dailyAnswers.fields.body, requestKey: v.string() },
   returns: v.id('coachPlanRequestsV1'),
@@ -560,6 +792,8 @@ export const finishDailyAndReserveFirst = mutation({
       .order('desc')
       .first();
     if (existing) return existing._id;
+    if (!(await hasVerifiedPremium(ctx, userId)))
+      throw new ConvexError('Verified access required for daily questions');
     const healthContinuation =
       state.healthContinuation ??
       ((await hasVerifiedPremium(ctx, userId)) ? 'unavailable' : undefined);
@@ -602,7 +836,7 @@ export const finishDailyAndReserveFirst = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -614,7 +848,9 @@ export const finishDailyAndReserveFirst = mutation({
       dailyAnswerId,
       firstPlanRequestId: requestId,
       healthContinuation,
-      stage: 'paywall',
+      // A returning member stays in the completed-member route while the
+      // current-day request prepares. New-member onboarding remains 'daily'.
+      stage: state.stage === 'complete' ? 'complete' : 'daily',
       updatedAt: now,
     });
     await ctx.scheduler.runAfter(0, internal.coachDailyService.generateReserved, { requestId });
@@ -636,6 +872,8 @@ export const reserveFirstPlan = mutation({
       )
       .first();
     if (existing) return existing._id;
+    if (!(await hasVerifiedPremium(ctx, userId)))
+      throw new ConvexError('Verified access required for plan preparation');
     const occupiedKey = await ctx.db
       .query('coachPlanRequestsV1')
       .withIndex('by_user_day_key', (q) =>
@@ -674,13 +912,13 @@ export const reserveFirstPlan = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId: daily._id,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
       updatedAt: now,
     });
-    await ctx.db.patch(state._id, { firstPlanRequestId: id, stage: 'paywall', updatedAt: now });
+    await ctx.db.patch(state._id, { firstPlanRequestId: id, stage: 'daily', updatedAt: now });
     return id;
   },
 });
@@ -766,7 +1004,7 @@ export const reserveLaterPlan = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId: daily._id,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -822,14 +1060,13 @@ export const recordPlanRevision = internalMutation({
       throw new ConvexError('Stale or claimed request');
     // This internal writer predates the named client prompt. Keep its legacy
     // request versions compatible; new v2 requests require v2 details.
-    const checked =
-      request.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
-        ? validateDailyPlanOutputV2(
-            { ...args.output, ...args.detailsV2 },
-            request.inputSnapshot,
-            request.day
-          )
-        : validateDailyPlanOutput(args.output, request.inputSnapshot, request.day);
+    const checked = isV2DailyPrompt(request.promptVersion)
+      ? validateDailyPlanOutputV2(
+          { ...args.output, ...args.detailsV2 },
+          request.inputSnapshot,
+          request.day
+        )
+      : validateDailyPlanOutput(args.output, request.inputSnapshot, request.day);
     if (
       checked.stepTarget !== args.stepTarget ||
       JSON.stringify(checked.workout) !== JSON.stringify(args.workout)
@@ -876,8 +1113,7 @@ export const recordPlanRevision = internalMutation({
       version: (latest?.version ?? 0) + 1,
       requestId: args.requestId,
       output: args.output,
-      detailsV2:
-        request.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION ? args.detailsV2 : undefined,
+      detailsV2: isV2DailyPrompt(request.promptVersion) ? args.detailsV2 : undefined,
       workout: args.workout,
       stepTarget: args.stepTarget,
       sleepTargetHours: 7,

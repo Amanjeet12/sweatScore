@@ -1,7 +1,7 @@
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
   Barbell,
@@ -33,6 +33,7 @@ import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CoachCheckInFlow from '~/components/core/dashboard/CoachCheckInFlow';
+import { checkInPostRoute } from '~/shared/coachCheckInPresentation';
 import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
@@ -41,7 +42,7 @@ import { Id } from '~/convex/_generated/dataModel';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { useHealthSync } from '~/hooks/useHealthSync';
 import { TARGETS } from '~/shared/activityGoals';
-import { CoachCategory } from '~/shared/coachFoundation';
+import { COACH_CATEGORIES, CoachCategory } from '~/shared/coachFoundation';
 import {
   activityProgressFraction,
   planBannerLabel,
@@ -82,6 +83,7 @@ export default function TodayScreen() {
     api.revenueCatEntitlements.myPlan,
     accepted ? { refresh: dayRefresh } : 'skip'
   );
+  const beginPlanSetup = useMutation(api.coachFoundation.beginReturningPlanSetup);
   const checkIns = useQuery(api.coachCheckIns.myToday, accepted ? { refresh: dayRefresh } : 'skip');
   const banner = useQuery(api.coachToday.myBanner, accepted ? { refresh: dayRefresh } : 'skip');
   const progress = useQuery(
@@ -111,13 +113,24 @@ export default function TodayScreen() {
   );
   const [refreshing, setRefreshing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [openingSetup, setOpeningSetup] = useState(false);
+  const openingSetupRef = useRef(false);
+  const [setupError, setSetupError] = useState('');
   const [restoreMessage, setRestoreMessage] = useState('');
   const [activeCheckIn, setActiveCheckIn] = useState<CoachCategory | null>(null);
+  const { checkIn } = useLocalSearchParams<{ checkIn?: string }>();
   const [checkInExpanded, setCheckInExpanded] = useState(false);
   const [checkInPreferredHeight, setCheckInPreferredHeight] = useState(0);
   const { restorePermissions } = useRevenueCat();
   const [now, setNow] = useState(Date.now());
   const [reduceMotion, setReduceMotion] = useState(true);
+  useEffect(() => {
+    const selected = COACH_CATEGORIES.find((item) => item === checkIn);
+    if (!selected || !plan?.access) return;
+    setCheckInPreferredHeight(0);
+    setActiveCheckIn(selected);
+    router.setParams({ checkIn: undefined });
+  }, [checkIn, plan?.access]);
   const arrowOffset = useRef(new Animated.Value(0)).current;
   const bannerState = plan
     ? planBannerState({
@@ -176,13 +189,40 @@ export default function TodayScreen() {
     return () => animation.stop();
   }, [bannerState, reduceMotion, arrowOffset]);
 
+  const openPlanSetup = async (category?: CoachCategory) => {
+    if (openingSetupRef.current) return;
+    openingSetupRef.current = true;
+    setOpeningSetup(true);
+    setSetupError('');
+    try {
+      await beginPlanSetup({});
+      router.push({
+        pathname: '/coach-onboarding',
+        params: category ? { nextCheckIn: category } : {},
+      });
+    } catch {
+      setSetupError('Could not open today’s questions. Please try again.');
+    } finally {
+      openingSetupRef.current = false;
+      setOpeningSetup(false);
+    }
+  };
   const openPlan = () => {
     if (bannerState === 'locked') return;
-    if (bannerState === 'no_plan') router.push('/coach-onboarding');
+    if (bannerState === 'no_plan') void openPlanSetup();
+    else if (bannerState !== 'ready') router.push('/coach-plan-loading');
     else router.push('/coach-plan');
   };
   const openTile = (category: CoachCategory) => {
     if (!plan?.access) return;
+    if (bannerState === 'no_plan') {
+      void openPlanSetup(category);
+      return;
+    }
+    if (bannerState !== 'ready') {
+      router.push('/coach-plan-loading');
+      return;
+    }
     setCheckInPreferredHeight(0);
     setActiveCheckIn(category);
   };
@@ -244,8 +284,8 @@ export default function TodayScreen() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'No sweat sisters checked in yet' : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
-          accessibilityState={{ disabled: bannerState === 'locked' }}
-          disabled={bannerState === 'locked'}
+          accessibilityState={{ disabled: bannerState === 'locked' || openingSetup }}
+          disabled={bannerState === 'locked' || openingSetup}
           activeOpacity={0.88}
           onPress={openPlan}
           className="mx-5 mb-5 overflow-hidden rounded-[28px] bg-[#3B1A08]"
@@ -333,6 +373,9 @@ export default function TodayScreen() {
             </View>
           </View>
         </TouchableOpacity>
+        {setupError ? (
+          <Text className="mx-5 -mt-3 mb-5 font-body text-sm text-red-600">{setupError}</Text>
+        ) : null}
 
         {!plan.access ? (
           <View className="mx-5 mb-5 rounded-2xl bg-white p-4">
@@ -389,8 +432,8 @@ export default function TodayScreen() {
                   key={tile.category}
                   accessibilityRole="button"
                   accessibilityLabel={`${LABELS[tile.category]}, ${detail}${tile.category === 'meals' ? `, ${tile.earned} of 3 shared` : tile.completed ? ', completed' : ''}`}
-                  accessibilityState={{ disabled: !plan.access }}
-                  disabled={!plan.access}
+                  accessibilityState={{ disabled: !plan.access || openingSetup }}
+                  disabled={!plan.access || openingSetup}
                   onPress={() => openTile(tile.category)}
                   className="mb-3 min-h-[96px] justify-center rounded-[22px] border border-[#E6E3E0] p-3"
                   style={{ width: '48.4%', backgroundColor: tile.completed ? '#F3F2F0' : 'white' }}>
@@ -639,6 +682,11 @@ export default function TodayScreen() {
               <CoachCheckInFlow
                 category={activeCheckIn}
                 onClose={closeCheckIn}
+                onCaptured={() => {
+                  const selected = activeCheckIn;
+                  closeCheckIn();
+                  router.push(checkInPostRoute(selected));
+                }}
                 onExpandedChange={setCheckInExpanded}
                 onPreferredHeightChange={(height) =>
                   setCheckInPreferredHeight((previous) =>
@@ -647,7 +695,8 @@ export default function TodayScreen() {
                 }
                 onOpenPlan={(status) => {
                   closeCheckIn();
-                  router.push(status === 'no_plan' ? '/coach-onboarding' : '/coach-plan');
+                  if (status === 'no_plan') void openPlanSetup(activeCheckIn ?? undefined);
+                  else router.push(status === 'ready' ? '/coach-plan' : '/coach-plan-loading');
                 }}
               />
             ) : null}

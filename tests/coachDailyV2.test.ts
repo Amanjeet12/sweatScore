@@ -209,6 +209,8 @@ describe('v2 daily plan contract', () => {
     expect(source).toContain('api.coachCheckIns.myToday');
     expect(source.match(/useMutation\(api\.[^)]+\)/g)).toEqual([
       'useMutation(api.coachDailyService.retryFailedPlan)',
+      'useMutation(api.coachFoundation.resetMyTodayPlanForTesting)',
+      'useMutation(api.coachFoundation.beginMyTodayReanswerForTesting)',
     ]);
     expect(source).not.toContain('generateDailyPlan');
     expect(source).not.toContain('completeProof');

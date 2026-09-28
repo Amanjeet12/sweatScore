@@ -1,5 +1,5 @@
 import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, TouchableOpacity, View } from 'react-native';
 import SafeAreaView from '~/components/core/SafeAreaView';
@@ -65,6 +65,7 @@ export default function AICoachSettings() {
   const save = useMutation(api.coachFoundation.saveToneContract);
   const preview = useAction(api.coachTonePreview.compare);
   const resetToday = useMutation(api.coachFoundation.resetMyTodayPlanForTesting);
+  const beginReanswer = useMutation(api.coachFoundation.beginMyTodayReanswerForTesting);
   const [selected, setSelected] = useState<ToneSelection | null>(null);
   const [sampleMeal, setSampleMeal] = useState<'burrito_bowl' | 'chicken_flatbread'>(
     'burrito_bowl'
@@ -446,17 +447,25 @@ export default function AICoachSettings() {
             ) : null}
           </View>
         ) : null}
-        {__DEV__ && resetAllowed ? (
+        {__DEV__ && user?.isAdmin && resetAllowed ? (
           <View className="mt-8 rounded-2xl bg-white p-4">
             <Text className="font-heading text-lg font-semibold">Development testing</Text>
             <Text className="mt-2 text-sm text-[#6B665F]">
               Clear only your own plan and answers for today to compare different daily selections.
               Your profile and earlier days remain. Available before any check-in or reward today.
             </Text>
+            {!resetAllowed.available ? (
+              <Text className="mt-3 text-sm text-[#8B5142]">
+                {resetAllowed.reason ===
+                'Today has check-in or reward records and cannot be reset safely'
+                  ? 'A check-in, meal analysis or reward is linked to this plan. Its original context and scan count must be preserved. Re-answer today’s questions to prepare a new plan revision.'
+                  : resetAllowed.reason}
+              </Text>
+            ) : null}
             <CoachActionButton
               label={resetting ? 'Clearing…' : 'Delete my plan for today'}
               variant="destructive"
-              disabled={resetting}
+              disabled={resetting || !resetAllowed.available}
               onPress={() =>
                 Alert.alert(
                   'Delete today’s test plan?',
@@ -472,10 +481,10 @@ export default function AICoachSettings() {
                         try {
                           await resetToday({});
                           Alert.alert('Plan cleared', 'You can answer today’s questions again.');
-                        } catch (cause) {
+                        } catch {
                           Alert.alert(
                             'Could not clear plan',
-                            cause instanceof Error ? cause.message : 'Please try again.'
+                            'Today’s plan may now have a check-in or reward record. Nothing was deleted. Please review the updated reset availability.'
                           );
                         } finally {
                           setResetting(false);
@@ -487,6 +496,29 @@ export default function AICoachSettings() {
               }
               className="mt-4"
             />
+            {resetAllowed.reason ===
+            'Today has check-in or reward records and cannot be reset safely' ? (
+              <CoachActionButton
+                label={resetting ? 'Opening questions…' : 'Re-answer today’s questions'}
+                variant="secondary"
+                disabled={resetting}
+                onPress={async () => {
+                  setResetting(true);
+                  try {
+                    await beginReanswer({});
+                    router.push('/coach-onboarding?reanswer=1');
+                  } catch (cause) {
+                    Alert.alert(
+                      'Could not reopen questions',
+                      cause instanceof Error ? cause.message : 'Please try again.'
+                    );
+                  } finally {
+                    setResetting(false);
+                  }
+                }}
+                className="mt-3"
+              />
+            ) : null}
           </View>
         ) : null}
       </ScrollView>

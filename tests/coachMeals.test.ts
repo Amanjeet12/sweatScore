@@ -5,9 +5,11 @@ import { validateMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy
 import { analyzeMealPhoto } from '../convex/coachMealProvider';
 import {
   saveCaption,
+  myDraft,
   reserveScan,
   scanInput,
   claimDispatch,
+  releaseScan,
   finishScan,
   share,
   retake,
@@ -325,7 +327,7 @@ describe('meal draft, scan and share transactions', () => {
     expect(inFlight.draft.toneVersion).toBe(1);
     expect(inFlight.draft.tone).toBe('calm_reassuring');
   });
-  test('member ownership and duplicate reservation; three dispatched scans, fourth rejected', async () => {
+  test('member ownership and duplicate reservation; failed dispatches do not use successful scans', async () => {
     const f = fixture();
     const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: '' });
     const first = await reserveScan._handler(f.ctx, {
@@ -353,10 +355,142 @@ describe('meal draft, scan and share transactions', () => {
       });
     }
     expect(f.rows.coachMealScansV1.filter((s) => s.dispatchedAt)).toHaveLength(3);
-    await expect(
-      reserveScan._handler(f.ctx, { userId: 'alice', draftId, requestKey: 'scan_four' })
-    ).rejects.toThrow();
+    const fourth = await reserveScan._handler(f.ctx, {
+      userId: 'alice',
+      draftId,
+      requestKey: 'scan_four',
+    });
+    expect(fourth).toBeTruthy();
+    await releaseScan._handler(f.ctx, { userId: 'alice', scanId: fourth });
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+    const unclear = await reserveScan._handler(f.ctx, {
+      userId: 'alice',
+      draftId,
+      requestKey: 'scan_unclear',
+    });
+    await claimDispatch._handler(f.ctx, { userId: 'alice', scanId: unclear });
+    expect(
+      await finishScan._handler(f.ctx, {
+        userId: 'alice',
+        scanId: unclear,
+        result: {
+          verdict: 'Nearly there',
+          feedback: 'I cannot see the food clearly enough to assess the portion.',
+        },
+        latencyMs: 20,
+      })
+    ).toBe('unclear');
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
     expect(f.rows.posts).toHaveLength(0);
+  });
+  test('timeout, network, invalid output, release and non-meal results leave the successful allowance intact', async () => {
+    for (const errorCode of ['provider_timeout', 'provider_unavailable', 'invalid_output']) {
+      const f = fixture();
+      const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Saved' });
+      const scanId = await reserveScan._handler(f.ctx, {
+        userId: 'alice',
+        draftId,
+        requestKey: `scan_${errorCode}`,
+      });
+      await claimDispatch._handler(f.ctx, { userId: 'alice', scanId });
+      await finishScan._handler(f.ctx, { userId: 'alice', scanId, errorCode, latencyMs: 20 });
+      expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+      expect(
+        await reserveScan._handler(f.ctx, {
+          userId: 'alice',
+          draftId,
+          requestKey: `retry_${errorCode}`,
+        })
+      ).toBeTruthy();
+    }
+    const f = fixture();
+    const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Saved' });
+    const released = await reserveScan._handler(f.ctx, {
+      userId: 'alice',
+      draftId,
+      requestKey: 'scan_released',
+    });
+    await releaseScan._handler(f.ctx, { userId: 'alice', scanId: released });
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+    const nonMeal = await reserveScan._handler(f.ctx, {
+      userId: 'alice',
+      draftId,
+      requestKey: 'scan_nonmeal',
+    });
+    await claimDispatch._handler(f.ctx, { userId: 'alice', scanId: nonMeal });
+    await finishScan._handler(f.ctx, {
+      userId: 'alice',
+      scanId: nonMeal,
+      result: { verdict: null, feedback: NON_MEAL_FEEDBACK },
+      latencyMs: 20,
+    });
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+  });
+  test('provider-cost throttle is distinct from the three successful meal scans', async () => {
+    const f = fixture();
+    const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Saved' });
+    for (let n = 0; n < 8; n++) {
+      const scanId = await reserveScan._handler(f.ctx, {
+        userId: 'alice',
+        draftId,
+        requestKey: `failed_${n}`,
+      });
+      await claimDispatch._handler(f.ctx, { userId: 'alice', scanId });
+      await finishScan._handler(f.ctx, {
+        userId: 'alice',
+        scanId,
+        errorCode: 'provider_timeout',
+        latencyMs: 20,
+      });
+    }
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+    await expect(
+      reserveScan._handler(f.ctx, { userId: 'alice', draftId, requestKey: 'attempt_nine' })
+    ).rejects.toThrow('successful scan allowance is unchanged');
+    for (const scan of f.rows.coachMealScansV1) scan.dispatchedAt = Date.now() - 3_600_001;
+    expect(
+      await reserveScan._handler(f.ctx, { userId: 'alice', draftId, requestKey: 'after_hour' })
+    ).toBeTruthy();
+  });
+  test('three in-flight scans reserve the three possible successes across devices', async () => {
+    const f = fixture();
+    const pending: string[] = [];
+    for (let ordinal = 1; ordinal <= 4; ordinal++) {
+      const subId = ordinal === 1 ? 'sub' : `sub${ordinal}`;
+      if (ordinal > 1)
+        f.rows.coachProofSubmissionsV1.push({
+          ...f.rows.coachProofSubmissionsV1[0],
+          _id: subId,
+          storageId: `photo${ordinal}`,
+          slotKey: `${day}:meals:${ordinal}`,
+        });
+      const draftId = await saveCaption._handler(f.ctx, {
+        submissionId: subId,
+        caption: `Meal ${ordinal}`,
+      });
+      if (ordinal === 4) {
+        await expect(
+          reserveScan._handler(f.ctx, { userId: 'alice', draftId, requestKey: 'scan_fourth' })
+        ).rejects.toThrow('in progress');
+      } else
+        pending.push(
+          await reserveScan._handler(f.ctx, {
+            userId: 'alice',
+            draftId,
+            requestKey: `scan_${ordinal}`,
+          })
+        );
+    }
+    for (const scanId of pending) {
+      expect(await claimDispatch._handler(f.ctx, { userId: 'alice', scanId })).toBe(true);
+      await finishScan._handler(f.ctx, {
+        userId: 'alice',
+        scanId,
+        result: examples[5],
+        latencyMs: 20,
+      });
+    }
+    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(3);
   });
   test('a stranded dispatch counts once and a late result cannot replace its retry', async () => {
     const f = fixture();

@@ -96,6 +96,8 @@ const schema = defineSchema({
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user', ['userId'])
+    .index('by_coach_submission', ['coachSubmissionId'])
+    .index('by_image', ['image'])
     .index('by_user_date_synced', ['userId', 'date', 'synced'])
     .index('by_date', ['date'])
     .index('by_review_status_synced', ['reviewStatus', 'synced']),
@@ -179,7 +181,9 @@ const schema = defineSchema({
     feedLiveNotificationSentAt: v.optional(v.number()),
   })
     .index('by_user', ['userId'])
-    .index('by_pinned', ['isPinned']),
+    .index('by_pinned', ['isPinned'])
+    .index('by_activity', ['activityId'])
+    .index('by_media', ['media']),
   postComments: defineTable({
     postId: v.id('posts'),
     userId: v.id('users'),
@@ -365,9 +369,11 @@ const schema = defineSchema({
   // Additive v1 foundation. No legacy table is rewritten during this stage.
   coachOnboardingV1: defineTable({
     userId: v.id('users'),
+    returningMember: v.optional(v.boolean()),
     stage: v.union(
       v.literal('profile'),
       v.literal('health'),
+      v.literal('setup'),
       v.literal('daily'),
       v.literal('paywall'),
       v.literal('complete')
@@ -396,6 +402,17 @@ const schema = defineSchema({
       })
     ),
     dailyDraftDay: v.optional(v.string()),
+    testReanswerDay: v.optional(v.string()),
+    testReanswerKey: v.optional(v.string()),
+    testReanswerDraft: v.optional(
+      v.object({
+        sleep: v.optional(dailyAnswers.fields.sleep),
+        energy: v.optional(dailyAnswers.fields.energy),
+        mood: v.optional(dailyAnswers.fields.mood),
+        upFor: v.optional(dailyAnswers.fields.upFor),
+        body: v.optional(dailyAnswers.fields.body),
+      })
+    ),
     profileRevisionId: v.optional(v.id('coachProfileRevisionsV1')),
     dailyAnswerId: v.optional(v.id('coachDailyAnswersV1')),
     firstPlanRequestId: v.optional(v.id('coachPlanRequestsV1')),
@@ -547,6 +564,7 @@ const schema = defineSchema({
     validationStage: v.optional(
       v.union(v.literal('provider_format'), v.literal('plan_validation'))
     ),
+    failureFormatCode: v.optional(v.string()),
     generationAttempt: v.optional(v.number()),
     queuedAt: v.optional(v.number()),
     dispatchedAt: v.optional(v.number()),
@@ -641,6 +659,8 @@ const schema = defineSchema({
     captureSource: v.optional(v.literal('live_camera')),
     uploadIssuedAt: v.optional(v.number()),
     activityId: v.optional(v.id('dailyActivities')),
+    postId: v.optional(v.id('posts')),
+    caption: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     reversedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -727,6 +747,7 @@ const schema = defineSchema({
     dispatchedAt: v.optional(v.number()),
     finishedAt: v.optional(v.number()),
     errorCode: v.optional(v.string()),
+    usable: v.optional(v.boolean()),
   })
     .index('by_user_day', ['userId', 'day'])
     .index('by_user_day_key', ['userId', 'day', 'requestKey'])
@@ -760,6 +781,20 @@ const schema = defineSchema({
   })
     .index('by_admin_created', ['adminUserId', 'createdAt'])
     .index('by_admin', ['adminUserId']),
+  // Development-only cleanup ledger. No member answers or media are stored.
+  coachDevCleanupRunsV1: defineTable({
+    key: v.string(),
+    deployment: v.literal('beloved-stoat-88'),
+    status: v.literal('complete'),
+    beforeCounts: v.record(v.string(), v.number()),
+    afterCounts: v.record(v.string(), v.number()),
+    linkedActivitiesRemoved: v.number(),
+    linkedPostsRemoved: v.number(),
+    linkedMediaRemoved: v.number(),
+    coachPointsRemoved: v.number(),
+    startedAt: v.number(),
+    completedAt: v.number(),
+  }).index('by_key', ['key']),
   coachProfiles: defineTable({
     userId: v.id('users'),
     currentWeight: v.optional(v.number()),

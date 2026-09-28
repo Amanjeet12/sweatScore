@@ -11,6 +11,9 @@ import {
   materializeAssignments,
   updateProfileRevision,
   recordPlanRevision,
+  beginMyTodayReanswerForTesting,
+  saveMyTodayReanswerDraftForTesting,
+  finishMyTodayReanswerForTesting,
 } from '../convex/coachFoundation';
 import { forMemberDay } from '../convex/coachLegacyInventory';
 
@@ -110,6 +113,129 @@ const daily = {
 };
 
 describe('coach foundation invariants', () => {
+  test('development re-answer preserves an analysed meal and reserves only one new plan', async () => {
+    const original = process.env.CONVEX_CLOUD_URL;
+    process.env.CONVEX_CLOUD_URL = 'https://beloved-stoat-88.convex.cloud';
+    try {
+      const store = fakeStore({
+        users: [{ _id: 'member_a', timezone: 'UTC' }],
+        coachBillingEntitlementsV1: [{ _id: 'billing', userId: 'member_a', status: 'active' }],
+        coachOnboardingV1: [
+          {
+            _id: 'state',
+            userId: 'member_a',
+            profileRevisionId: 'profile',
+            entitlement: 'verified',
+            stage: 'complete',
+            dailyAnswerId: 'oldAnswers',
+          },
+        ],
+        coachProfileRevisionsV1: [
+          {
+            _id: 'profile',
+            userId: 'member_a',
+            answers: profile,
+            weightObservationId: 'weight',
+          },
+        ],
+        coachWeightObservationsV1: [
+          {
+            _id: 'weight',
+            userId: 'member_a',
+            weight: { value: 70, unit: 'kg' },
+            observedAt: Date.now(),
+            source: 'member',
+            version: 1,
+          },
+        ],
+        coachDailyAnswersV1: [
+          {
+            _id: 'oldAnswers',
+            userId: 'member_a',
+            day: today,
+            version: 1,
+            answers: daily,
+          },
+        ],
+        coachPlanRequestsV1: [
+          {
+            _id: 'oldRequest',
+            userId: 'member_a',
+            day: today,
+            status: 'ready',
+            dailyAnswerId: 'oldAnswers',
+            requestKey: 'old_request',
+          },
+        ],
+        coachPlanRevisionsV1: [
+          {
+            _id: 'oldPlan',
+            userId: 'member_a',
+            day: today,
+            version: 1,
+            requestId: 'oldRequest',
+          },
+        ],
+        coachAssignmentsV1: [
+          { _id: 'oldAssignment', userId: 'member_a', day: today, planRevisionId: 'oldPlan' },
+        ],
+        coachProofSubmissionsV1: [
+          { _id: 'mealProof', userId: 'member_a', day: today, planRevisionId: 'oldPlan' },
+        ],
+        coachRewardSlotsV1: [
+          { _id: 'mealSlot', userId: 'member_a', day: today, state: 'reserved' },
+        ],
+        coachMealDraftsV1: [
+          {
+            _id: 'analysedMeal',
+            userId: 'member_a',
+            day: today,
+            status: 'ready',
+            planRevisionId: 'oldPlan',
+            caption: 'Lunch',
+          },
+        ],
+        coachMealScansV1: [
+          {
+            _id: 'scan',
+            userId: 'member_a',
+            day: today,
+            draftId: 'analysedMeal',
+            status: 'ready',
+            usable: true,
+          },
+        ],
+      });
+      let scheduled = 0;
+      store.ctx.scheduler.runAfter = async () => {
+        scheduled += 1;
+      };
+      const session = await beginMyTodayReanswerForTesting._handler(store.ctx, {});
+      expect(session.day).toBe(today);
+      await saveMyTodayReanswerDraftForTesting._handler(store.ctx, {
+        sleep: 'rested_enough',
+        energy: 'flat',
+        mood: 'good',
+        upFor: 'short_session',
+      });
+      const next = await finishMyTodayReanswerForTesting._handler(store.ctx, { body: 'fine' });
+      expect(await finishMyTodayReanswerForTesting._handler(store.ctx, { body: 'fine' })).toBe(
+        next
+      );
+      expect(scheduled).toBe(1);
+      expect(store.rows.coachPlanRequestsV1).toHaveLength(2);
+      expect(store.rows.coachPlanRevisionsV1.map((row) => row._id)).toEqual(['oldPlan']);
+      expect(store.rows.coachMealDraftsV1[0].planRevisionId).toBe('oldPlan');
+      expect(store.rows.coachMealScansV1[0].status).toBe('ready');
+      expect(store.rows.coachRewardSlotsV1).toHaveLength(1);
+      expect(store.rows.coachDailyAnswersV1).toHaveLength(2);
+      expect(store.rows.coachPlanRequestsV1[1].kind).toBe('daily');
+      expect(store.rows.coachPlanRequestsV1[1].dailyAnswerId).not.toBe('oldAnswers');
+      expect(store.rows.coachPlanRequestsV1[1].inputSnapshot.daily.energy).toBe('flat');
+    } finally {
+      process.env.CONVEX_CLOUD_URL = original;
+    }
+  });
   test('day and category slot identity is independent of plan revision', () => {
     expect(rewardSlotKey(today, 'workout', 1)).toBe(`${today}:workout:1`);
     expect(rewardSlotKey(today, 'meals', 3)).toBe(`${today}:meals:3`);
@@ -164,6 +290,7 @@ describe('coach foundation invariants', () => {
 
   test('first-plan reservation is transactional and idempotent across request keys', async () => {
     const store = fakeStore({
+      coachBillingEntitlementsV1: [{ _id: 'billing', userId: 'member_a', status: 'active' }],
       users: [{ _id: 'member_a', timezone: 'UTC' }],
       coachOnboardingV1: [
         {
@@ -229,7 +356,7 @@ describe('coach foundation invariants', () => {
     expect(second).toBe(first);
     expect(store.rows.coachPlanRequestsV1).toHaveLength(1);
     expect(store.rows.coachPlanRequestsV1[0].inputSnapshot.daily).toEqual(daily);
-    expect(store.rows.coachPlanRequestsV1[0].promptVersion).toBe('client-daily-plan-v2');
+    expect(store.rows.coachPlanRequestsV1[0].promptVersion).toBe('client-daily-plan-v2.1');
     expect(store.rows.coachPlanRequestsV1[0].inputSnapshot.mealHistory).toEqual([
       { day: yesterday, caption: 'Eggs with toast', source: 'shared_member_caption' },
     ]);

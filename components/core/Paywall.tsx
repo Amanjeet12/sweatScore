@@ -1,5 +1,5 @@
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useConvex, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import * as Localization from 'expo-localization';
 import { Link, router, useLocalSearchParams } from 'expo-router';
@@ -16,7 +16,6 @@ import {
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
-import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -141,7 +140,6 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   }>();
   const convex = useConvex();
   const decision = useQuery(api.coachResume.myDecision, {});
-  const retryFailedPlan = useMutation(api.coachDailyService.retryFailedPlan);
 
   const { signOut } = useAuthActions();
 
@@ -156,7 +154,7 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
 
   useEffect(() => {
     // A delayed webhook or a verified restore after restart uses persisted server state.
-    if (decision?.verifiedAccess && decision.screen === 'today')
+    if (decision?.verifiedAccess && decision.screen !== 'paywall')
       resumeMember(convex).catch(() => {});
   }, [convex, decision?.verifiedAccess, decision?.screen]);
 
@@ -245,8 +243,7 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
     isLoading ||
     isLoggingOut ||
     isRestoring ||
-    isPackagesLoading ||
-    (onboarding && decision?.requestStatus !== 'ready');
+    isPackagesLoading;
 
   const paywallBullets = [
     'Monthly Guided Challenges',
@@ -359,183 +356,156 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-white"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingBottom: 18,
-      }}>
-      <View className="items-center pt-10">
-        <Image
-          accessibilityLabel="SweatScore"
-          source={require('~/assets/paywall/logo.png')}
-          contentFit="contain"
-          style={{ width: 190, height: 38 }}
-        />
-      </View>
-
-      <View className="mt-7 items-center">
-        <Text className="max-w-[310px] text-center font-heading text-[28px] font-semibold leading-[34px] text-[#111111]">
-          Start your consistency journey.
-        </Text>
-        <Text
-          className="mt-3 max-w-[250px] text-center text-sm leading-5 text-[#1A1A1A]"
-          style={{ fontFamily: 'Inter_400Regular' }}>
-          Connect with a community and coaches for daily progress, and get help with your goals.
-        </Text>
-      </View>
-
-      <View className="mt-9 gap-y-4 px-3">
-        {paywallBullets.map((item) => (
-          <View key={item} className="flex-row items-center">
-            <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-primary-500">
-              <Icon.Check size={18} color="#FFFFFF" weight="bold" />
-            </View>
-            <Text className="flex-1 font-body text-base leading-6 text-[#1A1A1A]">{item}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View className="mt-10 flex-row items-stretch" style={{ columnGap: 14, marginBottom: 10 }}>
-        <PlanCard
-          title="Monthly"
-          price={monthlyPackage?.product.priceString}
-          billingSuffix="/mo"
-          detail="Cancel anytime"
-          selected={isMonthlySelected}
-          disabled={!monthlyPackage || isLoading || isLoggingOut || isRestoring}
-          onPress={() => {
-            if (monthlyPackage) {
-              setSelectedPackage(monthlyPackage);
-            }
-          }}
-        />
-
-        <PlanCard
-          title="Annual"
-          price={annualPackage?.product.priceString}
-          billingSuffix="/yr"
-          detail={annualMonthlyPrice ? `Just ${annualMonthlyPrice}/mo.` : 'Best monthly value'}
-          selected={isAnnualSelected}
-          disabled={!annualPackage || isLoading || isLoggingOut || isRestoring}
-          offerLabel={annualOfferLabel}
-          onPress={() => {
-            if (annualPackage) {
-              setSelectedPackage(annualPackage);
-            }
-          }}
-        />
-      </View>
-
-      {onboarding && decision?.requestStatus === 'pending' ? (
-        <View className="mt-4">
-          <CoachPlanPreparing compact />
-        </View>
-      ) : onboarding ? (
-        <View className="mt-4 rounded-2xl bg-[#FFF3EC] p-4">
-          <Text className="text-center font-body text-sm text-[#4F4F4F]">
-            {decision?.requestStatus === 'ready'
-              ? 'Your plan is saved and ready for you after verification.'
-              : decision?.requestStatus === 'failed'
-                ? decision.canRetry
-                  ? 'We could not prepare your plan. Your answers are saved.'
-                  : 'We cannot prepare a plan for these answers yet. Your answers are saved. Please contact support.'
-                : 'Preparing your personal plan. Your answers are saved.'}
-          </Text>
-          {decision?.requestStatus === 'failed' && decision.canRetry ? (
-            <TouchableOpacity
-              className="mt-3 min-h-14 items-center justify-center rounded-[20px] bg-white px-4 py-3"
-              onPress={async () => {
-                try {
-                  await retryFailedPlan({
-                    requestKey: `retry_${decision.day.replaceAll('-', '')}_${Date.now()}`,
-                  });
-                } catch {
-                  Alert.alert('Retry unavailable', 'Please try again in a moment.');
-                }
-              }}>
-              <Text
-                className="text-center text-primary-500"
-                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
-                Retry plan preparation
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-
-      <OnboardingPrimaryButton
-        className="mt-3"
-        borderRadius={20}
-        labelFontSize={18}
-        label={
-          onboarding && decision?.requestStatus === 'failed'
-            ? decision.canRetry
-              ? 'Retry above to continue'
-              : 'Plan unavailable'
-            : onboarding && decision?.requestStatus !== 'ready'
-              ? 'Preparing plan...'
-              : isPackagesLoading
-                ? 'Loading plans...'
-                : 'Start My Plan'
-        }
-        onPress={handlePurchase}
-        disabled={isCtaDisabled}
-        isLoading={isLoading}
-      />
-
-      <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">
-        Instant access. Cancel anytime.
-      </Text>
-
-      <View className="mt-7 flex-row items-center justify-center">
-        <Link href="/legals/terms">
-          <Text className="font-body text-sm text-[#5F5F5F]">Terms</Text>
-        </Link>
-        <Text className="mx-4 font-body text-sm text-[#5F5F5F]">|</Text>
-        <Link href="/legals/privacy-policy">
-          <Text className="font-body text-sm text-[#5F5F5F]">Privacy Policy</Text>
-        </Link>
-      </View>
-
-      <TouchableOpacity
-        accessibilityRole="button"
-        activeOpacity={0.7}
-        disabled={!restorePermissions || isRestoring || isLoading || isLoggingOut}
-        onPress={handleRestore}
-        className="mt-2 items-center py-2">
-        {isRestoring ? (
-          <View className="flex-row items-center">
-            <ActivityIndicator size="small" color="#FF5C1A" />
-            <Text className="ml-2 font-body text-xs font-semibold text-[#FF5C1A]">
-              Restoring purchases...
-            </Text>
-          </View>
-        ) : (
-          <Text className="font-body text-xs font-semibold text-[#777777] underline">
-            Restore purchases
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      {showBackToLogin === 'true' ? (
+    <View className="flex-1 bg-white">
+      {onboarding || showBackToLogin === 'true' ? (
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Sign out and return to login"
+          accessibilityState={{ disabled: isLoggingOut || isLoading || isRestoring }}
           onPress={handleBackToLogin}
           disabled={isLoggingOut || isLoading || isRestoring}
           activeOpacity={0.7}
-          className="items-center py-3">
+          className="mx-6 mt-2 min-h-11 flex-row items-center self-start rounded-[20px] px-2">
           {isLoggingOut ? (
-            <View className="flex-row items-center">
-              <ActivityIndicator size="small" color="#FF5C1A" />
-              <Text className="ml-2 text-sm font-semibold text-[#FF5C1A]">Signing out...</Text>
-            </View>
+            <ActivityIndicator size="small" color="#FF5C1A" />
           ) : (
-            <Text className="text-sm font-semibold text-[#FF5C1A]">Back to login</Text>
+            <Icon.ArrowLeft size={20} color="#FF5C1A" weight="bold" />
           )}
+          <Text
+            className="ml-2 text-[#E9512A]"
+            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+            {isLoggingOut ? 'Signing out…' : 'Back to login'}
+          </Text>
         </TouchableOpacity>
       ) : null}
-    </ScrollView>
+      <ScrollView
+        className="flex-1 bg-white"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 24,
+          paddingBottom: 18,
+        }}>
+        <View className="items-center pt-10">
+          <Image
+            accessibilityLabel="SweatScore"
+            source={require('~/assets/paywall/logo.png')}
+            contentFit="contain"
+            style={{ width: 190, height: 38 }}
+          />
+        </View>
+
+        <View className="mt-7 items-center">
+          <Text className="max-w-[310px] text-center font-heading text-[28px] font-semibold leading-[34px] text-[#111111]">
+            Start your consistency journey.
+          </Text>
+          <Text
+            className="mt-3 max-w-[250px] text-center text-sm leading-5 text-[#1A1A1A]"
+            style={{ fontFamily: 'Inter_400Regular' }}>
+            Connect with a community and coaches for daily progress, and get help with your goals.
+          </Text>
+        </View>
+
+        <View className="mt-9 gap-y-4 px-3">
+          {paywallBullets.map((item) => (
+            <View key={item} className="flex-row items-center">
+              <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-primary-500">
+                <Icon.Check size={18} color="#FFFFFF" weight="bold" />
+              </View>
+              <Text className="flex-1 font-body text-base leading-6 text-[#1A1A1A]">{item}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View className="mt-10 flex-row items-stretch" style={{ columnGap: 14, marginBottom: 10 }}>
+          <PlanCard
+            title="Monthly"
+            price={monthlyPackage?.product.priceString}
+            billingSuffix="/mo"
+            detail="Cancel anytime"
+            selected={isMonthlySelected}
+            disabled={!monthlyPackage || isLoading || isLoggingOut || isRestoring}
+            onPress={() => {
+              if (monthlyPackage) {
+                setSelectedPackage(monthlyPackage);
+              }
+            }}
+          />
+
+          <PlanCard
+            title="Annual"
+            price={annualPackage?.product.priceString}
+            billingSuffix="/yr"
+            detail={annualMonthlyPrice ? `Just ${annualMonthlyPrice}/mo.` : 'Best monthly value'}
+            selected={isAnnualSelected}
+            disabled={!annualPackage || isLoading || isLoggingOut || isRestoring}
+            offerLabel={annualOfferLabel}
+            onPress={() => {
+              if (annualPackage) {
+                setSelectedPackage(annualPackage);
+              }
+            }}
+          />
+        </View>
+
+        {onboarding ? (
+          <View className="mt-4 rounded-2xl bg-[#FFF3EC] p-4">
+            <Text className="text-center font-body text-sm text-[#4F4F4F]">
+              {decision?.requestStatus === 'ready'
+                ? 'Your saved plan will be available after verification.'
+                : decision?.requestStatus === 'pending'
+                  ? 'Your previously saved answers are safe. Your plan is still preparing.'
+                  : decision?.requestStatus === 'failed'
+                    ? 'Your previously saved answers are safe. You can retry plan preparation after access is verified.'
+                    : 'After your access is verified, answer five daily questions to prepare today’s plan.'}
+            </Text>
+          </View>
+        ) : null}
+
+        <OnboardingPrimaryButton
+          className="mt-3"
+          borderRadius={20}
+          labelFontSize={18}
+          label={isPackagesLoading ? 'Loading plans...' : 'Continue with Premium'}
+          onPress={handlePurchase}
+          disabled={isCtaDisabled}
+          isLoading={isLoading}
+        />
+
+        <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">
+          Access begins after payment verification. Cancel anytime.
+        </Text>
+
+        <View className="mt-7 flex-row items-center justify-center">
+          <Link href="/legals/terms">
+            <Text className="font-body text-sm text-[#5F5F5F]">Terms</Text>
+          </Link>
+          <Text className="mx-4 font-body text-sm text-[#5F5F5F]">|</Text>
+          <Link href="/legals/privacy-policy">
+            <Text className="font-body text-sm text-[#5F5F5F]">Privacy Policy</Text>
+          </Link>
+        </View>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          activeOpacity={0.7}
+          disabled={!restorePermissions || isRestoring || isLoading || isLoggingOut}
+          onPress={handleRestore}
+          className="mt-2 items-center py-2">
+          {isRestoring ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator size="small" color="#FF5C1A" />
+              <Text className="ml-2 font-body text-xs font-semibold text-[#FF5C1A]">
+                Restoring purchases...
+              </Text>
+            </View>
+          ) : (
+            <Text className="font-body text-xs font-semibold text-[#777777] underline">
+              Restore purchases
+            </Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }

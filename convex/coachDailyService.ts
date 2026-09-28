@@ -20,6 +20,7 @@ import {
 } from './coachFoundationValidators';
 import { DAILY_PLAN_PROMPT_VERSION } from './coachDailyPrompt';
 import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
 import { buildDailyProviderInput, dailyPolicy, validateDailyPlanOutput } from './coachDailyPolicy';
 import {
   validateDailyPlanOutputV2,
@@ -35,6 +36,7 @@ import { canRetryCurrentPlanRequest } from './coachPlanRetry';
 import { formatDateInTZ } from './utils/timezone';
 
 const CLAIM_LEASE_MS = 60_000;
+const GENERATION_WATCHDOG_MS = 120_000;
 
 async function member(ctx: MutationCtx | QueryCtx): Promise<Id<'users'>> {
   const userId = await getAuthUserId(ctx);
@@ -69,8 +71,8 @@ export const currentReadyPlan = query({
   },
 });
 
-// Only explicit final-question submission uses this entry point. It returns after queueing,
-// allowing the paywall to open while the provider works asynchronously.
+// Only explicit final-question submission uses this entry point after verified access.
+// It returns after queueing so the saved-plan screen can show the real pending state.
 export const submitDailyAnswersAndGenerate = action({
   args: { requestKey: v.string(), body: dailyAnswers.fields.body },
   returns: v.id('coachPlanRequestsV1'),
@@ -142,6 +144,15 @@ export const retryFailedPlan = mutation({
       .unique();
     if (occupied && occupied.kind === 'retry' && occupied.retryOfRequestId === previous?._id)
       return occupied._id;
+    const billing = await ctx.db
+      .query('coachBillingEntitlementsV1')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique();
+    if (
+      !user?.isAdmin &&
+      !(billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
+    )
+      throw new ConvexError('Verified access required for plan preparation');
     if (
       !previous ||
       previous.userId !== userId ||
@@ -204,7 +215,11 @@ export const claim = internalMutation({
     const request = await ctx.db.get(requestId);
     if (!request || request.status !== 'pending') return null;
     if (
-      ![DAILY_PLAN_PROMPT_VERSION, DAILY_PLAN_V2_PROMPT_VERSION].includes(request.promptVersion)
+      ![
+        DAILY_PLAN_PROMPT_VERSION,
+        DAILY_PLAN_V2_PROMPT_VERSION,
+        DAILY_PLAN_V2_1_PROMPT_VERSION,
+      ].includes(request.promptVersion)
     ) {
       await ctx.db.patch(requestId, {
         status: 'failed',
@@ -230,6 +245,17 @@ export const claim = internalMutation({
     if (request.dispatchedAt && now - request.dispatchedAt < CLAIM_LEASE_MS) return null;
     const generationAttempt = (request.generationAttempt ?? 0) + 1;
     await ctx.db.patch(requestId, { generationAttempt, dispatchedAt: now, updatedAt: now });
+    // An action crash must not leave a member watching a permanent pending
+    // state. This watchdog only marks that exact attempt failed; it never
+    // retries or creates a plan, and late provider replies are ignored.
+    await ctx.scheduler.runAfter(
+      GENERATION_WATCHDOG_MS + 1_000,
+      internal.coachDailyService.expireStaleAttempt,
+      {
+        requestId,
+        generationAttempt,
+      }
+    );
     const plans: { day: string; output: Doc<'coachPlanRevisionsV1'>['output'] }[] = [];
     for (const revisionId of request.inputSnapshot.recentPlanRevisionIds) {
       const revision = await ctx.db.get(revisionId);
@@ -268,6 +294,26 @@ export const claim = internalMutation({
   },
 });
 
+export const expireStaleAttempt = internalMutation({
+  args: { requestId: v.id('coachPlanRequestsV1'), generationAttempt: v.number() },
+  returns: v.boolean(),
+  handler: async (ctx, { requestId, generationAttempt }) => {
+    const request = await ctx.db.get(requestId);
+    if (!request || request.status !== 'pending' || request.generationAttempt !== generationAttempt)
+      return false;
+    const now = Date.now();
+    if (!request.dispatchedAt || now - request.dispatchedAt < GENERATION_WATCHDOG_MS) return false;
+    await ctx.db.patch(requestId, {
+      status: 'failed',
+      errorCode: 'provider_timeout',
+      failureFormatCode: 'attempt_watchdog',
+      completedAt: now,
+      updatedAt: now,
+    });
+    return true;
+  },
+});
+
 export const finish = internalMutation({
   args: {
     requestId: v.id('coachPlanRequestsV1'),
@@ -291,6 +337,7 @@ export const finish = internalMutation({
           v.literal('generation_failed'),
           v.literal('policy_unresolved')
         ),
+        formatCode: v.optional(v.string()),
         latencyMs: v.number(),
         model: v.optional(v.string()),
       })
@@ -327,7 +374,13 @@ export const finish = internalMutation({
       await ctx.db.patch(request._id, {
         status: 'failed',
         errorCode: args.result.code,
-        validationStage: args.result.code === 'invalid_output' ? 'provider_format' : undefined,
+        validationStage:
+          args.result.code === 'invalid_output'
+            ? args.result.formatCode === 'plan_validation'
+              ? 'plan_validation'
+              : 'provider_format'
+            : undefined,
+        failureFormatCode: args.result.formatCode,
         provider: args.result.model ? 'anthropic' : undefined,
         model: args.result.model,
         latencyMs: args.result.latencyMs,
@@ -351,20 +404,19 @@ export const finish = internalMutation({
       recentPlans.push({ day: revision.day, output: revision.output });
     }
     try {
-      parsed =
-        request.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
-          ? validateDailyPlanOutputV2(
-              args.result.output,
-              request.inputSnapshot,
-              request.day,
-              recentPlans
-            )
-          : validateDailyPlanOutput(
-              args.result.output,
-              request.inputSnapshot,
-              request.day,
-              recentPlans
-            );
+      parsed = isV2DailyPrompt(request.promptVersion)
+        ? validateDailyPlanOutputV2(
+            args.result.output,
+            request.inputSnapshot,
+            request.day,
+            recentPlans
+          )
+        : validateDailyPlanOutput(
+            args.result.output,
+            request.inputSnapshot,
+            request.day,
+            recentPlans
+          );
     } catch (error) {
       await ctx.db.patch(request._id, {
         status: 'failed',
@@ -477,7 +529,7 @@ export const generateReserved = internalAction({
     const config = providerConfig(claimed.promptVersion);
     const input = {
       ...buildDailyProviderInput(claimed.snapshot, claimed.day, claimed.recentPlans),
-      ...(claimed.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
+      ...(isV2DailyPrompt(claimed.promptVersion)
         ? { recorded_meals: claimed.snapshot.mealHistory ?? [] }
         : {}),
     };
@@ -493,15 +545,14 @@ export const generateReserved = internalAction({
         promptVersion: claimed.promptVersion,
         retryGuidance,
       });
-    const result =
-      claimed.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
-        ? await generateV2WithRepair({
-            call,
-            snapshot: claimed.snapshot,
-            day: claimed.day,
-            recentPlans: claimed.recentPlans,
-          })
-        : await call();
+    const result = isV2DailyPrompt(claimed.promptVersion)
+      ? await generateV2WithRepair({
+          call,
+          snapshot: claimed.snapshot,
+          day: claimed.day,
+          recentPlans: claimed.recentPlans,
+        })
+      : await call();
     const outcome = await ctx.runMutation(internal.coachDailyService.finish, {
       requestId,
       generationAttempt: claimed.generationAttempt,
@@ -514,7 +565,13 @@ export const generateReserved = internalAction({
             inputTokens: result.inputTokens,
             outputTokens: result.outputTokens,
           }
-        : { ok: false, code: result.code, latencyMs: result.latencyMs, model: config?.model },
+        : {
+            ok: false,
+            code: result.code,
+            formatCode: result.formatCode,
+            latencyMs: result.latencyMs,
+            model: config?.model,
+          },
     });
     return { status: outcome.status };
   },

@@ -3,7 +3,7 @@ import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
-import { Barbell, Footprints, ForkKnife, MoonStars, X } from 'phosphor-react-native';
+import { ArrowLeft, Barbell, Footprints, ForkKnife, MoonStars, X } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -33,6 +33,7 @@ type ProofQueue = {
   };
   uri?: string;
   storageId?: Id<'_storage'>;
+  caption?: string;
 };
 
 export default function CoachCheckInFlow({
@@ -41,12 +42,16 @@ export default function CoachCheckInFlow({
   onOpenPlan,
   onExpandedChange,
   onPreferredHeightChange,
+  mode = 'details',
+  onCaptured,
 }: {
   category: CoachCategory;
   onClose: () => void;
   onOpenPlan: (status: 'no_plan' | 'pending' | 'ready' | 'locked') => void;
   onExpandedChange?: (expanded: boolean) => void;
   onPreferredHeightChange?: (height: number) => void;
+  mode?: 'details' | 'post';
+  onCaptured?: () => void;
 }) {
   const convex = useConvex();
   const authToken = useAuthToken();
@@ -55,6 +60,8 @@ export default function CoachCheckInFlow({
   const reserve = useMutation(api.coachFoundation.reserveProof);
   const issueUpload = useMutation(api.coachCheckIns.issueUpload);
   const complete = useMutation(api.coachCheckIns.complete);
+  const saveProofCaption = useMutation(api.coachCheckIns.saveCaption);
+  const retakeProof = useMutation(api.coachCheckIns.retakeProof);
   const cancel = useMutation(api.coachCheckIns.cancel);
   const saveMealCaption = useMutation(api.coachMeals.saveCaption);
   const retakeMeal = useMutation(api.coachMeals.retake);
@@ -67,6 +74,7 @@ export default function CoachCheckInFlow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [caption, setCaption] = useState('');
+  const [mealRefresh, setMealRefresh] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
@@ -75,11 +83,22 @@ export default function CoachCheckInFlow({
       onPreferredHeightChange?.(headerHeight + contentHeight + footerHeight + 12);
   }, [headerHeight, contentHeight, footerHeight, onPreferredHeightChange]);
   useEffect(() => {
-    onExpandedChange?.(showCamera || (category === 'meals' && Boolean(queue?.storageId)));
-  }, [showCamera, category, queue?.storageId, onExpandedChange]);
+    onExpandedChange?.(showCamera);
+  }, [showCamera, onExpandedChange]);
   const meal = useQuery(
     api.coachMeals.myDraft,
-    category === 'meals' && queue?.submissionId ? { submissionId: queue.submissionId } : 'skip'
+    category === 'meals' && queue?.submissionId
+      ? { submissionId: queue.submissionId, refresh: mealRefresh }
+      : 'skip'
+  );
+  useEffect(() => {
+    if (meal?.draft?.status !== 'analyzing') return;
+    const timer = setInterval(() => setMealRefresh((value) => value + 1), 15_000);
+    return () => clearInterval(timer);
+  }, [meal?.draft?.status]);
+  const proofImage = useQuery(
+    api.coachCheckIns.myProofImage,
+    mode === 'post' && queue?.storageId ? { submissionId: queue.submissionId } : 'skip'
   );
   useEffect(() => {
     if (meal?.draft?.caption && !caption) setCaption(meal.draft.caption);
@@ -112,10 +131,13 @@ export default function CoachCheckInFlow({
         ) {
           const recovered = server.storageId ? { ...saved, storageId: server.storageId } : saved;
           setQueue(recovered);
+          setCaption(recovered.caption ?? server.caption ?? '');
           if (server.storageId) storeData(queueKey, recovered);
         } else removeData(queueKey);
       })
-      .catch(() => removeData(queueKey));
+      .catch(() => {
+        // A temporary entitlement or network failure must not erase pinned local proof.
+      });
   }, [category, convex, currentUser?._id, queueKey, today?.day]);
 
   const persist = (next: ProofQueue) => {
@@ -170,6 +192,7 @@ export default function CoachCheckInFlow({
       await FileSystem.copyAsync({ from: photo.uri, to: uri });
       persist({ ...queue, uri });
       setShowCamera(false);
+      if (mode === 'details') onCaptured?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the photo.');
     } finally {
@@ -177,8 +200,8 @@ export default function CoachCheckInFlow({
     }
   };
 
-  const upload = async () => {
-    if (!queue?.uri) return;
+  const upload = async (): Promise<Id<'_storage'> | null> => {
+    if (!queue?.uri) return null;
     setBusy(true);
     setError('');
     try {
@@ -202,32 +225,15 @@ export default function CoachCheckInFlow({
       const storageId = JSON.parse(result.body).storageId as Id<'_storage'> | undefined;
       if (!storageId) throw new Error('Photo upload did not return media identity.');
       persist({ ...queue, storageId });
-      if (category === 'meals') return;
-      await complete({ submissionId: queue.submissionId });
-      if (queueKey) removeData(queueKey);
-      await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
-      setQueue(null);
-      Alert.alert('Check-in complete', 'Your proof and points have been saved.');
-      onClose();
+      return storageId;
     } catch (cause) {
       try {
         const saved = await convex.query(api.coachCheckIns.mySubmission, {
           submissionId: queue.submissionId,
         });
-        if (saved.state === 'completed') {
-          if (queueKey) removeData(queueKey);
-          setQueue(null);
-          onClose();
-          return;
-        }
         if (saved.state === 'uploaded' && saved.storageId) {
           persist({ ...queue, storageId: saved.storageId });
-          setError(
-            category === 'meals'
-              ? 'Photo saved for meal analysis.'
-              : 'Photo saved. Finish your check-in.'
-          );
-          return;
+          return saved.storageId;
         }
       } catch {
         /* Keep the local queue for an offline retry. */
@@ -235,23 +241,30 @@ export default function CoachCheckInFlow({
       setError(
         cause instanceof Error ? cause.message : 'Upload failed. Your photo is saved for retry.'
       );
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
-  const finishUploaded = async () => {
+  const publishProof = async () => {
     if (!queue || category === 'meals') return;
     setBusy(true);
     setError('');
     try {
-      await complete({ submissionId: queue.submissionId });
+      await saveProofCaption({ submissionId: queue.submissionId, caption });
+      const storageId = queue.storageId ?? (await upload());
+      if (!storageId) return;
+      await complete({ submissionId: queue.submissionId, caption });
       if (queueKey) removeData(queueKey);
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       setQueue(null);
+      Alert.alert('Check-in posted', 'Your activity and points have been saved.');
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not finish check-in.');
+      setError(
+        cause instanceof Error ? cause.message : 'Could not post. Your photo is saved for retry.'
+      );
     } finally {
       setBusy(false);
     }
@@ -268,7 +281,15 @@ export default function CoachCheckInFlow({
         requestKey: Crypto.randomUUID().replaceAll('-', ''),
       });
       if (result.status === 'failed')
-        setError('We could not assess this photo. You can retry if a scan remains.');
+        setError(
+          result.errorCode === 'provider_timeout'
+            ? 'Analysis timed out. Your photo is saved. Retry when ready; no successful scan was used.'
+            : result.errorCode === 'unclear_image'
+              ? 'The photo is too unclear to assess. Retake it in better light; no successful scan was used.'
+              : result.errorCode === 'invalid_output'
+                ? 'We could not assess this photo reliably. Retry or retake; no successful scan was used.'
+                : 'Meal analysis is temporarily unavailable. Retry when connected; no successful scan was used.'
+        );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Meal analysis could not start.');
     } finally {
@@ -298,16 +319,20 @@ export default function CoachCheckInFlow({
     }
   };
 
-  const retakePlate = async () => {
+  const retakePhoto = async () => {
     if (!queue) return;
     setBusy(true);
     setError('');
     try {
-      await retakeMeal({ submissionId: queue.submissionId });
+      if (queue.storageId) {
+        if (category === 'meals') await retakeMeal({ submissionId: queue.submissionId });
+        else await retakeProof({ submissionId: queue.submissionId });
+      }
+      if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       persist({ ...queue, storageId: undefined, uri: undefined });
       setShowCamera(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not retake plate.');
+      setError(cause instanceof Error ? cause.message : 'Could not retake photo.');
     } finally {
       setBusy(false);
     }
@@ -317,33 +342,44 @@ export default function CoachCheckInFlow({
   const ready = today.status === 'ready' && Boolean(assignment);
   let primaryLabel = 'Close';
   let primaryAction: () => void = onClose;
-  if (!ready) {
+  if (mode === 'post' && queue && today.status !== 'locked') {
+    if (!queue.uri && !queue.storageId) {
+      primaryLabel = 'Take live photo';
+      primaryAction = () => setShowCamera(true);
+    } else if (category === 'meals') {
+      if (!queue.storageId && queue.uri) {
+        primaryLabel = 'Upload photo to analyse';
+        primaryAction = () => {
+          upload().catch(() => {});
+        };
+      } else if (meal?.draft?.status === 'ready' && meal.draft.verdict) {
+        primaryLabel = 'Share meal';
+        primaryAction = publishMeal;
+      } else if (meal?.draft?.status === 'ready' && !meal.draft.verdict) {
+        primaryLabel = 'Retake photo';
+        primaryAction = retakePhoto;
+      } else if (meal?.draft?.status === 'analyzing') {
+        primaryLabel = meal.canRetryAnalysis ? 'Retry analysis' : 'Analysing meal…';
+        if (meal.canRetryAnalysis) primaryAction = scanMeal;
+      } else if (queue.storageId && (meal?.scanCount ?? 0) < 3) {
+        primaryLabel = meal?.draft?.status === 'failed' ? 'Retry analysis' : 'Analyse meal';
+        primaryAction = scanMeal;
+      }
+    } else if (queue.uri || queue.storageId) {
+      primaryLabel = 'Post check-in';
+      primaryAction = publishProof;
+    }
+  } else if (!ready) {
     primaryLabel = 'Get today’s plan';
     primaryAction = () => onOpenPlan(today.status);
-  } else if (category === 'meals' && queue?.storageId) {
-    if (meal?.draft?.status === 'ready' && meal.draft.verdict) {
-      primaryLabel = 'Share activity';
-      primaryAction = publishMeal;
-    } else if (meal?.draft?.status !== 'ready' && (meal?.scanCount ?? 0) < 3) {
-      primaryLabel = meal?.draft?.status === 'failed' ? 'Retry analysis' : 'Analyse plate';
-      primaryAction = scanMeal;
-    }
-  } else if (queue?.uri && !queue.storageId) {
-    primaryLabel = category === 'meals' ? 'Upload plate photo' : 'Upload and complete check-in';
-    primaryAction = upload;
-  } else if (queue && !queue.storageId) {
-    primaryLabel = 'Resume live camera';
-    primaryAction = () => setShowCamera(true);
-  } else if (queue && category !== 'meals') {
-    primaryLabel = 'Finish saved upload';
-    primaryAction = finishUploaded;
+  } else if (queue?.uri || queue?.storageId) {
+    primaryLabel = 'Continue check-in';
+    primaryAction = () => onCaptured?.();
   } else if (assignment?.mandatory && assignment.consumedCount < (category === 'meals' ? 3 : 1)) {
     primaryLabel = 'Start live proof';
     primaryAction = start;
   }
-  const canRetakeMeal =
-    category === 'meals' && Boolean(queue?.storageId) && (meal?.scanCount ?? 0) < 3;
-  const guide = assignment ? checkInGuide(category, assignment, queue) : null;
+  const guide = assignment || queue ? checkInGuide(category, assignment ?? queue!, queue) : null;
   const Icon = {
     workout: Barbell,
     meals: ForkKnife,
@@ -355,28 +391,49 @@ export default function CoachCheckInFlow({
       <View
         onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
         className="border-b border-[#F0ECE9] px-6 pb-4 pt-3">
-        <View
-          className="mb-3 h-1 w-10 self-center rounded-full bg-[#DDD8D4]"
-          accessibilityElementsHidden
-        />
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-x-3">
-            <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-              <Icon size={21} color="#F45A2B" weight="regular" />
-            </View>
-            <Text className="font-heading text-xl font-semibold text-[#231F1D]">
-              {category[0].toUpperCase()}
+        {mode === 'post' ? (
+          <View className="min-h-14 flex-row items-center justify-between">
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Back to Today"
+              onPress={onClose}
+              className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
+              <ArrowLeft size={21} color="#514943" />
+            </TouchableOpacity>
+            <Text
+              className="flex-1 text-center font-heading text-xl font-semibold text-[#231F1D]"
+              numberOfLines={2}>
+              Post {category[0].toUpperCase()}
               {category.slice(1)} check-in
             </Text>
+            <View className="w-11" accessibilityElementsHidden />
           </View>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Close check-in"
-            onPress={onClose}
-            className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
-            <X size={20} color="#514943" />
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <>
+            <View
+              className="mb-3 h-1 w-10 self-center rounded-full bg-[#DDD8D4]"
+              accessibilityElementsHidden
+            />
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-x-3">
+                <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
+                  <Icon size={21} color="#F45A2B" weight="regular" />
+                </View>
+                <Text className="font-heading text-xl font-semibold text-[#231F1D]">
+                  {category[0].toUpperCase()}
+                  {category.slice(1)} check-in
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Close check-in"
+                onPress={onClose}
+                className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
+                <X size={20} color="#514943" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
       {showCamera ? (
         <View className="flex-1">
@@ -404,7 +461,90 @@ export default function CoachCheckInFlow({
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={(_, height) => setContentHeight(height)}
             contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}>
-            {today.status !== 'ready' || !assignment ? (
+            {mode === 'post' ? (
+              queue && today.status !== 'locked' ? (
+                <>
+                  {queue.uri || proofImage ? (
+                    <Image
+                      source={{ uri: queue.uri ?? proofImage ?? undefined }}
+                      className="h-64 w-full rounded-[20px] bg-[#F4F1EE]"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text className="rounded-2xl bg-[#F7F6F4] p-5">
+                      The local photo is unavailable. Retake it before posting.
+                    </Text>
+                  )}
+                  <Text className="mt-5 font-heading text-xl font-semibold text-[#251E1A]">
+                    {guide?.title}
+                  </Text>
+                  {guide?.recommendation ? (
+                    <Text className="mt-2 font-body text-sm text-[#655B55]">
+                      {guide.recommendation}
+                    </Text>
+                  ) : null}
+                  <TextInput
+                    value={caption}
+                    onChangeText={(value) => {
+                      setCaption(value);
+                      persist({ ...queue, caption: value });
+                    }}
+                    onEndEditing={() => {
+                      const save =
+                        category === 'meals'
+                          ? queue.storageId
+                            ? saveMealCaption({ submissionId: queue.submissionId, caption })
+                            : Promise.resolve()
+                          : saveProofCaption({ submissionId: queue.submissionId, caption });
+                      save.catch(() => {});
+                    }}
+                    placeholder="Add a caption"
+                    accessibilityLabel="Check-in caption"
+                    multiline
+                    maxLength={500}
+                    className="mt-5 min-h-24 rounded-[20px] border border-[#E3E1DE] bg-white p-4 font-body text-base"
+                  />
+                  {category === 'meals' ? (
+                    <View className="mt-5">
+                      <Text className="font-body text-sm text-[#655B55]">
+                        {meal?.scanCount ?? 0} of 3 successful meal scans used
+                      </Text>
+                      {busy ? <Text className="mt-3">Analysing your plate…</Text> : null}
+                      {meal?.draft?.status === 'ready' && meal.draft.verdict ? (
+                        <View
+                          className={`mt-4 rounded-[20px] p-5 ${meal.draft.verdict === 'On point' ? 'bg-green-100' : meal.draft.verdict === 'Nearly there' ? 'bg-amber-100' : 'bg-orange-100'}`}>
+                          <Text className="font-heading text-lg font-semibold">
+                            Portion Suggestion
+                          </Text>
+                          <Text className="mt-2 font-semibold">{meal.draft.verdict}</Text>
+                          <Text className="mt-2">{meal.draft.feedback}</Text>
+                        </View>
+                      ) : meal?.draft?.status === 'ready' ? (
+                        <View className="mt-4 rounded-[20px] bg-[#F7F6F4] p-5">
+                          <Text className="font-heading text-lg">Unable to assess a meal</Text>
+                          <Text className="mt-2">{meal.draft.feedback}</Text>
+                          <Text className="mt-2">
+                            This did not use a successful scan. Retake or try again with a clearer
+                            meal photo.
+                          </Text>
+                        </View>
+                      ) : meal?.draft?.status === 'failed' ? (
+                        <Text className="mt-3">
+                          Analysis failed. Your photo and caption are saved; no successful scan was
+                          used.
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <Text className="font-body text-base text-[#655B55]">
+                  {today.status === 'locked'
+                    ? 'Premium access is required to post this check-in.'
+                    : 'No photo is ready for this check-in. Go back and take a live photo.'}
+                </Text>
+              )
+            ) : today.status !== 'ready' || !assignment ? (
               <>
                 <Text className="font-heading text-2xl">Get today’s plan first</Text>
                 <Text className="mt-3">A ready plan is needed for personalised check-ins.</Text>
@@ -458,49 +598,10 @@ export default function CoachCheckInFlow({
                     This category’s daily reward slot has already been used.
                   </Text>
                 ) : null}
-                {category === 'meals' && queue?.storageId ? (
-                  <View className="mt-5">
-                    <Text className="font-heading text-xl">Log Activity</Text>
-                    {queue.uri ? (
-                      <Image source={{ uri: queue.uri }} className="mt-3 h-56 w-full rounded-xl" />
-                    ) : null}
-                    <TextInput
-                      value={caption}
-                      onChangeText={setCaption}
-                      onEndEditing={() => {
-                        if (queue?.storageId)
-                          saveMealCaption({ submissionId: queue.submissionId, caption }).catch(
-                            () => {}
-                          );
-                      }}
-                      placeholder="Add a caption"
-                      multiline
-                      maxLength={500}
-                      className="mt-3 min-h-20 rounded-xl border border-gray-300 bg-white p-3"
-                    />
-                    <Text className="mt-3 text-sm">
-                      {meal?.scanCount ?? 0} of 3 daily scans used
-                    </Text>
-                    {busy ? <Text className="mt-3">Checking your plate...</Text> : null}
-                    {meal?.draft?.status === 'ready' && meal.draft.verdict ? (
-                      <View
-                        className={`mt-4 rounded-xl p-4 ${meal.draft.verdict === 'On point' ? 'bg-green-100' : meal.draft.verdict === 'Nearly there' ? 'bg-amber-100' : 'bg-orange-100'}`}>
-                        <Text className="font-heading text-lg">Portion Suggestion</Text>
-                        <Text className="mt-2 font-semibold">{meal.draft.verdict}</Text>
-                        <Text className="mt-2">{meal.draft.feedback}</Text>
-                      </View>
-                    ) : meal?.draft?.status === 'ready' ? (
-                      <View className="mt-4 rounded-xl bg-gray-100 p-4">
-                        <Text className="font-heading text-lg">Unable to assess a meal</Text>
-                        <Text className="mt-2">{meal.draft.feedback}</Text>
-                      </View>
-                    ) : meal?.draft?.status === 'failed' ? (
-                      <Text className="mt-3">
-                        Analysis failed. Your photo and caption remain saved.
-                      </Text>
-                    ) : null}
-                  </View>
-                ) : null}
+                <Text className="mt-5 font-body text-sm text-[#655B55]">
+                  Proof requires a new live camera photo. The image and caption are added on the
+                  next page.
+                </Text>
               </>
             )}
           </ScrollView>
@@ -510,19 +611,25 @@ export default function CoachCheckInFlow({
             {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
             <CoachActionButton
               label={busy ? 'Working…' : primaryLabel}
-              disabled={busy}
+              disabled={
+                busy ||
+                (mode === 'post' &&
+                  (!queue ||
+                    today.status === 'locked' ||
+                    (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
+              }
               onPress={primaryAction}
             />
-            {canRetakeMeal ? (
+            {mode === 'post' && queue && (queue.uri || queue.storageId) ? (
               <CoachActionButton
                 label="Retake photo"
                 variant="secondary"
                 disabled={busy}
-                onPress={retakePlate}
+                onPress={retakePhoto}
                 className="mt-2"
               />
             ) : null}
-            {queue && !queue.storageId ? (
+            {mode === 'details' && queue && !queue.storageId ? (
               <CoachActionButton
                 label="Cancel capture"
                 variant="secondary"

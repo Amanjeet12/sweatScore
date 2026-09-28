@@ -1,5 +1,6 @@
 import { validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
 import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
+import { addDaysToDateKey } from './utils/timezone';
 
 export type DailyOutputV2 = DailyOutput & {
   workoutExamples: string[];
@@ -78,9 +79,14 @@ export function validateDailyPlanOutputV2(
   const examples = (workoutExamples as string[]).map((item) => item.trim().toLowerCase());
   const workoutExplanation = text(workoutReason, 300);
   const stepExplanation = text(stepsReason, 300);
-  if (
-    /\b(?:you completed|you trained|you logged a workout|yesterday.{0,50}(?:workout|session)|(?:workout|session).{0,50}yesterday)\b/i.test(
+  const historyClaim =
+    /\b(?:you (?:completed|logged|trained|worked out)[^.!?]{0,45}yesterday|yesterday[^.!?]{0,45}you (?:completed|logged|trained|worked out)|yesterday['’]s (?:full[- ]body|upper[- ]body|lower[- ]body|leg|strength|cardio|light|hard)?\s*(?:session|workout|training|work))\b/i.test(
       `${workoutExplanation} ${base.output.why}`
+    );
+  if (
+    historyClaim &&
+    !snapshot.health.workouts.some(
+      (item) => item.source === 'activity_log' && item.day === addDaysToDateKey(day, -1)
     )
   )
     throw new Error('invalid_output');
@@ -114,8 +120,9 @@ export function validateDailyPlanOutputV2(
       throw new Error('invalid_output');
   }
   const avg = verifiedStepAverage(snapshot);
-  const stepNumbers = [...stepExplanation.matchAll(/\b\d[\d,]*\b/g)].map((match) =>
-    Number(match[0].replaceAll(',', ''))
+  // A count of observed days or a duration is not a second step target.
+  const stepNumbers = [...stepExplanation.matchAll(/\b(\d[\d,]*)\s+steps?\b/gi)].map((match) =>
+    Number(match[1].replaceAll(',', ''))
   );
   // The explanation may repeat the single canonical target. When an observed
   // average exists it may cite that too; neither is a second target.

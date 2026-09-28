@@ -4,7 +4,12 @@ import { resumeDecision } from '../shared/coachResume';
 import { myDecision } from '../convex/coachResume';
 import { myPlan } from '../convex/revenueCatEntitlements';
 import { DAILY_PLAN_PROMPT_VERSION } from '../convex/coachDailyPrompt';
-import { finishDailyAndReserveFirst } from '../convex/coachFoundation';
+import {
+  continueAfterHealth,
+  finishCoachSetup,
+  finishDailyAndReserveFirst,
+  saveDailyDraft,
+} from '../convex/coachFoundation';
 import { updateLastActiveAt, updateOnboarded } from '../convex/users';
 
 const day = new Date().toISOString().slice(0, 10);
@@ -115,7 +120,7 @@ const draft = {
 };
 
 describe('Stage 4 persisted resume', () => {
-  test('new member follows bio, seven profile answers, health, five daily answers and paywall', () => {
+  test('new member follows bio, profile, health, setup, paywall, then daily after verification', () => {
     expect(resumeDecision({ ...base, hasBio: false }).screen).toBe('bio');
     const profileState = resumeDecision({
       ...base,
@@ -124,7 +129,12 @@ describe('Stage 4 persisted resume', () => {
     });
     expect(profileState).toMatchObject({ screen: 'profile', question: 2 });
     expect(resumeDecision({ ...base, hasHealthContinuation: false }).screen).toBe('health');
+    expect(resumeDecision({ ...base, setupPending: true })).toMatchObject({ screen: 'setup' });
     expect(resumeDecision({ ...base, dailyDraft: draft })).toMatchObject({
+      screen: 'paywall',
+      question: 0,
+    });
+    expect(resumeDecision({ ...base, verifiedAccess: true, dailyDraft: draft })).toMatchObject({
       screen: 'daily',
       question: 4,
     });
@@ -134,13 +144,13 @@ describe('Stage 4 persisted resume', () => {
   });
 
   test('denied health continues, existing entitled profile setup skips another paywall', () => {
-    expect(resumeDecision({ ...base, hasHealthContinuation: true }).screen).toBe('daily');
+    expect(resumeDecision({ ...base, hasHealthContinuation: true }).screen).toBe('paywall');
     expect(resumeDecision({ ...base, verifiedAccess: true, hasProfile: false }).screen).toBe(
       'profile'
     );
     expect(
       resumeDecision({ ...base, verifiedAccess: true, hasHealthContinuation: false }).screen
-    ).toBe('today');
+    ).toBe('daily');
     expect(
       resumeDecision({
         ...base,
@@ -168,13 +178,13 @@ describe('Stage 4 persisted resume', () => {
   });
 
   test('cancellation, restart and delayed verification reuse the same purchase stage', () => {
-    const persisted = { ...base, hasTodayRequest: true, requestStatus: 'ready' as const };
+    const persisted = { ...base };
     expect(resumeDecision(persisted).screen).toBe('paywall');
     expect(resumeDecision({ ...persisted }).screen).toBe('paywall');
-    expect(resumeDecision({ ...persisted, verifiedAccess: true }).screen).toBe('today');
+    expect(resumeDecision({ ...persisted, verifiedAccess: true }).screen).toBe('daily');
   });
 
-  test('member-local day change preserves old plan and offers a fresh daily-plan entry', () => {
+  test('member-local day change preserves old plan and resumes fresh daily answers', () => {
     expect(
       resumeDecision({
         ...base,
@@ -182,10 +192,14 @@ describe('Stage 4 persisted resume', () => {
         changedDay: true,
         dailyDraft: { sleep: 'restful' },
       })
-    ).toMatchObject({ screen: 'today', question: 0, changedDay: true, requestStatus: 'none' });
+    ).toMatchObject({ screen: 'daily', question: 1, changedDay: true, requestStatus: 'none' });
+    expect(
+      resumeDecision({ ...base, verifiedAccess: true, changedDay: true, completedOnboarding: true })
+        .screen
+    ).toBe('today');
   });
 
-  test('server query ignores old onboarded flag and uses verified billing row', async () => {
+  test('legacy completed-account flag routes to access-limited Today without granting billing', async () => {
     const store = fixture({
       users: [
         {
@@ -197,7 +211,11 @@ describe('Stage 4 persisted resume', () => {
         },
       ],
     });
-    expect((await myDecision._handler(store.ctx, {})).screen).toBe('profile');
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'today',
+      verifiedAccess: false,
+      returningMember: true,
+    });
     store.rows.coachOnboardingV1 = [
       {
         _id: 'state',
@@ -208,13 +226,61 @@ describe('Stage 4 persisted resume', () => {
         dailyDraft: draft,
       },
     ];
-    expect((await myDecision._handler(store.ctx, {})).screen).toBe('daily');
+    expect((await myDecision._handler(store.ctx, {})).verifiedAccess).toBe(false);
     store.rows.coachPlanRequestsV1 = [{ _id: 'request', userId: 'member_a', day, status: 'ready' }];
-    expect((await myDecision._handler(store.ctx, {})).screen).toBe('paywall');
+    expect((await myDecision._handler(store.ctx, {})).verifiedAccess).toBe(false);
     store.rows.coachBillingEntitlementsV1 = [
       { _id: 'billing', userId: 'member_a', status: 'active' },
     ];
     expect((await myDecision._handler(store.ctx, {})).screen).toBe('today');
+    store.rows.coachPlanRequestsV1 = [];
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('today');
+  });
+
+  test('health continuation and visual setup save progress without starting AI or rewards', async () => {
+    const store = fixture({
+      coachOnboardingV1: [
+        { _id: 'state', userId: 'member_a', stage: 'health', profileRevisionId: 'profile' },
+      ],
+    });
+    await continueAfterHealth._handler(store.ctx, { result: 'declined' });
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('setup');
+    await finishCoachSetup._handler(store.ctx, {});
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('paywall');
+    expect(store.rows.coachOnboardingV1[0].healthContinuation).toBe('declined');
+    expect(store.rows.coachPlanRequestsV1).toBeUndefined();
+    expect(store.scheduled).toHaveLength(0);
+    await expect(saveDailyDraft._handler(store.ctx, { sleep: 'rested_enough' })).rejects.toThrow(
+      'Verified access required'
+    );
+    store.rows.coachBillingEntitlementsV1 = [
+      { _id: 'billing', userId: 'member_a', status: 'active' },
+    ];
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('daily');
+  });
+
+  test('an unpaid direct final answer cannot reserve or queue a first plan', async () => {
+    const store = fixture({
+      coachOnboardingV1: [
+        {
+          _id: 'state',
+          userId: 'member_a',
+          stage: 'paywall',
+          profileRevisionId: 'profile',
+          healthContinuation: 'declined',
+          dailyDraftDay: day,
+          dailyDraft: draft,
+        },
+      ],
+    });
+    await expect(
+      finishDailyAndReserveFirst._handler(store.ctx, {
+        body: 'fine',
+        requestKey: 'unpaid_direct_123',
+      })
+    ).rejects.toThrow('Verified access required');
+    expect(store.rows.coachPlanRequestsV1).toBeUndefined();
+    expect(store.scheduled).toHaveLength(0);
   });
 
   test('paywall and Today expose retry only for a retryable failed request', async () => {
@@ -305,6 +371,7 @@ describe('Stage 4 persisted resume', () => {
           source: 'member',
         },
       ],
+      coachBillingEntitlementsV1: [{ _id: 'billing', userId: 'member_a', status: 'active' }],
     });
     const first = await finishDailyAndReserveFirst._handler(store.ctx, {
       body: 'fine',

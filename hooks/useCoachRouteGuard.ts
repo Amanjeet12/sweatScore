@@ -5,7 +5,7 @@ import { api } from '~/convex/_generated/api';
 import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
 import { ResumeScreen } from '~/shared/coachResume';
 import { useAuthStore } from '~/store/useAuthStore';
-import { resumePath } from '~/utils/coachResumeNavigation';
+import { resumePathForDecision } from '~/utils/coachResumeNavigation';
 
 export function useCoachRouteGuard(allowed: readonly ResumeScreen[]) {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -32,7 +32,7 @@ export function useCoachRouteGuard(allowed: readonly ResumeScreen[]) {
     !isLoading && !isAuthenticated
       ? '/(auth)/email'
       : decision && !accepted
-        ? resumePath(decision.screen)
+        ? resumePathForDecision(decision)
         : null;
   useEffect(() => {
     if (!destination) {

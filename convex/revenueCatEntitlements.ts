@@ -14,6 +14,7 @@ import { parseRevenueCatSubscriber, VerifiedPremium } from './revenueCatPolicy';
 import { formatDateInTZ } from './utils/timezone';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
 import { planDetailsV2, workoutMetadata } from './coachFoundationValidators';
+import { dailyPolicy } from './coachDailyPolicy';
 
 const reason = v.union(v.literal('client'), v.literal('webhook'), v.literal('expiry'));
 const verifiedSnapshot = v.object({
@@ -62,6 +63,15 @@ export const myPlan = query({
     ),
     access: v.boolean(),
     canRetry: v.boolean(),
+    requestId: v.union(v.id('coachPlanRequestsV1'), v.null()),
+    errorCode: v.optional(v.string()),
+    policyBlock: v.optional(
+      v.union(
+        v.literal('full_plus_poor_readiness'),
+        v.literal('recovery_plus_soreness'),
+        v.literal('high_steps_threshold')
+      )
+    ),
     plan: v.union(
       v.null(),
       v.object({
@@ -107,13 +117,19 @@ export const myPlan = query({
     );
     return {
       day,
-      requestStatus: (revision ? 'ready' : (request?.status ?? 'none')) as
+      requestStatus: (request?.status ?? (revision ? 'ready' : 'none')) as
         | 'ready'
         | 'pending'
         | 'failed'
         | 'none',
       access,
       canRetry: !revision && canRetryCurrentPlanRequest(request),
+      requestId: access ? (request?._id ?? null) : null,
+      errorCode: access && request?.status === 'failed' ? request.errorCode : undefined,
+      policyBlock:
+        access && request?.status === 'failed' && request.errorCode === 'policy_unresolved'
+          ? dailyPolicy(request.inputSnapshot, day).unresolved
+          : undefined,
       plan:
         access && revision
           ? {

@@ -102,6 +102,57 @@ export const mySubmission = query({
   },
 });
 
+export const myProofImage = query({
+  args: { submissionId: v.id('coachProofSubmissionsV1') },
+  handler: async (ctx, { submissionId }) => {
+    const userId = await owner(ctx);
+    if (!(await entitled(ctx, userId))) throw new ConvexError('Verified entitlement required');
+    const submission = await ctx.db.get(submissionId);
+    if (!submission || submission.userId !== userId)
+      throw new ConvexError('Submission does not belong to member');
+    return submission.storageId ? await ctx.storage.getUrl(submission.storageId) : null;
+  },
+});
+
+export const saveCaption = mutation({
+  args: { submissionId: v.id('coachProofSubmissionsV1'), caption: v.string() },
+  handler: async (ctx, { submissionId, caption }) => {
+    const userId = await owner(ctx);
+    const submission = await ctx.db.get(submissionId);
+    if (!submission || submission.userId !== userId || submission.category === 'meals')
+      throw new ConvexError('Check-in does not belong to member');
+    if (submission.state === 'completed') return submissionId;
+    if (submission.state === 'reversed' || submission.day !== (await today(ctx, userId)))
+      throw new ConvexError('Check-in is no longer editable');
+    if (caption.length > 500) throw new ConvexError('Caption is too long');
+    await ctx.db.patch(submissionId, { caption: caption.trim(), updatedAt: Date.now() });
+    return submissionId;
+  },
+});
+
+export const retakeProof = mutation({
+  args: { submissionId: v.id('coachProofSubmissionsV1') },
+  handler: async (ctx, { submissionId }) => {
+    const userId = await owner(ctx);
+    const submission = await ctx.db.get(submissionId);
+    if (!submission || submission.userId !== userId || submission.category === 'meals')
+      throw new ConvexError('Check-in does not belong to member');
+    if (
+      submission.day !== (await today(ctx, userId)) ||
+      submission.state === 'completed' ||
+      submission.state === 'reversed'
+    )
+      throw new ConvexError('Check-in cannot be retaken');
+    await ctx.db.patch(submissionId, {
+      state: 'reserved',
+      storageId: undefined,
+      captureToken: undefined,
+      updatedAt: Date.now(),
+    });
+    return submissionId;
+  },
+});
+
 export const issueUpload = mutation({
   args: { submissionId: v.id('coachProofSubmissionsV1') },
   handler: async (ctx, { submissionId }) => {
@@ -219,14 +270,18 @@ async function legacyCount(
 // Meals are deliberately excluded. Stage 6 must atomically analyze, share and
 // award their slots; uploading a meal photo here only prepares that future flow.
 export const complete = mutation({
-  args: { submissionId: v.id('coachProofSubmissionsV1') },
-  handler: async (ctx, { submissionId }) => {
+  args: { submissionId: v.id('coachProofSubmissionsV1'), caption: v.optional(v.string()) },
+  handler: async (ctx, { submissionId, caption }) => {
     const userId = await owner(ctx);
     const submission = await ctx.db.get(submissionId);
     if (!submission || submission.userId !== userId)
       throw new ConvexError('Submission does not belong to member');
     if (submission.state === 'completed')
-      return { pointsEarned: POINTS[submission.category], activityId: submission.activityId };
+      return {
+        pointsEarned: POINTS[submission.category],
+        activityId: submission.activityId,
+        postId: submission.postId,
+      };
     if (submission.category === 'meals')
       throw new ConvexError('Meal sharing requires photo analysis');
     if (
@@ -238,6 +293,8 @@ export const complete = mutation({
     if (submission.day !== (await today(ctx, userId)))
       throw new ConvexError('Proof day has changed');
     if (!(await entitled(ctx, userId))) throw new ConvexError('Verified entitlement required');
+    if ((caption ?? submission.caption ?? '').length > 500)
+      throw new ConvexError('Caption is too long');
     const assignment = await ctx.db.get(submission.assignmentId);
     const revision = await ctx.db.get(submission.planRevisionId);
     if (
@@ -282,9 +339,19 @@ export const complete = mutation({
       image: submission.storageId,
       coachSubmissionId: submissionId,
     });
+    const postId = await ctx.db.insert('posts', {
+      userId,
+      createdAt: now,
+      body: (caption ?? submission.caption ?? '').trim(),
+      media: submission.storageId,
+      mediaType: 'image',
+      activityId,
+    });
     await ctx.db.patch(submissionId, {
       state: 'completed',
       activityId,
+      postId,
+      caption: (caption ?? submission.caption ?? '').trim(),
       completedAt: now,
       updatedAt: now,
     });
@@ -306,7 +373,7 @@ export const complete = mutation({
       userId,
       date: submission.day,
     });
-    return { pointsEarned: points, activityId };
+    return { pointsEarned: points, activityId, postId };
   },
 });
 

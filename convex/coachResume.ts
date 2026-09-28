@@ -13,6 +13,7 @@ export const myDecision = query({
       v.literal('bio'),
       v.literal('profile'),
       v.literal('health'),
+      v.literal('setup'),
       v.literal('daily'),
       v.literal('paywall'),
       v.literal('today')
@@ -28,6 +29,8 @@ export const myDecision = query({
     ),
     verifiedAccess: v.boolean(),
     canRetry: v.boolean(),
+    completedOnboarding: v.boolean(),
+    returningMember: v.boolean(),
   }),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
@@ -35,7 +38,7 @@ export const myDecision = query({
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError('Member missing');
     const day = formatDateInTZ(new Date(), user.timezone);
-    const [state, billing, todayRequest, todayPlan] = await Promise.all([
+    const [state, billing, todayRequest, todayPlan, earlierPlan] = await Promise.all([
       ctx.db
         .query('coachOnboardingV1')
         .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -54,30 +57,50 @@ export const myDecision = query({
         .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
         .order('desc')
         .first(),
+      ctx.db
+        .query('coachPlanRevisionsV1')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .first(),
     ]);
     const previous = state?.firstPlanRequestId ? await ctx.db.get(state.firstPlanRequestId) : null;
     const verifiedAccess = Boolean(
       user.isAdmin ||
       (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
     );
+    // The legacy completed-account marker is routing compatibility evidence,
+    // not an entitlement grant. Some returning accounts retain a Coach stage
+    // of `daily` after a cleared or failed first plan request.
+    const returningMember = Boolean(
+      user.onboarded ||
+      state?.returningMember ||
+      state?.stage === 'complete' ||
+      earlierPlan ||
+      (!state && verifiedAccess)
+    );
     const decided = resumeDecision({
       hasBio: Boolean(user.name?.trim() && user.birthdate),
       hasProfile: Boolean(state?.profileRevisionId),
       hasHealthContinuation: Boolean(state?.healthContinuation),
       verifiedAccess,
-      previouslyVerified: state?.entitlement === 'expired',
+      previouslyVerified:
+        state?.entitlement === 'expired' || Boolean(billing?.productId && !verifiedAccess),
       profileDraft: state?.profileDraft,
       dailyDraft: state?.dailyDraftDay === day ? state.dailyDraft : undefined,
       hasTodayRequest: Boolean(todayRequest),
       hasTodayPlan: Boolean(todayPlan),
       requestStatus: todayRequest?.status,
       changedDay: Boolean(previous && previous.day !== day),
+      setupPending: state?.stage === 'setup',
+      completedOnboarding: state?.stage === 'complete',
+      returningMember,
     });
     return {
       ...decided,
       day,
       verifiedAccess,
       canRetry: !todayPlan && canRetryCurrentPlanRequest(todayRequest),
+      completedOnboarding: state?.stage === 'complete',
+      returningMember,
     };
   },
 });

@@ -10,7 +10,7 @@ import { providerConfig } from './coachDailyProvider';
 import { runDailyTonePreview, runMealTonePreview } from './coachTonePreviewRunner';
 import { ToneSelection, effectiveTone, previewMealSampleConfig } from '../shared/coachTonePreview';
 import { DEFAULT_COACH_TONE } from '../shared/coachFoundation';
-import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION } from './coachDailyPromptV2_1';
 import { MEAL_PROMPT_VERSION } from './coachMealPrompt';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
@@ -45,7 +45,7 @@ export const compare = action({
       {}
     );
     const history = await ctx.runQuery(api.coachFoundation.getToneHistory, {});
-    const config = providerConfig(DAILY_PLAN_V2_PROMPT_VERSION);
+    const config = providerConfig(DAILY_PLAN_V2_1_PROMPT_VERSION);
     if (!config)
       return { status: 'unavailable' as const, reason: 'Provider configuration is unavailable.' };
 
@@ -146,7 +146,7 @@ export const compare = action({
     return {
       status: 'ready' as const,
       currentVersion: current.version,
-      promptVersions: { daily: DAILY_PLAN_V2_PROMPT_VERSION, meal: MEAL_PROMPT_VERSION },
+      promptVersions: { daily: DAILY_PLAN_V2_1_PROMPT_VERSION, meal: MEAL_PROMPT_VERSION },
       sampleMeal: {
         key: sampleKey,
         label: sampleLabel,

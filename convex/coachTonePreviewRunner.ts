@@ -1,7 +1,7 @@
 import { buildDailyProviderInput, DailySnapshot } from './coachDailyPolicy';
 import { validateDailyPlanOutputV2 } from './coachDailyPolicyV2';
 import { generateV2WithRepair } from './coachDailyRepair';
-import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION } from './coachDailyPromptV2_1';
 import { generateDailyPlan, ProviderConfig } from './coachDailyProvider';
 import { analyzeMealPhoto } from './coachMealProvider';
 import {
@@ -30,7 +30,7 @@ export async function runDailyTonePreview(args: {
         input,
         style,
         fetchImpl: args.fetchImpl,
-        promptVersion: DAILY_PLAN_V2_PROMPT_VERSION,
+        promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
         retryGuidance,
       }),
     snapshot,

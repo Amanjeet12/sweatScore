@@ -262,6 +262,15 @@ describe('server-verified Premium', () => {
       },
     ];
     expect((await myPlan._handler(store.ctx, {})).plan?.output.headline).toBe('Secret plan');
+    store.rows.coachPlanRequestsV1.push({
+      _id: 'newRequest',
+      userId: 'member_a',
+      day: today,
+      status: 'pending',
+    });
+    const updating = await myPlan._handler(store.ctx, {});
+    expect(updating.requestStatus).toBe('pending');
+    expect(updating.plan?.output.headline).toBe('Secret plan');
   });
 
   test('raw-body HMAC authenticates webhook, rejects tampering and replay', async () => {

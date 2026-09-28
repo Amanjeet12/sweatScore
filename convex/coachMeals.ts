@@ -9,7 +9,7 @@ import {
   QueryCtx,
 } from './_generated/server';
 import { internal } from './_generated/api';
-import { Id } from './_generated/dataModel';
+import { Doc, Id } from './_generated/dataModel';
 import { formatDateInTZ } from './utils/timezone';
 import { MEAL_PROMPT_VERSION } from './coachMealPrompt';
 import { rewardSlotKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
@@ -34,9 +34,30 @@ async function today(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
 function asError(code: string): never {
   throw new ConvexError(code);
 }
+const RESERVATION_MS = 120_000;
+const DISPATCH_MS = 60_000;
+// Provider-cost throttle is separate from the three successful scans shown to members.
+const MAX_DISPATCHES_PER_HOUR = 8;
+const UNCLEAR_IMAGE =
+  /\b(?:unclear|blurry|blurred|cannot see|can't see|unable to (?:see|assess|identify)|not (?:clear|visible)|hard to (?:see|identify)|too dark)\b/i;
+
+async function usableScanCount(ctx: QueryCtx | MutationCtx, scans: Doc<'coachMealScansV1'>[]) {
+  let count = 0;
+  for (const scan of scans) {
+    if (scan.status !== 'ready' || scan.usable === false) continue;
+    if (scan.usable === true) {
+      count++;
+      continue;
+    }
+    // Historical ready rows predate the explicit usable flag.
+    const draft = await ctx.db.get(scan.draftId);
+    if (draft?.verdict) count++;
+  }
+  return count;
+}
 
 export const myDraft = query({
-  args: { submissionId: v.id('coachProofSubmissionsV1') },
+  args: { submissionId: v.id('coachProofSubmissionsV1'), refresh: v.optional(v.number()) },
   handler: async (ctx, { submissionId }) => {
     const userId = await owner(ctx);
     if (!(await entitled(ctx, userId))) asError('Verified entitlement required');
@@ -61,7 +82,16 @@ export const myDraft = query({
       .collect();
     return {
       draft,
-      scanCount: scans.filter((s) => s.dispatchedAt).length,
+      scanCount: await usableScanCount(ctx, scans),
+      canRetryAnalysis:
+        draft?.status === 'analyzing' && draft.scanId
+          ? scans.some(
+              (s) =>
+                s._id === draft.scanId &&
+                ((s.status === 'reserved' && Date.now() - s.reservedAt >= RESERVATION_MS) ||
+                  (s.status === 'dispatched' && Date.now() - (s.dispatchedAt ?? 0) >= DISPATCH_MS))
+            )
+          : false,
       shareCount: activities.filter(
         (a) => a.loggedActivityKey === 'healthy_meal' && a.reviewStatus !== 'rejected'
       ).length,
@@ -215,16 +245,21 @@ export const reserveScan = internalMutation({
     if (draft.status === 'ready') asError('This photo has already been analysed');
     if (draft.status === 'analyzing') {
       const prior = draft.scanId ? await ctx.db.get(draft.scanId) : null;
-      if (!prior?.dispatchedAt || Date.now() - prior.dispatchedAt < 60000)
+      if (
+        prior &&
+        ((prior.status === 'reserved' && Date.now() - prior.reservedAt < RESERVATION_MS) ||
+          (prior.status === 'dispatched' && Date.now() - (prior.dispatchedAt ?? 0) < DISPATCH_MS))
+      )
         asError('This photo is already being analysed');
-      // An action can disappear after its durable dispatch claim. Count that
-      // dispatch, then allow a deliberate new request without losing the photo.
-      if (prior.status === 'dispatched')
+      // A stranded provider call releases the member-facing allowance.
+      if (prior?.status === 'dispatched')
         await ctx.db.patch(prior._id, {
           status: 'failed',
           errorCode: 'provider_timeout',
           finishedAt: Date.now(),
         });
+      if (prior?.status === 'reserved')
+        await ctx.db.patch(prior._id, { status: 'released', finishedAt: Date.now() });
       await ctx.db.patch(draftId, {
         status: 'failed',
         errorCode: 'provider_timeout',
@@ -235,17 +270,47 @@ export const reserveScan = internalMutation({
       .query('coachMealScansV1')
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', draft.day))
       .collect();
+    const now = Date.now();
+    for (const scan of scans) {
+      if (scan.status === 'reserved' && now - scan.reservedAt >= RESERVATION_MS)
+        await ctx.db.patch(scan._id, { status: 'released', finishedAt: now });
+      if (scan.status === 'dispatched' && now - (scan.dispatchedAt ?? now) >= DISPATCH_MS) {
+        await ctx.db.patch(scan._id, {
+          status: 'failed',
+          errorCode: 'provider_timeout',
+          finishedAt: now,
+        });
+        const stranded = await ctx.db.get(scan.draftId);
+        if (stranded?.status === 'analyzing' && stranded.scanId === scan._id)
+          await ctx.db.patch(stranded._id, {
+            status: 'failed',
+            errorCode: 'provider_timeout',
+            updatedAt: now,
+          });
+      }
+    }
     if (
       scans.some(
         (s) =>
-          s.draftId === draftId && s.status === 'reserved' && Date.now() - s.reservedAt < 120000
+          s.draftId === draftId && s.status === 'reserved' && now - s.reservedAt < RESERVATION_MS
       )
     )
       asError('This photo already has a pending scan');
-    const active = scans.filter(
-      (s) => s.dispatchedAt || (s.status === 'reserved' && Date.now() - s.reservedAt < 120000)
-    );
-    if (active.length >= 3) asError('Three daily meal scans have been used or reserved');
+    const successful = await usableScanCount(ctx, scans);
+    if (
+      scans.filter((s) => s.dispatchedAt && now - s.dispatchedAt < 3_600_000).length >=
+      MAX_DISPATCHES_PER_HOUR
+    )
+      asError(
+        'Meal analysis is temporarily paused after repeated attempts. Your successful scan allowance is unchanged; try again later.'
+      );
+    const pending = scans.filter(
+      (s) =>
+        (s.status === 'reserved' && now - s.reservedAt < RESERVATION_MS) ||
+        (s.status === 'dispatched' && now - (s.dispatchedAt ?? now) < DISPATCH_MS)
+    ).length;
+    if (successful + pending >= 3)
+      asError('Three successful meal scans are used or currently in progress');
     const activities = await ctx.db
       .query('dailyActivities')
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', draft.day))
@@ -297,12 +362,27 @@ export const claimDispatch = internalMutation({
     const scan = await ctx.db.get(scanId);
     if (!scan || scan.userId !== userId) asError('Scan does not belong to member');
     if (scan.status !== 'reserved') return false;
-    if (Date.now() - scan.reservedAt >= 120000) asError('Scan reservation expired');
+    if (Date.now() - scan.reservedAt >= RESERVATION_MS) asError('Scan reservation expired');
     const all = await ctx.db
       .query('coachMealScansV1')
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', scan.day))
       .collect();
-    if (all.filter((s) => s.dispatchedAt).length >= 3) asError('Three daily meal scans used');
+    const successful = await usableScanCount(ctx, all);
+    if (
+      all.filter((s) => s.dispatchedAt && Date.now() - s.dispatchedAt < 3_600_000).length >=
+      MAX_DISPATCHES_PER_HOUR
+    )
+      asError(
+        'Meal analysis is temporarily paused after repeated attempts. Your successful scan allowance is unchanged; try again later.'
+      );
+    const otherPending = all.filter(
+      (s) =>
+        s._id !== scanId &&
+        ((s.status === 'reserved' && Date.now() - s.reservedAt < RESERVATION_MS) ||
+          (s.status === 'dispatched' && Date.now() - (s.dispatchedAt ?? 0) < DISPATCH_MS))
+    ).length;
+    if (successful + otherPending >= 3)
+      asError('Three successful meal scans are used or currently in progress');
     const draft = await ctx.db.get(scan.draftId);
     const submission = draft ? await ctx.db.get(draft.submissionId) : null;
     if (
@@ -342,25 +422,29 @@ export const finishScan = internalMutation({
   },
   handler: async (ctx, args) => {
     const scan = await ctx.db.get(args.scanId);
-    if (!scan || scan.userId !== args.userId || scan.status !== 'dispatched') return;
+    if (!scan || scan.userId !== args.userId || scan.status !== 'dispatched') return 'ignored';
     const draft = await ctx.db.get(scan.draftId);
-    if (!draft || draft.userId !== args.userId || draft.scanId !== scan._id) return;
+    if (!draft || draft.userId !== args.userId || draft.scanId !== scan._id) return 'ignored';
     const now = Date.now();
+    const unclear = Boolean(args.result?.verdict && UNCLEAR_IMAGE.test(args.result.feedback));
+    const usable = Boolean(args.result?.verdict) && !unclear;
     await ctx.db.patch(scan._id, {
-      status: args.result ? 'ready' : 'failed',
+      status: args.result && !unclear ? 'ready' : 'failed',
+      usable,
       finishedAt: now,
-      errorCode: args.errorCode,
+      errorCode: unclear ? 'unclear_image' : args.errorCode,
     });
     await ctx.db.patch(draft._id, {
-      status: args.result ? 'ready' : 'failed',
+      status: args.result && !unclear ? 'ready' : 'failed',
       verdict: args.result?.verdict,
       feedback: args.result?.feedback,
-      errorCode: args.errorCode,
+      errorCode: unclear ? 'unclear_image' : args.errorCode,
       inputTokens: args.inputTokens,
       outputTokens: args.outputTokens,
       latencyMs: args.latencyMs,
       updatedAt: now,
     });
+    return unclear ? 'unclear' : args.result ? 'ready' : 'failed';
   },
 });
 export const releaseScan = internalMutation({

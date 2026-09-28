@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   myToday,
   mySubmission,
+  saveCaption,
   issueUpload,
   authorizeUpload,
   attachUploadedInternal,
@@ -14,6 +15,7 @@ import { reserveProof } from '../convex/coachFoundation';
 import { createPost } from '../convex/posts';
 import { completeChallenge } from '../convex/challengeCompletions';
 import { getStreakEarnedDatesInRange } from '../convex/utils/streak';
+import { checkInPostRoute } from '../shared/coachCheckInPresentation';
 
 const day = new Date().toISOString().slice(0, 10);
 function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
@@ -170,6 +172,14 @@ function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
 }
 
 describe('plan-bound check-ins', () => {
+  test('each category leaves the details popup for its dedicated posting route', () => {
+    expect(['workout', 'meals', 'sleep', 'steps'].map(checkInPostRoute)).toEqual([
+      '/coach-check-in/post/workout',
+      '/coach-check-in/post/meals',
+      '/coach-check-in/post/sleep',
+      '/coach-check-in/post/steps',
+    ]);
+  });
   test('two members see their own lower/upper workout and distinct steps, without shared strength', async () => {
     const a = fixture();
     const b = fixture({}, 'bob');
@@ -412,6 +422,8 @@ describe('plan-bound check-ins', () => {
       token,
       storageId: 'fresh_media',
     });
+    expect(s.rows.posts).toBeUndefined();
+    expect(s.rows.dailyActivities).toBeUndefined();
     s.rows.coachPlanRevisionsV1.push({ _id: 'new_plan', userId: 'alice', day, version: 2 });
     const restarted = fixture(s.rows);
     const saved = await mySubmission._handler(restarted.ctx, { submissionId: id });
@@ -481,8 +493,15 @@ describe('plan-bound check-ins', () => {
       token,
       storageId: 'fresh_media',
     });
-    expect(await complete._handler(s.ctx, { submissionId: id })).toMatchObject({ pointsEarned: 5 });
-    expect(await complete._handler(s.ctx, { submissionId: id })).toMatchObject({ pointsEarned: 5 });
+    await saveCaption._handler(s.ctx, { submissionId: id, caption: '  My workout  ' });
+    const posted = await complete._handler(s.ctx, { submissionId: id, caption: 'My workout' });
+    expect(posted).toMatchObject({ pointsEarned: 5 });
+    expect(
+      await complete._handler(s.ctx, { submissionId: id, caption: 'Changed on retry' })
+    ).toEqual(posted);
+    expect(s.rows.posts).toHaveLength(1);
+    expect(s.rows.posts[0].body).toBe('My workout');
+    expect(s.rows.coachProofSubmissionsV1.find((x) => x._id === id).caption).toBe('My workout');
     expect(s.rows.dailyActivities).toHaveLength(1);
     expect(s.rows.dailyActivities[0].coachSubmissionId).toBe(id);
     expect(s.rows.coachProofEventsV1).toHaveLength(1);

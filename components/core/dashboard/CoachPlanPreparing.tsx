@@ -6,7 +6,13 @@ import { AccessibilityInfo, Animated, Easing, View } from 'react-native';
 import { Text } from '~/components/ui/text';
 
 /** Indeterminate animation: plan generation has no measurable percentage. */
-export default function CoachPlanPreparing({ compact = false }: { compact?: boolean }) {
+export default function CoachPlanPreparing({
+  compact = false,
+  mode = 'plan',
+}: {
+  compact?: boolean;
+  mode?: 'plan' | 'profile';
+}) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [trackWidth, setTrackWidth] = useState(0);
   const travel = useRef(new Animated.Value(0)).current;
@@ -95,20 +101,23 @@ export default function CoachPlanPreparing({ compact = false }: { compact?: bool
             SWEATSCORE AI COACH
           </Text>
           <Text className="mt-1 font-heading text-xl font-semibold text-[#241B17]">
-            Crafting today’s plan
+            {mode === 'profile' ? 'Getting your coach ready' : 'Crafting today’s plan'}
           </Text>
         </View>
       </View>
       {!compact ? (
         <Text className="mt-5 font-body text-base leading-6 text-[#655B55]">
-          Your answers are saved. We’re shaping practical guidance for your workout, steps, sleep
-          and meals.
+          {mode === 'profile'
+            ? 'Saving your coach profile and getting your coaching experience ready. You’ll answer today’s questions after access is verified.'
+            : 'Your answers are saved. We’re shaping practical guidance for your workout, steps, sleep and meals.'}
         </Text>
       ) : null}
       <View
         className="mt-6 h-2.5 overflow-hidden rounded-full bg-[#F2D7C9]"
         accessibilityRole="progressbar"
-        accessibilityLabel="Plan preparation in progress"
+        accessibilityLabel={
+          mode === 'profile' ? 'Coach profile setup in progress' : 'Plan preparation in progress'
+        }
         accessibilityValue={{ text: 'Preparing' }}
         onLayout={(event) => {
           const width = event.nativeEvent.layout.width;
@@ -139,7 +148,9 @@ export default function CoachPlanPreparing({ compact = false }: { compact?: bool
         )}
       </View>
       <Text className="mt-3 font-body text-xs text-[#7A6C63]">
-        This may take a moment. Your answers are saved.
+        {mode === 'profile'
+          ? 'Your profile is saved. Today’s plan has not been started.'
+          : 'This may take a moment. Your answers are saved.'}
       </Text>
     </LinearGradient>
   );
