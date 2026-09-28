@@ -269,19 +269,13 @@ export default function CoachOnboarding() {
       eyebrow: 'Your profile',
       description: 'Choose the answer that feels most like you.',
     };
-    const heroHeight = Math.min(Math.max(windowHeight * 0.39, 300), 390);
+    // Match the responsive hero used by the email and OTP onboarding screens.
+    const heroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
     const effectiveProfileChoice =
       pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
-    const canContinue =
-      question.key === 'weight'
-        ? Number.isFinite(Number(weight)) && Number(weight) > 0
-        : Boolean(effectiveProfileChoice);
+    const canContinueWeight = Number.isFinite(Number(weight)) && Number(weight) > 0;
     const continueProfile = () => {
-      if (question.key === 'weight') {
-        saveWeight().catch(() => {});
-        return;
-      }
-      if (effectiveProfileChoice) choose(effectiveProfileChoice).catch(() => {});
+      saveWeight().catch(() => {});
     };
 
     return (
@@ -368,6 +362,7 @@ export default function CoachOnboarding() {
                         onPress={() => {
                           setError('');
                           setPendingProfileChoice(value);
+                          choose(value).catch(() => {});
                         }}
                         accessibilityRole="radio"
                         accessibilityState={{ selected: isSelected, disabled: busy }}
@@ -399,16 +394,22 @@ export default function CoachOnboarding() {
               ) : null}
 
               <View className="mt-auto pt-6">
-                <OnboardingPrimaryButton
-                  label={step === PROFILE_QUESTIONS.length - 1 ? 'Finish setup' : 'Continue'}
-                  onPress={continueProfile}
-                  isLoading={busy}
-                  disabled={!canContinue}
-                  borderRadius={18}
-                  labelFontSize={18}
-                />
+                {question.key === 'weight' ? (
+                  <OnboardingPrimaryButton
+                    label="Continue"
+                    onPress={continueProfile}
+                    isLoading={busy}
+                    disabled={!canContinueWeight}
+                    borderRadius={18}
+                    labelFontSize={18}
+                  />
+                ) : null}
                 <Text className="mt-3 text-center font-body text-xs text-[#77716D]">
-                  Your answers save securely as you go.
+                  {question.key === 'weight'
+                    ? 'Your answers save securely as you go.'
+                    : busy
+                      ? 'Saving your answer…'
+                      : 'Choose one answer to continue.'}
                 </Text>
               </View>
             </ScrollView>
