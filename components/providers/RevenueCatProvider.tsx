@@ -38,6 +38,7 @@ interface RevenueCatProps {
   purchasePackage?: (pack: PurchasesPackage) => Promise<'active' | 'inactive' | 'pending'>;
   restorePermissions?: () => Promise<'active' | 'inactive' | 'pending'>;
   packages: PurchasesPackage[];
+  hasActiveStoreSubscription: boolean;
   isPro: boolean;
   redeemWebPurchaseUrl: (url: string) => Promise<RedemptionResult>;
 }
@@ -50,11 +51,16 @@ const isUserCancelledError = (error: unknown) =>
   'userCancelled' in error &&
   error.userCancelled === true;
 
+const customerHasActiveSubscription = (customerInfo: CustomerInfo) =>
+  customerInfo.activeSubscriptions.length > 0 ||
+  Object.keys(customerInfo.entitlements.active).length > 0;
+
 export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const convex = useConvex();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [hasActiveStoreSubscription, setHasActiveStoreSubscription] = useState(false);
   const billingStatus = useQuery(api.revenueCatEntitlements.myStatus);
   const isPro = billingStatus?.isPro ?? false;
   const reconcileMine = useAction(api.revenueCatEntitlements.reconcileMine);
@@ -71,8 +77,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   }, []);
 
   const updateCustomerInformation = useCallback(
-    async (_customerInfo: CustomerInfo) => {
+    async (customerInfo: CustomerInfo) => {
       // SDK CustomerInfo is a signal, never authority for access.
+      setHasActiveStoreSubscription(customerHasActiveSubscription(customerInfo));
       if (currentUser?._id && (await Purchases.getAppUserID()) === currentUser._id.toString())
         await reconcileMine({});
     },
@@ -89,6 +96,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       try {
         await verifyIdentifiedMember();
         await Purchases.purchasePackage(pack);
+        setHasActiveStoreSubscription(
+          customerHasActiveSubscription(await Purchases.getCustomerInfo())
+        );
         return await reconcileMine({});
       } catch (error) {
         if (!isUserCancelledError(error)) alert(error);
@@ -100,7 +110,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   const restorePermissions = useCallback(async () => {
     await verifyIdentifiedMember();
-    await Purchases.restorePurchases();
+    setHasActiveStoreSubscription(
+      customerHasActiveSubscription(await Purchases.restorePurchases())
+    );
     return reconcileMine({});
   }, [reconcileMine, verifyIdentifiedMember]);
 
@@ -227,8 +239,22 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   );
 
   const value = useMemo(
-    () => ({ restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl }),
-    [restorePermissions, packages, purchasePackage, isPro, redeemWebPurchaseUrl]
+    () => ({
+      restorePermissions,
+      packages,
+      purchasePackage,
+      hasActiveStoreSubscription,
+      isPro,
+      redeemWebPurchaseUrl,
+    }),
+    [
+      restorePermissions,
+      packages,
+      purchasePackage,
+      hasActiveStoreSubscription,
+      isPro,
+      redeemWebPurchaseUrl,
+    ]
   );
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;

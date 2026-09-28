@@ -150,7 +150,8 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
-  const { packages, purchasePackage, restorePermissions } = useRevenueCat();
+  const { packages, purchasePackage, restorePermissions, hasActiveStoreSubscription } =
+    useRevenueCat();
 
   useEffect(() => {
     // A delayed webhook or a verified restore after restart uses persisted server state.
@@ -293,6 +294,15 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
     }
 
     await resumeMember(convex);
+  };
+
+  const handlePrimaryAction = async () => {
+    if (hasActiveStoreSubscription) {
+      await handleRestore();
+      return;
+    }
+
+    await handlePurchase();
   };
 
   const handleBackToLogin = async () => {
@@ -466,10 +476,16 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
           className="mt-3"
           borderRadius={20}
           labelFontSize={18}
-          label={isPackagesLoading ? 'Loading plans...' : 'Continue with Premium'}
-          onPress={handlePurchase}
-          disabled={isCtaDisabled}
-          isLoading={isLoading}
+          label={
+            isPackagesLoading
+              ? 'Loading plans...'
+              : hasActiveStoreSubscription
+                ? 'Verify Premium access'
+                : 'Continue with Premium'
+          }
+          onPress={handlePrimaryAction}
+          disabled={hasActiveStoreSubscription ? isRestoring || isLoggingOut : isCtaDisabled}
+          isLoading={hasActiveStoreSubscription ? isRestoring : isLoading}
         />
 
         <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">

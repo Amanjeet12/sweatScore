@@ -231,6 +231,21 @@ describe('v2 daily plan contract', () => {
     expect(loading).toContain('isReduceMotionEnabled');
     expect(loading).not.toMatch(/\d+%/);
   });
+  test('an owned StoreKit subscription verifies instead of reopening checkout', () => {
+    const paywall = readFileSync(
+      new URL('../components/core/Paywall.tsx', import.meta.url),
+      'utf8'
+    );
+    const provider = readFileSync(
+      new URL('../components/providers/RevenueCatProvider.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(provider).toContain('hasActiveStoreSubscription');
+    expect(provider).toContain('customerInfo.activeSubscriptions.length > 0');
+    expect(paywall).toContain('hasActiveStoreSubscription) {');
+    expect(paywall).toContain('await handleRestore()');
+    expect(paywall).toContain("'Verify Premium access'");
+  });
   test('one invalid provider candidate is revised inside the same logical request', async () => {
     const calls: unknown[] = [];
     const result = await generateV2WithRepair({
