@@ -4,6 +4,22 @@ export function checkInPostRoute(category: CoachCategory) {
   return `/coach-check-in/post/${category}` as const;
 }
 
+export function canStartCoachLivePhoto(
+  category: CoachCategory,
+  mode: 'details' | 'post',
+  status: string,
+  assignment: { mandatory: boolean; consumedCount: number } | null | undefined,
+  hasCapturedPhoto: boolean
+) {
+  return Boolean(
+    mode === 'details' &&
+    status === 'ready' &&
+    assignment?.mandatory &&
+    assignment.consumedCount < (category === 'meals' ? 3 : 1) &&
+    !hasCapturedPhoto
+  );
+}
+
 type GuideSource = {
   label?: string;
   recommendation: string;

@@ -23,7 +23,7 @@ import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
-import { checkInGuide } from '~/shared/coachCheckInPresentation';
+import { canStartCoachLivePhoto, checkInGuide } from '~/shared/coachCheckInPresentation';
 import { CoachCategory } from '~/shared/coachFoundation';
 import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { getData, removeData, storeData } from '~/utils/storage';
@@ -74,7 +74,6 @@ export default function CoachCheckInFlow({
   const complete = useMutation(api.coachCheckIns.complete);
   const saveProofCaption = useMutation(api.coachCheckIns.saveCaption);
   const retakeProof = useMutation(api.coachCheckIns.retakeProof);
-  const cancel = useMutation(api.coachCheckIns.cancel);
   const saveMealCaption = useMutation(api.coachMeals.saveCaption);
   const retakeMeal = useMutation(api.coachMeals.retake);
   const analyzeMeal = useAction(api.coachMealAnalysis.analyze);
@@ -90,8 +89,9 @@ export default function CoachCheckInFlow({
   const [headerHeight, setHeaderHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
+  const closing = useRef(false);
   useEffect(() => {
-    if (headerHeight && contentHeight && footerHeight)
+    if (headerHeight && contentHeight)
       onPreferredHeightChange?.(headerHeight + contentHeight + footerHeight + 12);
   }, [headerHeight, contentHeight, footerHeight, onPreferredHeightChange]);
   useEffect(() => {
@@ -157,6 +157,16 @@ export default function CoachCheckInFlow({
     if (queueKey) storeData(queueKey, next);
   };
 
+  const closeSheet = () => {
+    if (closing.current) return;
+    closing.current = true;
+    // A reserved slot is intentionally reused on reopening. Cancelling it here
+    // would leave the slot occupied but make its proof impossible to upload.
+    // Captured photos and captions stay in the owner-bound local queue.
+    setShowCamera(false);
+    onClose();
+  };
+
   const start = async () => {
     if (!assignment || !currentUser || !today || !category || !queueKey) return;
     setBusy(true);
@@ -204,7 +214,7 @@ export default function CoachCheckInFlow({
       await FileSystem.copyAsync({ from: photo.uri, to: uri });
       persist({ ...queue, uri });
       setShowCamera(false);
-      if (mode === 'details') onCaptured?.();
+      if (mode === 'details' && !closing.current) onCaptured?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the photo.');
     } finally {
@@ -387,9 +397,6 @@ export default function CoachCheckInFlow({
   } else if (queue?.uri || queue?.storageId) {
     primaryLabel = 'Continue check-in';
     primaryAction = () => onCaptured?.();
-  } else if (assignment?.mandatory && assignment.consumedCount < (category === 'meals' ? 3 : 1)) {
-    primaryLabel = 'Start live proof';
-    primaryAction = start;
   }
   const guide = assignment || queue ? checkInGuide(category, assignment ?? queue!, queue) : null;
   const workoutDetails =
@@ -399,13 +406,14 @@ export default function CoachCheckInFlow({
     workoutDetails && assignment?.mandatory
       ? workoutYoutubeSearch(queue?.label ?? assignment?.label)
       : null;
-  const canTakeWorkoutPhoto = Boolean(
-    workoutDetails &&
-    assignment?.mandatory &&
-    !workoutRewardUsed &&
-    !queue?.uri &&
-    !queue?.storageId
+  const canTakeLivePhoto = canStartCoachLivePhoto(
+    category,
+    mode,
+    today.status,
+    assignment,
+    Boolean(queue?.uri || queue?.storageId)
   );
+  const showFooter = mode === 'post' || !ready || Boolean(queue?.uri || queue?.storageId);
   const openWorkoutSearch = async () => {
     if (!workoutSearch) return;
     try {
@@ -482,7 +490,7 @@ export default function CoachCheckInFlow({
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Close check-in"
-                onPress={onClose}
+                onPress={closeSheet}
                 className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
                 <X size={20} color="#514943" />
               </TouchableOpacity>
@@ -498,14 +506,6 @@ export default function CoachCheckInFlow({
               label={busy ? 'Working…' : 'Take live proof photo'}
               disabled={busy}
               onPress={capture}
-            />
-          </View>
-          <View className="mx-5 mb-5">
-            <CoachActionButton
-              label="Cancel camera"
-              variant="secondary"
-              disabled={busy}
-              onPress={() => setShowCamera(false)}
             />
           </View>
         </View>
@@ -692,7 +692,7 @@ export default function CoachCheckInFlow({
                     This category’s daily reward slot has already been used.
                   </Text>
                 ) : null}
-                {canTakeWorkoutPhoto ? (
+                {canTakeLivePhoto ? (
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel="Take live photo using the in-app camera"
@@ -713,20 +713,17 @@ export default function CoachCheckInFlow({
                     <ArrowRight size={20} color="#F45A2B" />
                   </TouchableOpacity>
                 ) : null}
-                {!workoutDetails ? (
-                  <Text className="mt-5 font-body text-sm text-[#655B55]">
-                    Proof requires a new live camera photo. The image and caption are added on the
-                    next page.
-                  </Text>
+                {error && !showFooter ? (
+                  <Text className="mt-3 font-body text-sm text-red-600">{error}</Text>
                 ) : null}
               </>
             )}
           </ScrollView>
-          <View
-            onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-            className="border-t border-[#EEE9E5] bg-white px-6 pb-4 pt-3">
-            {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
-            {!(canTakeWorkoutPhoto && !error) ? (
+          {showFooter ? (
+            <View
+              onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+              className="border-t border-[#EEE9E5] bg-white px-6 pb-4 pt-3">
+              {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
               <CoachActionButton
                 label={busy ? 'Working…' : primaryLabel}
                 disabled={
@@ -738,33 +735,17 @@ export default function CoachCheckInFlow({
                 }
                 onPress={primaryAction}
               />
-            ) : null}
-            {mode === 'post' && queue && (queue.uri || queue.storageId) ? (
-              <CoachActionButton
-                label="Retake photo"
-                variant="secondary"
-                disabled={busy}
-                onPress={retakePhoto}
-                className="mt-2"
-              />
-            ) : null}
-            {mode === 'details' && queue && !queue.storageId ? (
-              <CoachActionButton
-                label="Cancel capture"
-                variant="secondary"
-                disabled={busy}
-                onPress={async () => {
-                  await cancel({ submissionId: queue.submissionId });
-                  if (queue.uri)
-                    await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
-                  if (queueKey) removeData(queueKey);
-                  setQueue(null);
-                  setShowCamera(false);
-                }}
-                className="mt-2"
-              />
-            ) : null}
-          </View>
+              {mode === 'post' && queue && (queue.uri || queue.storageId) ? (
+                <CoachActionButton
+                  label="Retake photo"
+                  variant="secondary"
+                  disabled={busy}
+                  onPress={retakePhoto}
+                  className="mt-2"
+                />
+              ) : null}
+            </View>
+          ) : null}
         </>
       )}
     </View>
