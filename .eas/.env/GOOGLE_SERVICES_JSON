@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "378477656027",
+    "project_id": "sweatscore-a83b8",
+    "storage_bucket": "sweatscore-a83b8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:378477656027:android:91e978e450a19fadfc99fe",
+        "android_client_info": {
+          "package_name": "com.sweatscore.sweatscoreapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNWzYOv8WGoqY7GfVB28Fw8O3XJAkIAYs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

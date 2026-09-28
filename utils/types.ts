@@ -3,6 +3,7 @@ export enum ALL_TABS {
   NOTIFICATIONS = 'notifications',
   SETTINGS = 'settings',
   REWARDS = 'rewards',
+  WORKOUTS = 'workouts',
   HUB = 'hub',
   SHARE = 'share',
 }

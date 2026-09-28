@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 
 import { components } from './_generated/api';
 import { internalAction } from './_generated/server';
+import { legacySchedulerRetired, shouldSuppressPush } from './legacySchedulerCutover';
 
 export const notificationContents = {
   newActivitySubmitted: {
@@ -26,11 +27,11 @@ export const notificationContents = {
     body: "500 points earned! You finished this month's challenge. Take your flowers and keep earning. 🎉",
   },
   newRewardUnlocked250: {
-    title: "200 points 💪",
+    title: '200 points 💪',
     body: "Look at you climb. You're right in your rhythm this week.",
   },
   newRewardUnlocked100: {
-    title: " 100 points 🎉",
+    title: ' 100 points 🎉',
     body: 'Great start to the challenge. Keep it going, sis.',
   },
   newCommentPosted: {
@@ -52,7 +53,7 @@ export const notificationContents = {
 
   // Add this
   dailyCheckInLive: {
-    title: "Time to check in 💬",
+    title: 'Time to check in 💬',
     body: "Show the sisters what you're doing today and keep your streak going.",
   },
 
@@ -101,6 +102,7 @@ export const sendPushNotification = internalAction({
     ),
   },
   handler: async (ctx, args) => {
+    if (shouldSuppressPush(legacySchedulerRetired(), args.notificationType)) return;
     const pushNotifications = new PushNotifications(components.pushNotifications);
 
     const { title, body } = notificationContents[args.notificationType];

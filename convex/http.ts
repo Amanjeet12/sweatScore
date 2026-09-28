@@ -1,9 +1,12 @@
 import { httpRouter } from 'convex/server';
+import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
+import { Id } from './_generated/dataModel';
 import { httpAction, internalMutation, internalQuery } from './_generated/server';
 import { auth } from './auth';
+import { parseRevenueCatEvent, verifyRevenueCatSignature } from './revenueCatPolicy';
 
 export const patchCompositeVideo = internalMutation({
   args: {
@@ -269,6 +272,43 @@ export const getPostsNeedingThumbnail = internalQuery({
 
 const http = httpRouter();
 
+http.route({
+  path: '/api/revenuecat-webhook',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const signingSecret = process.env.REVENUECAT_WEBHOOK_SIGNING_SECRET;
+    const expectedAuthorization = process.env.REVENUECAT_WEBHOOK_AUTHORIZATION;
+    if (
+      !signingSecret ||
+      (expectedAuthorization && request.headers.get('authorization') !== expectedAuthorization)
+    )
+      return new Response('Unauthorized', { status: 401 });
+    const body = await request.text();
+    if (
+      !(await verifyRevenueCatSignature(
+        body,
+        request.headers.get('x-revenuecat-webhook-signature'),
+        signingSecret,
+        Date.now()
+      ))
+    )
+      return new Response('Unauthorized', { status: 401 });
+    let event;
+    try {
+      event = parseRevenueCatEvent(JSON.parse(body));
+    } catch {
+      return new Response('Invalid event', { status: 400 });
+    }
+    await ctx.runMutation(internal.revenueCatEntitlements.recordWebhookEvent, {
+      eventId: event.id,
+      eventType: event.type,
+      eventAt: event.eventAt,
+      appUserIds: event.appUserIds,
+    });
+    return new Response('OK', { status: 200 });
+  }),
+});
+
 auth.addHttpRoutes(http);
 
 export const sendEmailEndpoint = httpAction(async (ctx, request) => {
@@ -347,6 +387,58 @@ http.route({
   method: 'POST',
   handler: sendEmailEndpoint,
 });
+
+// The photo is stored by this authenticated handler and immediately bound to
+// the same member's reserved proof. A generic upload storage ID cannot be
+// submitted to a public check-in mutation.
+const coachProofUploadEndpoint = httpAction(async (ctx, request) => {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return new Response('Unauthorized', { status: 401 });
+  const submissionId = request.headers.get(
+    'X-Coach-Submission'
+  ) as Id<'coachProofSubmissionsV1'> | null;
+  const token = request.headers.get('X-Coach-Capture-Token');
+  if (!submissionId || !token) return new Response('Proof session unavailable', { status: 403 });
+  let authorized = false;
+  try {
+    authorized = await ctx.runQuery(internal.coachCheckIns.authorizeUpload, {
+      userId,
+      submissionId,
+      token,
+    });
+  } catch {
+    /* Invalid or stale submission IDs are not disclosed. */
+  }
+  if (!authorized) return new Response('Proof session unavailable', { status: 403 });
+  if (request.headers.get('Content-Type')?.split(';')[0] !== 'image/jpeg')
+    return new Response('JPEG photo required', { status: 415 });
+  if (Number(request.headers.get('Content-Length') ?? 0) > 12_000_000)
+    return new Response('Invalid photo size', { status: 413 });
+  const blob = await request.blob();
+  if (blob.size < 100 || blob.size > 12_000_000)
+    return new Response('Invalid photo size', { status: 413 });
+  const signature = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+  if (signature[0] !== 0xff || signature[1] !== 0xd8 || signature[2] !== 0xff)
+    return new Response('Invalid photo format', { status: 415 });
+  const storageId = await ctx.storage.store(blob);
+  try {
+    await ctx.runMutation(internal.coachCheckIns.attachUploadedInternal, {
+      userId,
+      submissionId,
+      token,
+      storageId,
+    });
+  } catch {
+    await ctx.storage.delete(storageId);
+    return new Response('Proof session changed; retry upload', { status: 409 });
+  }
+  return new Response(JSON.stringify({ storageId }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+});
+
+http.route({ path: '/api/coach-proof-upload', method: 'POST', handler: coachProofUploadEndpoint });
 
 // Generate upload URL for Trigger.dev video merge
 const generateUploadUrlEndpoint = httpAction(async (ctx, request) => {

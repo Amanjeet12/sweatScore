@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -27,9 +28,11 @@ import {
   isAppleHealthAvailable,
 } from '~/utils/apple-health-kit';
 import { healthPermissionsAndroid } from '~/utils/constants';
-import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
 import { storeData } from '~/utils/storage';
-import { hasActiveSubscription } from '~/utils/subscription';
+import { resumeMember } from '~/utils/coachResumeNavigation';
+import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
+
+const HEALTH_ROUTE = ['health'] as const;
 
 function getHealthConnect() {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -58,6 +61,7 @@ function withTimeout<T>(
 }
 
 export default function AskHealthPermission() {
+  const { accepted } = useCoachRouteGuard(HEALTH_ROUTE);
   const appState = useRef(AppState.currentState);
   const convex = useConvex();
   const { height: windowHeight } = useWindowDimensions();
@@ -66,7 +70,7 @@ export default function AskHealthPermission() {
   const [isConnecting, setIsConnecting] = useState(false);
   const healthProviderName = Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
   const heroHeight = Math.min(Math.max(windowHeight * 0.53, 390), 475);
-  const updateOnboarded = useMutation(api.users.updateOnboarded);
+  const continueAfterHealth = useMutation(api.coachFoundation.continueAfterHealth);
   const updateUserAutoSyncEnabled = useMutation(api.users.updateUserAutoSyncEnabled);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
 
@@ -82,7 +86,11 @@ export default function AskHealthPermission() {
 
         if (!isAvailable) {
           if (!canBypassAvailability) {
-            Alert.alert('Apple Health not available');
+            Alert.alert(
+              'Apple Health not available',
+              'You can continue without health data and connect it later.'
+            );
+            await handleSkip();
             return;
           }
 
@@ -101,6 +109,7 @@ export default function AskHealthPermission() {
               { text: 'Open Settings', onPress: () => Linking.openSettings() },
             ]
           );
+          await handleSkip();
           return;
         }
 
@@ -126,7 +135,7 @@ export default function AskHealthPermission() {
       }
 
       if (status === SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
-        await handleSuccess('install');
+        await handleSkip();
         return;
       }
 
@@ -164,13 +173,14 @@ export default function AskHealthPermission() {
           ? error.message
           : 'Something went wrong while opening health permissions. Please try again.'
       );
+      await handleSkip();
     } finally {
       setIsConnecting(false);
     }
   };
 
-  const handleSuccess = async (showSuccess: string) => {
-    await updateOnboarded({ onboarded: true });
+  const handleSuccess = async (_showSuccess: string) => {
+    await continueAfterHealth({ result: 'connected' });
     await updateUserAutoSyncEnabled({ enabled: true });
 
     storeData('autoSync', { enabled: true });
@@ -178,33 +188,11 @@ export default function AskHealthPermission() {
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
 
-    if (hasPendingRevenueCatRedemption()) {
-      return;
-    }
-
-    const isSubscribed = await hasActiveSubscription(user);
-
-    router.dismissAll();
-
-    if (isSubscribed) {
-      router.replace({
-        pathname: '/(tabs)/dashboard',
-        params: { showSuccess },
-      });
-      return;
-    }
-
-    router.replace({
-      pathname: '/subscription',
-      params: {
-        redirectTo: '/(tabs)/dashboard',
-        showBackToLogin: 'true',
-      },
-    });
+    await resumeMember(convex);
   };
 
   const handleSkip = async () => {
-    await updateOnboarded({ onboarded: true });
+    await continueAfterHealth({ result: 'declined' });
     await updateUserAutoSyncEnabled({ enabled: false });
 
     storeData('autoSync', { enabled: false });
@@ -212,26 +200,7 @@ export default function AskHealthPermission() {
     const user = await convex.query(api.users.current);
     await setCurrentUser(user);
 
-    if (hasPendingRevenueCatRedemption()) {
-      return;
-    }
-
-    const isSubscribed = await hasActiveSubscription(user);
-
-    router.dismissAll();
-
-    if (isSubscribed) {
-      router.replace('/(tabs)/dashboard');
-      return;
-    }
-
-    router.replace({
-      pathname: '/subscription',
-      params: {
-        redirectTo: '/(tabs)/dashboard',
-        showBackToLogin: 'true',
-      },
-    });
+    await resumeMember(convex);
   };
 
   useEffect(() => {
@@ -262,6 +231,8 @@ export default function AskHealthPermission() {
       subscription.remove();
     };
   }, []);
+
+  if (!accepted) return <ScreenLoading />;
 
   return (
     <View className="flex-1 bg-white">

@@ -2,6 +2,7 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
+import { legacySchedulerRetired } from './legacySchedulerCutover';
 
 async function requireAdmin(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -62,6 +63,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireAdmin(ctx);
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in categories retired');
     if (!args.name.trim() || !args.description.trim())
       throw new ConvexError('Name and description are required');
     const now = Date.now();
@@ -89,6 +91,7 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in categories retired');
     const existing = await ctx.db.get(args.categoryId);
     if (!existing) throw new ConvexError('Category not found');
     if (!args.name.trim() || !args.description.trim())
@@ -111,6 +114,7 @@ export const remove = mutation({
   args: { categoryId: v.id('checkInCategories') },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in categories retired');
     const category = await ctx.db.get(args.categoryId);
     if (!category) throw new ConvexError('Category not found');
     const challenges = await ctx.db.query('challenges').collect();

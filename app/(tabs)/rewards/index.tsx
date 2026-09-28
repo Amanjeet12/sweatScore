@@ -2,9 +2,9 @@ import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Camera, LockSimple, ShareNetwork } from 'phosphor-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -118,14 +118,18 @@ function Stat({ label, value, unit }: { label: string; value: string | number; u
 }
 
 export default function TabTrack() {
+  const { openShare } = useLocalSearchParams<{ openShare?: string }>();
   const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
-  const progress = useQuery(api.progressPhotos.getDashboard, currentUser?._id ? {} : 'skip') as
-    | DashboardData
-    | undefined;
+  const { isPro, requireSubscription } = useSubscriptionGuard();
+  const progress = useQuery(
+    api.progressPhotos.getDashboard,
+    currentUser?._id && isPro ? {} : 'skip'
+  ) as DashboardData | undefined;
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const createPost = useMutation(api.posts.createPost);
   const comparisonRef = useRef<View>(null);
+  const autoShareOpened = useRef(false);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState<number | null>(null);
   const [view, setView] = useState<'front' | 'side'>('front');
   const [metric, setMetric] = useState<TrendMetric>('points');
@@ -136,7 +140,6 @@ export default function TabTrack() {
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
     writeOnly: true,
   });
-  const { requireSubscription } = useSubscriptionGuard();
 
   const openProgressPhoto = () => {
     if (
@@ -285,6 +288,38 @@ export default function TabTrack() {
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
+
+  useEffect(() => {
+    if (openShare !== '1') {
+      autoShareOpened.current = false;
+      return;
+    }
+    if (
+      autoShareOpened.current ||
+      !comparisonLeft ||
+      !comparisonRight ||
+      !shareLoadedUrls.includes(comparisonLeft) ||
+      !shareLoadedUrls.includes(comparisonRight) ||
+      !shareLogoLoaded
+    ) return;
+    autoShareOpened.current = true;
+    router.setParams({ openShare: undefined });
+    handleShare();
+  }, [openShare, comparisonLeft, comparisonRight, shareLoadedUrls, shareLogoLoaded]);
+
+  if (!isPro)
+    return (
+      <SafeAreaView className="flex-1 bg-[#F9F9F9] px-5 pt-8">
+        <Text className="font-heading text-2xl font-semibold">Your Progress</Text>
+        <View className="mt-6 rounded-2xl bg-white p-5">
+          <Text className="font-heading text-lg font-semibold">Progress access unavailable</Text>
+          <Text className="mt-2 text-sm text-[#77716D]">
+            Your saved photos remain private. Verified Premium access is required to compare, share
+            or save them.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">

@@ -1,4 +1,4 @@
-import { usePaginatedQuery } from 'convex/react';
+import { usePaginatedQuery, useQuery } from 'convex/react';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, TouchableOpacity, View } from 'react-native';
@@ -12,6 +12,7 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 
 export default function AdminViewChallenges() {
+  const schedulerStatus = useQuery(api.admin.legacySchedulerStatus, {});
   const { results, status, loadMore } = usePaginatedQuery(
     api.admin.listChallenges,
     {},
@@ -97,7 +98,11 @@ export default function AdminViewChallenges() {
                   })
                 }
                 className="mb-3">
-                <ChallengeRow challenge={item} currentTime={currentTime} />
+                <ChallengeRow
+                  challenge={item}
+                  currentTime={currentTime}
+                  schedulerRetired={schedulerStatus?.retired}
+                />
               </TouchableOpacity>
             )}
             keyExtractor={(item) => item._id}

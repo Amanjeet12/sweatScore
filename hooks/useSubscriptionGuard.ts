@@ -1,6 +1,5 @@
-import { router, usePathname } from 'expo-router';
-import { useCallback, useRef } from 'react';
-
+import { useCallback } from 'react';
+import { Alert } from 'react-native';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 
 type SubscriptionGuardOptions = {
@@ -9,47 +8,20 @@ type SubscriptionGuardOptions = {
   paywallPath?: '/subscription' | '/(tabs)/dashboard/paywall';
 };
 
+// RevenueCatProvider.isPro reflects the persisted server-verified entitlement.
+// Existing member actions remain gated without opening a second in-app paywall.
 export function useSubscriptionGuard() {
   const { isPro } = useRevenueCat();
-  const pathname = usePathname();
-
-  const openingPaywallRef = useRef(false);
-
   const requireSubscription = useCallback(
-    ({ redirectTo, source, paywallPath = '/subscription' }: SubscriptionGuardOptions = {}) => {
-      if (isPro) {
-        return true;
-      }
-
-      if (pathname === '/subscription' || pathname.includes('paywall')) {
-        return false;
-      }
-
-      if (openingPaywallRef.current) {
-        return false;
-      }
-
-      openingPaywallRef.current = true;
-
-      router.push({
-        pathname: paywallPath,
-        params: {
-          redirectTo: redirectTo || pathname || '/(tabs)/dashboard',
-          ...(source ? { source } : {}),
-        },
-      });
-
-      setTimeout(() => {
-        openingPaywallRef.current = false;
-      }, 750);
-
+    (_options: SubscriptionGuardOptions = {}) => {
+      if (isPro) return true;
+      Alert.alert(
+        'Premium access unavailable',
+        'Your purchase is not currently verified. Use Restore purchases on Today.'
+      );
       return false;
     },
-    [isPro, pathname]
+    [isPro]
   );
-
-  return {
-    isPro,
-    requireSubscription,
-  };
+  return { isPro, requireSubscription };
 }

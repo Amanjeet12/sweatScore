@@ -1,0 +1,207 @@
+import { validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
+import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
+
+export type DailyOutputV2 = DailyOutput & {
+  workoutExamples: string[];
+  workoutReason: string;
+  stepsReason: string;
+};
+export type DailyDetailsV2 = Pick<
+  DailyOutputV2,
+  'workoutExamples' | 'workoutReason' | 'stepsReason'
+>;
+
+const EXAMPLES: Record<string, readonly string[]> = {
+  full_body_strength: ['chair squats', 'wall push-ups', 'glute bridges'],
+  upper_body_strength: ['wall push-ups', 'seated rows', 'arm circles'],
+  lower_body_strength: ['chair squats', 'glute bridges', 'step-ups'],
+  core: ['dead bugs', 'bird dogs', 'gentle planks'],
+  jump_rope: ['easy skips', 'alternating-foot steps', 'side steps'],
+  cardio: ['brisk walking', 'marching in place', 'easy cycling'],
+};
+const FOODS = [
+  'eggs',
+  'egg',
+  'fish',
+  'salmon',
+  'tuna',
+  'chicken',
+  'turkey',
+  'tofu',
+  'tempeh',
+  'yoghurt',
+  'yogurt',
+  'lentils',
+  'beans',
+  'chickpeas',
+  'oats',
+  'omelette',
+];
+const unsafe =
+  /\b(?:calories|macros|grams|sets?|reps?|weights?|cheat(?:ing)?|bad food|good food)\b|—/i;
+const remembered = /\b(?:you (?:logged|ate|had)|your last (?:meal|food))\b/i;
+const preference =
+  /\b(?:you enjoy|you like|your (?:usual|favourite|favorite|preferred) (?:meal|food))\b/i;
+
+function text(value: unknown, max: number) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max || unsafe.test(value))
+    throw new Error('invalid_output');
+  return value.trim();
+}
+
+export function validateDailyPlanOutputV2(
+  value: unknown,
+  snapshot: DailySnapshot,
+  day: string,
+  recentPlans: { day: string; output: DailyOutput }[] = []
+): ValidatedPlan & { detailsV2: DailyDetailsV2 } {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('invalid_output');
+  const data = value as Record<string, unknown>;
+  const keys = [
+    'headline',
+    'workout',
+    'workoutExamples',
+    'workoutReason',
+    'steps',
+    'stepsReason',
+    'sleep',
+    'meals',
+    'why',
+  ];
+  if (Object.keys(data).sort().join('|') !== keys.sort().join('|'))
+    throw new Error('invalid_output');
+  const { workoutExamples, workoutReason, stepsReason, ...six } = data;
+  const base = validateDailyPlanOutput(six, snapshot, day, recentPlans);
+  if (!Array.isArray(workoutExamples) || workoutExamples.some((item) => typeof item !== 'string'))
+    throw new Error('invalid_output');
+  const examples = (workoutExamples as string[]).map((item) => item.trim().toLowerCase());
+  const workoutExplanation = text(workoutReason, 300);
+  const stepExplanation = text(stepsReason, 300);
+  if (
+    /\b(?:you completed|you trained|you logged a workout|yesterday.{0,50}(?:workout|session)|(?:workout|session).{0,50}yesterday)\b/i.test(
+      `${workoutExplanation} ${base.output.why}`
+    )
+  )
+    throw new Error('invalid_output');
+  if (base.workout.type === 'rest') {
+    if (
+      examples.length ||
+      !/rest|recover/i.test(workoutExplanation) ||
+      /\b(?:try|exercise|workout)\b/i.test(workoutExplanation)
+    )
+      throw new Error('invalid_output');
+  } else {
+    const allowed = EXAMPLES[base.workout.type];
+    if (
+      examples.length < 2 ||
+      examples.length > 3 ||
+      new Set(examples).size !== examples.length ||
+      examples.some((item) => !allowed.includes(item))
+    )
+      throw new Error('invalid_output');
+    if (
+      snapshot.daily.body === 'sore_upper' &&
+      (!/(?:upper[- ]body|arms?)/i.test(workoutExplanation) ||
+        !/recover|rest|avoid/i.test(workoutExplanation))
+    )
+      throw new Error('invalid_output');
+    if (
+      snapshot.daily.body === 'sore_lower' &&
+      (!/(?:legs?|lower[- ]body)/i.test(workoutExplanation) ||
+        !/recover|rest|avoid/i.test(workoutExplanation))
+    )
+      throw new Error('invalid_output');
+  }
+  const avg = verifiedStepAverage(snapshot);
+  const stepNumbers = [...stepExplanation.matchAll(/\b\d[\d,]*\b/g)].map((match) =>
+    Number(match[0].replaceAll(',', ''))
+  );
+  // The explanation may repeat the single canonical target. When an observed
+  // average exists it may cite that too; neither is a second target.
+  if (stepNumbers.some((number) => number !== base.stepTarget && number !== avg))
+    throw new Error('invalid_output');
+  if (avg === undefined) {
+    if (
+      /\baverage|averaging\b/i.test(`${stepExplanation} ${base.output.why}`) ||
+      /\b(?:your recent steps|your observed steps|your usual steps|your step history)\b/i.test(
+        `${stepExplanation} ${base.output.why}`
+      ) ||
+      !/\b(today|sleep|energy|sore|pain|rest|light|ready)\b/i.test(stepExplanation)
+    )
+      throw new Error('invalid_output');
+  } else if (!/recent steps|observed steps|usual steps|walking|average/i.test(stepExplanation)) {
+    throw new Error('invalid_output');
+  }
+  const targetNumber = base.stepTarget.toLocaleString('en-US');
+  if (!base.output.why.includes(targetNumber) && !base.output.why.includes(String(base.stepTarget)))
+    throw new Error('invalid_output');
+  const workoutMention: Record<string, RegExp> = {
+    rest: /rest|recover/i,
+    lower_body_strength: /lower[- ]body|legs?/i,
+    upper_body_strength: /upper[- ]body|arms?/i,
+    full_body_strength: /full[- ]body|strength/i,
+    core: /core/i,
+    jump_rope: /jump|rope|skip/i,
+    cardio: /cardio|walking|cycling|march/i,
+  };
+  if (!workoutMention[base.workout.type].test(base.output.why)) throw new Error('invalid_output');
+  const mealFood = FOODS.find((food) => new RegExp(`\\b${food}\\b`, 'i').test(base.output.meals));
+  const priorFoodClaim = remembered.test(`${base.output.meals} ${base.output.why}`);
+  const claimedFoods = FOODS.filter((food) =>
+    new RegExp(
+      `\\b(?:you (?:logged|ate|had)|your last (?:meal|food))\\b[^.!?]{0,60}\\b${food}\\b`,
+      'i'
+    ).test(`${base.output.meals} ${base.output.why}`)
+  );
+  const captionSupportsFood = (snapshot.mealHistory ?? []).some(
+    (item) =>
+      item.source === 'shared_member_caption' &&
+      new RegExp(`\\b${mealFood}\\b`, 'i').test(item.caption)
+  );
+  if (
+    !mealFood ||
+    !/meal|food|eggs?|fish|salmon|tuna|chicken|tofu|beans|lentils|yogurt|yoghurt|chickpeas|oats|omelette/i.test(
+      base.output.why
+    ) ||
+    /protein at the centre of every plate/i.test(base.output.meals) ||
+    preference.test(`${base.output.meals} ${base.output.why}`) ||
+    (priorFoodClaim &&
+      (!captionSupportsFood ||
+        !claimedFoods.length ||
+        claimedFoods.some(
+          (food) =>
+            !(snapshot.mealHistory ?? []).some(
+              (item) =>
+                item.source === 'shared_member_caption' &&
+                new RegExp(`\\b${food}\\b`, 'i').test(item.caption)
+            )
+        )))
+  )
+    throw new Error('invalid_output');
+  if (
+    snapshot.daily.body === 'pain_unwell' &&
+    /\b(?:exercise|squats|push-ups|planks)\b/i.test(`${workoutExplanation} ${base.output.why}`)
+  )
+    throw new Error('invalid_output');
+  return {
+    ...base,
+    detailsV2: {
+      workoutExamples: examples,
+      workoutReason: workoutExplanation,
+      stepsReason: stepExplanation,
+    },
+  };
+}
+
+export function workoutRecommendationV2(
+  output: DailyOutput,
+  details: DailyDetailsV2,
+  rest: boolean
+) {
+  if (rest) return output.workout;
+  return `${output.workout} Try ${details.workoutExamples.join(', ')}. ${details.workoutReason}`;
+}
+export function stepsRecommendationV2(output: DailyOutput, details: DailyDetailsV2) {
+  return `${output.steps}. ${details.stepsReason}`;
+}

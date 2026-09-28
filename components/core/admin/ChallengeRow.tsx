@@ -10,9 +10,14 @@ type ChallengeRowProps = {
   };
 
   currentTime: number;
+  schedulerRetired?: boolean;
 };
 
-export default function ChallengeRow({ challenge, currentTime }: ChallengeRowProps) {
+export default function ChallengeRow({
+  challenge,
+  currentTime,
+  schedulerRetired,
+}: ChallengeRowProps) {
   const challengeType = challenge.type ?? 'challenge';
 
   const typeLabel =
@@ -123,7 +128,7 @@ export default function ChallengeRow({ challenge, currentTime }: ChallengeRowPro
           {challenge.isLocked && <Text className="text-xs text-amber-600">🔒 Premium</Text>}
         </View>
 
-        {scheduleLabel && (
+        {scheduleLabel && !schedulerRetired && (
           <View className="mt-1">
             <View className="flex-row flex-wrap items-center gap-2">
               <View

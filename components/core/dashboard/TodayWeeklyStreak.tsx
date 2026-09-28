@@ -11,13 +11,15 @@ export default function TodayWeeklyStreak({
   target = 5,
   currentWeeklyStreak = 0,
   tourTargetRef,
+  refresh,
 }: {
   daysEarned?: number;
   target?: number;
   currentWeeklyStreak?: number;
   tourTargetRef?: RefObject<View>;
+  refresh?: number;
 }) {
-  const week = useQuery(api.challengeCompletions.getUserCompletionsForWeek);
+  const week = useQuery(api.challengeCompletions.getUserCompletionsForWeek, { refresh });
 
   return (
     <View

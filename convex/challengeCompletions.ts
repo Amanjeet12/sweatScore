@@ -8,6 +8,7 @@ import { internalMutation, mutation, query, QueryCtx, MutationCtx } from './_gen
 import { getSafeMemberName, getSafeUserImageUrl } from './chat/userPresentation';
 import { evaluateUserMilestones } from './utils/milestones';
 import { getStreakEarnedDatesInRange, WEEKLY_STREAK_TARGET_DAYS } from './utils/streak';
+import { rewardSlotKey } from '../shared/coachFoundation';
 import {
   addDaysUTC,
   addDaysToDateKey,
@@ -315,6 +316,26 @@ export const completeChallenge = mutation({
 
     const isDailyChallenge = challenge.isDailyChallenge === true;
     const isCheckIn = challenge.type === 'check_in';
+    if (isCheckIn) {
+      // Legacy check-ins have no reliable category context. Once a new proof
+      // reserves a category, conservatively prevent an old binary earning a
+      // second check-in reward on the same local day.
+      const coachSlots = await ctx.db
+        .query('coachRewardSlotsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', todayStr))
+        .collect();
+      if (coachSlots.length) throw new ConvexError('A plan check-in is already reserved today');
+      const activities = await ctx.db
+        .query('dailyActivities')
+        .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', todayStr))
+        .collect();
+      if (
+        activities.some(
+          (item) => item.loggedActivityKey === 'gym_workout' || item.loggedActivityKey === 'workout'
+        )
+      )
+        throw new ConvexError('Workout activity already completed today');
+    }
     const isCommunityChallenge = challenge.isCommunityChallenge === true;
     const isSideBySideChallenge =
       !isCheckIn && (!isCommunityChallenge || challenge.outputType === 'side_by_side');
@@ -613,6 +634,23 @@ export const completeChallenge = mutation({
     };
 
     const completionId = await ctx.db.insert('challengeCompletions', completionData);
+    if (isCheckIn) {
+      await ctx.db.insert('coachRewardSlotsV1', {
+        userId,
+        day: todayStr,
+        category: 'workout',
+        ordinal: 1,
+        key: rewardSlotKey(todayStr, 'workout', 1),
+        state: 'legacy_consumed',
+        legacySource: {
+          table: 'challengeCompletions',
+          id: String(completionId),
+          context: 'legacy_unknown',
+        },
+        pointsEarned: totalPoints,
+        createdAt: now,
+      });
+    }
 
     if (communityParticipant && completionBankPointsEarned > 0) {
       await ctx.db.patch(communityParticipant._id, {
@@ -859,7 +897,7 @@ export const completeChallenge = mutation({
 });
 
 export const getUserCompletionsForWeek = query({
-  args: {},
+  args: { refresh: v.optional(v.number()) },
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
@@ -910,7 +948,7 @@ export const getUserCompletionsForWeek = query({
 });
 
 export const getUserStreaksForMonth = query({
-  args: {},
+  args: { refresh: v.optional(v.number()) },
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
@@ -1529,7 +1567,7 @@ export const getCompletionCompositeVideo = query({
 });
 
 export const getPointsEarnedToday = query({
-  args: {},
+  args: { refresh: v.optional(v.number()) },
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {

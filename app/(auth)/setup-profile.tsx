@@ -35,8 +35,13 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 import { formatDateToLocaleString } from '~/utils/formatter';
+import { resumeMember } from '~/utils/coachResumeNavigation';
+import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
+
+const BIO_ROUTE = ['bio'] as const;
 
 export default function SetupProfile() {
+  const { accepted } = useCoachRouteGuard(BIO_ROUTE);
   const convex = useConvex();
   const [error, setError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<ImagePickerAsset | null>(null);
@@ -128,7 +133,7 @@ export default function SetupProfile() {
     if (response) {
       const user = await convex.query(api.users.current);
       setCurrentUser(user);
-      router.push('/(auth)/setup-activity-goal');
+      await resumeMember(convex);
     }
 
     setIsLoading(false);
@@ -166,7 +171,7 @@ export default function SetupProfile() {
     }
   }, [currentUser?.name, currentUser?.birthdate]);
 
-  if (isPending) return <ScreenLoading />;
+  if (isPending || !accepted) return <ScreenLoading />;
 
   const avatarUri = photo?.uri ?? currentUser?.image ?? undefined;
   const hasAvatar = !!avatarUri;

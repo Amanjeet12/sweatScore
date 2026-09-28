@@ -3,7 +3,6 @@ import { PushNotifications } from '@convex-dev/expo-push-notifications';
 import { ConvexError, v } from 'convex/values';
 
 import { components, internal } from './_generated/api';
-import { applyFreeDailyCap } from './challengeCompletions';
 import { Id } from './_generated/dataModel';
 import {
   action,
@@ -15,6 +14,7 @@ import {
 } from './_generated/server';
 import { MailerLiteGroup } from './mailerlite';
 import { EnduranceZoneUserUpsertResponse } from './services/enduranceZone';
+import { formatDateInTZ } from './utils/timezone';
 
 export const current = query({
   args: {},
@@ -149,25 +149,10 @@ export const updateUserIsPremium = mutation({
   args: {
     isPremium: v.boolean(),
   },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return;
-
-    const user = await ctx.db.get(userId);
-    if (!user) return;
-
-    await ctx.db.patch(userId, {
-      isPremium: args.isPremium,
-    });
-
-    if (!args.isPremium) {
-      await ctx.scheduler.runAfter(0, internal.users.syncToEnduranceZoneForUser, {
-        userId,
-        level: 'Basic',
-      });
-    }
-
-    return { success: true };
+  returns: v.null(),
+  handler: async () => {
+    // Kept for old clients; a client boolean or SDK result is never proof of payment.
+    throw new ConvexError('Premium is verified by the server');
   },
 });
 
@@ -259,40 +244,6 @@ export const updateLastActiveAt = mutation({
       countryCode: args.countryCode ?? user.countryCode,
     });
 
-    const userCheckIn = await ctx.db
-      .query('userCheckIns')
-      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', args.date))
-      .unique();
-
-    const DAILY_CHECK_IN_POINTS = 1;
-
-    if (!userCheckIn) {
-      const cappedPoints = await applyFreeDailyCap(
-        ctx,
-        userId,
-        args.date,
-        DAILY_CHECK_IN_POINTS,
-        'checkin'
-      );
-      await ctx.db.insert('userCheckIns', {
-        userId,
-        date: args.date,
-        points: cappedPoints,
-      });
-
-      const yearMonth = args.date.split('-')[0] + '-' + args.date.split('-')[1];
-      ctx.runMutation(internal.leaderboard.updateMonthlyLeaderboard, {
-        userId,
-        yearMonth,
-      });
-
-      // Recompute track rollups after check-in
-      await ctx.runMutation(internal.track.recompute.recomputeTrackForDate, {
-        userId,
-        date: args.date,
-      });
-    }
-
     return { success: true };
   },
 });
@@ -325,7 +276,9 @@ export const updateOnboarded = mutation({
   args: {
     onboarded: v.boolean(),
   },
+  returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
+    if (!args.onboarded) throw new ConvexError('Onboarding cannot be reset by the client');
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new ConvexError('User not found');
@@ -336,8 +289,41 @@ export const updateOnboarded = mutation({
       throw new ConvexError('User not found');
     }
 
-    if (!user.onboarded && args.onboarded) {
-      ctx.scheduler.runAfter(
+    const day = formatDateInTZ(new Date(), user.timezone);
+    const state = await ctx.db
+      .query('coachOnboardingV1')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique();
+    const billing = await ctx.db
+      .query('coachBillingEntitlementsV1')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique();
+    const request = state?.firstPlanRequestId ? await ctx.db.get(state.firstPlanRequestId) : null;
+    const profile = state?.profileRevisionId ? await ctx.db.get(state.profileRevisionId) : null;
+    const daily = state?.dailyAnswerId ? await ctx.db.get(state.dailyAnswerId) : null;
+    const access =
+      user.isAdmin ||
+      (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()));
+    if (
+      !user.name?.trim() ||
+      !user.birthdate ||
+      !state?.healthContinuation ||
+      !profile ||
+      profile.userId !== userId ||
+      !daily ||
+      daily.userId !== userId ||
+      daily.day !== day ||
+      !request ||
+      request.userId !== userId ||
+      request.day !== day ||
+      !access
+    )
+      throw new ConvexError('Saved answers and verified access required');
+
+    if (user.onboarded) return { success: true };
+
+    if (!user.onboarded) {
+      await ctx.scheduler.runAfter(
         24 * 60 * 60 * 1000,
         internal.notifications.sendNoActivityReminderNotification,
         {
@@ -350,8 +336,8 @@ export const updateOnboarded = mutation({
       onboarded: args.onboarded,
     });
 
-    if (args.onboarded) {
-      ctx.scheduler.runAfter(0, internal.mailerlite.addUserToGroup, {
+    if (user.email && user.name) {
+      await ctx.scheduler.runAfter(0, internal.mailerlite.addUserToGroup, {
         userId,
         email: user.email!,
         name: user.name!,
@@ -428,7 +414,7 @@ export const saveEnduranceZoneData = internalMutation({
 });
 
 // Action to sync user to Endurance Zone
-export const syncToEnduranceZone = action({
+export const syncToEnduranceZone = internalAction({
   args: {
     level: v.optional(
       v.union(
@@ -551,6 +537,59 @@ export const deleteAccount = mutation({
     // Find user by email
     const user = await ctx.db.get(userId);
     if (!user) return;
+
+    // Delete unattached proof media as well as member-owned coach records.
+    for (const table of [
+      'coachMealScansV1',
+      'coachMealDraftsV1',
+      'coachProofEventsV1',
+      'coachProofSubmissionsV1',
+      'coachRewardSlotsV1',
+      'coachAssignmentsV1',
+      'coachPlanRevisionsV1',
+      'coachPlanRequestsV1',
+      'coachDailyAnswersV1',
+      'coachProfileRevisionsV1',
+      'coachWeightObservationsV1',
+      'coachOnboardingV1',
+      'coachBillingEntitlementsV1',
+      'coachBillingChecksV1',
+    ] as const) {
+      const records = await ctx.db
+        .query(table)
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .collect();
+      for (const record of records) {
+        if (table === 'coachMealDraftsV1' && 'storageId' in record && record.storageId) {
+          const linkedActivity =
+            'activityId' in record && record.activityId
+              ? await ctx.db.get(record.activityId)
+              : null;
+          const proof = 'submissionId' in record ? await ctx.db.get(record.submissionId) : null;
+          if (!linkedActivity && proof?.storageId !== record.storageId)
+            await ctx.storage.delete(record.storageId);
+        }
+        if (table === 'coachProofSubmissionsV1' && 'storageId' in record && record.storageId) {
+          const linkedActivity =
+            'activityId' in record && record.activityId
+              ? await ctx.db.get(record.activityId)
+              : null;
+          if (!linkedActivity) await ctx.storage.delete(record.storageId);
+        }
+        await ctx.db.delete(record._id);
+      }
+    }
+    const previewAttempts = await ctx.db
+      .query('coachTonePreviewAttemptsV1')
+      .withIndex('by_admin', (q) => q.eq('adminUserId', userId))
+      .collect();
+    for (const attempt of previewAttempts) await ctx.db.delete(attempt._id);
+    const toneSettings = await ctx.db.query('coachToneSettingsV1').collect();
+    for (const setting of toneSettings) {
+      if (setting.adminUserId === userId) {
+        await ctx.db.patch(setting._id, { adminUserId: undefined, actorStatus: 'deleted_admin' });
+      }
+    }
 
     // Delete user's profile image from storage if exists
     if (user.image) {

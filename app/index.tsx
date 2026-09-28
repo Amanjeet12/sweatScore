@@ -11,8 +11,9 @@ import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimar
 import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
-import { getData, storeData } from '~/utils/storage';
+import { storeData } from '~/utils/storage';
 
 export default function Home() {
   const convex = useConvex();
@@ -42,34 +43,7 @@ export default function Home() {
         enabled: user.autoSyncEnabled ?? true,
       });
 
-      router.dismissAll();
-
-      if (!user.name || !user.birthdate) {
-        router.replace('/(auth)/setup-profile');
-        return;
-      }
-
-      if (!user.activityGoal) {
-        router.replace('/(auth)/setup-activity-goal');
-        return;
-      }
-
-      if (!user.expoPushToken && !getData('skipPushPermission')) {
-        router.replace('/(auth)/ask-push-permission');
-        return;
-      }
-
-      if (!user.onboarded) {
-        router.replace('/(auth)/ask-health-permission');
-        return;
-      }
-
-      if (hasPendingRevenueCatRedemption()) {
-        return;
-      }
-
-      // Subscription gates premium actions, not access to the app itself.
-      router.replace('/(tabs)/dashboard');
+      await resumeMember(convex);
     } catch (error) {
       console.error('Authentication check failed:', error);
     } finally {

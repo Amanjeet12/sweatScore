@@ -1,13 +1,15 @@
-import { router } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
+import { useConvex } from 'convex/react';
 
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { useAuthStore } from '~/store/useAuthStore';
 import { REVENUECAT_PENDING_REDEMPTION_KEY } from '~/utils/revenuecatRedemption';
 import { getData, removeData, storage } from '~/utils/storage';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 
 export default function RevenueCatRedemptionHandler() {
+  const convex = useConvex();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { redeemWebPurchaseUrl } = useRevenueCat();
   const processingRef = useRef(false);
@@ -23,15 +25,19 @@ export default function RevenueCatRedemptionHandler() {
     removeData(REVENUECAT_PENDING_REDEMPTION_KEY);
   }, []);
 
-  const handleSuccess = useCallback(() => {
+  const handleSuccess = useCallback(async () => {
     clearPendingRedemption();
-    Alert.alert(
-      "You're Premium! 🎉",
-      'Your SweatScore membership is now active.',
-      [{ text: 'Continue', onPress: () => router.replace('/(tabs)/dashboard') }],
-      { cancelable: false }
-    );
-  }, [clearPendingRedemption]);
+    const decision = await resumeMember(convex);
+    if (decision.screen === 'today' && decision.requestStatus === 'ready')
+      setTimeout(
+        () =>
+          Alert.alert(
+            "You're Premium! 🎉",
+            'Your saved plan is ready. Choose “View today’s plan” on Today.'
+          ),
+        300
+      );
+  }, [clearPendingRedemption, convex]);
 
   const handleExpired = useCallback(
     (email?: string) => {
@@ -80,7 +86,6 @@ export default function RevenueCatRedemptionHandler() {
       if (
         !normalizedUrl ||
         !currentUser?._id ||
-        !currentUser.onboarded ||
         processingRef.current ||
         currentProcessingUrlRef.current === normalizedUrl ||
         attemptedErrorUrlRef.current === normalizedUrl
@@ -96,7 +101,7 @@ export default function RevenueCatRedemptionHandler() {
 
         switch (result.status) {
           case 'success':
-            handleSuccess();
+            await handleSuccess();
             break;
           case 'expired':
             handleExpired(result.email);
@@ -112,7 +117,12 @@ export default function RevenueCatRedemptionHandler() {
             handleError(result.error);
             break;
           case 'login_required':
+            break;
           case 'not_ready':
+            Alert.alert(
+              'Verification pending',
+              'Your redemption is saved. Premium will activate after server verification.'
+            );
             break;
         }
       } catch (error) {
@@ -135,11 +145,11 @@ export default function RevenueCatRedemptionHandler() {
   );
 
   const processPendingRedemption = useCallback(async () => {
-    if (!currentUser?._id || !currentUser.onboarded) return;
+    if (!currentUser?._id) return;
 
     const pendingUrl = getPendingRedemptionUrl();
     if (pendingUrl) await processRedemptionUrl(pendingUrl);
-  }, [currentUser?._id, currentUser?.onboarded, getPendingRedemptionUrl, processRedemptionUrl]);
+  }, [currentUser?._id, getPendingRedemptionUrl, processRedemptionUrl]);
 
   useEffect(() => {
     processPendingRedemption().catch(handleError);

@@ -1,6 +1,18 @@
 import { authTables } from '@convex-dev/auth/server';
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import {
+  category,
+  dailyAnswers,
+  detail,
+  planOutput,
+  planDetailsV2,
+  profileAnswers,
+  tone,
+  toneScope,
+  weightAnswer,
+  workoutMetadata,
+} from './coachFoundationValidators';
 
 const schema = defineSchema({
   ...authTables,
@@ -57,6 +69,7 @@ const schema = defineSchema({
     reviewedAt: v.optional(v.number()), // The timestamp when the activity was approved
     reviewStatus: v.optional(v.union(v.literal('approved'), v.literal('rejected'))), // The status of the approval
     image: v.optional(v.id('_storage')),
+    coachSubmissionId: v.optional(v.id('coachProofSubmissionsV1')),
     loggedActivityKey: v.optional(
       v.union(
         v.literal('hydration'),
@@ -349,6 +362,404 @@ const schema = defineSchema({
     featureFlag: v.union(v.literal('mission'), v.literal('progress_coach')),
     enabled: v.boolean(),
   }).index('by_user_feature_flag', ['userId', 'featureFlag']),
+  // Additive v1 foundation. No legacy table is rewritten during this stage.
+  coachOnboardingV1: defineTable({
+    userId: v.id('users'),
+    stage: v.union(
+      v.literal('profile'),
+      v.literal('health'),
+      v.literal('daily'),
+      v.literal('paywall'),
+      v.literal('complete')
+    ),
+    profileDraft: v.optional(
+      v.object({
+        weight: v.optional(weightAnswer),
+        goal: v.optional(profileAnswers.fields.goal),
+        bodyFeeling: v.optional(profileAnswers.fields.bodyFeeling),
+        routineFeeling: v.optional(profileAnswers.fields.routineFeeling),
+        foodRelationship: v.optional(profileAnswers.fields.foodRelationship),
+        usualSleep: v.optional(profileAnswers.fields.usualSleep),
+        biggestChallenge: v.optional(profileAnswers.fields.biggestChallenge),
+      })
+    ),
+    healthContinuation: v.optional(
+      v.union(v.literal('connected'), v.literal('declined'), v.literal('unavailable'))
+    ),
+    dailyDraft: v.optional(
+      v.object({
+        sleep: v.optional(dailyAnswers.fields.sleep),
+        energy: v.optional(dailyAnswers.fields.energy),
+        mood: v.optional(dailyAnswers.fields.mood),
+        upFor: v.optional(dailyAnswers.fields.upFor),
+        body: v.optional(dailyAnswers.fields.body),
+      })
+    ),
+    dailyDraftDay: v.optional(v.string()),
+    profileRevisionId: v.optional(v.id('coachProfileRevisionsV1')),
+    dailyAnswerId: v.optional(v.id('coachDailyAnswersV1')),
+    firstPlanRequestId: v.optional(v.id('coachPlanRequestsV1')),
+    entitlement: v.union(v.literal('unverified'), v.literal('verified'), v.literal('expired')),
+    entitlementCheckedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+  coachBillingEntitlementsV1: defineTable({
+    userId: v.id('users'),
+    revenueCatAppUserId: v.string(),
+    status: v.union(v.literal('active'), v.literal('inactive')),
+    source: v.literal('revenuecat_server'),
+    providerCheckedAt: v.number(),
+    checkedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    productId: v.optional(v.string()),
+    lastEventId: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+  coachBillingEventsV1: defineTable({
+    eventId: v.string(),
+    eventType: v.string(),
+    eventAt: v.number(),
+    appUserIds: v.array(v.string()),
+    receivedAt: v.number(),
+    status: v.union(v.literal('queued'), v.literal('ignored')),
+  }).index('by_event_id', ['eventId']),
+  coachBillingChecksV1: defineTable({
+    userId: v.id('users'),
+    reason: v.union(v.literal('client'), v.literal('webhook'), v.literal('expiry')),
+    status: v.union(
+      v.literal('active'),
+      v.literal('inactive'),
+      v.literal('error'),
+      v.literal('stale')
+    ),
+    providerCheckedAt: v.optional(v.number()),
+    eventId: v.optional(v.string()),
+    checkedAt: v.number(),
+  }).index('by_user', ['userId']),
+  coachProfileRevisionsV1: defineTable({
+    userId: v.id('users'),
+    version: v.number(),
+    answers: profileAnswers,
+    weightObservationId: v.id('coachWeightObservationsV1'),
+    source: v.union(v.literal('member'), v.literal('legacy_mapped')),
+    createdAt: v.number(),
+  })
+    .index('by_user_version', ['userId', 'version'])
+    .index('by_user', ['userId']),
+  coachWeightObservationsV1: defineTable({
+    userId: v.id('users'),
+    version: v.number(),
+    weight: weightAnswer,
+    observedAt: v.optional(v.number()),
+    recordedAt: v.number(),
+    source: v.union(v.literal('member'), v.literal('legacy_known'), v.literal('legacy_unknown')),
+    sourceId: v.optional(v.string()),
+  })
+    .index('by_user_version', ['userId', 'version'])
+    .index('by_user', ['userId']),
+  coachDailyAnswersV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    version: v.number(),
+    answers: dailyAnswers,
+    source: v.literal('member'),
+    createdAt: v.number(),
+  })
+    .index('by_user_day_version', ['userId', 'day', 'version'])
+    .index('by_user', ['userId']),
+  coachPlanRequestsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    requestKey: v.string(),
+    kind: v.union(
+      v.literal('first'),
+      v.literal('daily'),
+      v.literal('profile_refresh'),
+      v.literal('retry')
+    ),
+    retryOfRequestId: v.optional(v.id('coachPlanRequestsV1')),
+    profileRevisionId: v.id('coachProfileRevisionsV1'),
+    dailyAnswerId: v.id('coachDailyAnswersV1'),
+    // Immutable input and generation identity; status alone may transition later.
+    inputSnapshot: v.object({
+      profile: profileAnswers,
+      weight: weightAnswer,
+      weightHistory: v.array(
+        v.object({
+          value: v.number(),
+          unit: v.union(v.literal('kg'), v.literal('lb')),
+          observedAt: v.optional(v.number()),
+          source: v.union(
+            v.literal('member'),
+            v.literal('legacy_known'),
+            v.literal('legacy_unknown')
+          ),
+        })
+      ),
+      daily: dailyAnswers,
+      health: v.object({
+        steps: v.array(
+          v.object({
+            day: v.string(),
+            count: v.number(),
+            source: v.optional(v.literal('health_sync')),
+            coverage: v.optional(v.union(v.literal('sensor_observed'), v.literal('unknown'))),
+          })
+        ),
+        workouts: v.array(
+          v.object({
+            day: v.string(),
+            label: v.string(),
+            source: v.optional(
+              v.union(v.literal('activity_log'), v.literal('check_in_completion'))
+            ),
+          })
+        ),
+        stepAverage: v.optional(v.number()),
+        streak: v.optional(v.number()),
+      }),
+      recentPlanRevisionIds: v.array(v.id('coachPlanRevisionsV1')),
+      mealHistory: v.optional(
+        v.array(
+          v.object({
+            day: v.string(),
+            caption: v.string(),
+            source: v.literal('shared_member_caption'),
+          })
+        )
+      ),
+    }),
+    promptVersion: v.string(),
+    toneVersion: v.number(),
+    status: v.union(v.literal('pending'), v.literal('ready'), v.literal('failed')),
+    errorCode: v.optional(
+      v.union(
+        v.literal('provider_timeout'),
+        v.literal('provider_rate_limited'),
+        v.literal('provider_unavailable'),
+        v.literal('invalid_output'),
+        v.literal('generation_failed'),
+        v.literal('policy_unresolved'),
+        v.literal('superseded')
+      )
+    ),
+    validationStage: v.optional(
+      v.union(v.literal('provider_format'), v.literal('plan_validation'))
+    ),
+    generationAttempt: v.optional(v.number()),
+    queuedAt: v.optional(v.number()),
+    dispatchedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    provider: v.optional(v.literal('anthropic')),
+    model: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_day_key', ['userId', 'day', 'requestKey'])
+    .index('by_user_day_kind', ['userId', 'day', 'kind'])
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_user', ['userId']),
+  coachPlanRevisionsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    version: v.number(),
+    requestId: v.id('coachPlanRequestsV1'),
+    output: planOutput,
+    detailsV2: v.optional(planDetailsV2),
+    workout: workoutMetadata,
+    stepTarget: v.number(),
+    sleepTargetHours: v.literal(7),
+    promptVersion: v.string(),
+    toneVersion: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_user_day_version', ['userId', 'day', 'version'])
+    .index('by_request', ['requestId'])
+    .index('by_user', ['userId']),
+  coachAssignmentsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    category,
+    planRevisionId: v.id('coachPlanRevisionsV1'),
+    recommendation: v.string(),
+    label: v.string(),
+    detailsV2: v.optional(planDetailsV2),
+    workout: v.optional(workoutMetadata),
+    stepTarget: v.optional(v.number()),
+    sleepTargetHours: v.optional(v.literal(7)),
+    createdAt: v.number(),
+  })
+    .index('by_user_day_category_revision', ['userId', 'day', 'category', 'planRevisionId'])
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_user', ['userId']),
+  coachRewardSlotsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    category,
+    ordinal: v.number(),
+    key: v.string(),
+    state: v.union(v.literal('reserved'), v.literal('earned'), v.literal('legacy_consumed')),
+    submissionId: v.optional(v.id('coachProofSubmissionsV1')),
+    legacySource: v.optional(
+      v.object({
+        table: v.union(v.literal('challengeCompletions'), v.literal('dailyActivities')),
+        id: v.string(),
+        context: v.literal('legacy_unknown'),
+      })
+    ),
+    pointsEarned: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index('by_user_key', ['userId', 'key'])
+    .index('by_day', ['day'])
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_user', ['userId']),
+  coachProofSubmissionsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    requestKey: v.string(),
+    assignmentId: v.id('coachAssignmentsV1'),
+    planRevisionId: v.id('coachPlanRevisionsV1'),
+    category,
+    recommendation: v.string(),
+    label: v.string(),
+    slotKey: v.string(),
+    state: v.union(
+      v.literal('reserved'),
+      v.literal('uploaded'),
+      v.literal('cancelled'),
+      v.literal('failed'),
+      v.literal('completed'),
+      v.literal('reversed')
+    ),
+    storageId: v.optional(v.id('_storage')),
+    captureToken: v.optional(v.string()),
+    captureSource: v.optional(v.literal('live_camera')),
+    uploadIssuedAt: v.optional(v.number()),
+    activityId: v.optional(v.id('dailyActivities')),
+    completedAt: v.optional(v.number()),
+    reversedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_day_key', ['userId', 'day', 'requestKey'])
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_storage', ['storageId'])
+    .index('by_user', ['userId']),
+  coachProofEventsV1: defineTable({
+    userId: v.id('users'),
+    submissionId: v.id('coachProofSubmissionsV1'),
+    day: v.string(),
+    action: v.union(v.literal('completed'), v.literal('reversed')),
+    points: v.number(),
+    activityId: v.optional(v.id('dailyActivities')),
+    at: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_submission', ['submissionId']),
+  coachMealDraftsV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    submissionId: v.id('coachProofSubmissionsV1'),
+    assignmentId: v.id('coachAssignmentsV1'),
+    planRevisionId: v.id('coachPlanRevisionsV1'),
+    recommendation: v.string(),
+    storageId: v.id('_storage'),
+    caption: v.string(),
+    goal: v.union(
+      v.literal('lose'),
+      v.literal('recomp'),
+      v.literal('fitness'),
+      v.literal('unavailable')
+    ),
+    workoutLoggedToday: v.boolean(),
+    promptVersion: v.string(),
+    toneVersion: v.number(),
+    tone,
+    detail,
+    status: v.union(
+      v.literal('draft'),
+      v.literal('analyzing'),
+      v.literal('ready'),
+      v.literal('failed'),
+      v.literal('shared'),
+      v.literal('superseded')
+    ),
+    verdict: v.optional(
+      v.union(
+        v.literal('On point'),
+        v.literal('Nearly there'),
+        v.literal('Room to improve'),
+        v.null()
+      )
+    ),
+    feedback: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    scanId: v.optional(v.id('coachMealScansV1')),
+    activityId: v.optional(v.id('dailyActivities')),
+    postId: v.optional(v.id('posts')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_submission', ['submissionId'])
+    .index('by_user', ['userId']),
+  coachMealScansV1: defineTable({
+    userId: v.id('users'),
+    day: v.string(),
+    draftId: v.id('coachMealDraftsV1'),
+    requestKey: v.string(),
+    status: v.union(
+      v.literal('reserved'),
+      v.literal('dispatched'),
+      v.literal('ready'),
+      v.literal('failed'),
+      v.literal('released')
+    ),
+    reservedAt: v.number(),
+    dispatchedAt: v.optional(v.number()),
+    finishedAt: v.optional(v.number()),
+    errorCode: v.optional(v.string()),
+  })
+    .index('by_user_day', ['userId', 'day'])
+    .index('by_user_day_key', ['userId', 'day', 'requestKey'])
+    .index('by_user', ['userId']),
+  coachToneSettingsV1: defineTable({
+    version: v.number(),
+    tone,
+    detail,
+    scope: toneScope,
+    action: v.union(v.literal('save'), v.literal('restore')),
+    adminUserId: v.optional(v.id('users')),
+    actorStatus: v.union(v.literal('active_admin'), v.literal('deleted_admin')),
+    createdAt: v.number(),
+  }).index('by_version', ['version']),
+  coachTonePreviewAttemptsV1: defineTable({
+    adminUserId: v.id('users'),
+    kind: v.union(v.literal('daily_plan'), v.literal('meal_feedback')),
+    comparisonSide: v.union(v.literal('current'), v.literal('selected')),
+    savedVersion: v.number(),
+    tone,
+    detail,
+    scope: toneScope,
+    status: v.union(v.literal('reserved'), v.literal('ready'), v.literal('failed')),
+    errorCode: v.optional(v.string()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+    quotaExemptedAt: v.optional(v.number()),
+  })
+    .index('by_admin_created', ['adminUserId', 'createdAt'])
+    .index('by_admin', ['adminUserId']),
   coachProfiles: defineTable({
     userId: v.id('users'),
     currentWeight: v.optional(v.number()),

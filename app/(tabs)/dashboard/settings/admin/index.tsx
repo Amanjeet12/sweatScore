@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
 import { useState } from 'react';
+import { useQuery } from 'convex/react';
 import { View, TouchableOpacity } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
+import { api } from '~/convex/_generated/api';
 
 export default function AdminView() {
   const [loading, setLoading] = useState(false);
+  const schedulerStatus = useQuery(api.admin.legacySchedulerStatus, {});
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -28,13 +31,23 @@ export default function AdminView() {
       />
       <View className="mx-8 mt-4 flex-col gap-y-8">
         <TouchableOpacity
-          onPress={() => router.push('/dashboard/settings/admin/check-in-categories' as any)}
-          disabled={loading}>
+          accessibilityRole="button"
+          onPress={() => router.push('/dashboard/settings/admin/ai-coach' as any)}>
           <View className="flex-row items-center gap-x-4">
-            <Ionicons size={25} name="checkbox-outline" />
-            <Text className="font-lsBold text-2xl">Check-In Categories</Text>
+            <Ionicons size={25} name="options-outline" />
+            <Text className="font-lsBold text-2xl">AI Coach settings</Text>
           </View>
         </TouchableOpacity>
+        {!schedulerStatus?.retired ? (
+          <TouchableOpacity
+            onPress={() => router.push('/dashboard/settings/admin/check-in-categories' as any)}
+            disabled={loading}>
+            <View className="flex-row items-center gap-x-4">
+              <Ionicons size={25} name="checkbox-outline" />
+              <Text className="font-lsBold text-2xl">Check-In Categories</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           onPress={() => {
             router.push('/dashboard/settings/admin/users');

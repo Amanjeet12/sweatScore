@@ -1,6 +1,7 @@
 import { cronJobs } from 'convex/server';
 
 import { internal } from './_generated/api';
+import { legacySchedulerRetired } from './legacySchedulerCutover';
 
 const crons = cronJobs();
 
@@ -21,11 +22,14 @@ crons.hourly(
   internal.notifications.processDailyMissionNotifications
 );
 
-crons.interval(
-  'Maintain Rolling Daily Check-Ins',
-  { minutes: 5 },
-  internal.admin.maintainRollingDailyCheckIns
-);
+// Retained legacy registration for rollback review. Only the explicit
+// server-side retirement switch removes it from an active deployment.
+if (!legacySchedulerRetired())
+  crons.interval(
+    'Maintain Rolling Daily Check-Ins',
+    { minutes: 5 },
+    internal.admin.maintainRollingDailyCheckIns
+  );
 
 // crons.cron(
 //   'Send Reward Notifications',

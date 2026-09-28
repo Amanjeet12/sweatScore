@@ -1,26 +1,16 @@
-import { Stack } from 'expo-router';
-import { Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router, Stack } from 'expo-router';
+import { useEffect } from 'react';
+import ScreenLoading from '~/components/core/ScreenLoading';
 
-import Paywall from '~/components/core/Paywall';
-import SafeAreaView from '~/components/core/SafeAreaView';
-
-export default function RewardsPaywallScreen() {
-  const insets = useSafeAreaInsets();
-
+// Legacy in-app paywall links return through the persisted access decision.
+export default function LegacyInAppPaywall() {
+  useEffect(() => {
+    router.replace('/resume');
+  }, []);
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          headerShadowVisible: false,
-        }}
-      />
-      <View
-        className="flex-1"
-        style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-        <Paywall />
-      </View>
-    </SafeAreaView>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenLoading />
+    </>
   );
 }

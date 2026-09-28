@@ -29,6 +29,7 @@ export const usePushNotifications = (): PushNotificationState => {
 
   const notificationListener = useRef<Notifications.EventSubscription>();
   const responseListener = useRef<Notifications.EventSubscription>();
+  const handledResponseIds = useRef(new Set<string>());
 
   async function registerForPushNotificationsAsync() {
     let token;
@@ -73,22 +74,34 @@ export const usePushNotifications = (): PushNotificationState => {
       setNotification(notification);
     });
 
-    Notifications.getLastNotificationResponseAsync().then((response) => {
+    const handleResponse = (response: Notifications.NotificationResponse | null) => {
       if (!response?.notification) {
         return;
       }
+      const responseId = response.notification.request.identifier;
+      if (handledResponseIds.current.has(responseId)) return;
+      handledResponseIds.current.add(responseId);
 
       const notificationDataString = (response.notification.request?.content as any)?.dataString;
       if (notificationDataString && notificationDataString !== '') {
-        const parsedData = JSON.parse(notificationDataString);
-        response.notification.request.content.data = parsedData;
+        try {
+          response.notification.request.content.data = JSON.parse(notificationDataString);
+        } catch {
+          // Keep the notification's native data when an old payload is malformed.
+        }
       }
 
       setBackgroundNotification(response.notification);
-    });
+      // A previously tapped notification must not navigate again after a reload.
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    };
+
+    Notifications.getLastNotificationResponseAsync()
+      .then(handleResponse)
+      .catch(() => {});
 
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      setBackgroundNotification(response.notification);
+      handleResponse(response);
     });
 
     return () => {

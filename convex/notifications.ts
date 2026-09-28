@@ -7,6 +7,7 @@ import { internalMutation } from './_generated/server';
 import { appVersions } from './appVersions';
 import { MailerLiteGroup } from './mailerlite';
 import { Id } from './_generated/dataModel';
+import { legacySchedulerRetired } from './legacySchedulerCutover';
 
 function getDaysBetweenDates(date1: Date, date2: Date): number {
   // Clone dates to avoid mutating originals
@@ -482,6 +483,8 @@ export const processScheduledCheckInNotification = internalMutation({
   },
 
   handler: async (ctx, args) => {
+    if (legacySchedulerRetired())
+      return { success: false, sent: 0, reason: 'Shared check-in scheduling retired' };
     const challenge = await ctx.db.get(args.challengeId);
 
     if (!challenge) {

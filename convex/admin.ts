@@ -17,6 +17,7 @@ import {
   COMPLETION_BANK_POINTS_MAX,
 } from './challenges';
 import { DAILY_SCHEDULE_TIMEZONE, getNextMidnightTimestamp } from './utils/timezone';
+import { legacySchedulerRetired } from './legacySchedulerCutover';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -29,6 +30,7 @@ async function scheduleCheckInWindowNotifications(
   endsAt: number,
   now: number
 ) {
+  if (legacySchedulerRetired()) return;
   const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
   const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
 
@@ -650,6 +652,8 @@ export const createChallenge = mutation({
     completionBankPoints: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (legacySchedulerRetired() && args.type === 'check_in')
+      throw new ConvexError('Shared check-in creation retired');
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new ConvexError('Unauthorized');
@@ -776,6 +780,8 @@ export const updateChallenge = mutation({
     if (!challenge) {
       throw new ConvexError('Challenge not found');
     }
+    if (legacySchedulerRetired() && (challenge.type === 'check_in' || args.type === 'check_in'))
+      throw new ConvexError('Shared check-in editing retired');
 
     if (
       args.points !== undefined &&
@@ -1108,6 +1114,53 @@ export const deleteUser = internalMutation({
 
     const userId = user._id;
 
+    for (const table of [
+      'coachMealScansV1',
+      'coachMealDraftsV1',
+      'coachProofEventsV1',
+      'coachProofSubmissionsV1',
+      'coachRewardSlotsV1',
+      'coachAssignmentsV1',
+      'coachPlanRevisionsV1',
+      'coachPlanRequestsV1',
+      'coachDailyAnswersV1',
+      'coachProfileRevisionsV1',
+      'coachWeightObservationsV1',
+      'coachOnboardingV1',
+      'coachBillingEntitlementsV1',
+      'coachBillingChecksV1',
+    ] as const) {
+      const records = await ctx.db
+        .query(table)
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .collect();
+      for (const record of records) {
+        if (table === 'coachMealDraftsV1' && 'storageId' in record && record.storageId) {
+          const linkedActivity =
+            'activityId' in record && record.activityId
+              ? await ctx.db.get(record.activityId)
+              : null;
+          const proof = 'submissionId' in record ? await ctx.db.get(record.submissionId) : null;
+          if (!linkedActivity && proof?.storageId !== record.storageId)
+            await ctx.storage.delete(record.storageId);
+        }
+        if (table === 'coachProofSubmissionsV1' && 'storageId' in record && record.storageId) {
+          const linkedActivity =
+            'activityId' in record && record.activityId
+              ? await ctx.db.get(record.activityId)
+              : null;
+          if (!linkedActivity) await ctx.storage.delete(record.storageId);
+        }
+        await ctx.db.delete(record._id);
+      }
+    }
+
+    const previewAttempts = await ctx.db
+      .query('coachTonePreviewAttemptsV1')
+      .withIndex('by_admin', (q) => q.eq('adminUserId', userId))
+      .collect();
+    for (const attempt of previewAttempts) await ctx.db.delete(attempt._id);
+
     // Delete user's profile image from storage if exists
     if (user.image) {
       await ctx.storage.delete(user.image);
@@ -1289,6 +1342,16 @@ export const deleteUser = internalMutation({
   },
 });
 
+export const legacySchedulerStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const user = userId ? await ctx.db.get(userId) : null;
+    if (!user?.isAdmin) throw new ConvexError('Unauthorized');
+    return { retired: legacySchedulerRetired() };
+  },
+});
+
 export const getDailyChallengeSchedule = query({
   args: {},
 
@@ -1306,6 +1369,7 @@ export const getDailyChallengeSchedule = query({
     }
 
     const now = Date.now();
+    if (legacySchedulerRetired()) return { current: null, next: null, serverTime: now };
 
     const scheduledChallenges = await ctx.db
       .query('challenges')
@@ -1345,6 +1409,7 @@ export const setCurrentDailyChallenge = mutation({
   },
 
   handler: async (ctx, args) => {
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in scheduling retired');
     const userId = await getAuthUserId(ctx);
 
     if (!userId) {
@@ -1501,6 +1566,7 @@ export const setNextDailyChallenge = mutation({
   },
 
   handler: async (ctx, args) => {
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in scheduling retired');
     const userId = await getAuthUserId(ctx);
 
     if (!userId) {
@@ -1621,6 +1687,7 @@ export const removeDailyChallengeSchedule = mutation({
   },
 
   handler: async (ctx, args) => {
+    if (legacySchedulerRetired()) throw new ConvexError('Shared check-in scheduling retired');
     const userId = await getAuthUserId(ctx);
 
     if (!userId) {
@@ -1666,6 +1733,7 @@ export const removeDailyChallengeSchedule = mutation({
 export const maintainRollingDailyCheckIns = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (legacySchedulerRetired()) return { status: 'retired' as const };
     const now = Date.now();
     const scheduledChallenges = await ctx.db
       .query('challenges')

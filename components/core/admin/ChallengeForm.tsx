@@ -203,6 +203,7 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
    * Convex queries and mutations
    */
   const dailySchedule = useQuery(api.admin.getDailyChallengeSchedule, {});
+  const schedulerStatus = useQuery(api.admin.legacySchedulerStatus, {});
   const checkInCategories = useQuery(api.checkInCategories.listForAdmin, {});
 
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
@@ -963,7 +964,12 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             </Input>
           </View>
 
-          {challengeType === 'check_in' ? (
+          {challengeType === 'check_in' && schedulerStatus?.retired ? (
+            <Text className="mb-5 text-gray-600">
+              Historical check-in. Shared assignment editing is retired.
+            </Text>
+          ) : null}
+          {challengeType === 'check_in' && !schedulerStatus?.retired ? (
             <View className="mb-5">
               <Text className="mb-2 text-xl font-bold text-primary-500">Check-In Categories</Text>
               <Text className="mb-3 text-sm text-gray-500">
@@ -1512,116 +1518,119 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
             </View>
           ) : null}
 
-          {mode === 'edit' && initialData && challengeType === 'check_in' && (
-            <View className="mb-6 rounded-xl bg-gray-50 p-4">
-              <Text className="text-xl font-bold text-primary-500">Daily Check In Schedule</Text>
+          {mode === 'edit' &&
+            initialData &&
+            challengeType === 'check_in' &&
+            !schedulerStatus?.retired && (
+              <View className="mb-6 rounded-xl bg-gray-50 p-4">
+                <Text className="text-xl font-bold text-primary-500">Daily Check In Schedule</Text>
 
-              <View className="mt-4 rounded-xl bg-white px-4 py-3">
-                <Text className="text-xs font-semibold uppercase text-gray-400">
-                  Current status
-                </Text>
+                <View className="mt-4 rounded-xl bg-white px-4 py-3">
+                  <Text className="text-xs font-semibold uppercase text-gray-400">
+                    Current status
+                  </Text>
 
-                {dailySchedule === undefined ? (
-                  <Text className="mt-1 text-sm text-gray-500">Loading schedule...</Text>
-                ) : isCurrentChallenge ? (
-                  <>
-                    <Text className="mt-1 font-bold text-green-700">Current Day Challenge</Text>
+                  {dailySchedule === undefined ? (
+                    <Text className="mt-1 text-sm text-gray-500">Loading schedule...</Text>
+                  ) : isCurrentChallenge ? (
+                    <>
+                      <Text className="mt-1 font-bold text-green-700">Current Day Challenge</Text>
 
-                    {initialData.dailyEndAt && (
-                      <Text className="mt-1 text-xs text-gray-500">
-                        Ends: {new Date(initialData.dailyEndAt).toLocaleString()}
-                      </Text>
-                    )}
-                  </>
-                ) : isNextChallenge ? (
-                  <>
-                    <Text className="mt-1 font-bold text-blue-700">Next Day Challenge</Text>
+                      {initialData.dailyEndAt && (
+                        <Text className="mt-1 text-xs text-gray-500">
+                          Ends: {new Date(initialData.dailyEndAt).toLocaleString()}
+                        </Text>
+                      )}
+                    </>
+                  ) : isNextChallenge ? (
+                    <>
+                      <Text className="mt-1 font-bold text-blue-700">Next Day Challenge</Text>
 
-                    {nextChallengeStartText && (
-                      <Text className="mt-1 text-xs text-gray-500">
-                        Starts: {nextChallengeStartText}
-                      </Text>
-                    )}
-                  </>
-                ) : isExpiredSchedule ? (
-                  <Text className="mt-1 font-bold text-amber-700">Expired Daily Schedule</Text>
-                ) : (
-                  <Text className="mt-1 text-sm text-gray-600">Not scheduled</Text>
+                      {nextChallengeStartText && (
+                        <Text className="mt-1 text-xs text-gray-500">
+                          Starts: {nextChallengeStartText}
+                        </Text>
+                      )}
+                    </>
+                  ) : isExpiredSchedule ? (
+                    <Text className="mt-1 font-bold text-amber-700">Expired Daily Schedule</Text>
+                  ) : (
+                    <Text className="mt-1 text-sm text-gray-600">Not scheduled</Text>
+                  )}
+                </View>
+
+                <View className="mt-4">
+                  <Text className="mb-2 text-base font-bold text-primary-500">
+                    Daily Card Short Description
+                  </Text>
+
+                  <Input size="xl" variant="rounded">
+                    <InputField
+                      placeholder="Text displayed on the daily dashboard card"
+                      value={shortDescription}
+                      onChangeText={(text) => {
+                        clearMessages();
+
+                        setShortDescription(text);
+                      }}
+                    />
+                  </Input>
+
+                  <Text className="mt-1 text-xs text-gray-500">
+                    This is only used on the scheduled dashboard card.
+                  </Text>
+                </View>
+
+                <View className="mt-5 flex-row gap-x-3">
+                  <View className="flex-1">
+                    <LoadingButton
+                      variant={isCurrentChallenge ? 'solid' : 'outline'}
+                      size="lg"
+                      action="primary"
+                      className="h-14 w-full rounded-lg"
+                      onPress={handleSetCurrentDay}
+                      loading={scheduleAction === 'current'}
+                      disabled={isScheduling || isCurrentChallenge || !initialData.isPublished}>
+                      <ButtonText>{isCurrentChallenge ? 'Current Day' : 'Set Today'}</ButtonText>
+                    </LoadingButton>
+                  </View>
+
+                  <View className="flex-1">
+                    <LoadingButton
+                      variant={isNextChallenge ? 'solid' : 'outline'}
+                      size="lg"
+                      action="secondary"
+                      className="h-14 w-full rounded-lg"
+                      onPress={handleSetNextDay}
+                      loading={scheduleAction === 'next'}
+                      disabled={
+                        isScheduling ||
+                        isCurrentChallenge ||
+                        isNextChallenge ||
+                        !dailySchedule?.current ||
+                        !initialData.isPublished
+                      }>
+                      <ButtonText>{isNextChallenge ? 'Next Day' : 'Set Next Day'}</ButtonText>
+                    </LoadingButton>
+                  </View>
+                </View>
+
+                {hasDailySchedule && (
+                  <View className="mt-3">
+                    <LoadingButton
+                      variant="outline"
+                      size="lg"
+                      action="negative"
+                      className="h-12 w-full rounded-lg"
+                      onPress={handleRemoveDailySchedule}
+                      loading={isRemovingSchedule}
+                      disabled={isRemovingSchedule || isScheduling}>
+                      <ButtonText className="text-red-500">Remove from Daily Schedule</ButtonText>
+                    </LoadingButton>
+                  </View>
                 )}
               </View>
-
-              <View className="mt-4">
-                <Text className="mb-2 text-base font-bold text-primary-500">
-                  Daily Card Short Description
-                </Text>
-
-                <Input size="xl" variant="rounded">
-                  <InputField
-                    placeholder="Text displayed on the daily dashboard card"
-                    value={shortDescription}
-                    onChangeText={(text) => {
-                      clearMessages();
-
-                      setShortDescription(text);
-                    }}
-                  />
-                </Input>
-
-                <Text className="mt-1 text-xs text-gray-500">
-                  This is only used on the scheduled dashboard card.
-                </Text>
-              </View>
-
-              <View className="mt-5 flex-row gap-x-3">
-                <View className="flex-1">
-                  <LoadingButton
-                    variant={isCurrentChallenge ? 'solid' : 'outline'}
-                    size="lg"
-                    action="primary"
-                    className="h-14 w-full rounded-lg"
-                    onPress={handleSetCurrentDay}
-                    loading={scheduleAction === 'current'}
-                    disabled={isScheduling || isCurrentChallenge || !initialData.isPublished}>
-                    <ButtonText>{isCurrentChallenge ? 'Current Day' : 'Set Today'}</ButtonText>
-                  </LoadingButton>
-                </View>
-
-                <View className="flex-1">
-                  <LoadingButton
-                    variant={isNextChallenge ? 'solid' : 'outline'}
-                    size="lg"
-                    action="secondary"
-                    className="h-14 w-full rounded-lg"
-                    onPress={handleSetNextDay}
-                    loading={scheduleAction === 'next'}
-                    disabled={
-                      isScheduling ||
-                      isCurrentChallenge ||
-                      isNextChallenge ||
-                      !dailySchedule?.current ||
-                      !initialData.isPublished
-                    }>
-                    <ButtonText>{isNextChallenge ? 'Next Day' : 'Set Next Day'}</ButtonText>
-                  </LoadingButton>
-                </View>
-              </View>
-
-              {hasDailySchedule && (
-                <View className="mt-3">
-                  <LoadingButton
-                    variant="outline"
-                    size="lg"
-                    action="negative"
-                    className="h-12 w-full rounded-lg"
-                    onPress={handleRemoveDailySchedule}
-                    loading={isRemovingSchedule}
-                    disabled={isRemovingSchedule || isScheduling}>
-                    <ButtonText className="text-red-500">Remove from Daily Schedule</ButtonText>
-                  </LoadingButton>
-                </View>
-              )}
-            </View>
-          )}
+            )}
 
           {scheduleMessage && (
             <View className="mb-4 rounded-xl bg-green-50 px-4 py-3">
@@ -1638,7 +1647,13 @@ export default function ChallengeForm({ mode, initialData, onSuccess }: Challeng
               action="primary"
               className="h-16 w-full rounded-lg"
               onPress={handleSubmit}
-              disabled={isLoading || isUploading || isScheduling || isRemovingSchedule}
+              disabled={
+                isLoading ||
+                isUploading ||
+                isScheduling ||
+                isRemovingSchedule ||
+                (schedulerStatus?.retired === true && challengeType === 'check_in')
+              }
               loading={isLoading}>
               <ButtonText>
                 {mode === 'create'

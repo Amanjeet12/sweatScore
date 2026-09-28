@@ -18,7 +18,7 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { cn } from '~/utils/cn';
 import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
-import { hasPendingRevenueCatRedemption } from '~/utils/revenuecatRedemption';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 
 export default function Verify() {
   const convex = useConvex();
@@ -69,17 +69,7 @@ export default function Verify() {
       const user = await convex.query(api.users.current);
       await setCurrentUser(user);
 
-      router.dismissAll();
-      if (!user?.onboarded) {
-        router.replace('/(auth)/setup-profile');
-        return;
-      }
-
-      if (hasPendingRevenueCatRedemption()) {
-        return;
-      }
-
-      router.replace('/(tabs)/dashboard');
+      await resumeMember(convex);
     } catch {
       setError('Invalid code');
     } finally {

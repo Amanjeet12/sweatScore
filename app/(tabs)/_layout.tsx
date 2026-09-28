@@ -1,13 +1,15 @@
 import { useQuery } from 'convex/react';
 import { Tabs, usePathname } from 'expo-router';
-import { ChartBar, CrownSimple, Fire, Rows, Trophy } from 'phosphor-react-native';
+import { Barbell, CrownSimple, Fire, Rows, Trophy } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 
 import UpdateAvailableBanner from '~/components/core/dashboard/UpdateAvailableBanner';
+import ScreenLoading from '~/components/core/ScreenLoading';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useActivateUser } from '~/hooks/useActivateUser';
+import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { useHealthSync } from '~/hooks/useHealthSync';
 import { useAuthStore } from '~/store/useAuthStore';
 import { useRefreshStore } from '~/store/useRefreshStore';
@@ -16,7 +18,14 @@ import { colors } from '~/utils/constants';
 import { storage } from '~/utils/storage';
 import { ALL_TABS } from '~/utils/types';
 
+const TODAY_ROUTE = ['today'] as const;
+
 export default function TabLayout() {
+  const { accepted } = useCoachRouteGuard(TODAY_ROUTE);
+  return accepted ? <ActiveTabLayout /> : <ScreenLoading />;
+}
+
+function ActiveTabLayout() {
   const setCurrentTab = useTabStore((state) => state.setCurrentTab);
   const currentUser = useAuthStore((state) => state.currentUser);
   const pathname = usePathname();
@@ -112,8 +121,10 @@ export default function TabLayout() {
           name="dashboard"
           options={{
             title: '',
+            tabBarAccessibilityLabel: 'Today',
             tabBarLabel: ({ focused, color }) => (
               <Text
+                maxFontSizeMultiplier={1.1}
                 style={{
                   color: focused ? colors.primary : color,
                   fontSize: 10,
@@ -151,8 +162,10 @@ export default function TabLayout() {
           name="hub"
           options={{
             title: '',
+            tabBarAccessibilityLabel: 'Challenges',
             tabBarLabel: ({ focused, color }) => (
               <Text
+                maxFontSizeMultiplier={1.1}
                 style={{
                   color: focused ? colors.primary : color,
                   fontSize: 10,
@@ -180,8 +193,10 @@ export default function TabLayout() {
           name="share"
           options={{
             title: '',
+            tabBarAccessibilityLabel: 'Community',
             tabBarLabel: ({ focused, color }) => (
               <Text
+                maxFontSizeMultiplier={1.1}
                 style={{
                   color: focused ? colors.primary : color,
                   fontSize: 10,
@@ -232,8 +247,10 @@ export default function TabLayout() {
           name="notifications"
           options={{
             title: '',
+            tabBarAccessibilityLabel: 'League',
             tabBarLabel: ({ focused, color }) => (
               <Text
+                maxFontSizeMultiplier={1.1}
                 style={{
                   color: focused ? colors.primary : color,
                   fontSize: 10,
@@ -262,21 +279,23 @@ export default function TabLayout() {
           })}
         />
         <Tabs.Screen
-          name="rewards"
+          name="workouts"
           options={{
             title: '',
+            tabBarAccessibilityLabel: 'Workouts',
             tabBarLabel: ({ focused, color }) => (
               <Text
+                maxFontSizeMultiplier={1.1}
                 style={{
                   color: focused ? colors.primary : color,
                   fontSize: 10,
                   fontFamily: 'Inter_500Medium',
                 }}>
-                Progress
+                Workouts
               </Text>
             ),
             tabBarIcon: ({ color, focused }) => (
-              <ChartBar
+              <Barbell
                 color={focused ? colors.primary : color}
                 weight={focused ? 'fill' : 'duotone'}
                 size={28}
@@ -284,12 +303,9 @@ export default function TabLayout() {
             ),
             tabBarHideOnKeyboard: true,
           }}
-          listeners={() => ({
-            tabPress: () => {
-              setCurrentTab(ALL_TABS.REWARDS);
-            },
-          })}
+          listeners={() => ({ tabPress: () => setCurrentTab(ALL_TABS.WORKOUTS) })}
         />
+        <Tabs.Screen name="rewards" options={{ href: null }} />
         {/* <Tabs.Screen
           name="settings"
           options={{

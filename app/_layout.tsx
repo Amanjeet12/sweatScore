@@ -11,11 +11,11 @@ import {
 import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConvexReactClient } from 'convex/react';
-import { router, Stack, useRootNavigationState } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { LogBox, Platform, View, Text, TextInput } from 'react-native';
+import { LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,18 +53,8 @@ const queryClient = new QueryClient({
 });
 convexQueryClient.connect(queryClient);
 
-// @ts-ignore
-Text.defaultProps = { ...(Text.defaultProps || {}), allowFontScaling: false };
-// @ts-ignore
-TextInput.defaultProps = {
-  // @ts-ignore
-  ...(TextInput.defaultProps || {}),
-  allowFontScaling: false,
-};
-
 export default function Layout() {
   const currentUser = useAuthStore((state) => state.currentUser);
-  const rootNavigationState = useRootNavigationState();
   const { backgroundNotification } = usePushNotifications();
   const insets = useSafeAreaInsets();
 
@@ -77,10 +67,6 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    if (!rootNavigationState?.key) {
-      return;
-    }
-
     if (backgroundNotification && currentUser) {
       if (backgroundNotification.request.content.data) {
         const notificationData = backgroundNotification.request.content.data;
@@ -163,7 +149,7 @@ export default function Layout() {
         }
       }
     }
-  }, [backgroundNotification?.request?.content?.data, currentUser?._id, rootNavigationState?.key]);
+  }, [backgroundNotification?.request?.content?.data, currentUser?._id]);
 
   if (!interLoaded && !interError) {
     return null;

@@ -1,4 +1,4 @@
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -18,6 +18,7 @@ import { getErrorMessage } from '~/utils/error-message';
 type CategoryWithIconUrl = Doc<'checkInCategories'> & { iconUrl?: string | null };
 
 export default function CheckInCategoryForm({ category }: { category?: CategoryWithIconUrl }) {
+  const schedulerStatus = useQuery(api.admin.legacySchedulerStatus, {});
   const [name, setName] = useState(category?.name ?? '');
   const [description, setDescription] = useState(category?.description ?? '');
   const [sortOrder, setSortOrder] = useState(String(category?.sortOrder ?? 0));
@@ -31,6 +32,13 @@ export default function CheckInCategoryForm({ category }: { category?: CategoryW
   const generateUploadUrl = useMutation(api.upload.generateUploadUrl);
   const createCategory = useMutation(api.checkInCategories.create);
   const updateCategory = useMutation(api.checkInCategories.update);
+
+  if (schedulerStatus?.retired)
+    return (
+      <Text className="p-6 text-gray-600">
+        Shared check-in categories are historical and can no longer be edited.
+      </Text>
+    );
 
   const selectIcon = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({

@@ -11,6 +11,7 @@ import { appVersions } from './appVersions';
 import { applyFreeDailyCap } from './challengeCompletions';
 import { formatDateInTZ } from './utils/timezone';
 import { getLoggedActivityPoints } from '../shared/loggedActivities';
+import { rewardSlotKey } from '../shared/coachFoundation';
 
 const BADGE_POINTS_THRESHOLD = 500;
 
@@ -19,6 +20,25 @@ const postCounter = new ShardedCounter(components.shardedCounter);
 async function revokeLoggedActivity(ctx: MutationCtx, activityId: Id<'dailyActivities'>) {
   const activity = await ctx.db.get(activityId);
   if (!activity) return;
+
+  if (activity.coachSubmissionId) {
+    const proof = await ctx.db.get(activity.coachSubmissionId);
+    if (proof && proof.userId === activity.userId && proof.state === 'completed') {
+      const at = Date.now();
+      await ctx.db.patch(proof._id, { state: 'reversed', reversedAt: at, updatedAt: at });
+      await ctx.db.insert('coachProofEventsV1', {
+        userId: proof.userId,
+        submissionId: proof._id,
+        day: proof.day,
+        action: 'reversed',
+        points: -(activity.displayTotalPoints ?? 0),
+        activityId,
+        at,
+      });
+      // Keep the earned category slot consumed after a deleted post. The
+      // submission and event retain the original recommendation and revision.
+    }
+  }
 
   await ctx.db.delete(activityId);
   await ctx.scheduler.runAfter(0, internal.leaderboard.updateMonthlyLeaderboard, {
@@ -505,6 +525,35 @@ export const createPost = mutation({
       }
 
       const date = formatDateInTZ(new Date(), user.timezone);
+      const coachCategory =
+        args.activityKey === 'workout' || args.activityKey === 'gym_workout'
+          ? 'workout'
+          : args.activityKey === 'healthy_meal'
+            ? 'meals'
+            : args.activityKey === 'sleep'
+              ? 'sleep'
+              : args.activityKey === 'steps'
+                ? 'steps'
+                : null;
+      if (coachCategory) {
+        const slots = await ctx.db
+          .query('coachRewardSlotsV1')
+          .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', date))
+          .collect();
+        if (slots.some((slot) => slot.category === coachCategory))
+          throw new ConvexError('This category is already reserved or completed in your plan');
+        if (coachCategory === 'workout') {
+          const completions = await ctx.db
+            .query('challengeCompletions')
+            .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
+            .collect();
+          for (const completion of completions) {
+            const prior = await ctx.db.get(completion.challengeId);
+            if (prior?.type === 'check_in')
+              throw new ConvexError('Workout check-in already completed today');
+          }
+        }
+      }
       const activitiesForDate = await ctx.db
         .query('dailyActivities')
         .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', date))
@@ -536,6 +585,24 @@ export const createPost = mutation({
         loggedActivityKey: args.activityKey,
         activitySubmissionType: args.activitySubmissionType,
       });
+      if (coachCategory) {
+        const key = rewardSlotKey(date, coachCategory, 1);
+        await ctx.db.insert('coachRewardSlotsV1', {
+          userId,
+          day: date,
+          category: coachCategory,
+          ordinal: 1,
+          key,
+          state: 'legacy_consumed',
+          legacySource: {
+            table: 'dailyActivities',
+            id: String(activityId),
+            context: 'legacy_unknown',
+          },
+          pointsEarned,
+          createdAt: Date.now(),
+        });
+      }
     }
 
     const postId = await ctx.db.insert('posts', {

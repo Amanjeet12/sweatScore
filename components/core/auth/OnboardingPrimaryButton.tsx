@@ -10,6 +10,7 @@ type OnboardingPrimaryButtonProps = {
   disabled?: boolean;
   className?: string;
   borderRadius?: number;
+  labelFontSize?: number;
 };
 
 export function OnboardingPrimaryButton({
@@ -19,6 +20,7 @@ export function OnboardingPrimaryButton({
   disabled = false,
   className,
   borderRadius = 12,
+  labelFontSize,
 }: OnboardingPrimaryButtonProps) {
   const isDisabled = disabled || isLoading;
 
@@ -43,7 +45,15 @@ export function OnboardingPrimaryButton({
         <ActivityIndicator color="#FFFFFF" style={{ flex: 1 }} />
       ) : (
         <>
-          <Text className="font-heading text-base font-semibold text-white">{label}</Text>
+          {labelFontSize ? (
+            <Text
+              className="text-white"
+              style={{ fontFamily: 'Inter_600SemiBold', fontSize: labelFontSize }}>
+              {label}
+            </Text>
+          ) : (
+            <Text className="font-heading text-base font-semibold text-white">{label}</Text>
+          )}
           <Feather name="arrow-right" size={23} color="#FFFFFF" />
         </>
       )}

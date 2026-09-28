@@ -1,4 +1,4 @@
-import { useConvex, useMutation } from 'convex/react';
+import { useAction, useConvex, useQuery } from 'convex/react';
 import {
   PropsWithChildren,
   createContext,
@@ -35,8 +35,8 @@ export type RedemptionResult =
   | { status: 'error'; error?: unknown };
 
 interface RevenueCatProps {
-  purchasePackage?: (pack: PurchasesPackage) => Promise<void>;
-  restorePermissions?: () => Promise<CustomerInfo>;
+  purchasePackage?: (pack: PurchasesPackage) => Promise<'active' | 'inactive' | 'pending'>;
+  restorePermissions?: () => Promise<'active' | 'inactive' | 'pending'>;
   packages: PurchasesPackage[];
   isPro: boolean;
   redeemWebPurchaseUrl: (url: string) => Promise<RedemptionResult>;
@@ -55,9 +55,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const currentUser = useAuthStore((state) => state.currentUser);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [isPro, setIsPro] = useState(false);
-
-  const updateUserIsPremium = useMutation(api.users.updateUserIsPremium);
+  const billingStatus = useQuery(api.revenueCatEntitlements.myStatus);
+  const isPro = billingStatus?.isPro ?? false;
+  const reconcileMine = useAction(api.revenueCatEntitlements.reconcileMine);
 
   const loadOfferings = useCallback(async () => {
     try {
@@ -70,45 +70,39 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     }
   }, []);
 
-  const syncAdminAsPro = useCallback(async () => {
-    const [error, result] = await CatchPromiseWithType(convex.query(api.users.current));
-
-    if (error) return false;
-
-    if (result?.isAdmin) {
-      setIsPro(true);
-      return true;
-    }
-
-    return false;
-  }, [convex]);
-
   const updateCustomerInformation = useCallback(
-    async (customerInfo: CustomerInfo) => {
-      if (await syncAdminAsPro()) return;
-
-      const hasActivePremium = customerInfo.entitlements.active['Premium'] !== undefined;
-
-      if (__DEV__) {
-        console.log('[RevenueCat] Premium active', hasActivePremium);
-      }
-
-      setIsPro(hasActivePremium);
-      await updateUserIsPremium({ isPremium: hasActivePremium });
+    async (_customerInfo: CustomerInfo) => {
+      // SDK CustomerInfo is a signal, never authority for access.
+      if (currentUser?._id && (await Purchases.getAppUserID()) === currentUser._id.toString())
+        await reconcileMine({});
     },
-    [syncAdminAsPro, updateUserIsPremium]
+    [currentUser?._id, reconcileMine]
   );
 
-  const purchasePackage = useCallback(async (pack: PurchasesPackage) => {
-    try {
-      await Purchases.purchasePackage(pack);
-    } catch (error) {
-      if (!isUserCancelledError(error)) alert(error);
-      throw error;
-    }
-  }, []);
+  const verifyIdentifiedMember = useCallback(async () => {
+    if (!currentUser?._id || (await Purchases.getAppUserID()) !== currentUser._id.toString())
+      throw new Error('RevenueCat member identification is pending');
+  }, [currentUser?._id]);
 
-  const restorePermissions = useCallback(async () => Purchases.restorePurchases(), []);
+  const purchasePackage = useCallback(
+    async (pack: PurchasesPackage) => {
+      try {
+        await verifyIdentifiedMember();
+        await Purchases.purchasePackage(pack);
+        return await reconcileMine({});
+      } catch (error) {
+        if (!isUserCancelledError(error)) alert(error);
+        throw error;
+      }
+    },
+    [reconcileMine, verifyIdentifiedMember]
+  );
+
+  const restorePermissions = useCallback(async () => {
+    await verifyIdentifiedMember();
+    await Purchases.restorePurchases();
+    return reconcileMine({});
+  }, [reconcileMine, verifyIdentifiedMember]);
 
   useEffect(() => {
     let cancelled = false;
@@ -207,14 +201,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
         switch (result.result) {
           case WebPurchaseRedemptionResultType.SUCCESS:
-            await updateCustomerInformation(result.customerInfo);
-
-            if (result.customerInfo.entitlements.active['Premium'] === undefined) {
+            if ((await reconcileMine({})) !== 'active') {
               return {
-                status: 'error',
-                error: new Error(
-                  'Redemption succeeded but the Premium entitlement is not active. Check RevenueCat product configuration.'
-                ),
+                status: 'not_ready',
               };
             }
 
@@ -234,7 +223,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         return { status: 'error', error };
       }
     },
-    [convex, isConfigured, updateCustomerInformation]
+    [convex, isConfigured, reconcileMine]
   );
 
   const value = useMemo(

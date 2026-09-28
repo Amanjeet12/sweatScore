@@ -1,5 +1,5 @@
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useAction } from 'convex/react';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import * as Localization from 'expo-localization';
 import { Link, router, useLocalSearchParams } from 'expo-router';
@@ -16,11 +16,13 @@ import {
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const ANNUAL_PACKAGE_ID = '$rc_annual';
 const MONTHLY_PACKAGE_ID = '$rc_monthly';
@@ -133,11 +135,13 @@ function PlanCard({
   );
 }
 
-export default function Paywall() {
-  const { redirectTo, showBackToLogin } = useLocalSearchParams<{
-    redirectTo?: string;
+export default function Paywall({ onboarding = false }: { onboarding?: boolean }) {
+  const { showBackToLogin } = useLocalSearchParams<{
     showBackToLogin?: string;
   }>();
+  const convex = useConvex();
+  const decision = useQuery(api.coachResume.myDecision, {});
+  const retryFailedPlan = useMutation(api.coachDailyService.retryFailedPlan);
 
   const { signOut } = useAuthActions();
 
@@ -150,7 +154,11 @@ export default function Paywall() {
 
   const { packages, purchasePackage, restorePermissions } = useRevenueCat();
 
-  const syncToEnduranceZone = useAction(api.users.syncToEnduranceZone);
+  useEffect(() => {
+    // A delayed webhook or a verified restore after restart uses persisted server state.
+    if (decision?.verifiedAccess && decision.screen === 'today')
+      resumeMember(convex).catch(() => {});
+  }, [convex, decision?.verifiedAccess, decision?.screen]);
 
   if (__DEV__) {
     console.log('Available packages from RevenueCat:', JSON.stringify(packages, null, 2));
@@ -237,7 +245,8 @@ export default function Paywall() {
     isLoading ||
     isLoggingOut ||
     isRestoring ||
-    isPackagesLoading;
+    isPackagesLoading ||
+    (onboarding && decision?.requestStatus !== 'ready');
 
   const paywallBullets = [
     'Monthly Guided Challenges',
@@ -254,7 +263,7 @@ export default function Paywall() {
 
     setIsLoading(true);
 
-    const [purchaseError] = await CatchPromise(purchasePackage(selectedPackage));
+    const [purchaseError, verification] = await CatchPromise(purchasePackage(selectedPackage));
 
     if (purchaseError) {
       if (__DEV__) {
@@ -263,24 +272,30 @@ export default function Paywall() {
 
       setIsLoading(false);
 
+      if (
+        typeof purchaseError === 'object' &&
+        purchaseError !== null &&
+        'userCancelled' in purchaseError &&
+        purchaseError.userCancelled === true
+      )
+        return;
+
       Alert.alert('Purchase failed', 'Unable to complete the purchase. Please try again.');
 
       return;
     }
 
-    const userCountry = Localization.getLocales()[0]?.regionCode || 'UK';
-
-    await CatchPromise(
-      syncToEnduranceZone({
-        country: userCountry,
-      })
-    );
-
     setIsLoading(false);
 
-    router.dismissAll();
+    if (verification !== 'active') {
+      Alert.alert(
+        'Verification pending',
+        'Your purchase is saved. We will unlock Premium when payment is verified. You can retry or restore without repeating checkout.'
+      );
+      return;
+    }
 
-    router.replace((redirectTo || '/(tabs)/dashboard') as any);
+    await resumeMember(convex);
   };
 
   const handleBackToLogin = async () => {
@@ -301,7 +316,6 @@ export default function Paywall() {
 
       setCurrentUser(null);
 
-      router.dismissAll();
       router.replace('/(auth)/email');
     } catch (error) {
       console.error('Logout failed:', error);
@@ -320,19 +334,19 @@ export default function Paywall() {
     setIsRestoring(true);
 
     try {
-      const customerInfo = await restorePermissions();
-      const hasPremium = customerInfo.entitlements.active.Premium !== undefined;
+      const verification = await restorePermissions();
 
-      if (!hasPremium) {
-        Alert.alert('No subscription found', 'We could not find an active Premium subscription.');
+      if (verification !== 'active') {
+        Alert.alert(
+          verification === 'pending' ? 'Verification pending' : 'No subscription found',
+          verification === 'pending'
+            ? 'We could not verify this purchase yet. Please try Restore again shortly.'
+            : 'We could not find an active Premium subscription.'
+        );
         return;
       }
 
-      const userCountry = Localization.getLocales()[0]?.regionCode || 'UK';
-      await CatchPromise(syncToEnduranceZone({ country: userCountry }));
-
-      router.dismissAll();
-      router.replace((redirectTo || '/(tabs)/dashboard') as any);
+      await resumeMember(convex);
     } catch (error) {
       if (__DEV__) {
         console.log('Restore error:', error);
@@ -415,10 +429,58 @@ export default function Paywall() {
         />
       </View>
 
+      {onboarding && decision?.requestStatus === 'pending' ? (
+        <View className="mt-4">
+          <CoachPlanPreparing compact />
+        </View>
+      ) : onboarding ? (
+        <View className="mt-4 rounded-2xl bg-[#FFF3EC] p-4">
+          <Text className="text-center font-body text-sm text-[#4F4F4F]">
+            {decision?.requestStatus === 'ready'
+              ? 'Your plan is saved and ready for you after verification.'
+              : decision?.requestStatus === 'failed'
+                ? decision.canRetry
+                  ? 'We could not prepare your plan. Your answers are saved.'
+                  : 'We cannot prepare a plan for these answers yet. Your answers are saved. Please contact support.'
+                : 'Preparing your personal plan. Your answers are saved.'}
+          </Text>
+          {decision?.requestStatus === 'failed' && decision.canRetry ? (
+            <TouchableOpacity
+              className="mt-3 min-h-14 items-center justify-center rounded-[20px] bg-white px-4 py-3"
+              onPress={async () => {
+                try {
+                  await retryFailedPlan({
+                    requestKey: `retry_${decision.day.replaceAll('-', '')}_${Date.now()}`,
+                  });
+                } catch {
+                  Alert.alert('Retry unavailable', 'Please try again in a moment.');
+                }
+              }}>
+              <Text
+                className="text-center text-primary-500"
+                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+                Retry plan preparation
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+
       <OnboardingPrimaryButton
         className="mt-3"
         borderRadius={20}
-        label={isPackagesLoading ? 'Loading plans...' : 'Start My Plan'}
+        labelFontSize={18}
+        label={
+          onboarding && decision?.requestStatus === 'failed'
+            ? decision.canRetry
+              ? 'Retry above to continue'
+              : 'Plan unavailable'
+            : onboarding && decision?.requestStatus !== 'ready'
+              ? 'Preparing plan...'
+              : isPackagesLoading
+                ? 'Loading plans...'
+                : 'Start My Plan'
+        }
         onPress={handlePurchase}
         disabled={isCtaDisabled}
         isLoading={isLoading}
