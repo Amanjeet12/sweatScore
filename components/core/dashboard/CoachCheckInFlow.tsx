@@ -3,17 +3,29 @@ import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
-import { ArrowLeft, Barbell, Footprints, ForkKnife, MoonStars, X } from 'phosphor-react-native';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowSquareOut,
+  Barbell,
+  Camera,
+  Footprints,
+  ForkKnife,
+  MoonStars,
+  PlayCircle,
+  X,
+} from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 
-import ScreenLoading from '~/components/core/ScreenLoading';
 import CoachActionButton from '~/components/core/CoachActionButton';
+import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { checkInGuide } from '~/shared/coachCheckInPresentation';
 import { CoachCategory } from '~/shared/coachFoundation';
+import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { getData, removeData, storeData } from '~/utils/storage';
 
 type ProofQueue = {
@@ -380,6 +392,28 @@ export default function CoachCheckInFlow({
     primaryAction = start;
   }
   const guide = assignment || queue ? checkInGuide(category, assignment ?? queue!, queue) : null;
+  const workoutDetails =
+    mode === 'details' && category === 'workout' && ready && Boolean(assignment?.mandatory);
+  const workoutRewardUsed = Boolean(assignment && assignment.consumedCount >= 1);
+  const workoutSearch =
+    workoutDetails && assignment?.mandatory
+      ? workoutYoutubeSearch(queue?.label ?? assignment?.label)
+      : null;
+  const canTakeWorkoutPhoto = Boolean(
+    workoutDetails &&
+    assignment?.mandatory &&
+    !workoutRewardUsed &&
+    !queue?.uri &&
+    !queue?.storageId
+  );
+  const openWorkoutSearch = async () => {
+    if (!workoutSearch) return;
+    try {
+      await Linking.openURL(workoutSearch.url);
+    } catch {
+      Alert.alert('YouTube could not be opened. Please try again.');
+    }
+  };
   const Icon = {
     workout: Barbell,
     meals: ForkKnife,
@@ -414,16 +448,37 @@ export default function CoachCheckInFlow({
               className="mb-3 h-1 w-10 self-center rounded-full bg-[#DDD8D4]"
               accessibilityElementsHidden
             />
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-x-3">
-                <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-                  <Icon size={21} color="#F45A2B" weight="regular" />
+            <View className="flex-row items-start justify-between">
+              {workoutDetails ? (
+                <View className="min-w-0 flex-1 pr-3">
+                  <View className="flex-row flex-wrap items-center gap-2">
+                    <Text className="font-heading text-xs font-semibold uppercase tracking-wider text-[#F45A2B]">
+                      LOG ACTIVITY
+                    </Text>
+                    <View className="rounded-lg bg-[#F1EFED] px-2.5 py-1">
+                      <Text className="font-body text-xs text-[#655B55]">
+                        {assignment?.mandatory ? 'Required' : 'No proof required'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="mt-2 font-heading text-[22px] font-semibold leading-7 text-[#231F1D]">
+                    Add your proof
+                  </Text>
+                  <Text className="mt-1 font-body text-sm leading-5 text-[#77716D]">
+                    Take a live photo to record today’s workout.
+                  </Text>
                 </View>
-                <Text className="font-heading text-xl font-semibold text-[#231F1D]">
-                  {category[0].toUpperCase()}
-                  {category.slice(1)} check-in
-                </Text>
-              </View>
+              ) : (
+                <View className="min-w-0 flex-1 flex-row items-center gap-x-3 pr-3">
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
+                    <Icon size={21} color="#F45A2B" weight="regular" />
+                  </View>
+                  <Text className="flex-1 font-heading text-xl font-semibold text-[#231F1D]">
+                    {category[0].toUpperCase()}
+                    {category.slice(1)} check-in
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Close check-in"
@@ -551,33 +606,72 @@ export default function CoachCheckInFlow({
               </>
             ) : (
               <>
-                <View className="rounded-3xl border border-[#F6DFD2] bg-[#FFF8F4] p-5">
-                  <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#CA4E25]">
-                    TODAY’S {category === 'meals' ? 'MEAL GUIDANCE' : 'RECOMMENDATION'}
-                  </Text>
-                  <Text className="mt-2 font-heading text-[23px] font-semibold leading-7 text-[#251E1A]">
-                    {guide?.title}
-                  </Text>
-                  {guide?.recommendation ? (
-                    <Text className="mt-3 font-body text-base leading-6 text-[#5F5752]">
-                      {guide.recommendation}
-                    </Text>
-                  ) : null}
-                </View>
-                {guide?.examples.length ? (
-                  <View className="mt-5">
-                    <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                      Moves you could try
-                    </Text>
-                    <View className="mt-3 flex-row flex-wrap gap-2">
-                      {guide.examples.map((example) => (
-                        <View
-                          key={example}
-                          className="rounded-full border border-[#F2D6C6] bg-white px-4 py-2">
-                          <Text className="font-body text-sm text-[#55443B]">{example}</Text>
-                        </View>
-                      ))}
+                {workoutDetails ? (
+                  <View className="rounded-2xl bg-[#FFF8F4] p-4">
+                    <View className="flex-row items-start gap-3">
+                      <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
+                        <Barbell size={22} color="#F45A2B" />
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text className="font-heading text-base font-semibold text-[#251E1A]">
+                          {guide?.title}
+                        </Text>
+                        <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
+                          {queue?.recommendation ?? assignment.recommendation}
+                        </Text>
+                        <Text className="mt-2 font-body text-xs font-semibold text-[#C9532B]">
+                          {workoutRewardUsed
+                            ? 'Today’s workout reward has been used'
+                            : assignment.mandatory
+                              ? 'Reward available after live proof and posting'
+                              : 'Rest guidance · no proof required'}
+                        </Text>
+                      </View>
                     </View>
+                  </View>
+                ) : (
+                  <View className="rounded-3xl border border-[#F6DFD2] bg-[#FFF8F4] p-5">
+                    <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#CA4E25]">
+                      TODAY’S {category === 'meals' ? 'MEAL GUIDANCE' : 'RECOMMENDATION'}
+                    </Text>
+                    <Text className="mt-2 font-heading text-[23px] font-semibold leading-7 text-[#251E1A]">
+                      {guide?.title}
+                    </Text>
+                    {guide?.recommendation ? (
+                      <Text className="mt-3 font-body text-base leading-6 text-[#5F5752]">
+                        {guide.recommendation}
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
+                {workoutSearch ? (
+                  <View className="mt-4 rounded-2xl border border-[#E9DCD5] bg-white p-4">
+                    <View className="flex-row items-start gap-3">
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
+                        <PlayCircle size={23} color="#F45A2B" />
+                      </View>
+                      <View className="min-w-0 flex-1">
+                        <Text className="font-heading text-base font-semibold text-[#251E1A]">
+                          Find a guided workout
+                        </Text>
+                        <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
+                          Search YouTube for “{workoutSearch.phrase}”
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      accessibilityRole="link"
+                      accessibilityLabel={`Search on YouTube for ${workoutSearch.phrase}. Opens an external service.`}
+                      onPress={openWorkoutSearch}
+                      className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-xl border border-[#F0B99F] bg-[#FFF8F4] px-4 py-3">
+                      <Text className="font-body text-sm font-semibold text-[#C9532B]">
+                        Search on YouTube
+                      </Text>
+                      <ArrowSquareOut size={18} color="#C9532B" />
+                    </TouchableOpacity>
+                    <Text className="mt-2 font-body text-xs leading-4 text-[#77716D]">
+                      Opens YouTube. Videos are provided by third parties.
+                    </Text>
                   </View>
                 ) : null}
                 {guide?.reason ? (
@@ -590,7 +684,7 @@ export default function CoachCheckInFlow({
                     </Text>
                   </View>
                 ) : null}
-                {category === 'workout' && !assignment.mandatory ? (
+                {category === 'workout' && !assignment.mandatory && !workoutDetails ? (
                   <Text className="mt-4">Rest guidance is not a mandatory workout check-in.</Text>
                 ) : null}
                 {assignment.consumedCount >= (category === 'meals' ? 3 : 1) ? (
@@ -598,10 +692,33 @@ export default function CoachCheckInFlow({
                     This category’s daily reward slot has already been used.
                   </Text>
                 ) : null}
-                <Text className="mt-5 font-body text-sm text-[#655B55]">
-                  Proof requires a new live camera photo. The image and caption are added on the
-                  next page.
-                </Text>
+                {canTakeWorkoutPhoto ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Take live photo using the in-app camera"
+                    disabled={busy}
+                    onPress={start}
+                    className="mt-4 min-h-[72px] flex-row items-center gap-3 rounded-2xl border border-[#E3E1DE] bg-white px-4 py-3">
+                    <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
+                      <Camera size={23} color="#F45A2B" />
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text className="font-heading text-base font-semibold text-[#251E1A]">
+                        Take live photo
+                      </Text>
+                      <Text className="font-body text-sm text-[#77716D]">
+                        Use the in-app camera
+                      </Text>
+                    </View>
+                    <ArrowRight size={20} color="#F45A2B" />
+                  </TouchableOpacity>
+                ) : null}
+                {!workoutDetails ? (
+                  <Text className="mt-5 font-body text-sm text-[#655B55]">
+                    Proof requires a new live camera photo. The image and caption are added on the
+                    next page.
+                  </Text>
+                ) : null}
               </>
             )}
           </ScrollView>
@@ -609,17 +726,19 @@ export default function CoachCheckInFlow({
             onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
             className="border-t border-[#EEE9E5] bg-white px-6 pb-4 pt-3">
             {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
-            <CoachActionButton
-              label={busy ? 'Working…' : primaryLabel}
-              disabled={
-                busy ||
-                (mode === 'post' &&
-                  (!queue ||
-                    today.status === 'locked' ||
-                    (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
-              }
-              onPress={primaryAction}
-            />
+            {!(canTakeWorkoutPhoto && !error) ? (
+              <CoachActionButton
+                label={busy ? 'Working…' : primaryLabel}
+                disabled={
+                  busy ||
+                  (mode === 'post' &&
+                    (!queue ||
+                      today.status === 'locked' ||
+                      (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
+                }
+                onPress={primaryAction}
+              />
+            ) : null}
             {mode === 'post' && queue && (queue.uri || queue.storageId) ? (
               <CoachActionButton
                 label="Retake photo"
