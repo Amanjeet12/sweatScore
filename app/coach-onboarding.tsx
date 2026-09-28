@@ -1,18 +1,64 @@
 import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
+import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
-import SafeAreaView from '~/components/core/CoachSafeAreaView';
+import { Check } from 'phosphor-react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import CoachActionButton from '~/components/core/CoachActionButton';
-import ScreenLoading from '~/components/core/ScreenLoading';
+import SafeAreaView from '~/components/core/CoachSafeAreaView';
+import CoachSetupLoading from '~/components/core/CoachSetupLoading';
+import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
+import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
-import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
+import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const QUESTION_ROUTES = ['profile', 'daily', 'today'] as const;
+
+const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
+  weight: {
+    eyebrow: 'Your starting point',
+    description: 'This helps your Coach follow your progress over time.',
+  },
+  goal: {
+    eyebrow: 'Your goal',
+    description: 'Choose the outcome that matters most to you right now.',
+  },
+  bodyFeeling: {
+    eyebrow: 'How you feel',
+    description: 'There is no right answer. Choose what feels most honest today.',
+  },
+  routineFeeling: {
+    eyebrow: 'Your routine',
+    description: 'This helps your Coach suggest something you can realistically maintain.',
+  },
+  foodRelationship: {
+    eyebrow: 'Food and you',
+    description: 'Pick the answer that best reflects most of your days.',
+  },
+  usualSleep: {
+    eyebrow: 'Your recovery',
+    description: 'Think about how your sleep usually feels, rather than one unusual night.',
+  },
+  biggestChallenge: {
+    eyebrow: 'Your biggest barrier',
+    description: 'Your Coach will keep this in mind when shaping your daily guidance.',
+  },
+};
 
 export default function CoachOnboarding() {
   const convex = useConvex();
@@ -39,6 +85,18 @@ export default function CoachOnboarding() {
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
+  const submissionRef = useRef(false);
+  const backHandlerRef = useRef<() => void>(() => {});
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      backHandlerRef.current();
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     setLocalStep(null);
@@ -84,7 +142,7 @@ export default function CoachOnboarding() {
     (!reanswerMode && decision.screen === 'today' && currentPlan?.requestStatus !== 'none') ||
     (reanswerMode && foundation.state?.testReanswerDay !== foundation.day)
   )
-    return <ScreenLoading />;
+    return <CoachSetupLoading />;
   const profile =
     !reanswerMode &&
     (decision.screen === 'profile' ||
@@ -119,8 +177,29 @@ export default function CoachOnboarding() {
   const saved = reanswerMode ? testDraft : currentDraft;
   const selected = saved?.[question.key as keyof typeof saved];
 
-  const choose = async (value: string) => {
+  const goBack = () => {
     if (busy) return;
+    setError('');
+    if (step > 0) {
+      setPendingProfileChoice(null);
+      setLocalStep(step - 1);
+      return;
+    }
+    if (reanswerMode) {
+      router.replace('/coach-plan');
+      return;
+    }
+    if (decision.returningMember) {
+      router.replace('/(tabs)/dashboard');
+      return;
+    }
+    router.replace('/(auth)/setup-profile');
+  };
+  backHandlerRef.current = goBack;
+
+  const choose = async (value: string) => {
+    if (busy || submissionRef.current) return;
+    submissionRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -138,7 +217,10 @@ export default function CoachOnboarding() {
           await finishProfile({});
           if (decision.returningMember) setLocalStep(null);
           else await resumeMember(convex);
-        } else setLocalStep(step + 1);
+        } else {
+          setPendingProfileChoice(null);
+          setLocalStep(step + 1);
+        }
       } else if (step === DAILY_QUESTIONS.length - 1) {
         await submitDaily({
           body: value as 'fine',
@@ -156,6 +238,7 @@ export default function CoachOnboarding() {
       setError(cause instanceof Error ? cause.message : 'Could not save your answer. Try again.');
       setLocalStep(null);
     } finally {
+      submissionRef.current = false;
       setBusy(false);
     }
   };
@@ -166,6 +249,8 @@ export default function CoachOnboarding() {
       setError('Enter your current weight to continue.');
       return;
     }
+    if (busy || submissionRef.current) return;
+    submissionRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -174,9 +259,164 @@ export default function CoachOnboarding() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save your weight.');
     } finally {
+      submissionRef.current = false;
       setBusy(false);
     }
   };
+
+  if (profile) {
+    const copy = PROFILE_COPY[question.key] ?? {
+      eyebrow: 'Your profile',
+      description: 'Choose the answer that feels most like you.',
+    };
+    const heroHeight = Math.min(Math.max(windowHeight * 0.39, 300), 390);
+    const effectiveProfileChoice =
+      pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
+    const canContinue =
+      question.key === 'weight'
+        ? Number.isFinite(Number(weight)) && Number(weight) > 0
+        : Boolean(effectiveProfileChoice);
+    const continueProfile = () => {
+      if (question.key === 'weight') {
+        saveWeight().catch(() => {});
+        return;
+      }
+      if (effectiveProfileChoice) choose(effectiveProfileChoice).catch(() => {});
+    };
+
+    return (
+      <View className="flex-1 bg-white">
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <Image
+          source={require('~/assets/onboarding/coach-onboarding.jpg')}
+          contentFit="cover"
+          contentPosition={{ top: '22%', left: '50%' }}
+          accessibilityIgnoresInvertColors
+          style={{ width: '100%', height: heroHeight }}
+        />
+        <OnboardingHeroChrome activeStep={step + 1} totalSteps={7} onBack={goBack} />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
+          style={{ flex: 1, marginTop: -32 }}>
+          <View
+            className="flex-1 overflow-hidden bg-white"
+            style={{ borderTopLeftRadius: 34, borderTopRightRadius: 34 }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 24,
+                paddingTop: 28,
+                paddingBottom: Math.max(insets.bottom, 16) + 16,
+              }}>
+              <View accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of 7`}>
+                <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
+                  {copy.eyebrow}
+                </Text>
+                <Text className="mt-2 font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]">
+                  {question.title}
+                </Text>
+                <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
+                  {copy.description}
+                </Text>
+              </View>
+
+              <View className="mt-6">
+                {question.key === 'weight' ? (
+                  <>
+                    <View className="mb-4 flex-row gap-3">
+                      {(['lb', 'kg'] as const).map((choice) => (
+                        <TouchableOpacity
+                          key={choice}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: unit === choice }}
+                          disabled={busy}
+                          onPress={() => setUnit(choice)}
+                          className={`min-h-12 flex-1 items-center justify-center rounded-2xl border ${unit === choice ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
+                          <Text className="font-body text-base font-semibold text-[#1A1A1A]">
+                            {choice === 'lb' ? 'lbs' : 'kg'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput
+                      value={weight}
+                      onChangeText={(value) => {
+                        setError('');
+                        setWeight(value);
+                      }}
+                      editable={!busy}
+                      keyboardType="decimal-pad"
+                      placeholder="e.g. 170"
+                      placeholderTextColor="#AAA5A1"
+                      accessibilityLabel="Current weight"
+                      returnKeyType="done"
+                      onSubmitEditing={continueProfile}
+                      className="min-h-16 rounded-2xl border border-[#D9D5D2] bg-white px-5 py-4 font-body text-lg text-[#1A1A1A]"
+                    />
+                  </>
+                ) : (
+                  question.options.map(([value, label], optionIndex) => {
+                    const isSelected = effectiveProfileChoice === value;
+                    return (
+                      <TouchableOpacity
+                        key={value}
+                        disabled={busy}
+                        onPress={() => {
+                          setError('');
+                          setPendingProfileChoice(value);
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected, disabled: busy }}
+                        activeOpacity={0.82}
+                        className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
+                        <View
+                          className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
+                          <Text
+                            className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
+                            {String(optionIndex + 1).padStart(2, '0')}
+                          </Text>
+                        </View>
+                        <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
+                          {label}
+                        </Text>
+                        {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+
+              {error ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  className="mt-1 font-body text-sm text-red-600">
+                  {error}
+                </Text>
+              ) : null}
+
+              <View className="mt-auto pt-6">
+                <OnboardingPrimaryButton
+                  label={step === PROFILE_QUESTIONS.length - 1 ? 'Finish setup' : 'Continue'}
+                  onPress={continueProfile}
+                  isLoading={busy}
+                  disabled={!canContinue}
+                  borderRadius={18}
+                  labelFontSize={18}
+                />
+                <Text className="mt-3 text-center font-body text-xs text-[#77716D]">
+                  Your answers save securely as you go.
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">

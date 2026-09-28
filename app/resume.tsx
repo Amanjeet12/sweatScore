@@ -1,7 +1,8 @@
 import { useConvexAuth, useQuery } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { useEffect } from 'react';
-import ScreenLoading from '~/components/core/ScreenLoading';
+
+import CoachSetupLoading from '~/components/core/CoachSetupLoading';
 import { api } from '~/convex/_generated/api';
 import { resumePathForDecision } from '~/utils/coachResumeNavigation';
 
@@ -15,7 +16,7 @@ export default function Resume() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScreenLoading />
+      <CoachSetupLoading />
     </>
   );
 }

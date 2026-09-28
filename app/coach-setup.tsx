@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
-import ScreenLoading from '~/components/core/ScreenLoading';
+import CoachSetupLoading from '~/components/core/CoachSetupLoading';
 import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -38,7 +38,7 @@ export default function CoachSetup() {
     return () => clearTimeout(timer);
   }, [accepted, complete, error]);
 
-  if (!accepted) return <ScreenLoading />;
+  if (!accepted) return <CoachSetupLoading />;
   return (
     <SafeAreaView className="flex-1 justify-center bg-[#FFF9F5] px-6">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
