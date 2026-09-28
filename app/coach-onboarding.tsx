@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import CoachActionButton from '~/components/core/CoachActionButton';
@@ -87,6 +87,7 @@ export default function CoachOnboarding() {
   const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
   const submissionRef = useRef(false);
   const backHandlerRef = useRef<() => void>(() => {});
+  const profileScrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { isVisible: keyboardVisible } = useKeyboardState();
@@ -97,6 +98,14 @@ export default function CoachOnboarding() {
     });
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+    if (!keyboardVisible) return;
+    const timer = setTimeout(
+      () => profileScrollRef.current?.scrollTo({ y: 0, animated: false }),
+      50
+    );
+    return () => clearTimeout(timer);
+  }, [keyboardVisible]);
 
   useEffect(() => {
     setLocalStep(null);
@@ -271,6 +280,9 @@ export default function CoachOnboarding() {
     };
     // Match the responsive hero used by the email and OTP onboarding screens.
     const heroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
+    const panelHeroHeight = keyboardVisible
+      ? Math.min(Math.max(windowHeight * 0.4, 300), 390)
+      : heroHeight;
     const effectiveProfileChoice =
       pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
     const canContinueWeight = Number.isFinite(Number(weight)) && Number(weight) > 0;
@@ -297,142 +309,142 @@ export default function CoachOnboarding() {
         />
         <OnboardingHeroChrome activeStep={step + 1} totalSteps={7} onBack={goBack} />
 
-        <KeyboardStickyView style={{ flex: 1 }}>
-          <View className="flex-1">
-            <View style={{ width: '100%', height: heroHeight }} />
-            {keyboardVisible ? <View className="flex-1" /> : null}
-            <View
-              className="overflow-hidden bg-white"
-              style={{
-                flex: keyboardVisible ? undefined : 1,
-                maxHeight: keyboardVisible ? Math.max(320, windowHeight * 0.48) : undefined,
-                marginTop: -32,
-                borderTopLeftRadius: 34,
-                borderTopRightRadius: 34,
+        <View className="flex-1">
+          <View style={{ width: '100%', height: panelHeroHeight }} />
+          <View
+            className="flex-1 overflow-hidden bg-white"
+            style={{
+              marginTop: -32,
+              borderTopLeftRadius: 34,
+              borderTopRightRadius: 34,
+            }}>
+            <ScrollView
+              ref={profileScrollRef}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingHorizontal: 24,
+                paddingTop: keyboardVisible ? 18 : 28,
+                paddingBottom: Math.max(insets.bottom, 16) + 16,
               }}>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="interactive"
-                automaticallyAdjustKeyboardInsets
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  flexGrow: 1,
-                  paddingHorizontal: 24,
-                  paddingTop: 28,
-                  paddingBottom: Math.max(insets.bottom, 16) + 16,
-                }}>
-                <View accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of 7`}>
+              <View accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of 7`}>
+                {!keyboardVisible ? (
                   <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
                     {copy.eyebrow}
                   </Text>
-                  <Text className="mt-2 font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]">
-                    {question.title}
-                  </Text>
+                ) : null}
+                <Text
+                  className={`${keyboardVisible ? '' : 'mt-2'} font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]`}>
+                  {question.title}
+                </Text>
+                {!keyboardVisible ? (
                   <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
                     {copy.description}
                   </Text>
-                </View>
+                ) : null}
+              </View>
 
-                <View className="mt-6">
-                  {question.key === 'weight' ? (
-                    <>
-                      <View className="mb-4 flex-row gap-3">
-                        {(['lb', 'kg'] as const).map((choice) => (
-                          <TouchableOpacity
-                            key={choice}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: unit === choice }}
-                            disabled={busy}
-                            onPress={() => setUnit(choice)}
-                            className={`min-h-12 flex-1 items-center justify-center rounded-2xl border ${unit === choice ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                            <Text className="font-body text-base font-semibold text-[#1A1A1A]">
-                              {choice === 'lb' ? 'lbs' : 'kg'}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <TextInput
-                        value={weight}
-                        onChangeText={(value) => {
-                          setError('');
-                          setWeight(value);
-                        }}
-                        editable={!busy}
-                        keyboardType="decimal-pad"
-                        placeholder="e.g. 170"
-                        placeholderTextColor="#AAA5A1"
-                        accessibilityLabel="Current weight"
-                        returnKeyType="done"
-                        onSubmitEditing={continueProfile}
-                        className="min-h-16 rounded-2xl border border-[#D9D5D2] bg-white px-5 py-4 font-body text-lg text-[#1A1A1A]"
-                      />
-                    </>
-                  ) : (
-                    question.options.map(([value, label], optionIndex) => {
-                      const isSelected = effectiveProfileChoice === value;
-                      return (
+              <View className={keyboardVisible ? 'mt-3' : 'mt-6'}>
+                {question.key === 'weight' ? (
+                  <>
+                    <View className="mb-4 flex-row gap-3">
+                      {(['lb', 'kg'] as const).map((choice) => (
                         <TouchableOpacity
-                          key={value}
-                          disabled={busy}
-                          onPress={() => {
-                            setError('');
-                            setPendingProfileChoice(value);
-                            choose(value).catch(() => {});
-                          }}
+                          key={choice}
                           accessibilityRole="radio"
-                          accessibilityState={{ selected: isSelected, disabled: busy }}
-                          activeOpacity={0.82}
-                          className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                          <View
-                            className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
-                            <Text
-                              className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
-                              {String(optionIndex + 1).padStart(2, '0')}
-                            </Text>
-                          </View>
-                          <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
-                            {label}
+                          accessibilityState={{ selected: unit === choice }}
+                          disabled={busy}
+                          onPress={() => setUnit(choice)}
+                          className={`flex-1 items-center justify-center rounded-2xl border ${keyboardVisible ? 'min-h-11' : 'min-h-12'} ${unit === choice ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
+                          <Text className="font-body text-base font-semibold text-[#1A1A1A]">
+                            {choice === 'lb' ? 'lbs' : 'kg'}
                           </Text>
-                          {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
                         </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </View>
+                      ))}
+                    </View>
+                    <TextInput
+                      value={weight}
+                      onChangeText={(value) => {
+                        setError('');
+                        setWeight(value);
+                      }}
+                      editable={!busy}
+                      keyboardType="decimal-pad"
+                      placeholder="e.g. 170"
+                      placeholderTextColor="#AAA5A1"
+                      accessibilityLabel="Current weight"
+                      returnKeyType="done"
+                      onSubmitEditing={continueProfile}
+                      className={`${keyboardVisible ? 'min-h-14' : 'min-h-16'} rounded-2xl border border-[#D9D5D2] bg-white px-5 py-4 font-body text-lg text-[#1A1A1A]`}
+                    />
+                  </>
+                ) : (
+                  question.options.map(([value, label], optionIndex) => {
+                    const isSelected = effectiveProfileChoice === value;
+                    return (
+                      <TouchableOpacity
+                        key={value}
+                        disabled={busy}
+                        onPress={() => {
+                          setError('');
+                          setPendingProfileChoice(value);
+                          choose(value).catch(() => {});
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected, disabled: busy }}
+                        activeOpacity={0.82}
+                        className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
+                        <View
+                          className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
+                          <Text
+                            className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
+                            {String(optionIndex + 1).padStart(2, '0')}
+                          </Text>
+                        </View>
+                        <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
+                          {label}
+                        </Text>
+                        {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
 
-                {error ? (
-                  <Text
-                    accessibilityLiveRegion="polite"
-                    className="mt-1 font-body text-sm text-red-600">
-                    {error}
+              {error ? (
+                <Text
+                  accessibilityLiveRegion="polite"
+                  className="mt-1 font-body text-sm text-red-600">
+                  {error}
+                </Text>
+              ) : null}
+
+              <View className={`${keyboardVisible ? 'pt-1' : 'mt-auto pt-6'}`}>
+                {question.key === 'weight' && !keyboardVisible ? (
+                  <OnboardingPrimaryButton
+                    label="Continue"
+                    onPress={continueProfile}
+                    isLoading={busy}
+                    disabled={!canContinueWeight}
+                    borderRadius={18}
+                    labelFontSize={18}
+                  />
+                ) : null}
+                {!keyboardVisible ? (
+                  <Text className="mt-3 text-center font-body text-xs text-[#77716D]">
+                    {question.key === 'weight'
+                      ? 'Your answers save securely as you go.'
+                      : busy
+                        ? 'Saving your answer…'
+                        : 'Choose one answer to continue.'}
                   </Text>
                 ) : null}
-
-                <View className="mt-auto pt-6">
-                  {question.key === 'weight' && !keyboardVisible ? (
-                    <OnboardingPrimaryButton
-                      label="Continue"
-                      onPress={continueProfile}
-                      isLoading={busy}
-                      disabled={!canContinueWeight}
-                      borderRadius={18}
-                      labelFontSize={18}
-                    />
-                  ) : null}
-                  <Text className="mt-3 text-center font-body text-xs text-[#77716D]">
-                    {question.key === 'weight' && keyboardVisible
-                      ? 'Tap Done when your weight is entered.'
-                      : question.key === 'weight'
-                        ? 'Your answers save securely as you go.'
-                        : busy
-                          ? 'Saving your answer…'
-                          : 'Choose one answer to continue.'}
-                  </Text>
-                </View>
-              </ScrollView>
-            </View>
+              </View>
+            </ScrollView>
           </View>
-        </KeyboardStickyView>
+        </View>
       </View>
     );
   }
