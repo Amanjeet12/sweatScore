@@ -56,6 +56,22 @@ async function usableScanCount(ctx: QueryCtx | MutationCtx, scans: Doc<'coachMea
   return count;
 }
 
+async function scanAllowance(ctx: QueryCtx | MutationCtx, scans: Doc<'coachMealScansV1'>[]) {
+  const now = Date.now();
+  const used = await usableScanCount(ctx, scans);
+  const inProgress = scans.filter(
+    (scan) =>
+      (scan.status === 'reserved' && now - scan.reservedAt < RESERVATION_MS) ||
+      (scan.status === 'dispatched' && now - (scan.dispatchedAt ?? now) < DISPATCH_MS)
+  ).length;
+  return {
+    used,
+    inProgress,
+    remaining: Math.max(0, 3 - used - inProgress),
+    limitReached: used + inProgress >= 3,
+  };
+}
+
 export const myDraft = query({
   args: { submissionId: v.id('coachProofSubmissionsV1'), refresh: v.optional(v.number()) },
   handler: async (ctx, { submissionId }) => {
@@ -80,9 +96,13 @@ export const myDraft = query({
       .query('dailyActivities')
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', submission!.day))
       .collect();
+    const allowance = await scanAllowance(ctx, scans);
     return {
       draft,
-      scanCount: await usableScanCount(ctx, scans),
+      scanCount: allowance.used,
+      analysisChecksInProgress: allowance.inProgress,
+      analysisChecksRemaining: allowance.remaining,
+      analysisLimitReached: allowance.limitReached,
       canRetryAnalysis:
         draft?.status === 'analyzing' && draft.scanId
           ? scans.some(
@@ -97,6 +117,48 @@ export const myDraft = query({
       ).length,
       storageId: submission?.storageId ?? null,
     };
+  },
+});
+
+export const resetMyMealAnalysisCountForTesting = mutation({
+  args: {},
+  handler: async (ctx) => {
+    if (process.env.CONVEX_CLOUD_URL !== 'https://beloved-stoat-88.convex.cloud')
+      asError('This testing tool is available only in the approved development deployment');
+    const userId = await owner(ctx);
+    const day = await today(ctx, userId);
+    const scans = await ctx.db
+      .query('coachMealScansV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .collect();
+    const now = Date.now();
+    for (const scan of scans) {
+      if (scan.status === 'reserved')
+        await ctx.db.patch(scan._id, {
+          status: 'released',
+          usable: false,
+          errorCode: 'testing_reset',
+          finishedAt: now,
+        });
+      else if (scan.status === 'dispatched')
+        await ctx.db.patch(scan._id, {
+          status: 'failed',
+          usable: false,
+          errorCode: 'testing_reset',
+          finishedAt: now,
+        });
+      else if (scan.status === 'ready' && scan.usable !== false)
+        await ctx.db.patch(scan._id, { usable: false });
+
+      const draft = await ctx.db.get(scan.draftId);
+      if (draft?.status === 'analyzing' && draft.scanId === scan._id)
+        await ctx.db.patch(draft._id, {
+          status: 'failed',
+          errorCode: 'testing_reset',
+          updatedAt: now,
+        });
+    }
+    return { day, scansReset: scans.length };
   },
 });
 

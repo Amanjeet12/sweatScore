@@ -83,6 +83,7 @@ export default function CoachCheckInFlow({
   const retakeMeal = useMutation(api.coachMeals.retake);
   const analyzeMeal = useAction(api.coachMealAnalysis.analyze);
   const shareMeal = useMutation(api.coachMeals.share);
+  const resetMealAnalysisCount = useMutation(api.coachMeals.resetMyMealAnalysisCountForTesting);
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [queue, setQueue] = useState<ProofQueue | null>(null);
@@ -325,7 +326,31 @@ export default function CoachCheckInFlow({
                 : 'Meal analysis is temporarily unavailable. Retry when connected; no successful scan was used.'
         );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Meal analysis could not start.');
+      const message = cause instanceof Error ? cause.message : '';
+      if (message.includes('Three successful meal scans')) {
+        setError(
+          'You have used today’s three private portion checks. You can still share this meal.'
+        );
+        setMealRefresh((value) => value + 1);
+      } else if (message.includes('already being analysed')) {
+        setError('This meal is already being checked. Please wait a moment.');
+      } else {
+        setError('We could not start the portion check. Your photo is safe—please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetMealChecksForTesting = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await resetMealAnalysisCount({});
+      setMealRefresh((value) => value + 1);
+      Alert.alert('AI checks reset', 'You can test three meal portion checks again today.');
+    } catch {
+      setError('The testing reset is unavailable. No meal or post was changed.');
     } finally {
       setBusy(false);
     }
@@ -383,14 +408,18 @@ export default function CoachCheckInFlow({
 
   if (!today || !currentUser) return <ScreenLoading />;
   const ready = today.status === 'ready' && Boolean(assignment);
+  const mealAnalysisLimitReached = Boolean(meal?.analysisLimitReached);
   let primaryLabel = 'Close';
   let primaryAction: () => void = onClose;
+  let showPrimaryAction = true;
   if (mode === 'post' && queue && today.status !== 'locked') {
     if (!queue.uri && !queue.storageId) {
       primaryLabel = 'Take live photo';
       primaryAction = () => setShowCamera(true);
     } else if (category === 'meals') {
-      if (!queue.storageId && queue.uri) {
+      if (mealAnalysisLimitReached) {
+        showPrimaryAction = false;
+      } else if (!queue.storageId && queue.uri) {
         primaryLabel = 'Get portion suggestion';
         primaryAction = scanMeal;
       } else if (meal?.draft?.status === 'ready' && meal.draft.verdict) {
@@ -402,7 +431,7 @@ export default function CoachCheckInFlow({
       } else if (meal?.draft?.status === 'analyzing') {
         primaryLabel = meal.canRetryAnalysis ? 'Retry analysis' : 'Analysing meal…';
         if (meal.canRetryAnalysis) primaryAction = scanMeal;
-      } else if (queue.storageId && (meal?.scanCount ?? 0) < 3) {
+      } else if (queue.storageId) {
         primaryLabel =
           meal?.draft?.status === 'failed' ? 'Retry portion check' : 'Get portion suggestion';
         primaryAction = scanMeal;
@@ -623,6 +652,29 @@ export default function CoachCheckInFlow({
                           {meal?.scanCount ?? 0} of 3 today
                         </Text>
                       </View>
+                      {mealAnalysisLimitReached ? (
+                        <View className="mt-4 rounded-[20px] border border-[#F0C9B6] bg-[#FFF8F4] p-5">
+                          <Text className="font-heading text-lg font-semibold text-[#251E1A]">
+                            Daily AI checks used
+                          </Text>
+                          <Text className="mt-2 font-body text-sm leading-5 text-[#655B55]">
+                            You’ve used today’s three private portion checks. You can still share
+                            this meal without an AI check.
+                          </Text>
+                          {__DEV__ ? (
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              accessibilityLabel="Reset meal AI checks for development testing"
+                              disabled={busy}
+                              onPress={resetMealChecksForTesting}
+                              className="mt-4 min-h-11 items-center justify-center rounded-xl border border-[#F0B99F] bg-white px-4">
+                              <Text className="font-body text-sm font-semibold text-[#C9532B]">
+                                Reset AI checks for testing
+                              </Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      ) : null}
                       {busy ? (
                         <View className="mt-4 rounded-[24px] border border-[#F3D4C5] bg-[#FFF8F4] p-5">
                           <View className="flex-row items-center gap-3">
@@ -832,17 +884,19 @@ export default function CoachCheckInFlow({
                   </Text>
                 </TouchableOpacity>
               ) : null}
-              <CoachActionButton
-                label={busy ? 'Working…' : primaryLabel}
-                disabled={
-                  busy ||
-                  (mode === 'post' &&
-                    (!queue ||
-                      today.status === 'locked' ||
-                      (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
-                }
-                onPress={primaryAction}
-              />
+              {showPrimaryAction ? (
+                <CoachActionButton
+                  label={busy ? 'Working…' : primaryLabel}
+                  disabled={
+                    busy ||
+                    (mode === 'post' &&
+                      (!queue ||
+                        today.status === 'locked' ||
+                        (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
+                  }
+                  onPress={primaryAction}
+                />
+              ) : null}
             </View>
           ) : null}
         </>

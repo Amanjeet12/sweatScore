@@ -13,6 +13,7 @@ import {
   finishScan,
   share,
   retake,
+  resetMyMealAnalysisCountForTesting,
 } from '../convex/coachMeals';
 
 const day = new Date().toISOString().slice(0, 10);
@@ -518,7 +519,54 @@ describe('meal draft, scan and share transactions', () => {
         latencyMs: 20,
       });
     }
-    expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(3);
+    const allowance = await myDraft._handler(f.ctx, { submissionId: 'sub' });
+    expect(allowance.scanCount).toBe(3);
+    expect(allowance.analysisLimitReached).toBe(true);
+    expect(allowance.analysisChecksRemaining).toBe(0);
+  });
+  test('development reset restores only today meal AI allowance', async () => {
+    const original = process.env.CONVEX_CLOUD_URL;
+    process.env.CONVEX_CLOUD_URL = 'https://beloved-stoat-88.convex.cloud';
+    try {
+      const f = fixture();
+      const draftId = await saveCaption._handler(f.ctx, {
+        submissionId: 'sub',
+        caption: 'Saved meal',
+      });
+      const scanId = await reserveScan._handler(f.ctx, {
+        userId: 'alice',
+        draftId,
+        requestKey: 'scan_reset',
+      });
+      expect(await claimDispatch._handler(f.ctx, { userId: 'alice', scanId })).toBe(true);
+      await finishScan._handler(f.ctx, {
+        userId: 'alice',
+        scanId,
+        result: examples[5],
+        latencyMs: 20,
+      });
+      const before = structuredClone(f.rows);
+      const result = await resetMyMealAnalysisCountForTesting._handler(f.ctx, {});
+      expect(result).toEqual({ day, scansReset: 1 });
+      expect(f.rows.coachMealScansV1[0].usable).toBe(false);
+      expect((await myDraft._handler(f.ctx, { submissionId: 'sub' })).scanCount).toBe(0);
+      expect(f.rows.coachProofSubmissionsV1).toEqual(before.coachProofSubmissionsV1);
+      expect(f.rows.dailyActivities).toEqual(before.dailyActivities);
+      expect(f.rows.posts).toEqual(before.posts);
+    } finally {
+      process.env.CONVEX_CLOUD_URL = original;
+    }
+  });
+  test('meal AI reset is rejected outside the approved development deployment', async () => {
+    const original = process.env.CONVEX_CLOUD_URL;
+    process.env.CONVEX_CLOUD_URL = 'https://production.convex.cloud';
+    try {
+      await expect(resetMyMealAnalysisCountForTesting._handler(fixture().ctx, {})).rejects.toThrow(
+        'approved development deployment'
+      );
+    } finally {
+      process.env.CONVEX_CLOUD_URL = original;
+    }
   });
   test('a stranded dispatch counts once and a late result cannot replace its retry', async () => {
     const f = fixture();

@@ -135,6 +135,9 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain("primaryLabel = 'Get portion suggestion'");
     expect(source).toContain('Share without AI check');
     expect(source).toContain('PRIVATE AI PORTION CHECK');
+    expect(source).toContain('Daily AI checks used');
+    expect(source).toContain('Reset AI checks for testing');
+    expect(source).toContain('mealAnalysisLimitReached');
     expect(source).toContain('One useful adjustment');
     expect(source).not.toContain('Upload photo to analyse');
     expect(source).not.toContain("'Analyse meal'");
