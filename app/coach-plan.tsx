@@ -9,13 +9,12 @@ import {
   Check,
   Footprints,
   ForkKnife,
-  House,
   MoonStars,
   Sparkle,
-  UserCircle,
+  YoutubeLogo,
 } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
@@ -27,6 +26,7 @@ import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { planCardRoute, planCardState } from '~/shared/coachPlanCards';
+import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const categories = ['workout', 'steps', 'sleep', 'meals'] as const;
@@ -39,9 +39,9 @@ const actions = {
 };
 const accents = {
   workout: { tint: '#FFF0E8', color: '#E9512A' },
-  steps: { tint: '#EDF8F2', color: '#29855E' },
-  sleep: { tint: '#F1EEFF', color: '#6E5BB7' },
-  meals: { tint: '#FFF6DF', color: '#9A6A13' },
+  steps: { tint: '#FFF0E8', color: '#E9512A' },
+  sleep: { tint: '#FFF0E8', color: '#E9512A' },
+  meals: { tint: '#FFF0E8', color: '#E9512A' },
 };
 const icons = { workout: Barbell, steps: Footprints, sleep: MoonStars, meals: ForkKnife };
 
@@ -84,7 +84,6 @@ export default function SavedCoachPlan() {
   if (!accepted || !saved) return <ScreenLoading />;
   const plan = saved.plan;
   const output = plan?.output;
-  const details = plan?.detailsV2;
   const rest = plan?.workout.type === 'rest';
   const open = (category: CoachCategory) => router.push(planCardRoute(category));
   const visibleCategories = categories.filter((category) => !(category === 'workout' && rest));
@@ -102,8 +101,15 @@ export default function SavedCoachPlan() {
   }).format(new Date(`${saved.day}T12:00:00`));
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <Stack.Screen options={{ title: "Today's plan" }} />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 56 }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 56 }}>
+        <Text className="font-heading text-[30px] font-semibold leading-9 text-[#171311]">
+          Today’s plan
+        </Text>
+        <Text className="mb-5 mt-1 font-body text-base text-[#716A66]">
+          Small actions for a healthier, happier you.
+        </Text>
         {output && plan ? (
           <>
             {saved.requestStatus === 'pending' ? (
@@ -122,14 +128,17 @@ export default function SavedCoachPlan() {
               </View>
             ) : null}
             <LinearGradient
-              colors={['#FF6A32', '#E74720', '#B92D16']}
+              colors={['#FF7A3D', '#FF5C1A', '#E9512A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              className="mb-5 overflow-hidden rounded-[28px] p-6"
               style={{
-                shadowColor: '#8D2A12',
-                shadowOpacity: 0.2,
-                shadowRadius: 14,
+                marginBottom: 24,
+                overflow: 'hidden',
+                borderRadius: 28,
+                padding: 22,
+                shadowColor: '#6B2D16',
+                shadowOpacity: 0.18,
+                shadowRadius: 16,
                 elevation: 5,
               }}>
               <View className="flex-row items-center justify-between">
@@ -195,6 +204,8 @@ export default function SavedCoachPlan() {
               const completed = (assignment?.consumedCount ?? 0) > 0;
               const Icon = icons[category];
               const accent = accents[category];
+              const workoutSearch =
+                category === 'workout' ? workoutYoutubeSearch(assignment?.label ?? fullBody) : null;
               return (
                 <TouchableOpacity
                   key={category}
@@ -218,11 +229,11 @@ export default function SavedCoachPlan() {
                         </Text>
                         <View
                           className="flex-row items-center rounded-full px-2.5 py-1.5"
-                          style={{ backgroundColor: completed ? '#EAF7F0' : '#F5F2F0' }}>
-                          {completed ? <Check size={13} color="#29855E" weight="bold" /> : null}
+                          style={{ backgroundColor: completed ? '#FFF0E8' : '#F5F2F0' }}>
+                          {completed ? <Check size={13} color="#E9512A" weight="bold" /> : null}
                           <Text
                             className="font-body text-[11px] font-semibold"
-                            style={{ color: completed ? '#247250' : '#756C67' }}>
+                            style={{ color: completed ? '#C64520' : '#756C67' }}>
                             {state.status}
                           </Text>
                         </View>
@@ -234,27 +245,32 @@ export default function SavedCoachPlan() {
                       </Text>
                     </View>
                   </View>
-                  {category === 'workout' && details?.workoutExamples.length ? (
-                    <View className="mt-3 flex-row flex-wrap gap-2">
-                      {details.workoutExamples.slice(0, 3).map((example) => (
-                        <View key={example} className="rounded-full bg-[#FFF4EE] px-3 py-1.5">
-                          <Text className="font-body text-xs text-[#9D4729]">{example}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                  {enabled ? (
-                    <View className="mt-4 flex-row items-center justify-between border-t border-[#F1ECE8] pt-3">
+                  {enabled && workoutSearch ? (
+                    <TouchableOpacity
+                      accessibilityRole="link"
+                      accessibilityLabel={`Search YouTube for ${workoutSearch.phrase}`}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        Linking.openURL(workoutSearch.url).catch(() =>
+                          Alert.alert('YouTube could not be opened. Please try again.')
+                        );
+                      }}
+                      activeOpacity={0.8}
+                      className="mt-4 min-h-14 flex-row items-center rounded-2xl bg-[#FFF0E8] px-4">
+                      <YoutubeLogo size={22} color="#E9512A" weight="fill" />
+                      <Text className="ml-3 flex-1 text-center font-body text-sm font-semibold text-[#C64520]">
+                        Search workout on YouTube
+                      </Text>
+                      <ArrowRight size={18} color="#E9512A" weight="bold" />
+                    </TouchableOpacity>
+                  ) : enabled ? (
+                    <View className="mt-4 min-h-14 flex-row items-center justify-between rounded-2xl bg-[#FFF0E8] px-4">
                       <Text
                         className="font-body text-sm font-semibold"
                         style={{ color: accent.color }}>
                         {action}
                       </Text>
-                      <View
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        style={{ backgroundColor: accent.tint }}>
-                        <ArrowRight size={16} color={accent.color} weight="bold" />
-                      </View>
+                      <ArrowRight size={18} color={accent.color} weight="bold" />
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -348,36 +364,6 @@ export default function SavedCoachPlan() {
           />
         ) : null}
         {error ? <Text className="mb-3 text-red-600">{error}</Text> : null}
-        <View className="flex-row gap-3">
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Back to Today"
-            onPress={() => router.replace('/(tabs)/dashboard')}
-            activeOpacity={0.8}
-            className="min-h-[72px] flex-1 flex-row items-center rounded-[20px] border border-[#E7E1DD] bg-white px-4">
-            <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-              <House size={21} color="#E9512A" weight="duotone" />
-            </View>
-            <Text className="ml-3 flex-1 font-body text-sm font-semibold text-[#302824]">
-              Today
-            </Text>
-          </TouchableOpacity>
-          {saved.access ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Update your profile"
-              onPress={() => router.push('/coach-profile')}
-              activeOpacity={0.8}
-              className="min-h-[72px] flex-1 flex-row items-center rounded-[20px] border border-[#E7E1DD] bg-white px-4">
-              <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#F1EEFF]">
-                <UserCircle size={22} color="#6E5BB7" weight="duotone" />
-              </View>
-              <Text className="ml-3 flex-1 font-body text-sm font-semibold text-[#302824]">
-                Profile
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
         {__DEV__ && resetAvailability && saved.requestStatus !== 'none' ? (
           <View className="mt-8 rounded-2xl border border-[#E3E1DE] bg-white p-5">
             <Text className="font-heading text-base font-semibold text-[#1A1A1A]">

@@ -224,6 +224,13 @@ describe('v2 daily plan contract', () => {
     expect(source).toContain('numberOfLines={2}');
     expect(source).toContain('planCardRoute(category)');
     expect(source).toContain('setShowWhy((value) => !value)');
+    expect(source).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
+    expect(source).toContain('Search workout on YouTube');
+    expect(source).not.toContain('workoutExamples.slice');
+    expect(source).not.toContain('accessibilityLabel="Update your profile"');
+    expect(source).not.toContain('accessibilityLabel="Back to Today"');
+    expect(source).not.toContain("tint: '#EDF8F2'");
+    expect(source).not.toContain("tint: '#F1EEFF'");
     expect(source).not.toContain('Why this was suggested');
   });
   test('saved pending state uses an honest, reduced-motion loading view on plan and paywall', () => {
