@@ -215,6 +215,17 @@ describe('v2 daily plan contract', () => {
     expect(source).not.toContain('generateDailyPlan');
     expect(source).not.toContain('completeProof');
   });
+  test('saved plan uses a concise personalised dashboard without changing its actions', () => {
+    const source = readFileSync(new URL('../app/coach-plan.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('Made for your day');
+    expect(source).toContain('Today’s progress');
+    expect(source).toContain('Your focus');
+    expect(source).toContain('Why this fits you today');
+    expect(source).toContain('numberOfLines={2}');
+    expect(source).toContain('planCardRoute(category)');
+    expect(source).toContain('setShowWhy((value) => !value)');
+    expect(source).not.toContain('Why this was suggested');
+  });
   test('saved pending state uses an honest, reduced-motion loading view on plan and paywall', () => {
     const plan = readFileSync(new URL('../app/coach-plan.tsx', import.meta.url), 'utf8');
     const paywall = readFileSync(
