@@ -75,7 +75,7 @@ describe('Stage 7 Today model', () => {
     });
     expect(
       resumeDecision({ ...base, verifiedAccess: false, previouslyVerified: true })
-    ).toMatchObject({ screen: 'today' });
+    ).toMatchObject({ screen: 'paywall' });
     expect(
       resumeDecision({
         ...base,
@@ -83,7 +83,7 @@ describe('Stage 7 Today model', () => {
         verifiedAccess: false,
         previouslyVerified: true,
       }).screen
-    ).toBe('today');
+    ).toBe('paywall');
     expect(
       resumeDecision({ ...base, verifiedAccess: false, previouslyVerified: false })
     ).toMatchObject({ screen: 'paywall' });

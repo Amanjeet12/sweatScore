@@ -71,6 +71,7 @@ export const myDecision = query({
     // not an entitlement grant. Some returning accounts retain a Coach stage
     // of `daily` after a cleared or failed first plan request.
     const returningMember = Boolean(
+      user.isAdmin ||
       user.onboarded ||
       state?.returningMember ||
       state?.stage === 'complete' ||
@@ -82,6 +83,7 @@ export const myDecision = query({
       hasProfile: Boolean(state?.profileRevisionId),
       hasHealthContinuation: Boolean(state?.healthContinuation),
       verifiedAccess,
+      isAdmin: user.isAdmin === true,
       previouslyVerified:
         state?.entitlement === 'expired' || Boolean(billing?.productId && !verifiedAccess),
       profileDraft: state?.profileDraft,

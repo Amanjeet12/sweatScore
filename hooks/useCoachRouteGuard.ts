@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '~/convex/_generated/api';
 import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
-import { ResumeScreen } from '~/shared/coachResume';
+import { enforceResumeAccess, ResumeScreen } from '~/shared/coachResume';
 import { useAuthStore } from '~/store/useAuthStore';
 import { resumePathForDecision } from '~/utils/coachResumeNavigation';
 
@@ -18,16 +18,17 @@ export function useCoachRouteGuard(allowed: readonly ResumeScreen[]) {
   // Changing the refresh argument briefly clears a Convex query result. Keep
   // the last decision for this member so a clock refresh does not unmount the
   // entire tab navigator and send an open screen back to Today.
-  const decision = useRetainedQueryResult(
+  const retainedDecision = useRetainedQueryResult(
     queryDecision,
     isAuthenticated ? String(memberId ?? 'auth-loading') : 'signed-out'
   );
+  const decision = retainedDecision ? enforceResumeAccess(retainedDecision) : undefined;
   const lastRedirect = useRef<string | null>(null);
   useEffect(() => {
     const timer = setInterval(() => setRefresh((value) => value + 1), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const accepted = Boolean(decision && allowed.includes(decision.screen));
+  const accepted = Boolean(isAuthenticated && decision && allowed.includes(decision.screen));
   const destination =
     !isLoading && !isAuthenticated
       ? '/(auth)/email'

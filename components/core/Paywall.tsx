@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
@@ -366,7 +367,7 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white">
       {onboarding || showBackToLogin === 'true' ? (
         <TouchableOpacity
           accessibilityRole="button"
@@ -383,7 +384,7 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
           )}
           <Text
             className="ml-2 text-[#E9512A]"
-            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18, }}>
             {isLoggingOut ? 'Signing out…' : 'Back to login'}
           </Text>
         </TouchableOpacity>
@@ -522,6 +523,6 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
           )}
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

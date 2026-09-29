@@ -1,6 +1,28 @@
 // @ts-nocheck -- Bun-only test fixture; the app TypeScript config omits Bun types.
 import { expect, test } from 'bun:test';
 import { retainQueryResult } from '../hooks/useRetainedQueryResult';
+import { enforceResumeAccess } from '../shared/coachResume';
+
+test('old server Today response without purchase is accepted only by the paywall guard', () => {
+  const decision = enforceResumeAccess({ screen: 'today', verifiedAccess: false });
+  expect(['today'].includes(decision.screen)).toBe(false);
+  expect(['paywall'].includes(decision.screen)).toBe(true);
+  expect(enforceResumeAccess(decision)).toEqual(decision);
+});
+
+test('verified subscribers and admins keep Today access', () => {
+  const decision = { screen: 'today', verifiedAccess: true };
+  expect(enforceResumeAccess(decision)).toBe(decision);
+});
+
+test('first-time onboarding stays available but unpaid setup and daily routes require paywall', () => {
+  for (const screen of ['bio', 'profile', 'health', 'paywall']) {
+    expect(enforceResumeAccess({ screen, verifiedAccess: false }).screen).toBe(screen);
+  }
+  for (const screen of ['setup', 'daily']) {
+    expect(enforceResumeAccess({ screen, verifiedAccess: false }).screen).toBe('paywall');
+  }
+});
 
 test('minute refresh retains the member decision until the new server result arrives', () => {
   const initial = { scope: 'member-a', result: { screen: 'today', day: '2026-09-28' } };

@@ -1,7 +1,7 @@
 import { ConvexReactClient } from 'convex/react';
 import { router } from 'expo-router';
 import { api } from '~/convex/_generated/api';
-import { ResumeScreen } from '~/shared/coachResume';
+import { enforceResumeAccess, ResumeScreen } from '~/shared/coachResume';
 
 export function resumePath(screen: ResumeScreen) {
   switch (screen) {
@@ -39,7 +39,7 @@ export function resumePathForDecision(decision: {
 }
 
 export async function resumeMember(convex: ConvexReactClient) {
-  const decision = await convex.query(api.coachResume.myDecision, {});
+  const decision = enforceResumeAccess(await convex.query(api.coachResume.myDecision, {}));
   router.replace(resumePathForDecision(decision));
   return decision;
 }

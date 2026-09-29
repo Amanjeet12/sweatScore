@@ -683,7 +683,9 @@ export const continueAfterHealth = mutation({
     if (state.firstPlanRequestId) return state._id;
     await ctx.db.patch(state._id, {
       healthContinuation: result,
-      stage: 'setup',
+      // The health choice is the final free-onboarding step. Persist the
+      // paywall stage now so resumeMember cannot briefly route through Home.
+      stage: 'paywall',
       updatedAt: Date.now(),
     });
     return state._id;
