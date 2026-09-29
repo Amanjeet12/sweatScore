@@ -221,15 +221,24 @@ export const getCreators = query({
       .order('asc')
       .collect();
 
+    const videos = await ctx.db.query('creatorVideos').collect();
+    const youtubeThumbnail = (url?: string) => {
+      if (!url) return null;
+      const match = url.match(/(?:youtu\.be\/|[?&]v=|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
+      return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : null;
+    };
     const results = [];
 
     for (const creator of creators) {
-      const posterImageUrl = creator.posterImage
+      const storedPosterUrl = creator.posterImage
         ? await ctx.storage.getUrl(creator.posterImage)
         : null;
+      const firstVideo = videos
+        .filter((video) => video.creatorId === creator._id && video.isActive !== false)
+        .sort((a, b) => a.order - b.order)[0];
       results.push({
         ...creator,
-        posterImageUrl,
+        posterImageUrl: storedPosterUrl ?? youtubeThumbnail(firstVideo?.youtubeUrl),
       });
     }
 
