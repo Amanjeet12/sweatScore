@@ -2,7 +2,7 @@ import { useQuery } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ArrowSquareOut, Barbell, Play, Tag } from 'phosphor-react-native';
 import { useState } from 'react';
-import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { LinkPreview } from '~/components/core/LinkPreview';
 import SafeAreaView from '~/components/core/SafeAreaView';
@@ -78,7 +78,8 @@ export default function TabDashboardCreatorVideo() {
                   if (skipPopup) Linking.openURL(video.youtubeUrl || '');
                   else setShowStartWorkoutPopup(true);
                 }}
-                className="absolute inset-0 items-center justify-center">
+                style={StyleSheet.absoluteFillObject}
+                className="items-center justify-center">
                 <View className="h-16 w-16 items-center justify-center rounded-full bg-white shadow-lg">
                   <Play size={27} color="#FF5C35" weight="fill" />
                 </View>
