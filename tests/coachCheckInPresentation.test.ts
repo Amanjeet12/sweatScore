@@ -2,7 +2,12 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-import { canStartCoachLivePhoto, checkInGuide } from '../shared/coachCheckInPresentation';
+import {
+  canStartCoachLivePhoto,
+  checkInGuide,
+  coachCheckInPoints,
+  randomCoachCheckInCaption,
+} from '../shared/coachCheckInPresentation';
 import { COACH_CATEGORIES } from '../shared/coachFoundation';
 
 const detailsV2 = {
@@ -129,6 +134,23 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('publishMeal');
     expect(source).not.toContain('api.coachCheckIns.cancel');
     expect(source).toContain("if (mode === 'details' && !closing.current) onCaptured?.()");
+  });
+  test('post-capture layout uses exact rewards, caption presets and image retake control', () => {
+    expect(COACH_CATEGORIES.map(coachCheckInPoints)).toEqual([5, 2, 4, 3]);
+    for (const category of COACH_CATEGORIES) {
+      expect(randomCoachCheckInCaption(category).trim().length).toBeGreaterThan(0);
+    }
+    const source = readFileSync(
+      new URL('../components/core/dashboard/CoachCheckInFlow.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(source).toContain('DAILY ACTIVITY');
+    expect(source).toContain('+{points} pts');
+    expect(source).toContain('randomCoachCheckInCaption(category)');
+    expect(source).toContain('accessibilityLabel="Remove photo and retake"');
+    expect(source).toContain('onPress={retakePhoto}');
+    expect(source).toContain("primaryLabel = 'Share activity'");
+    expect(source).not.toContain('label="Retake photo"');
   });
   test('separates a v2 workout into title, suggested moves and reason', () => {
     const guide = checkInGuide('workout', {

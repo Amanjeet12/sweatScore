@@ -1,4 +1,27 @@
 import type { CoachCategory } from './coachFoundation';
+import { getRandomActivityCaption } from './loggedActivities';
+
+const COACH_CHECK_IN_POINTS: Record<CoachCategory, number> = {
+  workout: 5,
+  meals: 2,
+  sleep: 4,
+  steps: 3,
+};
+
+const COACH_ACTIVITY_KEYS: Record<CoachCategory, string> = {
+  workout: 'gym_workout',
+  meals: 'healthy_meal',
+  sleep: 'sleep',
+  steps: 'steps',
+};
+
+export function coachCheckInPoints(category: CoachCategory) {
+  return COACH_CHECK_IN_POINTS[category];
+}
+
+export function randomCoachCheckInCaption(category: CoachCategory, previousCaption?: string) {
+  return getRandomActivityCaption(COACH_ACTIVITY_KEYS[category], previousCaption);
+}
 
 export function checkInPostRoute(category: CoachCategory) {
   return `/coach-check-in/post/${category}` as const;

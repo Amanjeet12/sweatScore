@@ -23,7 +23,12 @@ import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
-import { canStartCoachLivePhoto, checkInGuide } from '~/shared/coachCheckInPresentation';
+import {
+  canStartCoachLivePhoto,
+  checkInGuide,
+  coachCheckInPoints,
+  randomCoachCheckInCaption,
+} from '~/shared/coachCheckInPresentation';
 import { CoachCategory } from '~/shared/coachFoundation';
 import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { getData, removeData, storeData } from '~/utils/storage';
@@ -142,9 +147,12 @@ export default function CoachCheckInFlow({
           server.state !== 'reversed'
         ) {
           const recovered = server.storageId ? { ...saved, storageId: server.storageId } : saved;
-          setQueue(recovered);
-          setCaption(recovered.caption ?? server.caption ?? '');
-          if (server.storageId) storeData(queueKey, recovered);
+          const recoveredCaption =
+            recovered.caption ?? server.caption ?? randomCoachCheckInCaption(category);
+          const nextRecovered = { ...recovered, caption: recoveredCaption };
+          setQueue(nextRecovered);
+          setCaption(recoveredCaption);
+          storeData(queueKey, nextRecovered);
         } else removeData(queueKey);
       })
       .catch(() => {
@@ -212,7 +220,9 @@ export default function CoachCheckInFlow({
       const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}.jpg`;
       await FileSystem.deleteAsync(uri, { idempotent: true });
       await FileSystem.copyAsync({ from: photo.uri, to: uri });
-      persist({ ...queue, uri });
+      const nextCaption = caption.trim() ? caption : randomCoachCheckInCaption(category);
+      setCaption(nextCaption);
+      persist({ ...queue, uri, caption: nextCaption });
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
     } catch (cause) {
@@ -388,7 +398,7 @@ export default function CoachCheckInFlow({
         primaryAction = scanMeal;
       }
     } else if (queue.uri || queue.storageId) {
-      primaryLabel = 'Post check-in';
+      primaryLabel = 'Share activity';
       primaryAction = publishProof;
     }
   } else if (!ready) {
@@ -428,6 +438,7 @@ export default function CoachCheckInFlow({
     sleep: MoonStars,
     steps: Footprints,
   }[category];
+  const points = coachCheckInPoints(category);
   return (
     <View className="flex-1 bg-white">
       <View
@@ -445,8 +456,7 @@ export default function CoachCheckInFlow({
             <Text
               className="flex-1 text-center font-heading text-xl font-semibold text-[#231F1D]"
               numberOfLines={2}>
-              Post {category[0].toUpperCase()}
-              {category.slice(1)} check-in
+              Log Activity
             </Text>
             <View className="w-11" accessibilityElementsHidden />
           </View>
@@ -519,46 +529,74 @@ export default function CoachCheckInFlow({
             {mode === 'post' ? (
               queue && today.status !== 'locked' ? (
                 <>
-                  {queue.uri || proofImage ? (
-                    <Image
-                      source={{ uri: queue.uri ?? proofImage ?? undefined }}
-                      className="h-64 w-full rounded-[20px] bg-[#F4F1EE]"
-                      resizeMode="cover"
+                  <View className="rounded-[24px] border border-[#EEE8E3] bg-[#FFFDFC] p-5">
+                    <View className="flex-row items-start justify-between gap-4">
+                      <View className="min-w-0 flex-1">
+                        <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#E9512A]">
+                          DAILY ACTIVITY
+                        </Text>
+                        <Text className="mt-2 font-heading text-xl font-semibold text-[#251E1A]">
+                          {guide?.title}
+                        </Text>
+                      </View>
+                      <Text className="font-heading text-base font-semibold text-[#E9512A]">
+                        +{points} pts
+                      </Text>
+                    </View>
+                    <View className="mt-5 flex-row items-center justify-between">
+                      <Text className="font-body text-sm font-medium text-[#514943]">Caption</Text>
+                      <Text className="font-body text-xs text-[#8B817B]">{caption.length}/150</Text>
+                    </View>
+                    <TextInput
+                      value={caption}
+                      onChangeText={(value) => {
+                        setCaption(value);
+                        persist({ ...queue, caption: value });
+                      }}
+                      onEndEditing={() => {
+                        const save =
+                          category === 'meals'
+                            ? queue.storageId
+                              ? saveMealCaption({ submissionId: queue.submissionId, caption })
+                              : Promise.resolve()
+                            : saveProofCaption({ submissionId: queue.submissionId, caption });
+                        save.catch(() => {});
+                      }}
+                      placeholder="Add a caption"
+                      accessibilityLabel="Check-in caption"
+                      multiline
+                      maxLength={150}
+                      className="mt-2 min-h-28 rounded-[20px] border border-[#DCD7D3] bg-white p-4 font-body text-base text-[#251E1A]"
                     />
+                  </View>
+                  {queue.uri || proofImage ? (
+                    <View className="relative mt-5">
+                      <Image
+                        source={{ uri: queue.uri ?? proofImage ?? undefined }}
+                        className="h-80 w-full rounded-[24px] bg-[#F4F1EE]"
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove photo and retake"
+                        disabled={busy}
+                        onPress={retakePhoto}
+                        className="absolute right-3 top-3 min-h-11 min-w-11 items-center justify-center rounded-full bg-black/75">
+                        <X size={22} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
                   ) : (
-                    <Text className="rounded-2xl bg-[#F7F6F4] p-5">
-                      The local photo is unavailable. Retake it before posting.
-                    </Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Retake missing photo"
+                      disabled={busy}
+                      onPress={retakePhoto}
+                      className="mt-5 rounded-2xl bg-[#F7F6F4] p-5">
+                      <Text className="font-body text-[#655B55]">
+                        The local photo is unavailable. Tap to retake it before posting.
+                      </Text>
+                    </TouchableOpacity>
                   )}
-                  <Text className="mt-5 font-heading text-xl font-semibold text-[#251E1A]">
-                    {guide?.title}
-                  </Text>
-                  {guide?.recommendation ? (
-                    <Text className="mt-2 font-body text-sm text-[#655B55]">
-                      {guide.recommendation}
-                    </Text>
-                  ) : null}
-                  <TextInput
-                    value={caption}
-                    onChangeText={(value) => {
-                      setCaption(value);
-                      persist({ ...queue, caption: value });
-                    }}
-                    onEndEditing={() => {
-                      const save =
-                        category === 'meals'
-                          ? queue.storageId
-                            ? saveMealCaption({ submissionId: queue.submissionId, caption })
-                            : Promise.resolve()
-                          : saveProofCaption({ submissionId: queue.submissionId, caption });
-                      save.catch(() => {});
-                    }}
-                    placeholder="Add a caption"
-                    accessibilityLabel="Check-in caption"
-                    multiline
-                    maxLength={500}
-                    className="mt-5 min-h-24 rounded-[20px] border border-[#E3E1DE] bg-white p-4 font-body text-base"
-                  />
                   {category === 'meals' ? (
                     <View className="mt-5">
                       <Text className="font-body text-sm text-[#655B55]">
@@ -735,15 +773,6 @@ export default function CoachCheckInFlow({
                 }
                 onPress={primaryAction}
               />
-              {mode === 'post' && queue && (queue.uri || queue.storageId) ? (
-                <CoachActionButton
-                  label="Retake photo"
-                  variant="secondary"
-                  disabled={busy}
-                  onPress={retakePhoto}
-                  className="mt-2"
-                />
-              ) : null}
             </View>
           ) : null}
         </>
