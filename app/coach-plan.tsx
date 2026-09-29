@@ -11,6 +11,7 @@ import {
   ForkKnife,
   MoonStars,
   Sparkle,
+  UserCircle,
   YoutubeLogo,
 } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
@@ -358,6 +359,34 @@ export default function SavedCoachPlan() {
             </Text>
           </View>
         )}
+        {saved.access ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Update your profile"
+            accessibilityHint="Review and change the seven answers used by your AI Coach"
+            onPress={() => router.push('/coach-profile')}
+            activeOpacity={0.85}
+            className="mb-5 overflow-hidden rounded-[24px] border border-[#ECE6E2] bg-white p-5"
+            style={{ shadowColor: '#39251D', shadowOpacity: 0.05, shadowRadius: 10 }}>
+            <View className="flex-row items-center">
+              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF0E8]">
+                <UserCircle size={23} color="#E9512A" weight="duotone" />
+              </View>
+              <View className="ml-3 min-w-0 flex-1">
+                <Text className="font-heading text-lg font-semibold text-[#211C19]">
+                  Your AI Coach profile
+                </Text>
+                <Text className="mt-1 font-body text-sm leading-5 text-[#766A64]">
+                  Review or change the seven answers that personalise your guidance.
+                </Text>
+              </View>
+              <ArrowRight size={20} color="#E9512A" weight="bold" />
+            </View>
+            <Text className="mt-3 font-body text-xs leading-5 text-[#8A817C]">
+              Saving changes may refresh today’s recommendation once.
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         {saved.access && saved.requestStatus === 'failed' && saved.canRetry && !output ? (
           <CoachActionButton
             label={busy ? 'Retrying…' : 'Retry plan preparation'}

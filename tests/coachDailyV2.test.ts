@@ -231,7 +231,9 @@ describe('v2 daily plan contract', () => {
     expect(source).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
     expect(source).toContain('Search workout on YouTube');
     expect(source).not.toContain('workoutExamples.slice');
-    expect(source).not.toContain('accessibilityLabel="Update your profile"');
+    expect(source).toContain('accessibilityLabel="Update your profile"');
+    expect(source).toContain("router.push('/coach-profile')");
+    expect(source).toContain('Review or change the seven answers');
     expect(source).not.toContain('accessibilityLabel="Back to Today"');
     expect(source).not.toContain("tint: '#EDF8F2'");
     expect(source).not.toContain("tint: '#F1EEFF'");
