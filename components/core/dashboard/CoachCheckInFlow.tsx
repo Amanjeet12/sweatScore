@@ -307,6 +307,8 @@ export default function CoachCheckInFlow({
     setBusy(true);
     setError('');
     try {
+      const storageId = queue.storageId ?? (await upload());
+      if (!storageId) return;
       const draftId = await saveMealCaption({ submissionId: queue.submissionId, caption });
       const result = await analyzeMeal({
         draftId,
@@ -329,16 +331,25 @@ export default function CoachCheckInFlow({
     }
   };
 
-  const publishMeal = async () => {
-    if (!queue || !meal?.draft) return;
+  const publishMeal = async (skipAnalysis = false) => {
+    if (!queue) return;
     setBusy(true);
     setError('');
     try {
-      await shareMeal({ draftId: meal.draft._id, caption });
+      const storageId = queue.storageId ?? (await upload());
+      if (!storageId) return;
+      const draftId =
+        meal?.draft?._id ?? (await saveMealCaption({ submissionId: queue.submissionId, caption }));
+      await shareMeal({ draftId, caption, skipAnalysis: skipAnalysis || undefined });
       if (queueKey) removeData(queueKey);
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       setQueue(null);
-      Alert.alert('Meal shared', 'Your activity and 2 points have been saved.');
+      Alert.alert(
+        'Meal shared',
+        skipAnalysis
+          ? 'Your meal and 2 points have been saved without an AI portion check.'
+          : 'Your meal, private portion check and 2 points have been saved.'
+      );
       onClose();
     } catch (cause) {
       setError(
@@ -380,13 +391,11 @@ export default function CoachCheckInFlow({
       primaryAction = () => setShowCamera(true);
     } else if (category === 'meals') {
       if (!queue.storageId && queue.uri) {
-        primaryLabel = 'Upload photo to analyse';
-        primaryAction = () => {
-          upload().catch(() => {});
-        };
+        primaryLabel = 'Get portion suggestion';
+        primaryAction = scanMeal;
       } else if (meal?.draft?.status === 'ready' && meal.draft.verdict) {
         primaryLabel = 'Share meal';
-        primaryAction = publishMeal;
+        primaryAction = () => publishMeal(false);
       } else if (meal?.draft?.status === 'ready' && !meal.draft.verdict) {
         primaryLabel = 'Retake photo';
         primaryAction = retakePhoto;
@@ -394,7 +403,8 @@ export default function CoachCheckInFlow({
         primaryLabel = meal.canRetryAnalysis ? 'Retry analysis' : 'Analysing meal…';
         if (meal.canRetryAnalysis) primaryAction = scanMeal;
       } else if (queue.storageId && (meal?.scanCount ?? 0) < 3) {
-        primaryLabel = meal?.draft?.status === 'failed' ? 'Retry analysis' : 'Analyse meal';
+        primaryLabel =
+          meal?.draft?.status === 'failed' ? 'Retry portion check' : 'Get portion suggestion';
         primaryAction = scanMeal;
       }
     } else if (queue.uri || queue.storageId) {
@@ -424,6 +434,12 @@ export default function CoachCheckInFlow({
     Boolean(queue?.uri || queue?.storageId)
   );
   const showFooter = mode === 'post' || !ready || Boolean(queue?.uri || queue?.storageId);
+  const canShareMealWithoutAnalysis =
+    mode === 'post' &&
+    category === 'meals' &&
+    Boolean(queue?.uri || queue?.storageId) &&
+    meal?.draft?.status !== 'analyzing' &&
+    !(meal?.draft?.status === 'ready' && meal.draft.verdict);
   const openWorkoutSearch = async () => {
     if (!workoutSearch) return;
     try {
@@ -599,18 +615,55 @@ export default function CoachCheckInFlow({
                   )}
                   {category === 'meals' ? (
                     <View className="mt-5">
-                      <Text className="font-body text-sm text-[#655B55]">
-                        {meal?.scanCount ?? 0} of 3 successful meal scans used
-                      </Text>
-                      {busy ? <Text className="mt-3">Analysing your plate…</Text> : null}
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#C9532B]">
+                          PRIVATE AI PORTION CHECK
+                        </Text>
+                        <Text className="font-body text-xs text-[#817772]">
+                          {meal?.scanCount ?? 0} of 3 today
+                        </Text>
+                      </View>
+                      {busy ? (
+                        <View className="mt-4 rounded-[24px] border border-[#F3D4C5] bg-[#FFF8F4] p-5">
+                          <View className="flex-row items-center gap-3">
+                            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#FF5C35]">
+                              <ForkKnife size={22} color="#FFFFFF" />
+                            </View>
+                            <View className="flex-1">
+                              <Text className="font-heading text-lg font-semibold text-[#251E1A]">
+                                Looking at your plate
+                              </Text>
+                              <Text className="mt-1 font-body text-sm text-[#655B55]">
+                                Checking the visible balance and portions.
+                              </Text>
+                            </View>
+                          </View>
+                          <View className="mt-4 h-2 overflow-hidden rounded-full bg-[#F0D8CC]">
+                            <View className="h-full w-1/2 rounded-full bg-[#FF5C35]" />
+                          </View>
+                        </View>
+                      ) : null}
                       {meal?.draft?.status === 'ready' && meal.draft.verdict ? (
-                        <View
-                          className={`mt-4 rounded-[20px] p-5 ${meal.draft.verdict === 'On point' ? 'bg-green-100' : meal.draft.verdict === 'Nearly there' ? 'bg-amber-100' : 'bg-orange-100'}`}>
-                          <Text className="font-heading text-lg font-semibold">
-                            Portion Suggestion
-                          </Text>
-                          <Text className="mt-2 font-semibold">{meal.draft.verdict}</Text>
-                          <Text className="mt-2">{meal.draft.feedback}</Text>
+                        <View className="mt-4 overflow-hidden rounded-[24px] border border-[#F0C9B6] bg-[#FFF8F4]">
+                          <View className="bg-[#FF5C35] px-5 py-4">
+                            <Text className="font-body text-xs font-semibold uppercase tracking-widest text-white/80">
+                              YOUR PLATE
+                            </Text>
+                            <Text className="mt-1 font-heading text-2xl font-semibold text-white">
+                              {meal.draft.verdict}
+                            </Text>
+                          </View>
+                          <View className="p-5">
+                            <Text className="font-heading text-lg font-semibold text-[#251E1A]">
+                              One useful adjustment
+                            </Text>
+                            <Text className="mt-2 font-body text-base leading-6 text-[#514943]">
+                              {meal.draft.feedback}
+                            </Text>
+                            <Text className="mt-4 font-body text-xs leading-4 text-[#817772]">
+                              Based only on food visible in this photo. This feedback stays private.
+                            </Text>
+                          </View>
                         </View>
                       ) : meal?.draft?.status === 'ready' ? (
                         <View className="mt-4 rounded-[20px] bg-[#F7F6F4] p-5">
@@ -622,10 +675,15 @@ export default function CoachCheckInFlow({
                           </Text>
                         </View>
                       ) : meal?.draft?.status === 'failed' ? (
-                        <Text className="mt-3">
-                          Analysis failed. Your photo and caption are saved; no successful scan was
-                          used.
-                        </Text>
+                        <View className="mt-4 rounded-[20px] border border-[#E8E2DE] bg-[#FAF8F7] p-4">
+                          <Text className="font-heading text-base font-semibold text-[#251E1A]">
+                            Portion check unavailable
+                          </Text>
+                          <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
+                            Your photo and caption are safe. Retry the check or share your meal
+                            without it.
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                   ) : null}
@@ -762,6 +820,18 @@ export default function CoachCheckInFlow({
               onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
               className="border-t border-[#EEE9E5] bg-white px-6 pb-4 pt-3">
               {error ? <Text className="mb-3 text-sm text-red-600">{error}</Text> : null}
+              {canShareMealWithoutAnalysis ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Share meal without AI portion check"
+                  disabled={busy}
+                  onPress={() => publishMeal(true)}
+                  className="mb-3 min-h-12 items-center justify-center rounded-2xl border border-[#DCD7D3] bg-white px-4">
+                  <Text className="font-body text-sm font-semibold text-[#514943]">
+                    Share without AI check
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               <CoachActionButton
                 label={busy ? 'Working…' : primaryLabel}
                 disabled={

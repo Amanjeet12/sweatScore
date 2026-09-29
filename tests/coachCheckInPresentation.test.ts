@@ -132,6 +132,12 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('Retake photo');
     expect(source).toContain('publishProof');
     expect(source).toContain('publishMeal');
+    expect(source).toContain("primaryLabel = 'Get portion suggestion'");
+    expect(source).toContain('Share without AI check');
+    expect(source).toContain('PRIVATE AI PORTION CHECK');
+    expect(source).toContain('One useful adjustment');
+    expect(source).not.toContain('Upload photo to analyse');
+    expect(source).not.toContain("'Analyse meal'");
     expect(source).not.toContain('api.coachCheckIns.cancel');
     expect(source).toContain("if (mode === 'details' && !closing.current) onCaptured?.()");
   });

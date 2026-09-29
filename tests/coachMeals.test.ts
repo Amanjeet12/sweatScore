@@ -182,6 +182,9 @@ describe('client meal prompt and provider image contract', () => {
       expect(validateMealResult(example)).toEqual(example);
     }
     expect(MEAL_SYSTEM_PROMPT).toContain('Bowl Depth & Layering');
+    expect(MEAL_SYSTEM_PROMPT).toContain('Nigerian and other West African foods');
+    expect(MEAL_SYSTEM_PROMPT).toContain('Do not call avocado olives');
+    expect(MEAL_SYSTEM_PROMPT).toContain('egusi');
   });
   test('same actual image is sent first under each saved goal; no text-only surrogate', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -238,6 +241,31 @@ describe('client meal prompt and provider image contract', () => {
         })
       ).ok
     ).toBe(false);
+  });
+  test('one invalid structured response is repaired within the same analysis action', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.PROGRESS_COACH_MODEL = 'mock-model';
+    let calls = 0;
+    const result = await analyzeMealPhoto({
+      imageBase64: 'photo',
+      mediaType: 'image/jpeg',
+      goal: 'lose',
+      workoutLoggedToday: false,
+      style: { tone: 'warm_direct', detail: 'concise' },
+      fetchImpl: async () => {
+        calls++;
+        return providerResponse(
+          calls === 1 ? { verdict: 'On point', feedback: 'Count macros.' } : examples[5]
+        );
+      },
+    });
+    expect(calls).toBe(2);
+    expect(result).toMatchObject({
+      ok: true,
+      result: examples[5],
+      inputTokens: 20,
+      outputTokens: 40,
+    });
   });
   test('provider timeout reports a safe code without accepting a plan or meal', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -547,6 +575,22 @@ describe('meal draft, scan and share transactions', () => {
     expect(await share._handler(f.ctx, { draftId, caption: 'Changed' })).toEqual(first);
     expect(f.rows.posts).toHaveLength(1);
     expect(f.rows.coachRewardSlotsV1[0].state).toBe('earned');
+  });
+  test('a member can share an uploaded live meal without using AI analysis', async () => {
+    const f = fixture();
+    const draftId = await saveCaption._handler(f.ctx, {
+      submissionId: 'sub',
+      caption: 'My meal today',
+    });
+    const shared = await share._handler(f.ctx, {
+      draftId,
+      caption: 'My meal today',
+      skipAnalysis: true,
+    });
+    expect(shared.pointsEarned).toBe(2);
+    expect(f.rows.coachMealScansV1).toHaveLength(0);
+    expect(f.rows.posts[0].body).toBe('My meal today');
+    expect(f.rows.coachMealDraftsV1[0]).toMatchObject({ status: 'shared' });
   });
   test('non-meal and failed analysis cannot share; retake retains scan history and no award', async () => {
     const f = fixture();

@@ -457,8 +457,12 @@ export const releaseScan = internalMutation({
 });
 
 export const share = mutation({
-  args: { draftId: v.id('coachMealDraftsV1'), caption: v.string() },
-  handler: async (ctx, { draftId, caption }) => {
+  args: {
+    draftId: v.id('coachMealDraftsV1'),
+    caption: v.string(),
+    skipAnalysis: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { draftId, caption, skipAnalysis }) => {
     const userId = await owner(ctx);
     const draft = await ctx.db.get(draftId);
     if (!draft || draft.userId !== userId) asError('Meal draft does not belong to member');
@@ -466,8 +470,10 @@ export const share = mutation({
       return { postId: draft.postId, activityId: draft.activityId, pointsEarned: 2 };
     if (!(await entitled(ctx, userId))) asError('Verified entitlement required');
     if (draft.day !== (await today(ctx, userId))) asError('Meal day has changed');
-    if (draft.status !== 'ready' || !draft.verdict || !draft.feedback)
-      asError('Successful meal analysis required before sharing');
+    const analysed = draft.status === 'ready' && Boolean(draft.verdict && draft.feedback);
+    if (!analysed && !skipAnalysis) asError('Meal analysis is not ready');
+    if (skipAnalysis && !['draft', 'failed', 'ready'].includes(draft.status))
+      asError('Wait for the current meal analysis before sharing');
     if (caption.length > 500) asError('Caption is too long');
     const submission = await ctx.db.get(draft.submissionId);
     const assignment = submission ? await ctx.db.get(submission.assignmentId) : null;
@@ -492,7 +498,7 @@ export const share = mutation({
     )
       asError('Pinned meal proof context changed');
     const scan = draft.scanId ? await ctx.db.get(draft.scanId) : null;
-    if (!scan || scan.userId !== userId || scan.status !== 'ready')
+    if (analysed && (!scan || scan.userId !== userId || scan.status !== 'ready'))
       asError('Verified meal scan required');
     const slot = await ctx.db
       .query('coachRewardSlotsV1')
