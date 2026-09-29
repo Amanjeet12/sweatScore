@@ -1,22 +1,25 @@
 import type { DailyOutput, DailySnapshot } from './coachDailyPolicy';
-import { validateDailyPlanOutputV2 } from './coachDailyPolicyV2';
+import { buildDeterministicDailyPlanV2, validateDailyPlanOutputV2 } from './coachDailyPolicyV2';
 import type { DailyOutputV2 } from './coachDailyPolicyV2';
 import type { ProviderResult } from './coachDailyProvider';
 
-type Guidance = { previousCandidate?: DailyOutput | DailyOutputV2 };
+type Guidance = {
+  previousCandidate?: DailyOutput | DailyOutputV2;
+  validationCode?: string;
+};
 
-function valid(
+function validationCode(
   result: ProviderResult,
   snapshot: DailySnapshot,
   day: string,
   recentPlans: { day: string; output: DailyOutput }[]
 ) {
-  if (!result.ok) return false;
+  if (!result.ok) return result.formatCode ?? result.code;
   try {
     validateDailyPlanOutputV2(result.output, snapshot, day, recentPlans);
-    return true;
-  } catch {
-    return false;
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : 'invalid_output';
   }
 }
 
@@ -29,17 +32,39 @@ export async function generateV2WithRepair(args: {
   recentPlans: { day: string; output: DailyOutput }[];
 }): Promise<ProviderResult> {
   const first = await args.call();
-  if (valid(first, args.snapshot, args.day, args.recentPlans)) return first;
+  const firstValidationCode = validationCode(first, args.snapshot, args.day, args.recentPlans);
+  if (!firstValidationCode) return first;
   if (!first.ok && first.code !== 'invalid_output') return first;
-  const second = await args.call({ previousCandidate: first.ok ? first.output : undefined });
+  const second = await args.call({
+    previousCandidate: first.ok ? first.output : undefined,
+    validationCode: firstValidationCode,
+  });
   const latencyMs = first.latencyMs + second.latencyMs;
-  if (!valid(second, args.snapshot, args.day, args.recentPlans))
+  const secondValidationCode = validationCode(second, args.snapshot, args.day, args.recentPlans);
+  if (secondValidationCode) {
+    const output = buildDeterministicDailyPlanV2(args.snapshot, args.day, args.recentPlans);
+    validateDailyPlanOutputV2(output, args.snapshot, args.day, args.recentPlans);
     return {
-      ok: false,
-      code: second.ok ? 'invalid_output' : second.code,
-      formatCode: second.ok ? 'plan_validation' : second.formatCode,
+      ok: true,
+      output,
       latencyMs,
+      inputTokens:
+        first.ok && second.ok && first.inputTokens !== undefined && second.inputTokens !== undefined
+          ? first.inputTokens + second.inputTokens
+          : second.ok
+            ? second.inputTokens
+            : undefined,
+      outputTokens:
+        first.ok &&
+        second.ok &&
+        first.outputTokens !== undefined &&
+        second.outputTokens !== undefined
+          ? first.outputTokens + second.outputTokens
+          : second.ok
+            ? second.outputTokens
+            : undefined,
     };
+  }
   if (!second.ok) return second;
   return {
     ...second,

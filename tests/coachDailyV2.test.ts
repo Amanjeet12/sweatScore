@@ -6,7 +6,10 @@ import {
   DAILY_PLAN_V2_PROMPT_VERSION,
   DAILY_PLAN_V2_SYSTEM_PROMPT,
 } from '../convex/coachDailyPromptV2';
-import { validateDailyPlanOutputV2 } from '../convex/coachDailyPolicyV2';
+import {
+  buildDeterministicDailyPlanV2,
+  validateDailyPlanOutputV2,
+} from '../convex/coachDailyPolicyV2';
 import { generateV2WithRepair } from '../convex/coachDailyRepair';
 import { generateDailyPlan, V2_OUTPUT_TOKENS } from '../convex/coachDailyProvider';
 import { planCardRoute, planCardState } from '../shared/coachPlanCards';
@@ -286,7 +289,7 @@ describe('v2 daily plan contract', () => {
     expect(calls[1]?.previousCandidate.why).toBe('Keep going.');
     expect(result).toMatchObject({ ok: true, latencyMs: 240, inputTokens: 20, outputTokens: 40 });
   });
-  test('an invalid second candidate stays failed and a timeout is not retried', async () => {
+  test('an invalid second candidate uses a validated fallback and a timeout is not retried', async () => {
     let attempts = 0;
     const invalid = await generateV2WithRepair({
       snapshot,
@@ -297,7 +300,10 @@ describe('v2 daily plan contract', () => {
         return { ok: true, output: { ...output, why: 'Keep going.' }, latencyMs: 100 };
       },
     });
-    expect(invalid).toMatchObject({ ok: false, code: 'invalid_output', latencyMs: 200 });
+    expect(invalid).toMatchObject({ ok: true, latencyMs: 200 });
+    expect(() =>
+      validateDailyPlanOutputV2(invalid.ok ? invalid.output : null, snapshot, day)
+    ).not.toThrow();
     expect(attempts).toBe(2);
     attempts = 0;
     const timeout = await generateV2WithRepair({
@@ -311,5 +317,84 @@ describe('v2 daily plan contract', () => {
     });
     expect(timeout).toMatchObject({ ok: false, code: 'provider_timeout' });
     expect(attempts).toBe(1);
+  });
+
+  test('deterministic recovery validates across daily answers and saved-history contexts', () => {
+    const sleep = ['barely_rested', 'rested_enough', 'restful'];
+    const energy = ['flat', 'steady', 'full'];
+    const mood = ['low', 'okay', 'good', 'motivated'];
+    const upFor = ['full_session', 'short_session', 'something_light', 'rest_day'];
+    const body = ['fine', 'sore_upper', 'sore_lower', 'pain_unwell'];
+    const historyContexts = [
+      { health: snapshot.health, recentPlans: [] },
+      {
+        health: {
+          ...snapshot.health,
+          steps: [
+            { day: '2026-09-25', count: 4200, source: 'health_sync', coverage: 'sensor_observed' },
+            { day: '2026-09-26', count: 5100, source: 'health_sync', coverage: 'sensor_observed' },
+            { day: '2026-09-27', count: 6000, source: 'health_sync', coverage: 'sensor_observed' },
+          ],
+        },
+        recentPlans: [],
+      },
+      {
+        health: snapshot.health,
+        recentPlans: [
+          {
+            day: '2026-09-27',
+            output: {
+              ...output,
+              workout: 'Log a 20-minute full body strength workout today.',
+            },
+          },
+        ],
+      },
+      {
+        health: {
+          ...snapshot.health,
+          workouts: ['2026-09-25', '2026-09-26', '2026-09-27'].map((workoutDay) => ({
+            day: workoutDay,
+            label: 'Workout',
+            source: 'activity_log',
+          })),
+        },
+        recentPlans: [],
+      },
+    ];
+    let checked = 0;
+    for (const context of historyContexts)
+      for (const sleepValue of sleep)
+        for (const energyValue of energy)
+          for (const moodValue of mood)
+            for (const upForValue of upFor)
+              for (const bodyValue of body) {
+                const state = {
+                  ...snapshot,
+                  health: context.health,
+                  daily: {
+                    sleep: sleepValue,
+                    energy: energyValue,
+                    mood: moodValue,
+                    upFor: upForValue,
+                    body: bodyValue,
+                  },
+                };
+                const fallback = buildDeterministicDailyPlanV2(state, day, context.recentPlans);
+                expect(() =>
+                  validateDailyPlanOutputV2(fallback, state, day, context.recentPlans)
+                ).not.toThrow();
+                checked++;
+              }
+    expect(checked).toBe(2304);
+  });
+
+  test('daily questions share the image-led Coach setup design and top-only navigation', () => {
+    const source = readFileSync(new URL('../app/coach-onboarding.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('const DAILY_COPY');
+    expect(source).toContain('totalSteps={DAILY_QUESTIONS.length}');
+    expect(source.match(/coach-onboarding\.jpg/g)?.length).toBe(2);
+    expect(source).not.toContain('label="Previous question"');
+    expect(source).toContain("'Choose one answer to continue.'");
   });
 });

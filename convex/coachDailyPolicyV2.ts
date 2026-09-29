@@ -1,4 +1,4 @@
-import { validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
+import { dailyPolicy, validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
 import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
 import { addDaysToDateKey } from './utils/timezone';
 
@@ -43,6 +43,15 @@ const unsafe =
 const remembered = /\b(?:you (?:logged|ate|had)|your last (?:meal|food))\b/i;
 const preference =
   /\b(?:you enjoy|you like|your (?:usual|favourite|favorite|preferred) (?:meal|food))\b/i;
+
+const FALLBACK_EXAMPLES: Record<string, string[]> = {
+  full_body_strength: ['chair squats', 'wall push-ups'],
+  upper_body_strength: ['wall push-ups', 'seated rows'],
+  lower_body_strength: ['chair squats', 'glute bridges'],
+  core: ['dead bugs', 'bird dogs'],
+  jump_rope: ['easy skips', 'alternating-foot steps'],
+  cardio: ['brisk walking', 'marching in place'],
+};
 
 function text(value: unknown, max: number) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || unsafe.test(value))
@@ -211,4 +220,79 @@ export function workoutRecommendationV2(
 }
 export function stepsRecommendationV2(output: DailyOutput, details: DailyDetailsV2) {
   return `${output.steps}. ${details.stepsReason}`;
+}
+
+/** Safe local copy used only after both provider candidates fail validation. */
+export function buildDeterministicDailyPlanV2(
+  snapshot: DailySnapshot,
+  day: string,
+  recentPlans: { day: string; output: DailyOutput }[] = []
+): DailyOutputV2 {
+  const policy = dailyPolicy(snapshot, day);
+  if (policy.unresolved) throw new Error('policy_unresolved');
+  const average = verifiedStepAverage(snapshot);
+  const stepTarget =
+    average === undefined
+      ? policy.missingHistoryTarget
+      : Math.max(500, Math.floor((average + 2000) / 500) * 500);
+  const steps = `${stepTarget.toLocaleString('en-US')} steps`;
+  const rest = policy.rest;
+  let type =
+    snapshot.daily.body === 'sore_upper'
+      ? 'lower_body_strength'
+      : snapshot.daily.body === 'sore_lower'
+        ? 'upper_body_strength'
+        : 'full_body_strength';
+  const yesterday = recentPlans.find((plan) => plan.day === addDaysToDateKey(day, -1));
+  if (
+    !rest &&
+    snapshot.daily.body === 'fine' &&
+    yesterday?.output.workout.includes('full body strength')
+  )
+    type = 'upper_body_strength';
+  const duration =
+    policy.duration === 'light'
+      ? 10
+      : policy.duration === 'short' || policy.duration === 'recovery'
+        ? 20
+        : 45;
+  const workoutNames: Record<string, string> = {
+    full_body_strength: 'full body strength',
+    upper_body_strength: 'upper body strength',
+    lower_body_strength: 'lower body strength',
+  };
+  const workout = rest
+    ? 'No workout today. Keep your streak going by logging your meals, steps and sleep.'
+    : `Log a ${duration}-minute ${workoutNames[type]} workout today.`;
+  const workoutReason = rest
+    ? 'Rest gives your body time to recover today.'
+    : snapshot.daily.body === 'sore_upper'
+      ? 'A lower-body session lets your upper body recover today.'
+      : snapshot.daily.body === 'sore_lower'
+        ? 'An upper-body session lets your lower body recover today.'
+        : 'This session fits your energy and readiness today.';
+  const stepsReason =
+    average === undefined
+      ? 'This target fits today’s sleep and energy without assuming a step history.'
+      : 'Your recent step average and today’s readiness make this a practical target.';
+  const meals =
+    'Try eggs with vegetables, aim for 2 litres of water today, and snap or log your meals for a portion check.';
+  const workoutSummary = rest
+    ? 'Rest supports recovery'
+    : type === 'lower_body_strength'
+      ? 'Lower-body strength supports recovery for your upper body'
+      : type === 'upper_body_strength'
+        ? 'Upper-body strength supports recovery for your lower body'
+        : 'Full-body strength fits your readiness';
+  return {
+    headline: policy.headline,
+    workout,
+    workoutExamples: rest ? [] : FALLBACK_EXAMPLES[type],
+    workoutReason,
+    steps,
+    stepsReason,
+    sleep: policy.sleep,
+    meals,
+    why: `${workoutSummary}, while ${steps} fit today’s answers. Eggs with vegetables offer a simple meal option.`,
+  };
 }

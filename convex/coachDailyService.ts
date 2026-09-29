@@ -537,6 +537,7 @@ export const generateReserved = internalAction({
       previousCandidate?:
         | import('./coachDailyPolicy').DailyOutput
         | import('./coachDailyPolicyV2').DailyOutputV2;
+      validationCode?: string;
     }) =>
       generateDailyPlan({
         config,

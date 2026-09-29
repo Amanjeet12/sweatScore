@@ -149,7 +149,10 @@ export async function generateDailyPlan(args: {
   style: { tone: string; detail: string };
   fetchImpl?: typeof fetch;
   promptVersion?: string;
-  retryGuidance?: { previousCandidate?: DailyOutput | DailyOutputV2 };
+  retryGuidance?: {
+    previousCandidate?: DailyOutput | DailyOutputV2;
+    validationCode?: string;
+  };
 }): Promise<ProviderResult> {
   const started = Date.now();
   if (!args.config) return { ok: false, code: 'provider_unavailable', latencyMs: 0 };
@@ -188,6 +191,7 @@ export async function generateDailyPlan(args: {
                     revision_instruction:
                       "The previous candidate failed validation or did not have a complete tool input. Call submit_daily_plan exactly once with every required field and the required types. Produce a materially corrected candidate, not a near-copy. Never use an em dash in any field. Keep headline and sleep exactly as output_constraints require. Copy output_constraints.workout and output_constraints.steps only when they are non-null; otherwise follow the workout type, duration and step cap. Meals must name ONE practical food suggestion, include the literal phrase '2 litres of water', and invite the member to snap or log meals, without listing alternative dishes. Why must include the same numeric Steps target returned in steps and repeat the one named food from Meals; connect both to today's saved answers and rest or workout choice. Keep exercise examples matched to the workout type and never invent history. Return all required tool fields.",
                     previous_candidate: args.retryGuidance.previousCandidate ?? null,
+                    validation_failure: args.retryGuidance.validationCode ?? 'invalid_output',
                   }
                 : {}),
             }),

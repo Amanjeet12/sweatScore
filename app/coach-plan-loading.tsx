@@ -110,12 +110,14 @@ export default function CoachPlanLoading() {
             </Text>
           </View>
         )}
-        <CoachActionButton
-          label="Back to Today"
-          variant="secondary"
-          onPress={() => router.replace('/(tabs)/dashboard')}
-          className="mt-6"
-        />
+        {!pending ? (
+          <CoachActionButton
+            label="Back to Today"
+            variant="secondary"
+            onPress={() => router.replace('/(tabs)/dashboard')}
+            className="mt-6"
+          />
+        ) : null}
       </View>
     </SafeAreaView>
   );

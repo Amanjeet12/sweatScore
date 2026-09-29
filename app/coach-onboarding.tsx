@@ -14,8 +14,6 @@ import {
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CoachActionButton from '~/components/core/CoachActionButton';
-import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import CoachSetupLoading from '~/components/core/CoachSetupLoading';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
@@ -56,6 +54,29 @@ const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
   biggestChallenge: {
     eyebrow: 'Your biggest barrier',
     description: 'Your Coach will keep this in mind when shaping your daily guidance.',
+  },
+};
+
+const DAILY_COPY: Record<string, { eyebrow: string; description: string }> = {
+  sleep: {
+    eyebrow: 'Your recovery',
+    description: 'Choose the answer that best describes last night.',
+  },
+  energy: {
+    eyebrow: 'Your energy',
+    description: 'Tell your Coach how much energy you have to work with today.',
+  },
+  mood: {
+    eyebrow: 'Your mood',
+    description: 'A quick honest answer helps keep today’s plan realistic.',
+  },
+  upFor: {
+    eyebrow: 'Your pace',
+    description: 'Choose what feels achievable for you today.',
+  },
+  body: {
+    eyebrow: 'Your body',
+    description: 'Your Coach will use this to keep today’s guidance appropriate.',
   },
 };
 
@@ -241,6 +262,7 @@ export default function CoachOnboarding() {
         });
       } else {
         await saveDaily({ [question.key]: value } as Parameters<typeof saveDaily>[0]);
+        setPendingProfileChoice(null);
         setLocalStep(step + 1);
       }
     } catch (cause) {
@@ -449,100 +471,106 @@ export default function CoachOnboarding() {
     );
   }
 
+  const dailyCopy = DAILY_COPY[question.key] ?? {
+    eyebrow: 'Today’s plan',
+    description: 'Choose the answer that feels most accurate today.',
+  };
+  const dailyHeroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
+  const effectiveDailyChoice =
+    pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
+
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <View className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingTop: 40,
-          paddingBottom: 32,
-        }}>
-        <Text className="font-body text-xs font-bold uppercase tracking-wider text-primary-500">
-          {profile ? 'YOUR PROFILE' : reanswerMode ? 'RE-ANSWER TODAY' : "TODAY'S PLAN"} ·{' '}
-          {step + 1} OF {questions.length}
-        </Text>
-        {decision.changedDay && !profile ? (
-          <Text className="mt-4 font-body text-sm text-[#6B665A]">
-            It’s a new day. Your earlier plan is saved as history; answer today’s questions for a
-            fresh plan.
-          </Text>
-        ) : null}
-        <Text className="mb-6 mt-4 font-heading text-2xl font-semibold text-[#1A1A1A]">
-          {question.title}
-        </Text>
-        {profile && step === 0 ? (
-          <>
-            <Text className="mb-4 font-body text-sm text-[#6B665A]">
-              Used to track your trend over time.
+      <Image
+        source={require('~/assets/onboarding/coach-onboarding.jpg')}
+        contentFit="cover"
+        contentPosition={{ top: '22%', left: '50%' }}
+        accessibilityIgnoresInvertColors
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          left: 0,
+          width: '100%',
+          height: dailyHeroHeight,
+        }}
+      />
+      <OnboardingHeroChrome
+        activeStep={step + 1}
+        totalSteps={DAILY_QUESTIONS.length}
+        onBack={goBack}
+      />
+      <View className="flex-1">
+        <View style={{ width: '100%', height: dailyHeroHeight }} />
+        <View
+          className="flex-1 overflow-hidden bg-white"
+          style={{ marginTop: -32, borderTopLeftRadius: 34, borderTopRightRadius: 34 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingHorizontal: 24,
+              paddingTop: 28,
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
+            }}>
+            <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
+              {reanswerMode ? 'Re-answer today' : dailyCopy.eyebrow}
             </Text>
-            <View className="mb-4 flex-row gap-3">
-              {(['lb', 'kg'] as const).map((choice) => (
-                <TouchableOpacity
-                  key={choice}
-                  onPress={() => setUnit(choice)}
-                  className={`rounded-[20px] border px-6 py-3 ${unit === choice ? 'border-primary-500 bg-[#FFF0E8]' : 'border-[#E3E1DE] bg-white'}`}>
-                  <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
-                    {choice === 'lb' ? 'lbs' : 'kg'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="decimal-pad"
-              placeholder="e.g. 170"
-              accessibilityLabel="Current weight"
-              className="mb-5 rounded-2xl border border-[#E3E1DE] bg-white px-4 py-4 text-lg"
-            />
-            <CoachActionButton
-              label={busy ? 'Saving…' : 'Next Question'}
-              disabled={busy}
-              onPress={saveWeight}
-            />
-          </>
-        ) : (
-          question.options.map(([value, label]) => (
-            <TouchableOpacity
-              key={value}
-              disabled={busy}
-              onPress={() => choose(value)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: selected === value }}
-              className={`mb-3 rounded-[20px] border px-5 py-5 ${selected === value ? 'border-primary-500 bg-[#FFF0E8]' : 'border-[#E3E1DE] bg-white'}`}>
-              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18, color: '#1A1A1A' }}>
-                {label}
+            <Text className="mt-2 font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]">
+              {question.title}
+            </Text>
+            <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
+              {decision.changedDay && step === 0
+                ? 'It’s a new day. Your earlier plan is saved; answer for a fresh plan.'
+                : dailyCopy.description}
+            </Text>
+            {decision.changedDay && step === 0 ? (
+              <Text className="mt-4 font-body text-sm text-[#6B665A]">
+                Your answers save securely as you go.
               </Text>
-            </TouchableOpacity>
-          ))
-        )}
-        {error ? <Text className="mt-3 font-body text-sm text-red-600">{error}</Text> : null}
-        {reanswerMode ? (
-          <CoachActionButton
-            label="Back to today’s plan"
-            variant="secondary"
-            disabled={busy}
-            onPress={() => router.replace('/coach-plan')}
-            className="mt-6"
-          />
-        ) : null}
-        {step > 0 ? (
-          <CoachActionButton
-            label="Previous question"
-            variant="secondary"
-            disabled={busy}
-            onPress={() => setLocalStep(step - 1)}
-            className="mt-6"
-          />
-        ) : null}
-        <View className="mt-auto py-3">
-          <Text className="text-center font-body text-xs text-[#6B665A]">
-            Your answers save as you go.
-          </Text>
+            ) : null}
+            <View className="mt-6">
+              {question.options.map(([value, label], optionIndex) => {
+                const isSelected = effectiveDailyChoice === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    disabled={busy}
+                    onPress={() => {
+                      setError('');
+                      setPendingProfileChoice(value);
+                      choose(value).catch(() => {});
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected, disabled: busy }}
+                    activeOpacity={0.82}
+                    className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
+                    <View
+                      className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
+                      <Text
+                        className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
+                        {String(optionIndex + 1).padStart(2, '0')}
+                      </Text>
+                    </View>
+                    <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
+                      {label}
+                    </Text>
+                    {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {error ? <Text className="mt-3 font-body text-sm text-red-600">{error}</Text> : null}
+            <View className="mt-auto py-3">
+              <Text className="text-center font-body text-xs text-[#6B665A]">
+                {busy ? 'Saving your answer…' : 'Choose one answer to continue.'}
+              </Text>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }

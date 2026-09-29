@@ -78,11 +78,11 @@ export default function CoachPlanPreparing({
 
   return (
     <LinearGradient
-      colors={['#FFF8F3', '#FFF0E7', '#FFFFFF']}
+      colors={['#FFF8F3', '#FFFFFF', '#FFF3EC']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      className="overflow-hidden rounded-[28px] border border-[#F7D7C6]"
-      style={{ padding: compact ? 18 : 24 }}
+      className="overflow-hidden rounded-[30px] border border-[#F3CDBA]"
+      style={{ padding: compact ? 18 : 26 }}
       accessibilityLiveRegion="polite">
       <View className="flex-row items-center">
         <Animated.View
@@ -106,14 +106,32 @@ export default function CoachPlanPreparing({
         </View>
       </View>
       {!compact ? (
-        <Text className="mt-5 font-body text-base leading-6 text-[#655B55]">
+        <Text className="mt-5 font-body text-base leading-6 text-[#5F5650]">
           {mode === 'profile'
             ? 'Saving your coach profile and getting your coaching experience ready. You’ll answer today’s questions after access is verified.'
             : 'Your answers are saved. We’re shaping practical guidance for your workout, steps, sleep and meals.'}
         </Text>
       ) : null}
+      {!compact && mode === 'plan' ? (
+        <View className="mt-5 flex-row justify-between rounded-2xl bg-white/80 px-4 py-3">
+          {['Answers saved', 'Building plan', 'Final check'].map((label, index) => (
+            <View key={label} className="flex-1 items-center">
+              <View
+                className={`h-7 w-7 items-center justify-center rounded-full ${index === 0 ? 'bg-primary-500' : index === 1 ? 'border-2 border-primary-500 bg-[#FFF3ED]' : 'border border-[#D9D2CD] bg-white'}`}>
+                <Text
+                  className={`font-body text-xs font-bold ${index === 0 ? 'text-white' : index === 1 ? 'text-primary-500' : 'text-[#928A84]'}`}>
+                  {index === 0 ? '✓' : index + 1}
+                </Text>
+              </View>
+              <Text className="mt-2 text-center font-body text-[10px] leading-4 text-[#655B55]">
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       <View
-        className="mt-6 h-2.5 overflow-hidden rounded-full bg-[#F2D7C9]"
+        className="mt-6 h-3 overflow-hidden rounded-full bg-[#F0D8CC]"
         accessibilityRole="progressbar"
         accessibilityLabel={
           mode === 'profile' ? 'Coach profile setup in progress' : 'Plan preparation in progress'
@@ -124,7 +142,10 @@ export default function CoachPlanPreparing({
           setTrackWidth((previous) => (Math.abs(previous - width) > 1 ? width : previous));
         }}>
         {reduceMotion ? (
-          <View className="h-full w-1/3 rounded-full bg-[#FF5C35]" />
+          <View
+            className="h-full rounded-full bg-[#FF5C35]"
+            style={{ width: Math.max(72, trackWidth * 0.45) }}
+          />
         ) : (
           <Animated.View
             className="h-full w-1/3 overflow-hidden rounded-full"
