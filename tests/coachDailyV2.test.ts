@@ -222,7 +222,8 @@ describe('v2 daily plan contract', () => {
     expect(source).toContain('Your focus');
     expect(source).toContain('Why this fits you today');
     expect(source).toContain('numberOfLines={2}');
-    expect(source).toContain('planCardRoute(category)');
+    expect(source).toContain("router.dismissTo({ pathname: '/(tabs)/dashboard'");
+    expect(source).toContain('supportingPlanText(fullBody)');
     expect(source).toContain('setShowWhy((value) => !value)');
     expect(source).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
     expect(source).toContain('Search workout on YouTube');

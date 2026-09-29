@@ -25,7 +25,7 @@ import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
-import { planCardRoute, planCardState } from '~/shared/coachPlanCards';
+import { planCardState } from '~/shared/coachPlanCards';
 import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
@@ -48,6 +48,12 @@ const icons = { workout: Barbell, steps: Footprints, sleep: MoonStars, meals: Fo
 function concisePlanText(value: string) {
   const firstSentence = value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
   return firstSentence || value;
+}
+
+function supportingPlanText(value: string) {
+  const primary = concisePlanText(value);
+  const remaining = value.slice(primary.length).trim();
+  return remaining ? concisePlanText(remaining) : '';
 }
 
 export default function SavedCoachPlan() {
@@ -85,7 +91,8 @@ export default function SavedCoachPlan() {
   const plan = saved.plan;
   const output = plan?.output;
   const rest = plan?.workout.type === 'rest';
-  const open = (category: CoachCategory) => router.push(planCardRoute(category));
+  const open = (category: CoachCategory) =>
+    router.dismissTo({ pathname: '/(tabs)/dashboard', params: { checkIn: category } });
   const visibleCategories = categories.filter((category) => !(category === 'workout' && rest));
   const completedCategories = visibleCategories.filter((category) => {
     const assignment = checkIns?.assignments.find((item) => item.category === category);
@@ -177,7 +184,7 @@ export default function SavedCoachPlan() {
               <CoachActionButton
                 label={`Continue to ${titles[selectedCheckIn]} check-in`}
                 disabled={!checkIns?.assignments.some((item) => item.category === selectedCheckIn)}
-                onPress={() => router.push(planCardRoute(selectedCheckIn))}
+                onPress={() => open(selectedCheckIn)}
                 className="mb-5"
               />
             ) : null}
@@ -199,6 +206,12 @@ export default function SavedCoachPlan() {
                   ? `${plan.stepTarget.toLocaleString('en-US')} steps`
                   : output[category];
               const body = concisePlanText(fullBody);
+              const supportingBody =
+                category === 'workout'
+                  ? (plan.detailsV2?.workoutReason ?? supportingPlanText(fullBody))
+                  : category === 'steps'
+                    ? (plan.detailsV2?.stepsReason ?? supportingPlanText(output.steps))
+                    : supportingPlanText(fullBody);
               const enabled = state.canOpen && Boolean(assignment);
               const action = state.canLog ? actions[category] : 'View check-in';
               const completed = (assignment?.consumedCount ?? 0) > 0;
@@ -243,6 +256,13 @@ export default function SavedCoachPlan() {
                         numberOfLines={2}>
                         {body}
                       </Text>
+                      {supportingBody ? (
+                        <Text
+                          className="mt-1.5 font-body text-[13px] leading-[18px] text-[#8A817C]"
+                          numberOfLines={2}>
+                          {supportingBody}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                   {enabled && workoutSearch ? (
