@@ -3,9 +3,9 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ArrowSquareOut, Barbell, Play, Tag } from 'phosphor-react-native';
 import { useState } from 'react';
 import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinkPreview } from '~/components/core/LinkPreview';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import StartWorkoutPopup from '~/components/core/creators/StartWorkoutPopup';
 import { Text } from '~/components/ui/text';

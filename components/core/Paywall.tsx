@@ -365,6 +365,27 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   return (
     <View className="flex-1 bg-[#F8FAFB]">
       <StatusBar style="dark" />
+      {onboarding || showBackToLogin === 'true' ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Sign out and return to login"
+          accessibilityState={{ disabled: isLoggingOut || isLoading || isRestoring }}
+          onPress={handleBackToLogin}
+          disabled={isLoggingOut || isLoading || isRestoring}
+          activeOpacity={0.7}
+          className="mx-6 mt-2 min-h-11 flex-row items-center self-start rounded-[20px] px-2">
+          {isLoggingOut ? (
+            <ActivityIndicator size="small" color="#FF5C1A" />
+          ) : (
+            <Icon.ArrowLeft size={20} color="#FF5C1A" weight="bold" />
+          )}
+          <Text
+            className="ml-2 text-[#E9512A]"
+            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+            {isLoggingOut ? 'Signing out…' : 'Back to login'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
       <ScrollView
         className="flex-1 bg-[#F8FAFB]"
         showsVerticalScrollIndicator={false}
@@ -520,27 +541,6 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
             </Text>
           )}
         </TouchableOpacity>
-        {onboarding || showBackToLogin === 'true' ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Sign out and return to login"
-            accessibilityState={{ disabled: isLoggingOut || isLoading || isRestoring }}
-            onPress={handleBackToLogin}
-            disabled={isLoggingOut || isLoading || isRestoring}
-            activeOpacity={0.7}
-            className="mt-2 min-h-11 flex-row items-center self-center rounded-[20px] px-3">
-            {isLoggingOut ? (
-              <ActivityIndicator size="small" color="#FF5C1A" />
-            ) : (
-              <Icon.ArrowLeft size={16} color="#777777" weight="bold" />
-            )}
-            <Text
-              className="ml-2 text-[#777777]"
-              style={{ fontFamily: 'Inter_500Medium', fontSize: 13 }}>
-              {isLoggingOut ? 'Signing out…' : 'Back to login'}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
       </ScrollView>
     </View>
   );

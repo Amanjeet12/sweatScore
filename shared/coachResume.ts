@@ -7,12 +7,29 @@ export type ResumeScreen =
   | 'paywall'
   | 'trial_notifications'
   | 'today';
+
+// Older servers can return Today with inactive access. Enforce the access
+// boundary on the client as well, including when opening the paywall itself.
+// verifiedAccess is server-owned and already includes the admin exemption.
+export function enforceResumeAccess<T extends { screen: ResumeScreen; verifiedAccess: boolean }>(
+  decision: T
+): T {
+  if (
+    !decision.verifiedAccess &&
+    (decision.screen === 'today' || decision.screen === 'daily' || decision.screen === 'setup')
+  ) {
+    return { ...decision, screen: 'paywall' };
+  }
+  return decision;
+}
+
 export type ResumeInput = {
   trialNotificationPending?: boolean;
   hasBio: boolean;
   hasProfile: boolean;
   hasHealthContinuation: boolean;
   verifiedAccess: boolean;
+  isAdmin?: boolean;
   previouslyVerified?: boolean;
   profileDraft?: Record<string, unknown>;
   dailyDraft?: Record<string, unknown>;
@@ -48,24 +65,20 @@ export function resumeDecision(input: ResumeInput): {
       ? ('ready' as const)
       : (input.requestStatus ?? ('none' as const)),
   };
-  if (!input.hasBio) return { screen: 'bio', question: 0, ...base };
-  // Previously entitled members see an access-limited Today screen while
-  // billing is inactive, even if their coach profile was never completed.
-  if (!input.verifiedAccess && input.previouslyVerified)
+  if (input.isAdmin) return { screen: 'today', question: 0, ...base };
+  // Every returning member must pass the subscription gate before Today.
+  // Check this before onboarding completeness because legacy accounts may not
+  // have the newer coach-profile fields persisted.
+  if (!input.verifiedAccess && (input.previouslyVerified || input.returningMember))
+    return { screen: 'paywall', question: 0, ...base };
+  if (input.returningMember && input.verifiedAccess)
     return { screen: 'today', question: 0, ...base };
-  // Returning members always enter Today. A new local day or a missing plan is
-  // an invitation to start setup, not a reason to leave the home screen.
-  if (input.returningMember) return { screen: 'today', question: 0, ...base };
+  if (!input.hasBio) return { screen: 'bio', question: 0, ...base };
   if (!input.hasProfile)
     return { screen: 'profile', question: firstMissing(profileKeys, input.profileDraft), ...base };
   if (!input.hasHealthContinuation && !input.verifiedAccess)
     return { screen: 'health', question: 0, ...base };
-  if (!input.verifiedAccess)
-    return {
-      screen: input.setupPending && !input.hasTodayRequest ? 'setup' : 'paywall',
-      question: 0,
-      ...base,
-    };
+  if (!input.verifiedAccess) return { screen: 'paywall', question: 0, ...base };
   if (input.hasTodayRequest || input.hasTodayPlan || input.completedOnboarding)
     return { screen: 'today', question: 0, ...base };
   return { screen: 'today', question: firstMissing(dailyKeys, input.dailyDraft), ...base };

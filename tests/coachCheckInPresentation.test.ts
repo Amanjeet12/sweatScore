@@ -164,7 +164,8 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('DAILY ACTIVITY');
     expect(source).toContain('+{points} {pointsLabel(points)}');
     expect(source).toContain('randomCoachCheckInCaption(category)');
-    expect(source).toContain('accessibilityLabel="Remove photo and retake"');
+    expect(source).toContain("'Remove photo and retake'");
+    expect(source).toContain("'Remove video and retake'");
     expect(source).toContain('onPress={retakePhoto}');
     expect(source).toContain("primaryLabel = 'Share activity'");
     expect(source).not.toContain('label="Retake photo"');

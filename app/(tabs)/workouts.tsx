@@ -26,7 +26,7 @@ export default function WorkoutsTab() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingTop: Platform.OS === 'android' ? insets.top + 20 : 18,
+          paddingTop: Platform.OS === 'android' ? insets.top : 18,
           paddingBottom: insets.bottom + 32,
         }}>
         <View className="mb-5 mt-3 flex-row items-end justify-between">

@@ -4,7 +4,6 @@ import { describe, expect, test } from 'bun:test';
 import { DAILY_PLAN_PROMPT_VERSION } from '../convex/coachDailyPrompt';
 import {
   continueAfterHealth,
-  finishCoachSetup,
   finishDailyAndReserveFirst,
   saveDailyDraft,
 } from '../convex/coachFoundation';
@@ -121,7 +120,24 @@ const draft = {
 };
 
 describe('Stage 4 persisted resume', () => {
-  test('new member follows bio, profile, health, setup, paywall, then Today after verification', () => {
+  test('returning login gates purchase before missing profile fields', () => {
+    const returning = { ...base, returningMember: true, hasBio: false, hasProfile: false };
+    expect(resumeDecision(returning).screen).toBe('paywall');
+    expect(resumeDecision({ ...returning, verifiedAccess: true }).screen).toBe('today');
+  });
+
+  test('admin without a purchase or onboarding profile goes directly to Today', async () => {
+    const store = fixture({
+      users: [{ _id: 'member_a', timezone: 'UTC', isAdmin: true }],
+    });
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'today',
+      verifiedAccess: true,
+      returningMember: true,
+    });
+  });
+
+  test('new member follows bio, profile, health, paywall, then Today after verification', () => {
     expect(resumeDecision({ ...base, hasBio: false }).screen).toBe('bio');
     const profileState = resumeDecision({
       ...base,
@@ -130,7 +146,7 @@ describe('Stage 4 persisted resume', () => {
     });
     expect(profileState).toMatchObject({ screen: 'profile', question: 2 });
     expect(resumeDecision({ ...base, hasHealthContinuation: false }).screen).toBe('health');
-    expect(resumeDecision({ ...base, setupPending: true })).toMatchObject({ screen: 'setup' });
+    expect(resumeDecision({ ...base, setupPending: true })).toMatchObject({ screen: 'paywall' });
     expect(resumeDecision({ ...base, dailyDraft: draft })).toMatchObject({
       screen: 'paywall',
       question: 0,
@@ -200,7 +216,7 @@ describe('Stage 4 persisted resume', () => {
     ).toBe('today');
   });
 
-  test('legacy completed-account flag routes to access-limited Today without granting billing', async () => {
+  test('legacy completed-account flag routes unpaid returning members to the paywall', async () => {
     const store = fixture({
       users: [
         {
@@ -213,7 +229,7 @@ describe('Stage 4 persisted resume', () => {
       ],
     });
     expect(await myDecision._handler(store.ctx, {})).toMatchObject({
-      screen: 'today',
+      screen: 'paywall',
       verifiedAccess: false,
       returningMember: true,
     });
@@ -238,15 +254,13 @@ describe('Stage 4 persisted resume', () => {
     expect((await myDecision._handler(store.ctx, {})).screen).toBe('today');
   });
 
-  test('health continuation and visual setup save progress without starting AI or rewards', async () => {
+  test('health continuation routes directly to paywall without starting AI or rewards', async () => {
     const store = fixture({
       coachOnboardingV1: [
         { _id: 'state', userId: 'member_a', stage: 'health', profileRevisionId: 'profile' },
       ],
     });
     await continueAfterHealth._handler(store.ctx, { result: 'declined' });
-    expect((await myDecision._handler(store.ctx, {})).screen).toBe('setup');
-    await finishCoachSetup._handler(store.ctx, {});
     expect((await myDecision._handler(store.ctx, {})).screen).toBe('paywall');
     expect(store.rows.coachOnboardingV1[0].healthContinuation).toBe('declined');
     expect(store.rows.coachPlanRequestsV1).toBeUndefined();
@@ -419,5 +433,5 @@ test('verified trials go to Home without a post-paywall notification gate', () =
   expect(resumeDecision({ ...input, trialNotificationPending: false }).screen).toBe('today');
   expect(
     resumeDecision({ ...input, verifiedAccess: false, trialNotificationPending: true }).screen
-  ).toBe('today');
+  ).toBe('paywall');
 });
