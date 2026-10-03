@@ -192,7 +192,7 @@ export default function NewPost() {
               },
             },
           ],
-          { compress: 0.7 }
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
         );
 
         setMedia({

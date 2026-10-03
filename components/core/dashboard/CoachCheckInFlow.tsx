@@ -104,6 +104,8 @@ export default function CoachCheckInFlow({
   const camera = useRef<CameraView>(null);
   const [queue, setQueue] = useState<ProofQueue | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [photoPreviewError, setPhotoPreviewError] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const [recording, setRecording] = useState(false);
   const [audioMuted, setAudioMuted] = useState(false);
@@ -291,6 +293,7 @@ export default function CoachCheckInFlow({
         mediaType,
       });
       setCameraMode(mediaType === 'video' ? 'video' : 'picture');
+      setCameraReady(false);
       setShowCamera(true);
     } catch {
       setError('Could not start check-in. Please try again.');
@@ -300,12 +303,14 @@ export default function CoachCheckInFlow({
   };
 
   const capture = async () => {
-    if (!queue || !camera.current || !FileSystem.documentDirectory) return;
+    if (!queue || !camera.current || !cameraReady || !FileSystem.documentDirectory) return;
     setBusy(true);
     setError('');
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.8, shutterSound: false });
       if (!photo?.uri) return;
+      const capturedFile = await FileSystem.getInfoAsync(photo.uri);
+      if (!capturedFile.exists || !capturedFile.size) throw new Error('Empty camera photo');
       const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}.jpg`;
       await FileSystem.deleteAsync(uri, { idempotent: true });
       await FileSystem.copyAsync({ from: photo.uri, to: uri });
@@ -316,6 +321,7 @@ export default function CoachCheckInFlow({
           : randomCoachCheckInCaption(category);
       setCaption(nextCaption);
       persist({ ...queue, uri, caption: nextCaption });
+      setPhotoPreviewError(false);
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
     } catch (cause) {
@@ -526,6 +532,8 @@ export default function CoachCheckInFlow({
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       persist({ ...queue, storageId: undefined, uri: undefined });
       setCameraMode(queue.mediaType === 'video' ? 'video' : 'picture');
+      setCameraReady(false);
+      setPhotoPreviewError(false);
       setShowCamera(true);
     } catch (cause) {
       setError('Could not retake the photo. Please try again.');
@@ -546,6 +554,7 @@ export default function CoachCheckInFlow({
       primaryLabel = queue.mediaType === 'video' ? 'Record video' : 'Take live photo';
       primaryAction = () => {
         setCameraMode(queue.mediaType === 'video' ? 'video' : 'picture');
+        setCameraReady(false);
         setShowCamera(true);
       };
     } else if (category === 'meals') {
@@ -717,6 +726,11 @@ export default function CoachCheckInFlow({
           <CameraView
             ref={camera}
             style={{ flex: 1 }}
+            onCameraReady={() => setCameraReady(true)}
+            onMountError={() => {
+              setCameraReady(false);
+              setError('Camera could not start. Please try again.');
+            }}
             facing={cameraFacing}
             mode={cameraMode}
             mute={audioMuted}
@@ -749,6 +763,7 @@ export default function CoachCheckInFlow({
             }
             onFlip={() => {
               if (busy) return;
+              setCameraReady(false);
               setCameraFacing((value) => (value === 'back' ? 'front' : 'back'));
             }}
           />
@@ -765,7 +780,7 @@ export default function CoachCheckInFlow({
                     ? 'Working…'
                     : 'Take live photo'
               }
-              disabled={countdown !== null || (busy && !recording)}
+              disabled={!cameraReady || countdown !== null || (busy && !recording)}
               onPress={
                 cameraMode === 'video'
                   ? recording
@@ -824,6 +839,7 @@ export default function CoachCheckInFlow({
                       placeholder="Add a caption"
                       accessibilityLabel="Check-in caption"
                       multiline
+                      textAlignVertical="top"
                       maxLength={150}
                       className="mt-2 min-h-28 rounded-[24px] border border-[#DCD7D3] bg-white p-4 font-body text-base text-[#251E1A]"
                     />
@@ -838,8 +854,17 @@ export default function CoachCheckInFlow({
                           className="w-full rounded-[24px] bg-[#F4F1EE]"
                           style={{ aspectRatio: 4 / 5 }}
                           resizeMode="cover"
+                          onLoad={() => setPhotoPreviewError(false)}
+                          onError={() => setPhotoPreviewError(true)}
                         />
                       )}
+                      {photoPreviewError && queue.mediaType !== 'video' ? (
+                        <View className="absolute inset-0 items-center justify-center rounded-[24px] bg-[#F4F1EE] px-5">
+                          <Text className="text-center font-body text-sm text-[#514943]">
+                            Photo preview unavailable. Remove it and take another photo.
+                          </Text>
+                        </View>
+                      ) : null}
                       <TouchableOpacity
                         accessibilityRole="button"
                         accessibilityLabel={

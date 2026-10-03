@@ -293,6 +293,8 @@ export default function PostRow({
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0 });
   const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetry, setImageRetry] = useState(0);
   const [loadedImageAspectRatio, setLoadedImageAspectRatio] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -300,7 +302,9 @@ export default function PostRow({
 
   useEffect(() => {
     setLoadedImageAspectRatio(null);
-  }, [post.mediaUrl]);
+    setImageError(false);
+    setImageLoading(true);
+  }, [post._id, post.mediaUrl]);
   const mediaBusy = isLoading || downloading || sharing;
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({
     writeOnly: true,
@@ -760,20 +764,30 @@ export default function PostRow({
           post.mediaUrl && (
             <View className="-mx-4 mt-3">
               <View className="relative">
-                {imageLoading && (
+                {imageLoading && !imageError && (
                   <View className="absolute z-10 flex h-full w-full items-center justify-center">
                     <ActivityIndicator size="large" />
                   </View>
                 )}
                 <ExpoImage
                   source={{ uri: post.mediaUrl }}
+                  key={`${post.mediaUrl}-${imageRetry}`}
+                  recyclingKey={`${post._id}-${post.mediaUrl}-${imageRetry}`}
                   contentFit="contain"
-                  onLoadStart={() => setImageLoading(true)}
+                  onLoadStart={() => {
+                    setImageError(false);
+                    setImageLoading(true);
+                  }}
                   onLoad={(event) => {
                     setImageLoading(false);
                     if (event.source.width > 0 && event.source.height > 0) {
                       setLoadedImageAspectRatio(event.source.width / event.source.height);
                     }
+                  }}
+                  onError={(event) => {
+                    console.warn('Community post image failed to load:', event.error);
+                    setImageLoading(false);
+                    setImageError(true);
                   }}
                   cachePolicy="memory-disk"
                   transition={200}
@@ -785,6 +799,17 @@ export default function PostRow({
                       loadedImageAspectRatio ?? (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
                   }}
                 />
+                {imageError && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading post image"
+                    onPress={() => setImageRetry((retry) => retry + 1)}
+                    className="absolute inset-0 items-center justify-center bg-[#F6F3F0]">
+                    <Text className="font-body text-sm text-[#55504D]">
+                      Image unavailable. Tap to retry.
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )

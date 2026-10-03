@@ -137,7 +137,7 @@ export default function EditPost() {
             },
           },
         ],
-        { compress: 0.7 }
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
       setMedia({

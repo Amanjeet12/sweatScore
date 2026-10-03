@@ -1,5 +1,6 @@
 import { CheckCircle, WarningCircle } from 'phosphor-react-native';
-import { View, useWindowDimensions } from 'react-native';
+import { Platform, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '../ui/text';
 import { Toast } from '../ui/toast';
@@ -13,6 +14,7 @@ interface ToastProps {
 
 export const ToastMessage = ({ message, action }: ToastProps) => {
   const { width } = useWindowDimensions();
+  const { top } = useSafeAreaInsets();
 
   const isError = action === 'error';
   const isWarning = action === 'warning';
@@ -30,7 +32,7 @@ export const ToastMessage = ({ message, action }: ToastProps) => {
       variant="solid"
       className="rounded-xl  px-4 py-3"
       style={{
-        marginTop: 8,
+        marginTop: (Platform.OS === 'android' ? top : 0) + 8,
         width: width - 32,
         maxWidth: width - 32,
         alignSelf: 'center',

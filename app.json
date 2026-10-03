@@ -123,6 +123,7 @@
     "package": "com.sweatscore.sweatscoreapp",
     "softwareKeyboardLayoutMode": "resize",
     "permissions": [
+      "android.permission.POST_NOTIFICATIONS",
       "android.permission.health.READ_STEPS",
       "android.permission.health.READ_HEART_RATE",
       "android.permission.CAMERA",

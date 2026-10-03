@@ -191,7 +191,6 @@ const TabShare = () => {
               ListFooterComponent={<View className="mb-6" />}
               onEndReached={loadMorePages}
               onEndReachedThreshold={2}
-              recycleItems
             />
           </View>
         </View>
