@@ -8,8 +8,7 @@ import {
 } from './utils/timezone';
 import { Id } from './_generated/dataModel';
 
-// Banner statistics use completed records only. Missing avatars remain missing;
-// no seeded headshots or prototype community totals are returned.
+// Banner statistics use completed records only. Members without photos use initials.
 export const myBanner = query({
   args: { refresh: v.optional(v.number()) },
   handler: async (ctx) => {
@@ -45,14 +44,16 @@ export const myBanner = query({
       if (challenge?.type === 'check_in' || challenge?.dailyChallengeType === 'check_in')
         memberIds.add(completion.userId);
     }
-    const avatarUrls: string[] = [];
-    for (const id of [...memberIds].slice(0, 12)) {
-      const user = await ctx.db.get(id);
-      if (!user?.image) continue;
-      const url = await ctx.storage.getUrl(user.image);
-      if (url) avatarUrls.push(url);
-      if (avatarUrls.length === 4) break;
-    }
-    return { day, nextMidnightAt, memberCount: memberIds.size, avatarUrls };
+    const avatarMembers = await Promise.all(
+      [...memberIds].slice(0, 4).map(async (id) => {
+        const user = await ctx.db.get(id);
+        const imageUrl = user?.image ? await ctx.storage.getUrl(user.image) : null;
+        return { userId: id, name: user?.name ?? '', imageUrl };
+      })
+    );
+    const avatarUrls = avatarMembers.flatMap((member) =>
+      member.imageUrl ? [member.imageUrl] : []
+    );
+    return { day, nextMidnightAt, memberCount: memberIds.size, avatarUrls, avatarMembers };
   },
 });

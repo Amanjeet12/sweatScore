@@ -1,7 +1,6 @@
 // @ts-nocheck -- Bun test runtime hooks are outside the app TypeScript project.
 import { describe, expect, test } from 'bun:test';
-import { DAILY_PLAN_SYSTEM_PROMPT, DAILY_PLAN_PROMPT_VERSION } from '../convex/coachDailyPrompt';
-import { DAILY_PLAN_V2_PROMPT_VERSION } from '../convex/coachDailyPromptV2';
+
 import {
   buildDailyProviderInput,
   dailyPolicy,
@@ -9,9 +8,13 @@ import {
   validateDailyPlanOutput,
   verifiedStepAverage,
 } from '../convex/coachDailyPolicy';
+import { DAILY_PLAN_SYSTEM_PROMPT, DAILY_PLAN_PROMPT_VERSION } from '../convex/coachDailyPrompt';
+import { DAILY_PLAN_V2_PROMPT_VERSION } from '../convex/coachDailyPromptV2';
 import { DEFAULT_OUTPUT_TOKENS, generateDailyPlan } from '../convex/coachDailyProvider';
 import {
   claim,
+  ratePlan,
+  myPlanFeedback,
   finish,
   retryFailedPlan,
   saveProfileAndMaybeRefresh,
@@ -147,6 +150,7 @@ function fakeDb(seed = {}) {
         first: async () => found[0] ?? null,
         unique: async () => found[0] ?? null,
         collect: async () => found,
+        take: async (count) => found.slice(0, count),
       };
       return chain;
     },
@@ -621,8 +625,7 @@ describe('request lifecycle', () => {
     });
     const generated = {
       ...output({
-        meals:
-          'Try eggs with vegetables toward your goal, aim for 2 litres of water today, and snap each meal for a portion check.',
+        meals: 'Try eggs with vegetables and aim for 2 litres of water today.',
         why: 'A short core workout fits steady energy; 7,000 steps fit your observed walking and eggs with vegetables are a practical meal option.',
       }),
       workoutExamples: ['dead bugs', 'bird dogs'],
@@ -859,4 +862,33 @@ describe('request lifecycle', () => {
     expect(calls).toHaveLength(3);
     expect(calls[1]).toMatchObject({ kind: 'profile_refresh', requestKey: 'refresh_12345' });
   });
+});
+
+test('plan ratings are member-owned and later generation receives saved feedback', async () => {
+  const store = fakeDb({
+    users: [{ _id: 'member_a' }],
+    coachPlanRevisionsV1: [
+      { _id: 'mine', userId: 'member_a', day: yesterday, output: output() },
+      { _id: 'other', userId: 'member_b', day: yesterday, output: output() },
+    ],
+    coachPlanRequestsV1: [
+      {
+        _id: 'request',
+        userId: 'member_a',
+        day,
+        status: 'pending',
+        promptVersion: DAILY_PLAN_PROMPT_VERSION,
+        toneVersion: 1,
+        inputSnapshot: base,
+      },
+    ],
+  });
+  await ratePlan._handler(store.ctx, { revisionId: 'mine', helpful: false });
+  expect(await myPlanFeedback._handler(store.ctx, { revisionId: 'mine' })).toBe(false);
+  await expect(
+    ratePlan._handler(store.ctx, { revisionId: 'other', helpful: true })
+  ).rejects.toThrow();
+  const claimed = await claim._handler(store.ctx, { requestId: 'request' });
+  expect(claimed.feedback).toEqual([{ day: yesterday, helpful: false, plan: output() }]);
+  expect(store.rows.coachPlanRevisionsV1[1].helpful).toBeUndefined();
 });

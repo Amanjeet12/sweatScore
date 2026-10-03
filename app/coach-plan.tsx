@@ -21,6 +21,7 @@ import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
+import PlanFeedback from '~/components/core/dashboard/PlanFeedback';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
@@ -330,6 +331,7 @@ export default function SavedCoachPlan() {
                 </Text>
               ) : null}
             </TouchableOpacity>
+            <PlanFeedback revisionId={plan.revisionId} />
           </>
         ) : saved.access && saved.requestStatus === 'pending' ? (
           <View className="mb-5 mt-3">
@@ -442,12 +444,8 @@ export default function SavedCoachPlan() {
                           try {
                             await resetToday({});
                             await resumeMember(convex);
-                          } catch (caught) {
-                            setError(
-                              caught instanceof Error
-                                ? caught.message
-                                : 'Today’s plan could not be cleared.'
-                            );
+                          } catch {
+                            setError('Today’s plan could not be cleared.');
                           } finally {
                             setResetBusy(false);
                           }
@@ -464,7 +462,7 @@ export default function SavedCoachPlan() {
                   {resetAvailability.reason ===
                   'Today has check-in or reward records and cannot be reset safely'
                     ? 'A check-in, meal analysis or reward is linked to this plan. Deleting it would lose its original context or scan count.'
-                    : resetAvailability.reason}
+                    : 'Today’s plan cannot be cleared right now.'}
                 </Text>
                 {resetAvailability.reason ===
                 'Today has check-in or reward records and cannot be reset safely' ? (
@@ -478,10 +476,8 @@ export default function SavedCoachPlan() {
                       try {
                         await beginReanswer({});
                         router.push('/coach-onboarding?reanswer=1');
-                      } catch (caught) {
-                        setError(
-                          caught instanceof Error ? caught.message : 'Could not reopen questions.'
-                        );
+                      } catch {
+                        setError('Could not reopen questions.');
                       } finally {
                         setResetBusy(false);
                       }

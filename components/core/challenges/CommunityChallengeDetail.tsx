@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Camera, Play } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
@@ -44,7 +45,7 @@ export default function CommunityChallengeDetail({
       <View className="mb-4 mt-2 flex-row items-center justify-end">
         <View className="rounded-[20px] bg-[#FFF1E9] px-3 py-2">
           <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-[#FF5C35]">
-            {challenge.totalAvailablePoints} {challenge.totalAvailablePoints === 1 ? 'pt' : 'pts'}
+            {challenge.totalAvailablePoints} {pointsLabel(challenge.totalAvailablePoints)}
           </Text>
         </View>
       </View>

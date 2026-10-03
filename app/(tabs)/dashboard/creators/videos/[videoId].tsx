@@ -131,13 +131,6 @@ export default function TabDashboardCreatorVideo() {
                   </View>
                 ) : null}
               </View>
-              {video.category ? (
-                <View className="mt-3 self-start rounded-full bg-[#FFF1E9] px-4 py-2">
-                  <Text className="font-body text-xs font-semibold text-[#D64A25]">
-                    {video.category}
-                  </Text>
-                </View>
-              ) : null}
 
               <TouchableOpacity
                 accessibilityRole="link"

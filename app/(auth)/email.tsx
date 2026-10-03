@@ -171,7 +171,7 @@ export default function Email() {
         </View>
       </KeyboardStickyView>
 
-      <OnboardingHeroChrome activeStep={1} onBack={router.back} />
+      <OnboardingHeroChrome onBack={router.back} />
     </View>
   );
 }

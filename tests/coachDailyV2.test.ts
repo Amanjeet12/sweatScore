@@ -1,18 +1,20 @@
 // @ts-nocheck -- Bun test runtime hooks are outside the app TypeScript project.
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+
+import {
+  buildDeterministicDailyPlanV2,
+  validateDailyPlanOutputV2,
+} from '../convex/coachDailyPolicyV2';
 import { DAILY_PLAN_PROMPT_VERSION, DAILY_PLAN_SYSTEM_PROMPT } from '../convex/coachDailyPrompt';
 import {
   DAILY_PLAN_V2_PROMPT_VERSION,
   DAILY_PLAN_V2_SYSTEM_PROMPT,
 } from '../convex/coachDailyPromptV2';
-import {
-  buildDeterministicDailyPlanV2,
-  validateDailyPlanOutputV2,
-} from '../convex/coachDailyPolicyV2';
-import { generateV2WithRepair } from '../convex/coachDailyRepair';
 import { generateDailyPlan, V2_OUTPUT_TOKENS } from '../convex/coachDailyProvider';
+import { generateV2WithRepair } from '../convex/coachDailyRepair';
 import { planCardRoute, planCardState } from '../shared/coachPlanCards';
+import { mealPlanSummary } from '../shared/coachPlanCopy';
 
 const day = '2026-09-28';
 const snapshot = {
@@ -46,11 +48,50 @@ const output = {
   stepsReason: 'Your lighter energy today makes this target a manageable start.',
   sleep:
     "Aim for 7 hours tonight. You didn't sleep well last night, so start winding down earlier than usual.",
-  meals:
-    'Try eggs with vegetables toward your goal, aim for 2 litres of water today, and snap each meal for a portion check.',
+  meals: 'Try eggs with vegetables and aim for 2 litres of water today.',
   why: 'Your sore upper body can recover with lower body strength, while 5,000 steps fit your lighter day. Eggs with vegetables are one simple option toward your goal.',
 };
 const validate = (value = output, state = snapshot) => validateDailyPlanOutputV2(value, state, day);
+
+describe('daily plan section copy', () => {
+  test('removes reminders from saved meals while retaining food and water', () => {
+    expect(
+      mealPlanSummary(
+        'Try chicken with vegetables, aim for 2 litres of water today, and snap or log your meals for a portion check.'
+      )
+    ).toBe('Try chicken with vegetables, aim for 2 litres of water today.');
+    expect(
+      mealPlanSummary('Try fish and aim for 2 litres of water. Snap each meal for a portion check.')
+    ).toBe('Try fish and aim for 2 litres of water.');
+  });
+  test('rejects every field exceeding its independent character allowance', () => {
+    const limits = {
+      headline: 80,
+      workout: 180,
+      steps: 30,
+      sleep: 180,
+      meals: 100,
+      why: 1200,
+      workoutReason: 300,
+      stepsReason: 300,
+    };
+    for (const [field, max] of Object.entries(limits)) {
+      expect(() => validate({ ...output, [field]: 'x'.repeat(max + 1) })).toThrow('invalid_output');
+    }
+    const boundaryMeal = output.meals + ' '.repeat(100 - output.meals.length);
+    expect(validate({ ...output, meals: boundaryMeal }).output.meals.length).toBe(100);
+  });
+
+  test('accepts meals without reminders and keeps a detailed personalized explanation', () => {
+    const why =
+      output.why +
+      ' Your upper body gets recovery time while your legs work. A light session suits your low energy after a rough night.';
+    expect(validate({ ...output, why }).output.why).toBe(why);
+    expect(() =>
+      validate({ ...output, meals: 'Try eggs; aim for 2 litres of water. Snap or log your meals.' })
+    ).toThrow('invalid_output');
+  });
+});
 
 describe('v2 daily plan contract', () => {
   test('v1 remains intact and v2 pins lower-body and numeric steps', () => {
@@ -137,7 +178,7 @@ describe('v2 daily plan contract', () => {
     const claim = {
       ...output,
       meals:
-        'You logged eggs before; try eggs with vegetables, aim for 2 litres of water today, and snap each meal for a portion check.',
+        'You logged eggs before; try eggs with vegetables and aim for 2 litres of water today.',
     };
     expect(() => validate(claim)).toThrow('invalid_output');
     const state = {
@@ -250,7 +291,7 @@ describe('v2 daily plan contract', () => {
       'utf8'
     );
     expect(plan).toContain("saved.requestStatus === 'pending'");
-    expect(paywall).toContain("decision?.requestStatus === 'pending'");
+    expect(paywall).toContain('decision?.verifiedAccess');
     expect(loading).toContain('accessibilityRole="progressbar"');
     expect(loading).toContain('isReduceMotionEnabled');
     expect(loading).not.toMatch(/\d+%/);

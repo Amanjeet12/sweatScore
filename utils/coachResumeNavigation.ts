@@ -1,5 +1,6 @@
 import { ConvexReactClient } from 'convex/react';
 import { router } from 'expo-router';
+
 import { api } from '~/convex/_generated/api';
 import { ResumeScreen } from '~/shared/coachResume';
 
@@ -16,6 +17,8 @@ export function resumePath(screen: ResumeScreen) {
       return '/coach-setup' as const;
     case 'paywall':
       return '/subscription' as const;
+    case 'trial_notifications':
+      return '/trial-notifications' as const;
     case 'today':
       return '/(tabs)/dashboard' as const;
   }
@@ -27,14 +30,6 @@ export function resumePathForDecision(decision: {
   completedOnboarding?: boolean;
   returningMember?: boolean;
 }) {
-  // A new member who just submitted her first answers may resume the result
-  // screen. Returning members always reopen Today and choose when to view it.
-  if (
-    decision.screen === 'today' &&
-    !decision.returningMember &&
-    (decision.requestStatus === 'pending' || decision.requestStatus === 'failed')
-  )
-    return '/coach-plan-loading' as const;
   return resumePath(decision.screen);
 }
 

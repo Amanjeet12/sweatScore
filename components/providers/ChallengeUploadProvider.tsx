@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useMutation } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import {
@@ -198,7 +199,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
     (message: string, action: 'error' | 'success' | 'warning') => {
       toast.show({
         placement: 'top',
-        duration: 7500,
+        duration: 10000,
         render: () => <ToastMessage message={message} action={action} />,
       });
     },
@@ -465,7 +466,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         if (result?.isDay1Baseline) {
           if (result.pointsEarned > 0) {
             showToast(
-              `+${result.pointsEarned} ${result.pointsEarned === 1 ? 'pt' : 'pts'} added successfully. Your post will be live soon.`,
+              `+${result.pointsEarned} ${pointsLabel(result.pointsEarned)} added successfully. Your post will be live soon.`,
               'success'
             );
           } else {
@@ -473,7 +474,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
           }
         } else if (result?.pointsEarned > 0) {
           showToast(
-            `+${result.pointsEarned} ${result.pointsEarned === 1 ? 'pt' : 'pts'} added. Your post will be live soon.`,
+            `+${result.pointsEarned} ${pointsLabel(result.pointsEarned)} added. Your post will be live soon.`,
             'success'
           );
         } else {

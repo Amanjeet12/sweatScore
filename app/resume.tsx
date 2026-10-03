@@ -15,7 +15,14 @@ export default function Resume() {
   }, [decision, isAuthenticated, isLoading]);
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+          presentation: 'transparentModal',
+          animation: 'none',
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <CoachSetupLoading />
     </>
   );

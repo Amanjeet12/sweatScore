@@ -1,18 +1,11 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useConvex, useQuery } from 'convex/react';
-import { Image } from 'expo-image';
 import * as Localization from 'expo-localization';
 import { Link, router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
@@ -75,61 +68,56 @@ function PlanCard({
         disabled,
       }}
       accessibilityLabel={`${title} subscription plan`}
-      className="flex-1"
       style={{
-        position: 'relative',
-        minHeight: 132,
-        borderRadius: 12,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? '#FF5C1A' : '#E8E3DF',
-        backgroundColor: selected ? '#FFF8F4' : '#FFFFFF',
-        paddingHorizontal: 10,
-        paddingTop: 28,
-        paddingBottom: 16,
+        minHeight: 84,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: selected ? '#FF5C1A' : '#E0E1E2',
+        backgroundColor: selected ? '#FFF7F3' : '#F8FAFB',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         opacity: disabled ? 0.55 : 1,
-        overflow: 'visible',
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
       }}>
-      <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">{title}</Text>
-
-      <Text
-        className="mt-2 w-full text-center font-body text-lg text-[#4F4F4F]"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.6}>
-        {price ? `${price}${billingSuffix}` : 'Loading...'}
-      </Text>
-
-      <Text
-        className="mt-2 w-full text-center font-body text-sm text-[#737373]"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}>
-        {detail}
-      </Text>
-
-      {offerLabel ? (
+      <View style={{ flex: 1 }}>
         <View
           style={{
-            position: 'absolute',
-            top: -16,
-            alignSelf: 'center',
-            borderRadius: 12,
-            backgroundColor: '#FF5C1A',
-            paddingHorizontal: 15,
-            paddingVertical: 6,
-            ...(Platform.OS === 'ios' ? {} : {}),
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
           }}>
-          <Text
-            className="text-[12px] font-extrabold uppercase text-white"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.65}>
-            {offerLabel}
+          <Text style={{ flex: 1, fontFamily: 'Inter_700Bold', fontSize: 17, color: '#111111' }}>
+            {title}
           </Text>
+          {offerLabel ? (
+            <View
+              style={{
+                borderRadius: 999,
+                backgroundColor: '#FF5C1A',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+              }}>
+              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF' }}>
+                {offerLabel}
+              </Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+        <Text
+          style={{
+            marginTop: 6,
+            fontFamily: 'Inter_400Regular',
+            fontSize: 13,
+            lineHeight: 18,
+            color: '#737373',
+          }}>
+          {price ? `${price}${billingSuffix}` : 'Loading...'}
+          {detail ? ` (${detail})` : ''}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -143,6 +131,8 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
 
   const { signOut } = useAuthActions();
 
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const firstName = currentUser?.name?.trim().split(' ')[0];
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
 
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
@@ -215,18 +205,10 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
     return Math.max(0, saving);
   }, [annualPackage, monthlyPackage]);
 
-  const annualSavingText = useMemo(() => {
-    if (annualSaving <= 0) {
-      return null;
-    }
-
-    const currencyCode =
-      annualPackage?.product.currencyCode ?? monthlyPackage?.product.currencyCode;
-
-    return formatCurrency(annualSaving, currencyCode);
-  }, [annualPackage, annualSaving, monthlyPackage]);
-
-  const annualOfferLabel = annualSavingText ? `Save ${annualSavingText}` : 'Best value';
+  const annualOfferLabel =
+    annualSaving > 0 && monthlyPackage
+      ? `SAVE ${Math.round((annualSaving / (monthlyPackage.product.price * 12)) * 100)}%`
+      : 'BEST VALUE';
 
   const annualMonthlyPrice = useMemo(() => {
     if (!annualPackage?.product.price) {
@@ -247,11 +229,26 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
     isPackagesLoading;
 
   const paywallBullets = [
-    'Monthly Guided Challenges',
-    'Daily Check-ins & Habits',
-    'Community Accountability',
-    'Direct Feedback From Coaches',
-    'Workouts & Guides',
+    {
+      icon: '⚡',
+      title: 'Daily Routine Planned For You:',
+      detail: 'Know exactly what to do each day to reach your goals.',
+    },
+    {
+      icon: '🥗',
+      title: 'Instant Meal Scans:',
+      detail: 'Get portion suggestions for your meals within seconds.',
+    },
+    {
+      icon: '🎶',
+      title: 'Fun Afrobeat Workouts:',
+      detail: 'Access high-energy routines with music you love.',
+    },
+    {
+      icon: '👥',
+      title: 'Real Sisterhood:',
+      detail: 'Join other women on our leaderboard and stay motivated.',
+    },
   ];
 
   const handlePurchase = async () => {
@@ -366,139 +363,141 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   };
 
   return (
-    <View className="flex-1 bg-white">
-      {onboarding || showBackToLogin === 'true' ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Sign out and return to login"
-          accessibilityState={{ disabled: isLoggingOut || isLoading || isRestoring }}
-          onPress={handleBackToLogin}
-          disabled={isLoggingOut || isLoading || isRestoring}
-          activeOpacity={0.7}
-          className="mx-6 mt-2 min-h-11 flex-row items-center self-start rounded-[20px] px-2">
-          {isLoggingOut ? (
-            <ActivityIndicator size="small" color="#FF5C1A" />
-          ) : (
-            <Icon.ArrowLeft size={20} color="#FF5C1A" weight="bold" />
-          )}
-          <Text
-            className="ml-2 text-[#E9512A]"
-            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
-            {isLoggingOut ? 'Signing out…' : 'Back to login'}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
+    <View className="flex-1 bg-[#F8FAFB]">
+      <StatusBar style="dark" />
       <ScrollView
-        className="flex-1 bg-white"
+        className="flex-1 bg-[#F8FAFB]"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingBottom: 18,
+          paddingHorizontal: 20,
+          paddingBottom: 24,
         }}>
-        <View className="items-center pt-10">
-          <Image
-            accessibilityLabel="SweatScore"
-            source={require('~/assets/paywall/logo.png')}
-            contentFit="contain"
-            style={{ width: 190, height: 38 }}
-          />
-        </View>
-
-        <View className="mt-7 items-center">
-          <Text className="max-w-[310px] text-center font-heading text-[28px] font-semibold leading-[34px] text-[#111111]">
-            Start your consistency journey.
+        <View style={{ alignItems: 'center', paddingTop: 20, paddingHorizontal: 4 }}>
+          <Text
+            style={{
+              fontFamily: 'Inter_700Bold',
+              fontSize: 12,
+              letterSpacing: 1,
+              color: '#FF5C1A',
+            }}>
+            YOUR PLAN IS READY
           </Text>
           <Text
-            className="mt-3 max-w-[250px] text-center text-sm leading-5 text-[#1A1A1A]"
-            style={{ fontFamily: 'Inter_400Regular' }}>
-            Connect with a community and coaches for daily progress, and get help with your goals.
+            style={{
+              marginTop: 6,
+              textAlign: 'center',
+              fontFamily: 'Inter_700Bold',
+              fontSize: 23,
+              lineHeight: 28,
+              color: '#080808',
+            }}>
+            {firstName
+              ? `${firstName}, your custom routine is ready.`
+              : 'Your custom routine is ready.'}
           </Text>
         </View>
 
-        <View className="mt-9 gap-y-4 px-3">
+        <View style={{ marginTop: 24, gap: 14 }}>
           {paywallBullets.map((item) => (
-            <View key={item} className="flex-row items-center">
-              <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-primary-500">
-                <Icon.Check size={18} color="#FFFFFF" weight="bold" />
-              </View>
-              <Text className="flex-1 font-body text-base leading-6 text-[#1A1A1A]">{item}</Text>
+            <View key={item.title} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <Text style={{ width: 24, marginRight: 8, fontSize: 16, lineHeight: 20 }}>
+                {item.icon}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontFamily: 'Inter_400Regular',
+                  fontSize: 13,
+                  lineHeight: 20,
+                  color: '#383838',
+                }}>
+                <Text style={{ fontFamily: 'Inter_700Bold' }}>{item.title}</Text> {item.detail}
+              </Text>
             </View>
           ))}
         </View>
 
-        <View className="mt-10 flex-row items-stretch" style={{ columnGap: 14, marginBottom: 10 }}>
+        <View style={{ marginTop: 24, gap: 12 }}>
           <PlanCard
-            title="Monthly"
-            price={monthlyPackage?.product.priceString}
-            billingSuffix="/mo"
-            detail="Cancel anytime"
-            selected={isMonthlySelected}
-            disabled={!monthlyPackage || isLoading || isLoggingOut || isRestoring}
-            onPress={() => {
-              if (monthlyPackage) {
-                setSelectedPackage(monthlyPackage);
-              }
-            }}
-          />
-
-          <PlanCard
-            title="Annual"
-            price={annualPackage?.product.priceString}
-            billingSuffix="/yr"
-            detail={annualMonthlyPrice ? `Just ${annualMonthlyPrice}/mo.` : 'Best monthly value'}
+            title="Annual Plan"
+            price={annualMonthlyPrice ?? undefined}
+            billingSuffix=" / month"
+            detail={annualPackage ? `${annualPackage.product.priceString} billed annually` : ''}
             selected={isAnnualSelected}
             disabled={!annualPackage || isLoading || isLoggingOut || isRestoring}
             offerLabel={annualOfferLabel}
             onPress={() => {
-              if (annualPackage) {
-                setSelectedPackage(annualPackage);
-              }
+              if (annualPackage) setSelectedPackage(annualPackage);
+            }}
+          />
+          <PlanCard
+            title="Monthly Plan"
+            price={monthlyPackage?.product.priceString}
+            billingSuffix=" / month"
+            detail=""
+            selected={isMonthlySelected}
+            disabled={!monthlyPackage || isLoading || isLoggingOut || isRestoring}
+            onPress={() => {
+              if (monthlyPackage) setSelectedPackage(monthlyPackage);
             }}
           />
         </View>
 
-        {onboarding ? (
-          <View className="mt-4 rounded-2xl bg-[#FFF3EC] p-4">
-            <Text className="text-center font-body text-sm text-[#4F4F4F]">
-              {decision?.requestStatus === 'ready'
-                ? 'Your saved plan will be available after verification.'
-                : decision?.requestStatus === 'pending'
-                  ? 'Your previously saved answers are safe. Your plan is still preparing.'
-                  : decision?.requestStatus === 'failed'
-                    ? 'Your previously saved answers are safe. You can retry plan preparation after access is verified.'
-                    : 'After your access is verified, answer five daily questions to prepare today’s plan.'}
-            </Text>
-          </View>
-        ) : null}
+        <View
+          style={{
+            marginTop: 14,
+            borderRadius: 14,
+            backgroundColor: '#FFF4DF',
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+          }}>
+          <Text
+            style={{
+              fontFamily: 'Inter_400Regular',
+              fontSize: 12,
+              lineHeight: 17,
+              color: '#4F4F4F',
+            }}>
+            <Text style={{ fontFamily: 'Inter_700Bold' }}>🔖 7 Days Free:</Text> We'll remind you 2
+            days before your trial ends.
+          </Text>
+        </View>
 
         <OnboardingPrimaryButton
-          className="mt-3"
-          borderRadius={20}
+          className="mt-4"
+          borderRadius={18}
           labelFontSize={18}
           label={
             isPackagesLoading
               ? 'Loading plans...'
               : hasActiveStoreSubscription
                 ? 'Verify Premium access'
-                : 'Continue with Premium'
+                : 'Try free for 7 days'
           }
           onPress={handlePrimaryAction}
           disabled={hasActiveStoreSubscription ? isRestoring || isLoggingOut : isCtaDisabled}
           isLoading={hasActiveStoreSubscription ? isRestoring : isLoading}
         />
 
-        <Text className="mt-4 text-center font-body text-sm text-[#8B8B8B]">
-          Access begins after payment verification. Cancel anytime.
+        <Text
+          style={{
+            marginTop: 8,
+            textAlign: 'center',
+            fontFamily: 'Inter_400Regular',
+            fontSize: 11,
+            color: '#8B8B8B',
+          }}>
+          Recurring billing. Cancel anytime in Settings.
         </Text>
 
-        <View className="mt-7 flex-row items-center justify-center">
+        <View className="mt-5 flex-row items-center justify-center">
           <Link href="/legals/terms">
-            <Text className="font-body text-sm text-[#5F5F5F]">Terms</Text>
+            <Text className="font-body text-xs text-[#5F5F5F]">Terms</Text>
           </Link>
-          <Text className="mx-4 font-body text-sm text-[#5F5F5F]">|</Text>
+          <Text className="mx-4 font-body text-xs text-[#5F5F5F]">|</Text>
           <Link href="/legals/privacy-policy">
-            <Text className="font-body text-sm text-[#5F5F5F]">Privacy Policy</Text>
+            <Text className="font-body text-xs text-[#5F5F5F]">Privacy Policy</Text>
           </Link>
         </View>
 
@@ -521,6 +520,27 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
             </Text>
           )}
         </TouchableOpacity>
+        {onboarding || showBackToLogin === 'true' ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Sign out and return to login"
+            accessibilityState={{ disabled: isLoggingOut || isLoading || isRestoring }}
+            onPress={handleBackToLogin}
+            disabled={isLoggingOut || isLoading || isRestoring}
+            activeOpacity={0.7}
+            className="mt-2 min-h-11 flex-row items-center self-center rounded-[20px] px-3">
+            {isLoggingOut ? (
+              <ActivityIndicator size="small" color="#FF5C1A" />
+            ) : (
+              <Icon.ArrowLeft size={16} color="#777777" weight="bold" />
+            )}
+            <Text
+              className="ml-2 text-[#777777]"
+              style={{ fontFamily: 'Inter_500Medium', fontSize: 13 }}>
+              {isLoggingOut ? 'Signing out…' : 'Back to login'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );

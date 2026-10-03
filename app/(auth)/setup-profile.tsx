@@ -31,12 +31,12 @@ import { Button, ButtonText } from '~/components/ui/button';
 import { Input, InputField, InputSlot } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
 import { formatDateToLocaleString } from '~/utils/formatter';
-import { resumeMember } from '~/utils/coachResumeNavigation';
-import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 
 const BIO_ROUTE = ['bio'] as const;
 
@@ -265,7 +265,7 @@ export default function SetupProfile() {
               <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
                 <InputField
                   className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
-                  placeholder="How should we call you?"
+                  placeholder="What should we call you?"
                   autoComplete="name"
                   returnKeyType="next"
                   value={name}
@@ -385,7 +385,7 @@ export default function SetupProfile() {
         </Modal>
       )}
 
-      <OnboardingHeroChrome activeStep={3} onBack={router.back} />
+      <OnboardingHeroChrome onBack={router.back} />
     </View>
   );
 }

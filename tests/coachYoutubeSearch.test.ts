@@ -67,7 +67,7 @@ describe('Coach workout YouTube search', () => {
     expect(source).not.toContain('Moves you could try');
     expect(source).toContain('workoutYoutubeSearch(queue?.label ?? assignment?.label)');
     expect(source).toContain('workoutSearch ? (');
-    expect(source).toContain('onPress={start}');
+    expect(source).toContain("start('image')");
     expect(source).toContain('Use the in-app camera');
     expect(source).toContain('assignment?.mandatory');
     expect(source).toContain('assignment.consumedCount');

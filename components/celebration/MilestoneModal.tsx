@@ -30,7 +30,7 @@ export function MilestoneModal({
                 {milestone.current}/{milestone.target} days this week
               </Text>
               <Text style={styles.body}>
-                You showed up for yourself this week.{`\n`}Keep that momentum going.
+                You showed up for yourself this week. Keep that momentum going.
               </Text>
             </>
           ) : (

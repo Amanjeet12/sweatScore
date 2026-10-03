@@ -1,3 +1,4 @@
+import { DAILY_PLAN_COPY_LIMITS } from '../shared/coachPlanCopy';
 import { DAILY_PLAN_PROMPT_VERSION, DAILY_PLAN_SYSTEM_PROMPT } from './coachDailyPrompt';
 import { DAILY_PLAN_V2_PROMPT_VERSION, DAILY_PLAN_V2_SYSTEM_PROMPT } from './coachDailyPromptV2';
 import {
@@ -20,7 +21,7 @@ const OUTPUT_LIMITS = {
   meals: 500,
   why: 1200,
 } as const;
-const V2_LIMITS = { ...OUTPUT_LIMITS, workoutReason: 300, stepsReason: 300 } as const;
+const V2_LIMITS = DAILY_PLAN_COPY_LIMITS;
 export type ProviderCode =
   | 'provider_timeout'
   | 'provider_rate_limited'
@@ -185,11 +186,16 @@ export async function generateDailyPlan(args: {
             role: 'user',
             content: JSON.stringify({
               input: args.input,
+              character_limits: isV2DailyPrompt(args.promptVersion ?? '')
+                ? V2_LIMITS
+                : OUTPUT_LIMITS,
+              length_instruction:
+                'Never exceed any field character limit. Keep the individual sections concise. Keep why personalized and explanatory within its separate allowance.',
               style: args.style,
               ...(args.retryGuidance
                 ? {
                     revision_instruction:
-                      "The previous candidate failed validation or did not have a complete tool input. Call submit_daily_plan exactly once with every required field and the required types. Produce a materially corrected candidate, not a near-copy. Never use an em dash in any field. Keep headline and sleep exactly as output_constraints require. Copy output_constraints.workout and output_constraints.steps only when they are non-null; otherwise follow the workout type, duration and step cap. Meals must name ONE practical food suggestion, include the literal phrase '2 litres of water', and invite the member to snap or log meals, without listing alternative dishes. Why must include the same numeric Steps target returned in steps and repeat the one named food from Meals; connect both to today's saved answers and rest or workout choice. Keep exercise examples matched to the workout type and never invent history. Return all required tool fields.",
+                      "The previous candidate failed validation or did not have a complete tool input. Call submit_daily_plan exactly once with every required field and the required types. Produce a materially corrected candidate, not a near-copy. Never use an em dash in any field. Keep headline and sleep exactly as output_constraints require. Copy output_constraints.workout and output_constraints.steps only when they are non-null; otherwise follow the workout type, duration and step cap. Meals must name ONE practical food suggestion, include the literal phrase '2 litres of water', stay within 100 characters, and omit meal logging or photo reminders, without listing alternative dishes. Why must include the same numeric Steps target returned in steps and repeat the one named food from Meals; connect both to today's saved answers and rest or workout choice. Keep exercise examples matched to the workout type and never invent history. Return all required tool fields.",
                     previous_candidate: args.retryGuidance.previousCandidate ?? null,
                     validation_failure: args.retryGuidance.validationCode ?? 'invalid_output',
                   }

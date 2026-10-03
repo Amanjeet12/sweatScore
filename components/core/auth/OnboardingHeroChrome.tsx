@@ -3,7 +3,7 @@ import { TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type OnboardingHeroChromeProps = {
-  activeStep: number;
+  activeStep?: number;
   onBack: () => void;
   totalSteps?: number;
 };
@@ -47,27 +47,29 @@ export function OnboardingHeroChrome({
         <Feather name="arrow-left" size={24} color="#FFFFFF" />
       </TouchableOpacity>
 
-      <View
-        accessibilityLabel={`Onboarding step ${activeStep} of ${totalSteps}`}
-        style={{
-          position: 'absolute',
-          top: insets.top + 39,
-          right: 24,
-          flexDirection: 'row',
-          gap: 5,
-        }}>
-        {Array.from({ length: totalSteps }).map((_, index) => (
-          <View
-            key={index}
-            style={{
-              width: 22,
-              height: 3,
-              borderRadius: 2,
-              backgroundColor: index < activeStep ? '#FFFFFF' : 'rgba(255,255,255,0.48)',
-            }}
-          />
-        ))}
-      </View>
+      {activeStep !== undefined ? (
+        <View
+          accessibilityLabel={`Onboarding step ${activeStep} of ${totalSteps}`}
+          style={{
+            position: 'absolute',
+            top: insets.top + 39,
+            right: 24,
+            flexDirection: 'row',
+            gap: 5,
+          }}>
+          {Array.from({ length: totalSteps }).map((_, index) => (
+            <View
+              key={index}
+              style={{
+                width: 22,
+                height: 3,
+                borderRadius: 2,
+                backgroundColor: index < activeStep ? '#FFFFFF' : 'rgba(255,255,255,0.48)',
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

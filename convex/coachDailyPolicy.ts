@@ -214,7 +214,6 @@ export function validateDailyPlanOutput(
   }
   if (
     !/\b\d(?:\.\d)? litres? of water\b/i.test(output.meals) ||
-    !/\b(snap|log)\b.{0,30}\bmeal/i.test(output.meals) ||
     /\b(calories|grams|macros|carb servings?)\b/i.test(output.meals) ||
     /\b(you trained today|you completed[^.!?]{0,50}today|you logged a workout today)\b/i.test(
       output.why
@@ -287,7 +286,8 @@ export function buildDailyProviderInput(
           : null,
       max_steps: average === undefined ? null : average + 2000,
       mention_step_average: average !== undefined,
-      include_water_target_and_meal_log_prompt: true,
+      include_water_target: true,
+      include_meal_log_prompt: false,
     },
   };
 }

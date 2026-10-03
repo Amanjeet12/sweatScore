@@ -189,7 +189,7 @@ export const saveCaption = mutation({
       await ctx.db.patch(existing._id, { caption: caption.trim(), updatedAt: Date.now() });
       return existing._id;
     }
-    const revision = await ctx.db.get(submission.planRevisionId);
+    const revision = submission.planRevisionId ? await ctx.db.get(submission.planRevisionId) : null;
     const request = revision ? await ctx.db.get(revision.requestId) : null;
     const profile = request ? await ctx.db.get(request.profileRevisionId) : null;
     const goal = profile?.answers.goal ?? 'unavailable';
@@ -539,14 +539,15 @@ export const share = mutation({
     if (caption.length > 500) asError('Caption is too long');
     const submission = await ctx.db.get(draft.submissionId);
     const assignment = submission ? await ctx.db.get(submission.assignmentId) : null;
-    const revision = submission ? await ctx.db.get(submission.planRevisionId) : null;
+    const revision = submission?.planRevisionId
+      ? await ctx.db.get(submission.planRevisionId)
+      : null;
     if (
       !submission ||
       !assignment ||
-      !revision ||
       submission.userId !== userId ||
       assignment.userId !== userId ||
-      revision.userId !== userId ||
+      (submission.planRevisionId && (!revision || revision.userId !== userId)) ||
       submission.state !== 'uploaded' ||
       submission.category !== 'meals' ||
       submission.storageId !== draft.storageId ||
@@ -554,7 +555,7 @@ export const share = mutation({
       draft.assignmentId !== submission.assignmentId ||
       draft.planRevisionId !== submission.planRevisionId ||
       draft.recommendation !== submission.recommendation ||
-      assignment.planRevisionId !== revision._id ||
+      assignment.planRevisionId !== submission.planRevisionId ||
       assignment.recommendation !== submission.recommendation ||
       assignment.day !== draft.day
     )

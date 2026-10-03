@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Dimensions, TouchableOpacity, View } from 'react-native';
@@ -124,7 +125,7 @@ export default function ChallengeCard({
 
       <View className="absolute right-3 top-3 rounded-lg bg-black/75 px-3 py-1">
         <Text className="font-body text-xs font-semibold text-white">
-          +{challenge.points} {challenge.points === 1 ? 'pt' : 'pts'}
+          +{challenge.points} {pointsLabel(challenge.points)}
         </Text>
       </View>
 

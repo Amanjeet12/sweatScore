@@ -2,7 +2,7 @@ import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Check } from 'phosphor-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   BackHandler,
   ScrollView,
@@ -14,7 +14,7 @@ import {
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import CoachSetupLoading from '~/components/core/CoachSetupLoading';
+import { CoachSurveyBridge } from '~/components/core/auth/CoachSurveyBridge';
 import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { Text } from '~/components/ui/text';
@@ -22,38 +22,52 @@ import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
+import { useAuthStore } from '~/store/useAuthStore';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const QUESTION_ROUTES = ['profile', 'daily', 'today'] as const;
 
 const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
   weight: {
-    eyebrow: 'Your starting point',
-    description: 'This helps your Coach follow your progress over time.',
+    eyebrow: "LET'S SET YOU UP",
+    description: 'Used to track your trend over time.',
   },
   goal: {
-    eyebrow: 'Your goal',
-    description: 'Choose the outcome that matters most to you right now.',
+    eyebrow: 'YOUR PROFILE',
+    description: 'This shapes every suggestion your coach gives.',
   },
   bodyFeeling: {
-    eyebrow: 'How you feel',
-    description: 'There is no right answer. Choose what feels most honest today.',
+    eyebrow: 'YOUR PROFILE',
+    description: "There's no wrong answer here.",
   },
   routineFeeling: {
-    eyebrow: 'Your routine',
-    description: 'This helps your Coach suggest something you can realistically maintain.',
+    eyebrow: 'YOUR PROFILE',
+    description: '',
   },
   foodRelationship: {
-    eyebrow: 'Food and you',
-    description: 'Pick the answer that best reflects most of your days.',
+    eyebrow: 'YOUR PROFILE',
+    description: '',
   },
   usualSleep: {
-    eyebrow: 'Your recovery',
-    description: 'Think about how your sleep usually feels, rather than one unusual night.',
+    eyebrow: 'YOUR PROFILE',
+    description: '',
   },
   biggestChallenge: {
-    eyebrow: 'Your biggest barrier',
-    description: 'Your Coach will keep this in mind when shaping your daily guidance.',
+    eyebrow: 'YOUR PROFILE',
+    description: '',
+  },
+};
+
+const PROFILE_OPTION_DESCRIPTIONS: Record<string, Record<string, string>> = {
+  goal: {
+    lose: 'Lose overall body fat',
+    recomp: 'Build muscle and lose fat',
+    fitness: 'Get more consistent',
+  },
+  bodyFeeling: {
+    feel_good: 'Working on improving',
+    little_insecure: 'Some areas I want to work on',
+    quite_insecure: 'Really want to change how I feel',
   },
 };
 
@@ -82,6 +96,18 @@ const DAILY_COPY: Record<string, { eyebrow: string; description: string }> = {
 
 export default function CoachOnboarding() {
   const convex = useConvex();
+  const memberId = useAuthStore((state) => state.currentUser?._id);
+  const [surveyStartedFor, setSurveyStartedFor] = useState<typeof memberId>(undefined);
+  const previousScreen = useRef<{ memberId: typeof memberId; content: ReactNode }>({
+    memberId,
+    content: null,
+  });
+  if (previousScreen.current.memberId !== memberId)
+    previousScreen.current = { memberId, content: null };
+  const rememberScreen = (content: ReactNode) => {
+    previousScreen.current = { memberId, content };
+    return content;
+  };
   const { reanswer, nextCheckIn } = useLocalSearchParams<{
     reanswer?: string;
     nextCheckIn?: string;
@@ -145,6 +171,20 @@ export default function CoachOnboarding() {
   }, [decision?.screen, currentPlan?.requestStatus, reanswerMode, selectedCheckIn]);
   useEffect(() => {
     if (
+      !reanswerMode &&
+      decision?.screen === 'today' &&
+      currentPlan?.requestStatus === 'none' &&
+      foundation?.state?.profileRevisionId
+    )
+      router.replace('/(tabs)/dashboard');
+  }, [
+    decision?.screen,
+    currentPlan?.requestStatus,
+    foundation?.state?.profileRevisionId,
+    reanswerMode,
+  ]);
+  useEffect(() => {
+    if (
       reanswerMode &&
       foundation &&
       (foundation.state?.testReanswerDay !== foundation.day || !foundation.state?.testReanswerKey)
@@ -170,9 +210,12 @@ export default function CoachOnboarding() {
     !foundation ||
     (decision.screen === 'today' && !currentPlan) ||
     (!reanswerMode && decision.screen === 'today' && currentPlan?.requestStatus !== 'none') ||
+    (!reanswerMode &&
+      decision.screen === 'today' &&
+      Boolean(foundation.state?.profileRevisionId)) ||
     (reanswerMode && foundation.state?.testReanswerDay !== foundation.day)
   )
-    return <CoachSetupLoading />;
+    return previousScreen.current.content;
   const profile =
     !reanswerMode &&
     (decision.screen === 'profile' ||
@@ -245,7 +288,7 @@ export default function CoachOnboarding() {
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
         if (step === PROFILE_QUESTIONS.length - 1) {
           await finishProfile({});
-          if (decision.returningMember) setLocalStep(null);
+          if (decision.returningMember) router.replace('/(tabs)/dashboard');
           else await resumeMember(convex);
         } else {
           setPendingProfileChoice(null);
@@ -265,8 +308,8 @@ export default function CoachOnboarding() {
         setPendingProfileChoice(null);
         setLocalStep(step + 1);
       }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save your answer. Try again.');
+    } catch {
+      setError('Could not save your answer. Please try again.');
       setLocalStep(null);
     } finally {
       submissionRef.current = false;
@@ -287,8 +330,8 @@ export default function CoachOnboarding() {
     try {
       await saveProfile({ weight: { value, unit } });
       setLocalStep(1);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save your weight.');
+    } catch {
+      setError('Could not save your weight. Please try again.');
     } finally {
       submissionRef.current = false;
       setBusy(false);
@@ -296,6 +339,14 @@ export default function CoachOnboarding() {
   };
 
   if (profile) {
+    if (firstUnanswered === 0 && surveyStartedFor !== memberId) {
+      return rememberScreen(
+        <View className="flex-1 bg-white">
+          <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+          <CoachSurveyBridge onStart={() => setSurveyStartedFor(memberId)} />
+        </View>
+      );
+    }
     const copy = PROFILE_COPY[question.key] ?? {
       eyebrow: 'Your profile',
       description: 'Choose the answer that feels most like you.',
@@ -312,7 +363,7 @@ export default function CoachOnboarding() {
       saveWeight().catch(() => {});
     };
 
-    return (
+    return rememberScreen(
       <View className="flex-1 bg-white">
         <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <Image
@@ -361,7 +412,7 @@ export default function CoachOnboarding() {
                   className={`${keyboardVisible ? '' : 'mt-2'} font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]`}>
                   {question.title}
                 </Text>
-                {!keyboardVisible ? (
+                {!keyboardVisible && copy.description ? (
                   <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
                     {copy.description}
                   </Text>
@@ -403,7 +454,7 @@ export default function CoachOnboarding() {
                     />
                   </>
                 ) : (
-                  question.options.map(([value, label], optionIndex) => {
+                  question.options.map(([value, label]) => {
                     const isSelected = effectiveProfileChoice === value;
                     return (
                       <TouchableOpacity
@@ -418,16 +469,16 @@ export default function CoachOnboarding() {
                         accessibilityState={{ selected: isSelected, disabled: busy }}
                         activeOpacity={0.82}
                         className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                        <View
-                          className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
-                          <Text
-                            className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
-                            {String(optionIndex + 1).padStart(2, '0')}
+                        <View className="flex-1 pr-3">
+                          <Text className="font-body text-base font-semibold leading-6 text-[#1A1A1A]">
+                            {label}
                           </Text>
+                          {PROFILE_OPTION_DESCRIPTIONS[question.key]?.[value] ? (
+                            <Text className="mt-1 font-body text-sm leading-5 text-[#77716D]">
+                              {PROFILE_OPTION_DESCRIPTIONS[question.key][value]}
+                            </Text>
+                          ) : null}
                         </View>
-                        <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
-                          {label}
-                        </Text>
                         {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
                       </TouchableOpacity>
                     );
@@ -479,7 +530,7 @@ export default function CoachOnboarding() {
   const effectiveDailyChoice =
     pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
 
-  return (
+  return rememberScreen(
     <View className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
       <Image
@@ -532,7 +583,7 @@ export default function CoachOnboarding() {
               </Text>
             ) : null}
             <View className="mt-6">
-              {question.options.map(([value, label], optionIndex) => {
+              {question.options.map(([value, label]) => {
                 const isSelected = effectiveDailyChoice === value;
                 return (
                   <TouchableOpacity
@@ -547,14 +598,7 @@ export default function CoachOnboarding() {
                     accessibilityState={{ selected: isSelected, disabled: busy }}
                     activeOpacity={0.82}
                     className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                    <View
-                      className={`h-10 w-10 items-center justify-center rounded-[14px] ${isSelected ? 'bg-primary-500' : 'bg-[#FFF0E8]'}`}>
-                      <Text
-                        className={`font-body text-sm font-bold ${isSelected ? 'text-white' : 'text-primary-500'}`}>
-                        {String(optionIndex + 1).padStart(2, '0')}
-                      </Text>
-                    </View>
-                    <Text className="mx-4 flex-1 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
+                    <Text className="flex-1 pr-3 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
                       {label}
                     </Text>
                     {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}

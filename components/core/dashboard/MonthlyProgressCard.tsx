@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'react-native';
@@ -74,7 +75,7 @@ export default function MonthlyProgressCard({
               </Text>
               <Text className="font-body text-white" style={{ fontSize: 18 }}>
                 {' '}
-                /{formatPoints(targetPoints)} {targetPoints === 1 ? 'pt' : 'pts'}
+                /{formatPoints(targetPoints)} {pointsLabel(targetPoints)}
               </Text>
             </View>
           </View>

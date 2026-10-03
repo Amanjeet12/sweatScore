@@ -245,7 +245,7 @@ export default function AskHealthPermission() {
         style={{ position: 'absolute', top: 0, right: 0, left: 0, height: heroHeight }}
       />
 
-      <OnboardingHeroChrome activeStep={6} onBack={router.back} />
+      <OnboardingHeroChrome onBack={router.back} />
 
       <View style={{ height: heroHeight }} />
 
@@ -265,7 +265,7 @@ export default function AskHealthPermission() {
           </View>
 
           <Text className="mt-3 font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-            Every move deserves credit
+            One more step to complete setup
           </Text>
           <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
             Let&apos;s track your sweat

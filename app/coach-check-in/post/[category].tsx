@@ -10,6 +10,10 @@ export default function CoachCheckInPost() {
   const { category: rawCategory } = useLocalSearchParams<{ category: string }>();
   const category = COACH_CATEGORIES.find((item) => item === rawCategory);
   const { accepted } = useCoachRouteGuard(['today']);
+  const returnToToday = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/dashboard');
+  };
   if (!accepted) return <ScreenLoading />;
   if (!category) return <Text>Unknown check-in category.</Text>;
   return (
@@ -18,7 +22,7 @@ export default function CoachCheckInPost() {
       <CoachCheckInFlow
         category={category}
         mode="post"
-        onClose={() => router.replace('/(tabs)/dashboard')}
+        onClose={returnToToday}
         onOpenPlan={(status) =>
           router.replace(status === 'no_plan' ? '/coach-onboarding' : '/coach-plan')
         }

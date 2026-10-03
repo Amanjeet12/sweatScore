@@ -15,7 +15,7 @@ import { useAuthStore } from '~/store/useAuthStore';
 function youtubeThumbnail(url?: string) {
   if (!url) return null;
   const match = url.match(/(?:youtu\.be\/|[?&]v=|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
-  return match ? `https://i.ytimg.com/vi/${match[1]}/hqdefault.jpg` : null;
+  return match ? `https://i.ytimg.com/vi/${match[1]}/mqdefault.jpg` : null;
 }
 
 function openVideo(videoId: Id<'creatorVideos'>) {
@@ -34,7 +34,7 @@ function WorkoutCard({ video }: { video: Doc<'creatorVideos'> }) {
       activeOpacity={0.88}
       onPress={() => openVideo(video._id)}
       className="mb-3 flex-row overflow-hidden rounded-[22px] bg-white">
-      <View className="relative h-[128px] w-[138px] bg-[#F1ECE7]">
+      <View className="relative h-[128px] w-[138px] overflow-hidden rounded-[22px] bg-[#F1ECE7]">
         {thumbnail ? (
           <Image
             source={{ uri: thumbnail }}

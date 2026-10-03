@@ -68,3 +68,23 @@ export function activityProgressFraction(value: number, target?: number): number
   if (!Number.isFinite(value) || !target || !Number.isFinite(target) || target <= 0) return 0;
   return Math.min(1, Math.max(0, value / target));
 }
+
+// Cached responses and servers running the previous banner API have photo URLs only.
+export function bannerAvatarMembers(
+  banner:
+    | {
+        memberCount: number;
+        avatarUrls?: string[];
+        avatarMembers?: { userId: string; name: string; imageUrl: string | null }[];
+      }
+    | null
+    | undefined
+) {
+  if (!banner) return [];
+  if (Array.isArray(banner.avatarMembers)) return banner.avatarMembers.slice(0, 4);
+  return Array.from({ length: Math.min(4, Math.max(0, banner.memberCount)) }, (_, index) => ({
+    userId: `legacy-avatar-${index}`,
+    name: '',
+    imageUrl: banner.avatarUrls?.[index] ?? null,
+  }));
+}

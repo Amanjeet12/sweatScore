@@ -256,6 +256,43 @@ describe('coach foundation invariants', () => {
     expect(store.rows.coachOnboardingV1[0].profileDraft.goal).toBe('lose');
     expect(store.writes.map((w) => w.table)).toEqual(['coachOnboardingV1', 'patch']);
   });
+  test('five daily answers survive navigation and a changed earlier answer', async () => {
+    const store = fakeStore({
+      users: [{ _id: 'member_a', timezone: 'UTC' }],
+      coachBillingEntitlementsV1: [{ _id: 'billing', userId: 'member_a', status: 'active' }],
+      coachOnboardingV1: [
+        {
+          _id: 'state',
+          userId: 'member_a',
+          profileRevisionId: 'profile',
+          healthContinuation: 'declined',
+          entitlement: 'verified',
+        },
+      ],
+    });
+    await saveDailyDraft._handler(store.ctx, { mood: 'good' });
+    await saveDailyDraft._handler(store.ctx, { sleep: 'rested_enough' });
+    await saveDailyDraft._handler(store.ctx, { energy: 'steady' });
+    expect(store.rows.coachOnboardingV1[0].dailyDraft).toMatchObject({
+      mood: 'good',
+      sleep: 'rested_enough',
+      energy: 'steady',
+    });
+    await saveDailyDraft._handler(store.ctx, { mood: 'motivated' });
+    await saveDailyDraft._handler(store.ctx, { upFor: 'short_session' });
+    await saveDailyDraft._handler(store.ctx, { body: 'fine' });
+    const answerId = await finishDailyAnswers._handler(store.ctx, {});
+    expect(
+      store.rows.coachDailyAnswersV1.find((answer) => answer._id === answerId)?.answers
+    ).toEqual({
+      sleep: 'rested_enough',
+      energy: 'steady',
+      mood: 'motivated',
+      upFor: 'short_session',
+      body: 'fine',
+    });
+    expect(store.rows.coachPlanRequestsV1).toBeUndefined();
+  });
 
   test('a reserved plan freezes its daily answers across duplicate submissions', async () => {
     const store = fakeStore({
@@ -426,6 +463,68 @@ describe('coach foundation invariants', () => {
     await expect(
       reserveProof._handler(other.ctx, { assignmentId: 'assignment', requestKey: 'device_b_456' })
     ).rejects.toThrow();
+  });
+
+  test('proof reservation uses current billing rather than a stale onboarding flag', async () => {
+    for (const onboarding of [
+      [],
+      [{ _id: 'state', userId: 'member_a', entitlement: 'unverified' }],
+      [{ _id: 'state', userId: 'member_a', entitlement: 'expired' }],
+    ]) {
+      const store = fakeStore({
+        users: [{ _id: 'member_a', timezone: 'UTC' }],
+        coachBillingEntitlementsV1: [
+          { _id: 'billing', userId: 'member_a', status: 'active', expiresAt: Date.now() + 60_000 },
+        ],
+        coachOnboardingV1: onboarding,
+        coachAssignmentsV1: [
+          {
+            _id: 'assignment',
+            userId: 'member_a',
+            day: today,
+            category: 'sleep',
+            recommendation: '7 hours sleep',
+            label: 'Log sleep',
+          },
+        ],
+      });
+      expect(
+        await reserveProof._handler(store.ctx, {
+          assignmentId: 'assignment',
+          requestKey: 'billing_active_123',
+        })
+      ).toBeTruthy();
+    }
+  });
+
+  test('a verified onboarding flag cannot authorize missing, expired or inactive billing', async () => {
+    for (const billing of [
+      [],
+      [{ _id: 'billing', userId: 'member_a', status: 'expired' }],
+      [{ _id: 'billing', userId: 'member_a', status: 'active', expiresAt: Date.now() - 1 }],
+    ]) {
+      const store = fakeStore({
+        users: [{ _id: 'member_a', timezone: 'UTC', isPremium: true }],
+        coachBillingEntitlementsV1: billing,
+        coachOnboardingV1: [{ _id: 'state', userId: 'member_a', entitlement: 'verified' }],
+        coachAssignmentsV1: [
+          {
+            _id: 'assignment',
+            userId: 'member_a',
+            day: today,
+            category: 'sleep',
+            label: 'Log sleep',
+          },
+        ],
+      });
+      await expect(
+        reserveProof._handler(store.ctx, {
+          assignmentId: 'assignment',
+          requestKey: 'billing_denied_123',
+        })
+      ).rejects.toThrow('Verified entitlement required');
+      expect(store.rows.coachProofSubmissionsV1 ?? []).toHaveLength(0);
+    }
   });
 
   test('legacy hydration is not treated as workout proof; real workout is', async () => {

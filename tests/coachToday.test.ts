@@ -4,6 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { myBanner } from '../convex/coachToday';
 import { resumeDecision } from '../shared/coachResume';
 import {
+  bannerAvatarMembers,
   planBannerState,
   planBannerLabel,
   todayTiles,
@@ -70,7 +71,7 @@ describe('Stage 7 Today model', () => {
   test('first paid arrival reopens the saved plan; an entitled no-plan member answers today’s questions', () => {
     expect(resumeDecision(base)).toMatchObject({ screen: 'today', requestStatus: 'ready' });
     expect(resumeDecision({ ...base, hasTodayRequest: false, hasTodayPlan: false })).toMatchObject({
-      screen: 'daily',
+      screen: 'today',
       requestStatus: 'none',
     });
     expect(
@@ -203,5 +204,30 @@ test('community banner counts unique completed members and real avatars on the m
   expect(result.day).toBe(day);
   expect(result.memberCount).toBe(2);
   expect(result.avatarUrls).toEqual(['https://example.test/bob.jpg']);
+  expect(result.avatarMembers.map((member) => member.userId)).toEqual(['bob', 'alice']);
+  expect(result.avatarMembers[1].imageUrl).toBeNull();
+  for (const count of [3, 4, 5, 8]) {
+    rows.coachRewardSlotsV1 = Array.from({ length: count - 1 }, (_, index) => ({
+      _id: `earned_${index}`,
+      userId: `member_${index}`,
+      day,
+      state: 'earned',
+    }));
+    const expanded = await myBanner._handler(ctx, {});
+    expect(expanded.memberCount).toBe(count);
+    expect(expanded.avatarMembers.length).toBe(Math.min(count, 4));
+    expect(Math.max(0, expanded.memberCount - 4)).toBe(Math.max(0, count - 4));
+  }
   expect(result.nextMidnightAt).toBeGreaterThan(Date.now());
+});
+
+test('banner avatars support loading, legacy and current server responses', () => {
+  expect(bannerAvatarMembers(undefined)).toEqual([]);
+  expect(bannerAvatarMembers({ memberCount: 0 })).toEqual([]);
+  const legacy = bannerAvatarMembers({ memberCount: 2, avatarUrls: ['photo.jpg'] });
+  expect(legacy).toHaveLength(2);
+  expect(legacy.map((member) => member.imageUrl)).toEqual(['photo.jpg', null]);
+  expect(bannerAvatarMembers({ memberCount: 5, avatarUrls: [] })).toHaveLength(4);
+  const members = [{ userId: 'alice', name: 'Alice', imageUrl: null }];
+  expect(bannerAvatarMembers({ memberCount: 1, avatarMembers: members })).toEqual(members);
 });

@@ -1,5 +1,5 @@
-import * as Crypto from 'expo-crypto';
 import { useAction, useQuery } from 'convex/react';
+import * as Crypto from 'expo-crypto';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import SafeAreaView from '~/components/core/CoachSafeAreaView';
+
 import CoachActionButton from '~/components/core/CoachActionButton';
+import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -71,7 +72,7 @@ export default function CoachProfileEditor() {
       });
       router.replace('/coach-plan');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save your profile.');
+      setError('Could not save your profile. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -101,7 +102,7 @@ export default function CoachProfileEditor() {
                         onPress={() => setUnit(choice)}
                         className="rounded-[20px] px-4 py-2"
                         style={{ backgroundColor: unit === choice ? '#FFF0E8' : '#F5F3F1' }}>
-                        <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+                        <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 16 }}>
                           {choice}
                         </Text>
                       </TouchableOpacity>
@@ -131,7 +132,7 @@ export default function CoachProfileEditor() {
                       backgroundColor:
                         answers[question.key as keyof Answers] === value ? '#FFF0E8' : 'white',
                     }}>
-                    <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>{label}</Text>
+                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 16 }}>{label}</Text>
                   </TouchableOpacity>
                 ))
               )}

@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -103,7 +104,7 @@ const UserCard = ({
             className={cn('text-xl', {
               'text-white': rank === 1,
             })}>
-            {formatPoints(totalPoints)} {totalPoints === 1 ? 'pt' : 'pts'}
+            {formatPoints(totalPoints)} {pointsLabel(totalPoints)}
           </Text>
         </View>
       </View>

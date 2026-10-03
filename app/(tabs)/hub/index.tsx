@@ -107,27 +107,6 @@ export default function ChallengesScreen() {
                 </View>
               </View>
 
-              <View className="mb-4 flex-row items-center justify-between rounded-[24px] bg-white px-5 py-5">
-                <View>
-                  <Text className="font-body text-xs text-[#77716D]">Today&apos;s Progress</Text>
-                  <Text
-                    style={{ fontFamily: 'Inter_700Bold' }}
-                    className="mt-1 text-base text-[#1A1A1A]">
-                    {result.summary.completedToday}{' '}
-                    {result.summary.completedToday === 1 ? 'challenge' : 'challenges'} completed
-                  </Text>
-                </View>
-
-                <View className="h-[88px] w-[88px] items-center justify-center rounded-full border-[5px] border-[#FFD9C9]">
-                  <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-xl text-[#1A1A1A]">
-                    {result.summary.monthPoints ?? '—'}
-                  </Text>
-                  <Text className="px-2 text-center font-body text-[9px] text-[#77716D]">
-                    points added this month
-                  </Text>
-                </View>
-              </View>
-
               <View className="mb-4 flex-row rounded-[24px] bg-[#F1ECE7] p-1">
                 {(['joined', 'not_joined'] as const).map((tab) => {
                   const selected = selectedTab === tab;

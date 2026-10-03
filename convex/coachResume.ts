@@ -1,9 +1,10 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
+
 import { query } from './_generated/server';
+import { canRetryCurrentPlanRequest } from './coachPlanRetry';
 import { formatDateInTZ } from './utils/timezone';
 import { resumeDecision } from '../shared/coachResume';
-import { canRetryCurrentPlanRequest } from './coachPlanRetry';
 
 export const myDecision = query({
   // Cache-busting refresh is client-owned; the decision still uses server time and member timezone.
@@ -16,6 +17,7 @@ export const myDecision = query({
       v.literal('setup'),
       v.literal('daily'),
       v.literal('paywall'),
+      v.literal('trial_notifications'),
       v.literal('today')
     ),
     question: v.number(),
@@ -82,6 +84,9 @@ export const myDecision = query({
       hasProfile: Boolean(state?.profileRevisionId),
       hasHealthContinuation: Boolean(state?.healthContinuation),
       verifiedAccess,
+      trialNotificationPending: Boolean(
+        billing?.isTrial && billing.expiresAt && !billing.trialNotificationChoice
+      ),
       previouslyVerified:
         state?.entitlement === 'expired' || Boolean(billing?.productId && !verifiedAccess),
       profileDraft: state?.profileDraft,

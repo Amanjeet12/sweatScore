@@ -12,15 +12,6 @@ import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 
-const policyMessages = {
-  full_plus_poor_readiness:
-    'A full session and poor sleep or low energy need a client decision about which guidance takes priority.',
-  recovery_plus_soreness:
-    'Recent completed workouts call for recovery while soreness suggests an opposite-body session. The priority needs a client decision.',
-  high_steps_threshold:
-    'Recent steps are above your observed average, but the “well above average” threshold has not been defined.',
-} as const;
-
 export default function CoachPlanLoading() {
   const { nextCheckIn } = useLocalSearchParams<{ nextCheckIn?: string }>();
   const selectedCheckIn = COACH_CATEGORIES.find((item) => item === nextCheckIn);
@@ -46,7 +37,6 @@ export default function CoachPlanLoading() {
   if (!accepted || !saved) return <ScreenLoading />;
   const waitingForRetry = Boolean(retryRequestId && saved.requestId !== retryRequestId);
   const pending = saved.requestStatus === 'pending' || waitingForRetry;
-  const blocked = saved.errorCode === 'policy_unresolved' && !saved.canRetry;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
@@ -60,15 +50,8 @@ export default function CoachPlanLoading() {
               Your answers are saved
             </Text>
             <Text className="mt-3 font-body text-base leading-6 text-[#5A554F]">
-              {blocked && saved.policyBlock
-                ? policyMessages[saved.policyBlock]
-                : 'We could not prepare today’s plan. Your five answers are still saved.'}
+              We could not prepare today’s plan. Your five answers are still saved.
             </Text>
-            {saved.errorCode ? (
-              <Text className="mt-4 font-body text-xs text-[#756F69]">
-                Code: {saved.errorCode} · Request: {saved.requestId ?? 'unavailable'}
-              </Text>
-            ) : null}
             {saved.canRetry && saved.requestId ? (
               <CoachActionButton
                 label={retryBusy ? 'Retrying…' : 'Retry plan preparation'}

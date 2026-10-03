@@ -39,6 +39,7 @@ import {
   getLoggedActivityPoints,
   getRandomActivityCaption,
 } from '~/shared/loggedActivities';
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { colors } from '~/utils/constants';
@@ -408,7 +409,7 @@ export default function NewPost() {
             <ToastMessage
               message={
                 response.pointsEarned > 0
-                  ? `+${response.pointsEarned} ${response.pointsEarned === 1 ? 'pt' : 'pts'} added. Your activity post is live.`
+                  ? `+${response.pointsEarned} ${pointsLabel(response.pointsEarned)} added. Your activity post is live.`
                   : 'Activity posted. You reached today’s points cap.'
               }
               action="success"
@@ -422,7 +423,6 @@ export default function NewPost() {
     setIsLoading(false);
   };
 
-  const mediaAspectRatio = media?.width && media?.height ? media.width / media.height : 16 / 9;
   const canSubmit =
     Boolean(body.trim()) && !isUploading && !isLoading && (!isActivityPost || Boolean(mediaKey));
 
@@ -483,7 +483,7 @@ export default function NewPost() {
                   <Text
                     className="text-base text-[#E94F12]"
                     style={{ fontFamily: 'Inter_600SemiBold' }}>
-                    +{activityPoints} pts
+                    +{activityPoints} {pointsLabel(activityPoints)}
                   </Text>
                 </View>
               </View>
@@ -614,8 +614,7 @@ export default function NewPost() {
                           source={{ uri: mediaUri }}
                           style={{
                             width: '100%',
-                            aspectRatio: mediaAspectRatio,
-                            maxHeight: 440,
+                            aspectRatio: 4 / 5,
                             backgroundColor: '#000',
                           }}
                           resizeMode="contain"
@@ -634,7 +633,7 @@ export default function NewPost() {
                       source={{ uri: mediaUri }}
                       style={{
                         width: '100%',
-                        height: isActivityPost ? 300 : 400,
+                        aspectRatio: 4 / 5,
                         backgroundColor: '#EFEFEF',
                       }}
                       resizeMode={isActivityPost ? 'cover' : 'contain'}

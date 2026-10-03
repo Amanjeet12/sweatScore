@@ -2,6 +2,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   myToday,
+  ensureStandaloneAssignments,
   mySubmission,
   saveCaption,
   issueUpload,
@@ -172,6 +173,55 @@ function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
 }
 
 describe('plan-bound check-ins', () => {
+  test('all four fixed check-ins are available before plan generation', async () => {
+    const s = fixture({ coachPlanRevisionsV1: [], coachAssignmentsV1: [] });
+    expect((await myToday._handler(s.ctx, {})).status).toBe('no_plan');
+    await ensureStandaloneAssignments._handler(s.ctx, {});
+    await ensureStandaloneAssignments._handler(s.ctx, {});
+    const today = await myToday._handler(s.ctx, {});
+    expect(today.status).toBe('no_plan');
+    expect(today.assignments.map((item) => item.category).sort()).toEqual([
+      'meals',
+      'sleep',
+      'steps',
+      'workout',
+    ]);
+    expect(today.assignments).toHaveLength(4);
+    const workout = today.assignments.find((item) => item.category === 'workout');
+    expect(workout?.label).toBe('Log a workout');
+    const proofId = await reserveProof._handler(s.ctx, {
+      assignmentId: workout!._id,
+      requestKey: 'standalone_workout',
+    });
+    expect(
+      (await mySubmission._handler(s.ctx, { submissionId: proofId })).planRevisionId
+    ).toBeUndefined();
+  });
+
+  test('a live workout video earns the existing workout reward once', async () => {
+    const s = fixture({ coachPlanRevisionsV1: [], coachAssignmentsV1: [] });
+    await ensureStandaloneAssignments._handler(s.ctx, {});
+    const workout = (await myToday._handler(s.ctx, {})).assignments.find(
+      (item) => item.category === 'workout'
+    )!;
+    const id = await reserveProof._handler(s.ctx, {
+      assignmentId: workout._id,
+      requestKey: 'video_workout',
+    });
+    const { token } = await issueUpload._handler(s.ctx, { submissionId: id, mediaType: 'video' });
+    s.rows._storage = [
+      { _id: 'live_video', _creationTime: Date.now() + 1, contentType: 'video/mp4', size: 1000 },
+    ];
+    await attachUploadedInternal._handler(s.ctx, {
+      userId: 'alice',
+      submissionId: id,
+      token,
+      storageId: 'live_video',
+    });
+    expect(await complete._handler(s.ctx, { submissionId: id })).toMatchObject({ pointsEarned: 5 });
+    expect(s.rows.posts[0].mediaType).toBe('video');
+    expect(s.rows.dailyActivities[0].activitySubmissionType).toBe('record_video');
+  });
   test('each category leaves the details popup for its dedicated posting route', () => {
     expect(['workout', 'meals', 'sleep', 'steps'].map(checkInPostRoute)).toEqual([
       '/coach-check-in/post/workout',

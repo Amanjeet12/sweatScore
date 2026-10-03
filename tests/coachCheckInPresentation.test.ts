@@ -31,6 +31,15 @@ describe('plan-derived check-in presentation', () => {
       expect(
         canStartCoachLivePhoto(
           category,
+          'details',
+          'no_plan',
+          { mandatory: true, consumedCount: 0 },
+          false
+        )
+      ).toBe(true);
+      expect(
+        canStartCoachLivePhoto(
+          category,
           'post',
           'ready',
           { mandatory: true, consumedCount: 0 },
@@ -112,14 +121,15 @@ describe('plan-derived check-in presentation', () => {
     ).toBe(false);
   });
 
-  test('one shared camera row replaces redundant footer actions without changing posting', () => {
+  test('the approved check-in sheet exposes live capture and the close control', () => {
     const source = readFileSync(
       new URL('../components/core/dashboard/CoachCheckInFlow.tsx', import.meta.url),
       'utf8'
     );
-    expect(source.match(/>\s*Take live photo\s*</g)).toHaveLength(1);
+    expect(source).toContain('Take live photo');
+    expect(source).toContain('Record video');
     expect(source).toContain('Use the in-app camera');
-    expect(source).toContain('onPress={start}');
+    expect(source).toContain("start('image')");
     expect(source).toContain('canStartCoachLivePhoto(');
     expect(source).not.toContain('Start live proof');
     expect(source).not.toContain('Cancel capture');
@@ -132,13 +142,11 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('Retake photo');
     expect(source).toContain('publishProof');
     expect(source).toContain('publishMeal');
-    expect(source).toContain("primaryLabel = 'Get portion suggestion'");
-    expect(source).toContain('Share without AI check');
-    expect(source).toContain('PRIVATE AI PORTION CHECK');
-    expect(source).toContain('Daily AI checks used');
-    expect(source).toContain('Reset AI checks for testing');
+    expect(source).toContain("primaryLabel = 'Analyse meal using AI'");
+    expect(source).toContain('Share without AI analysis');
+    expect(source).toContain('AI MEAL ANALYSIS');
     expect(source).toContain('mealAnalysisLimitReached');
-    expect(source).toContain('One useful adjustment');
+    expect(source).toContain('Private feedback');
     expect(source).not.toContain('Upload photo to analyse');
     expect(source).not.toContain("'Analyse meal'");
     expect(source).not.toContain('api.coachCheckIns.cancel');
@@ -154,7 +162,7 @@ describe('plan-derived check-in presentation', () => {
       'utf8'
     );
     expect(source).toContain('DAILY ACTIVITY');
-    expect(source).toContain('+{points} pts');
+    expect(source).toContain('+{points} {pointsLabel(points)}');
     expect(source).toContain('randomCoachCheckInCaption(category)');
     expect(source).toContain('accessibilityLabel="Remove photo and retake"');
     expect(source).toContain('onPress={retakePhoto}');

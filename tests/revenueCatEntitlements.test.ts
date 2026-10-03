@@ -1,8 +1,10 @@
 // @ts-nocheck -- Bun test-only Convex handler fixtures.
 import { describe, expect, test } from 'bun:test';
-import { updateUserIsPremium } from '../convex/users';
+
 import {
   applyVerifiedSnapshot,
+  chooseTrialNotifications,
+  sendTrialReminder,
   expireIfDue,
   fetchVerifiedPremium,
   myPlan,
@@ -14,6 +16,7 @@ import {
   parseRevenueCatSubscriber,
   verifyRevenueCatSignature,
 } from '../convex/revenueCatPolicy';
+import { updateUserIsPremium } from '../convex/users';
 
 const now = Date.now();
 const today = new Date(now).toISOString().slice(0, 10);
@@ -299,4 +302,60 @@ describe('server-verified Premium', () => {
     expect(await verifyRevenueCatSignature(body, header, 'secret', now + 3600_000)).toBe(false);
     expect(parseRevenueCatEvent(JSON.parse(body)).appUserIds).toEqual(['member_a']);
   });
+});
+
+describe('trial reminders', () => {
+  const expiresAt = Date.now() + 7 * 86_400_000;
+  const billing = {
+    _id: 'billing',
+    userId: 'member_a',
+    status: 'active',
+    isTrial: true,
+    expiresAt,
+  };
+  test('verified subscription period distinguishes trials from paid plans', () => {
+    const payload = provider();
+    payload.subscriber.subscriptions = { monthly: { period_type: 'trial' } };
+    expect(parseRevenueCatSubscriber(payload, 'member_a', now).isTrial).toBe(true);
+    payload.subscriber.subscriptions.monthly.period_type = 'normal';
+    expect(parseRevenueCatSubscriber(payload, 'member_a', now).isTrial).toBe(false);
+  });
+  test('opt-in queues once at expiry minus two days; skip queues nothing', async () => {
+    const store = fixture({
+      users: [{ _id: 'member_a', expoPushToken: 'ExponentPushToken[test]' }],
+      coachBillingEntitlementsV1: [billing],
+    });
+    const before = Date.now();
+    await chooseTrialNotifications._handler(store.ctx, { enabled: true });
+    const after = Date.now();
+    expect(store.scheduled).toHaveLength(1);
+    const delay = store.scheduled[0][0];
+    expect(delay).toBeGreaterThanOrEqual(expiresAt - after - 2 * 86_400_000);
+    expect(delay).toBeLessThanOrEqual(expiresAt - before - 2 * 86_400_000);
+    await chooseTrialNotifications._handler(store.ctx, { enabled: true });
+    expect(store.scheduled).toHaveLength(1);
+    await chooseTrialNotifications._handler(store.ctx, { enabled: false });
+    expect(store.rows.coachBillingEntitlementsV1[0].trialNotificationChoice).toBe('skipped');
+    await sendTrialReminder._handler(store.ctx, { userId: 'member_a', expiresAt });
+    expect(store.rows.coachBillingEntitlementsV1[0].trialReminderSentFor).toBeUndefined();
+    const skipped = fixture({ coachBillingEntitlementsV1: [billing] });
+    await chooseTrialNotifications._handler(skipped.ctx, { enabled: false });
+    expect(skipped.scheduled).toHaveLength(0);
+  });
+  test('no device token cannot opt in; renewed and expired trials ignore stale reminders', async () => {
+    const store = fixture({ coachBillingEntitlementsV1: [billing] });
+    await expect(chooseTrialNotifications._handler(store.ctx, { enabled: true })).rejects.toThrow();
+    expect(store.scheduled).toHaveLength(0);
+    await sendTrialReminder._handler(store.ctx, { userId: 'member_a', expiresAt: expiresAt - 1 });
+    expect(store.rows.coachBillingEntitlementsV1[0].trialReminderSentFor).toBeUndefined();
+  });
+});
+
+test('post-activity notification choice works for members without a trial', async () => {
+  const store = fixture({ users: [{ _id: 'member_a', expoPushToken: 'ExponentPushToken[test]' }] });
+  await chooseTrialNotifications._handler(store.ctx, { enabled: true });
+  expect(store.rows.users[0].notificationPromptChoice).toBe('enabled');
+  expect(store.scheduled).toHaveLength(0);
+  await chooseTrialNotifications._handler(store.ctx, { enabled: false });
+  expect(store.rows.users[0].notificationPromptChoice).toBe('skipped');
 });

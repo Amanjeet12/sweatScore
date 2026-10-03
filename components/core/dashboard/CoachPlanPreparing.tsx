@@ -9,14 +9,15 @@ import { Text } from '~/components/ui/text';
 export default function CoachPlanPreparing({
   compact = false,
   mode = 'plan',
+  firstName,
 }: {
   compact?: boolean;
   mode?: 'plan' | 'profile';
+  firstName?: string;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [trackWidth, setTrackWidth] = useState(0);
   const travel = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let active = true;
@@ -38,10 +39,8 @@ export default function CoachPlanPreparing({
 
   useEffect(() => {
     travel.stopAnimation();
-    pulse.stopAnimation();
     if (reduceMotion || trackWidth < 100) {
       travel.setValue(0);
-      pulse.setValue(0);
       return;
     }
     const sweep = Animated.loop(
@@ -52,84 +51,29 @@ export default function CoachPlanPreparing({
         useNativeDriver: true,
       })
     );
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
     sweep.start();
-    glow.start();
     return () => {
       sweep.stop();
-      glow.stop();
     };
-  }, [pulse, reduceMotion, trackWidth, travel]);
+  }, [reduceMotion, trackWidth, travel]);
 
   return (
-    <LinearGradient
-      colors={['#FFF8F3', '#FFFFFF', '#FFF3EC']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="overflow-hidden rounded-[30px] border border-[#F3CDBA]"
-      style={{ padding: compact ? 18 : 26 }}
-      accessibilityLiveRegion="polite">
-      <View className="flex-row items-center">
-        <Animated.View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={{
-            transform: [
-              { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.09] }) },
-            ],
-          }}
-          className="h-14 w-14 items-center justify-center rounded-2xl bg-[#FF5C35]">
-          <Sparkles size={28} color="#FFFFFF" strokeWidth={1.8} />
-        </Animated.View>
-        <View className="ml-4 flex-1">
-          <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#C54B25]">
-            SWEATSCORE AI COACH
-          </Text>
-          <Text className="mt-1 font-heading text-xl font-semibold text-[#241B17]">
-            {mode === 'profile' ? 'Getting your coach ready' : 'Crafting today’s plan'}
-          </Text>
-        </View>
-      </View>
-      {!compact ? (
-        <Text className="mt-5 font-body text-base leading-6 text-[#5F5650]">
-          {mode === 'profile'
-            ? 'Saving your coach profile and getting your coaching experience ready. You’ll answer today’s questions after access is verified.'
-            : 'Your answers are saved. We’re shaping practical guidance for your workout, steps, sleep and meals.'}
-        </Text>
-      ) : null}
-      {!compact && mode === 'plan' ? (
-        <View className="mt-5 flex-row justify-between rounded-2xl bg-white/80 px-4 py-3">
-          {['Answers saved', 'Building plan', 'Final check'].map((label, index) => (
-            <View key={label} className="flex-1 items-center">
-              <View
-                className={`h-7 w-7 items-center justify-center rounded-full ${index === 0 ? 'bg-primary-500' : index === 1 ? 'border-2 border-primary-500 bg-[#FFF3ED]' : 'border border-[#D9D2CD] bg-white'}`}>
-                <Text
-                  className={`font-body text-xs font-bold ${index === 0 ? 'text-white' : index === 1 ? 'text-primary-500' : 'text-[#928A84]'}`}>
-                  {index === 0 ? '✓' : index + 1}
-                </Text>
-              </View>
-              <Text className="mt-2 text-center font-body text-[10px] leading-4 text-[#655B55]">
-                {label}
-              </Text>
-            </View>
-          ))}
+    <View style={{ padding: compact ? 18 : 26 }} accessibilityLiveRegion="polite">
+      {mode === 'profile' ? (
+        <View className="mb-7 items-center">
+          <Sparkles size={54} color="#FF8B24" />
         </View>
       ) : null}
+      <Text className="text-center font-heading text-[30px] font-semibold leading-10 text-[#1A1A1A]">
+        {mode === 'profile'
+          ? `Building your custom routine${firstName ? ` ${firstName}` : ''}`
+          : 'Creating today’s plan'}
+      </Text>
+      <Text className="mt-7 text-center font-body text-lg leading-7 text-[#514943]">
+        {mode === 'profile'
+          ? 'Analysing your goals and setting up your profile'
+          : 'Your answers are saved and your plan is being built.'}
+      </Text>
       <View
         className="mt-6 h-3 overflow-hidden rounded-full bg-[#F0D8CC]"
         accessibilityRole="progressbar"
@@ -168,11 +112,11 @@ export default function CoachPlanPreparing({
           </Animated.View>
         )}
       </View>
-      <Text className="mt-3 font-body text-xs text-[#7A6C63]">
-        {mode === 'profile'
-          ? 'Your profile is saved. Today’s plan has not been started.'
-          : 'This may take a moment. Your answers are saved.'}
-      </Text>
-    </LinearGradient>
+      {mode === 'plan' ? (
+        <Text className="mt-3 text-center font-body text-sm text-[#77716D]">
+          This may take a moment
+        </Text>
+      ) : null}
+    </View>
   );
 }

@@ -99,7 +99,7 @@ export default function Home() {
               {/* Heading */}
               <View className="mb-6 items-center">
                 <Text className="text-center font-heading text-3xl font-semibold leading-9 text-white">
-                  Movement That {'\n'}Hits Different.
+                  Movement That's {'\n'}Made For You.
                 </Text>
               </View>
 

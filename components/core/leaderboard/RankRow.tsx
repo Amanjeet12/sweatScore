@@ -134,8 +134,12 @@ export default function RankRow({
                 style={{ width: `${pctLabel}%` }}
               />
             </View>
-            <Text className="w-9 text-right font-body text-[11px] text-[#817A76]">{pctLabel}%</Text>
-            {displayTotalPoints >= 500 ? (
+            {pct < 1 ? (
+              <Text className="w-9 text-right font-body text-[11px] text-[#817A76]">
+                {pctLabel}%
+              </Text>
+            ) : null}
+            {pct >= 1 ? (
               <Image
                 source={require('~/assets/icons/500points.png')}
                 style={{ width: 18, height: 18 }}

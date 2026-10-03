@@ -20,6 +20,22 @@ const category = v.union(
   v.literal('steps')
 );
 const POINTS = { workout: 5, meals: 2, sleep: 4, steps: 3 } as const;
+const DEFAULT_ASSIGNMENTS = [
+  { category: 'workout', label: 'Log a workout', recommendation: 'Log a workout' },
+  { category: 'meals', label: 'Log Your Meals', recommendation: 'Log a meal' },
+  {
+    category: 'sleep',
+    label: 'Aim for 7 Hours Sleep',
+    recommendation: '7 hours sleep',
+    sleepTargetHours: 7,
+  },
+  {
+    category: 'steps',
+    label: 'Hit 10,000 Steps',
+    recommendation: '10,000 steps',
+    stepTarget: 10000,
+  },
+] as const;
 
 async function owner(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
@@ -55,7 +71,6 @@ export const myToday = query({
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
       .order('desc')
       .first();
-    if (!revision) return { day, status: 'no_plan' as const, assignments: [] };
     const [assignments, slots] = await Promise.all([
       ctx.db
         .query('coachAssignmentsV1')
@@ -68,10 +83,10 @@ export const myToday = query({
     ]);
     return {
       day,
-      status: 'ready' as const,
+      status: revision ? ('ready' as const) : ('no_plan' as const),
       assignments: await Promise.all(
         assignments
-          .filter((item) => item.planRevisionId === revision._id)
+          .filter((item) => item.planRevisionId === revision?._id)
           .map(async (item) => ({
             ...item,
             mandatory: item.category !== 'workout' || item.workout?.type !== 'rest',
@@ -87,6 +102,35 @@ export const myToday = query({
           }))
       ),
     };
+  },
+});
+
+// Fixed check-ins have their own daily assignments. They do not create a plan.
+export const ensureStandaloneAssignments = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await owner(ctx);
+    if (!(await entitled(ctx, userId))) throw new ConvexError('Verified entitlement required');
+    const day = await today(ctx, userId);
+    const revision = await ctx.db
+      .query('coachPlanRevisionsV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
+      .order('desc')
+      .first();
+    if (revision) return;
+    const existing = await ctx.db
+      .query('coachAssignmentsV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .collect();
+    for (const item of DEFAULT_ASSIGNMENTS) {
+      if (existing.some((row) => row.category === item.category && !row.planRevisionId)) continue;
+      await ctx.db.insert('coachAssignmentsV1', {
+        userId,
+        day,
+        ...item,
+        createdAt: Date.now(),
+      });
+    }
   },
 });
 
@@ -154,8 +198,11 @@ export const retakeProof = mutation({
 });
 
 export const issueUpload = mutation({
-  args: { submissionId: v.id('coachProofSubmissionsV1') },
-  handler: async (ctx, { submissionId }) => {
+  args: {
+    submissionId: v.id('coachProofSubmissionsV1'),
+    mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
+  },
+  handler: async (ctx, { submissionId, mediaType }) => {
     const userId = await owner(ctx);
     if (!(await entitled(ctx, userId))) throw new ConvexError('Verified entitlement required');
     const submission = await ctx.db.get(submissionId);
@@ -169,10 +216,13 @@ export const issueUpload = mutation({
       throw new ConvexError('Submission is no longer awaiting proof');
     if (submission.day !== (await today(ctx, userId)))
       throw new ConvexError('Proof day has changed');
+    if (mediaType === 'video' && submission.category !== 'workout')
+      throw new ConvexError('Video is available only for workout proof');
     const token = crypto.randomUUID();
     await ctx.db.patch(submissionId, {
       captureToken: token,
       captureSource: 'live_camera',
+      mediaType: mediaType ?? 'image',
       uploadIssuedAt: Date.now(),
       state: 'reserved',
       updatedAt: Date.now(),
@@ -225,10 +275,13 @@ export const attachUploadedInternal = internalMutation({
     if (
       !media ||
       media._creationTime < submission.uploadIssuedAt ||
-      !media.contentType?.startsWith('image/') ||
+      !(submission.mediaType === 'video'
+        ? submission.category === 'workout' &&
+          (media.contentType === 'video/mp4' || media.contentType === 'video/quicktime')
+        : media.contentType?.startsWith('image/')) ||
       media.size <= 0
     )
-      throw new ConvexError('A fresh camera photo is required');
+      throw new ConvexError('A fresh camera photo or video is required');
     const used = await ctx.db
       .query('coachProofSubmissionsV1')
       .withIndex('by_storage', (q) => q.eq('storageId', storageId))
@@ -296,13 +349,12 @@ export const complete = mutation({
     if ((caption ?? submission.caption ?? '').length > 500)
       throw new ConvexError('Caption is too long');
     const assignment = await ctx.db.get(submission.assignmentId);
-    const revision = await ctx.db.get(submission.planRevisionId);
+    const revision = submission.planRevisionId ? await ctx.db.get(submission.planRevisionId) : null;
     if (
       !assignment ||
-      !revision ||
       assignment.userId !== userId ||
-      revision.userId !== userId ||
-      assignment.planRevisionId !== revision._id ||
+      (submission.planRevisionId && (!revision || revision.userId !== userId)) ||
+      assignment.planRevisionId !== submission.planRevisionId ||
       assignment.day !== submission.day ||
       assignment.category !== submission.category ||
       assignment.recommendation !== submission.recommendation ||
@@ -335,8 +387,8 @@ export const complete = mutation({
       synced: false,
       reviewStatus: 'approved',
       loggedActivityKey: submission.category === 'workout' ? 'workout' : submission.category,
-      activitySubmissionType: 'take_photo',
-      image: submission.storageId,
+      activitySubmissionType: submission.mediaType === 'video' ? 'record_video' : 'take_photo',
+      image: submission.mediaType === 'video' ? undefined : submission.storageId,
       coachSubmissionId: submissionId,
     });
     const postId = await ctx.db.insert('posts', {
@@ -344,7 +396,7 @@ export const complete = mutation({
       createdAt: now,
       body: (caption ?? submission.caption ?? '').trim(),
       media: submission.storageId,
-      mediaType: 'image',
+      mediaType: submission.mediaType === 'video' ? 'video' : 'image',
       activityId,
     });
     await ctx.db.patch(submissionId, {

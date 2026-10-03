@@ -113,13 +113,10 @@ export default function CommunityChallengeCard({
 
           {challenge.isJoined ? (
             completedToday ? (
-              <View className="flex-row items-center gap-x-1.5">
+              <View
+                accessibilityLabel="Done today"
+                className="ml-2 shrink-0 flex-row items-center gap-x-1.5">
                 <CheckCircle size={18} color="#6F6A66" weight="fill" />
-                <Text
-                  style={{ fontFamily: 'Inter_600SemiBold' }}
-                  className="text-[10px] text-[#6F6A66]">
-                  Done today
-                </Text>
               </View>
             ) : (
               <CaretRight size={18} color="#FF5C35" weight="bold" />

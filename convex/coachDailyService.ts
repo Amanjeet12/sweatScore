@@ -1,5 +1,6 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
+
 import { api, internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
 import {
@@ -11,6 +12,19 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
+import { buildDailyProviderInput, dailyPolicy, validateDailyPlanOutput } from './coachDailyPolicy';
+import type { ValidatedPlan } from './coachDailyPolicy';
+import {
+  validateDailyPlanOutputV2,
+  workoutRecommendationV2,
+  stepsRecommendationV2,
+} from './coachDailyPolicyV2';
+import type { DailyDetailsV2 } from './coachDailyPolicyV2';
+import { DAILY_PLAN_PROMPT_VERSION } from './coachDailyPrompt';
+import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
+import { generateDailyPlan, providerConfig } from './coachDailyProvider';
+import { generateV2WithRepair } from './coachDailyRepair';
 import {
   profileAnswers,
   weightAnswer,
@@ -18,21 +32,8 @@ import {
   planOutputV2,
   dailyAnswers,
 } from './coachFoundationValidators';
-import { DAILY_PLAN_PROMPT_VERSION } from './coachDailyPrompt';
-import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
-import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
-import { buildDailyProviderInput, dailyPolicy, validateDailyPlanOutput } from './coachDailyPolicy';
-import {
-  validateDailyPlanOutputV2,
-  workoutRecommendationV2,
-  stepsRecommendationV2,
-} from './coachDailyPolicyV2';
-import type { DailyDetailsV2 } from './coachDailyPolicyV2';
-import type { ValidatedPlan } from './coachDailyPolicy';
-import { generateDailyPlan, providerConfig } from './coachDailyProvider';
-import { generateV2WithRepair } from './coachDailyRepair';
-import { assignmentLabel, assertRequestKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
+import { assignmentLabel, assertRequestKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
 import { formatDateInTZ } from './utils/timezone';
 
 const CLAIM_LEASE_MS = 60_000;
@@ -68,6 +69,25 @@ export const currentReadyPlan = query({
       (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
     );
     return { day, revisionId: access ? (revision?._id ?? null) : null };
+  },
+});
+
+export const myPlanFeedback = query({
+  args: { revisionId: v.id('coachPlanRevisionsV1') },
+  handler: async (ctx, { revisionId }) => {
+    const userId = await member(ctx);
+    const revision = await ctx.db.get(revisionId);
+    return revision?.userId === userId ? (revision.helpful ?? null) : null;
+  },
+});
+
+export const ratePlan = mutation({
+  args: { revisionId: v.id('coachPlanRevisionsV1'), helpful: v.boolean() },
+  handler: async (ctx, { revisionId, helpful }) => {
+    const userId = await member(ctx);
+    const revision = await ctx.db.get(revisionId);
+    if (!revision || revision.userId !== userId) throw new ConvexError('Plan unavailable');
+    await ctx.db.patch(revisionId, { helpful, feedbackAt: Date.now() });
   },
 });
 
@@ -282,6 +302,15 @@ export const claim = internalMutation({
       return null;
     }
     const selected = setting && setting.scope !== 'meal_feedback' ? setting : DEFAULT_COACH_TONE;
+    const recentRevisions = await ctx.db
+      .query('coachPlanRevisionsV1')
+      .withIndex('by_user', (q) => q.eq('userId', request.userId))
+      .order('desc')
+      .take(30);
+    const feedback = recentRevisions
+      .filter((plan) => plan.helpful !== undefined)
+      .slice(0, 7)
+      .map((plan) => ({ day: plan.day, helpful: plan.helpful, plan: plan.output }));
     return {
       requestId,
       generationAttempt,
@@ -289,6 +318,7 @@ export const claim = internalMutation({
       day: request.day,
       snapshot: request.inputSnapshot,
       recentPlans: plans,
+      feedback,
       style: { tone: selected.tone, detail: selected.detail },
     };
   },
@@ -529,6 +559,9 @@ export const generateReserved = internalAction({
     const config = providerConfig(claimed.promptVersion);
     const input = {
       ...buildDailyProviderInput(claimed.snapshot, claimed.day, claimed.recentPlans),
+      member_feedback: claimed.feedback,
+      feedback_guidance:
+        'Use the member ratings to improve personal relevance. Negative ratings are preference feedback and must never override safety rules or verified facts.',
       ...(isV2DailyPrompt(claimed.promptVersion)
         ? { recorded_meals: claimed.snapshot.mealHistory ?? [] }
         : {}),

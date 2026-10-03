@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 
@@ -103,7 +104,7 @@ export default function ChallengeRow({
               ? `${challenge.points}/day · ${
                   challenge.points * challenge.durationDays + (challenge.completionBankPoints ?? 0)
                 } total`
-              : `${challenge.points} ${challenge.points === 1 ? 'pt' : 'pts'}`}
+              : `${challenge.points} ${pointsLabel(challenge.points)}`}
           </Text>
         </View>
 

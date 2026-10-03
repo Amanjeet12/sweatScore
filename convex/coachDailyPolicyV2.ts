@@ -1,3 +1,4 @@
+import { DAILY_PLAN_COPY_LIMITS, mealPlanSummary } from '../shared/coachPlanCopy';
 import { dailyPolicy, validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
 import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
 import { addDaysToDateKey } from './utils/timezone';
@@ -82,6 +83,14 @@ export function validateDailyPlanOutputV2(
   if (Object.keys(data).sort().join('|') !== keys.sort().join('|'))
     throw new Error('invalid_output');
   const { workoutExamples, workoutReason, stepsReason, ...six } = data;
+  for (const [key, max] of Object.entries(DAILY_PLAN_COPY_LIMITS)) {
+    if (
+      typeof (value as Record<string, unknown>)[key] !== 'string' ||
+      ((value as Record<string, unknown>)[key] as string).length > max
+    )
+      throw new Error('invalid_output');
+  }
+  if (mealPlanSummary(six.meals as string) !== (six.meals as string).trim()) throw new Error('invalid_output');
   const base = validateDailyPlanOutput(six, snapshot, day, recentPlans);
   if (!Array.isArray(workoutExamples) || workoutExamples.some((item) => typeof item !== 'string'))
     throw new Error('invalid_output');
@@ -275,8 +284,7 @@ export function buildDeterministicDailyPlanV2(
     average === undefined
       ? 'This target fits today’s sleep and energy without assuming a step history.'
       : 'Your recent step average and today’s readiness make this a practical target.';
-  const meals =
-    'Try eggs with vegetables, aim for 2 litres of water today, and snap or log your meals for a portion check.';
+  const meals = 'Try eggs with vegetables and aim for 2 litres of water today.';
   const workoutSummary = rest
     ? 'Rest supports recovery'
     : type === 'lower_body_strength'

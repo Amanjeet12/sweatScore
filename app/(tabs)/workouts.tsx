@@ -42,17 +42,6 @@ export default function WorkoutsTab() {
           ) : null}
         </View>
 
-        <View className="mb-5 rounded-[24px] bg-white px-5 py-5">
-          <Text className="font-body text-xs text-[#77716D]">Workout library</Text>
-          <Text
-            style={{ fontFamily: 'Inter_700Bold' }}
-            className="mt-1 text-xl leading-7 text-[#1A1A1A]">
-            Move with a coach you enjoy
-          </Text>
-          <Text className="mt-2 font-body text-sm leading-5 text-[#77716D]">
-            Choose a collection and find a workout for your energy today.
-          </Text>
-        </View>
         {!decision.verifiedAccess ? (
           <View className="items-center rounded-[24px] border border-[#EEE9E5] bg-[#FAF8F6] px-6 py-9">
             <View className="h-14 w-14 items-center justify-center rounded-2xl bg-[#FFF0E8]">

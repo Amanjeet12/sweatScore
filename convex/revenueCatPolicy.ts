@@ -4,6 +4,7 @@ export type VerifiedPremium = {
   providerCheckedAt: number;
   expiresAt?: number;
   productId?: string;
+  isTrial?: boolean;
 };
 
 type Json = Record<string, unknown>;
@@ -51,9 +52,13 @@ export function parseRevenueCatSubscriber(
   const effectiveExpiry = Math.max(expiresAt ?? 0, graceAt ?? 0) || undefined;
   // Null expiry is RevenueCat's lifetime entitlement, not an unknown expiry.
   const active = expiry === null || (effectiveExpiry !== undefined && effectiveExpiry > now);
+  const product =
+    typeof entitlement.product_identifier === 'string' ? entitlement.product_identifier : undefined;
+  const subscription = product ? object(object(subscriber.subscriptions)?.[product]) : null;
   return {
     appUserId,
     active,
+    isTrial: active && subscription?.period_type === 'trial',
     providerCheckedAt,
     expiresAt: effectiveExpiry,
     productId:

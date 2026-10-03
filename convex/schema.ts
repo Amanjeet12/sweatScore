@@ -1,6 +1,7 @@
 import { authTables } from '@convex-dev/auth/server';
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+
 import {
   category,
   dailyAnswers,
@@ -32,6 +33,8 @@ const schema = defineSchema({
     lastSyncDate: v.optional(v.number()),
     activityGoal: v.optional(v.string()),
     notificationEnabled: v.optional(v.boolean()),
+    notificationActivityCompleted: v.optional(v.boolean()),
+    notificationPromptChoice: v.optional(v.union(v.literal('enabled'), v.literal('skipped'))),
     commentNotificationEnabled: v.optional(v.boolean()),
     autoSyncEnabled: v.optional(v.boolean()),
     lastActiveAt: v.optional(v.number()),
@@ -422,6 +425,10 @@ const schema = defineSchema({
     updatedAt: v.number(),
   }).index('by_user', ['userId']),
   coachBillingEntitlementsV1: defineTable({
+    isTrial: v.optional(v.boolean()),
+    trialNotificationChoice: v.optional(v.union(v.literal('enabled'), v.literal('skipped'))),
+    trialReminderScheduledFor: v.optional(v.number()),
+    trialReminderSentFor: v.optional(v.number()),
     userId: v.id('users'),
     revenueCatAppUserId: v.string(),
     status: v.union(v.literal('active'), v.literal('inactive')),
@@ -582,6 +589,8 @@ const schema = defineSchema({
     .index('by_user_day', ['userId', 'day'])
     .index('by_user', ['userId']),
   coachPlanRevisionsV1: defineTable({
+    helpful: v.optional(v.boolean()),
+    feedbackAt: v.optional(v.number()),
     userId: v.id('users'),
     day: v.string(),
     version: v.number(),
@@ -602,7 +611,7 @@ const schema = defineSchema({
     userId: v.id('users'),
     day: v.string(),
     category,
-    planRevisionId: v.id('coachPlanRevisionsV1'),
+    planRevisionId: v.optional(v.id('coachPlanRevisionsV1')),
     recommendation: v.string(),
     label: v.string(),
     detailsV2: v.optional(planDetailsV2),
@@ -641,7 +650,7 @@ const schema = defineSchema({
     day: v.string(),
     requestKey: v.string(),
     assignmentId: v.id('coachAssignmentsV1'),
-    planRevisionId: v.id('coachPlanRevisionsV1'),
+    planRevisionId: v.optional(v.id('coachPlanRevisionsV1')),
     category,
     recommendation: v.string(),
     label: v.string(),
@@ -655,6 +664,7 @@ const schema = defineSchema({
       v.literal('reversed')
     ),
     storageId: v.optional(v.id('_storage')),
+    mediaType: v.optional(v.union(v.literal('image'), v.literal('video'))),
     captureToken: v.optional(v.string()),
     captureSource: v.optional(v.literal('live_camera')),
     uploadIssuedAt: v.optional(v.number()),
@@ -686,7 +696,7 @@ const schema = defineSchema({
     day: v.string(),
     submissionId: v.id('coachProofSubmissionsV1'),
     assignmentId: v.id('coachAssignmentsV1'),
-    planRevisionId: v.id('coachPlanRevisionsV1'),
+    planRevisionId: v.optional(v.id('coachPlanRevisionsV1')),
     recommendation: v.string(),
     storageId: v.id('_storage'),
     caption: v.string(),

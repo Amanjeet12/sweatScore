@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useQuery } from 'convex/react';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -9,7 +10,6 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
   ArrowRight,
-  CameraRotate,
   Microphone,
   MicrophoneSlash,
   Record,
@@ -30,6 +30,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RecordingOverlay } from '~/components/core/RecordingOverlay';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CompositeVideoPlayer from '~/components/core/dashboard/CompositeVideoPlayer';
 import CapturePermissionGate from '~/components/core/permissions/CapturePermissionGate';
@@ -1606,30 +1607,13 @@ function DuetRecordingContent() {
           ]}
         />
 
-        {state === 'pre-record' && (
-          <TouchableOpacity
-            onPress={handleSwitchCamera}
-            hitSlop={{
-              top: 12,
-              bottom: 12,
-              left: 12,
-              right: 12,
-            }}
-            style={{
-              position: 'absolute',
-              top: insets.top + 14,
-              right: 16,
-              zIndex: 30,
-              width: 46,
-              height: 46,
-              borderRadius: 23,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.45)',
-            }}>
-            <CameraRotate size={26} color="#FFFFFF" weight="bold" />
-          </TouchableOpacity>
-        )}
+        <RecordingOverlay
+          countdown={state === 'countdown' ? countdownValue : null}
+          recording={state === 'recording'}
+          elapsed={elapsed}
+          onFlip={handleSwitchCamera}
+          top={insets.top + 16}
+        />
 
         {state === 'pre-record' && isCheckIn && (
           <TouchableOpacity
@@ -1734,47 +1718,6 @@ function DuetRecordingContent() {
             }}>
             <X size={28} color="#FFFFFF" weight="bold" />
           </TouchableOpacity>
-        )}
-
-        {state === 'countdown' && (
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-            ]}>
-            <View
-              className="items-center justify-center rounded-full"
-              style={{
-                width: 90,
-                height: 90,
-                backgroundColor: 'rgba(0,0,0,0.55)',
-              }}>
-              <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-4xl text-white">
-                {countdownValue}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {state === 'recording' && (
-          <View
-            style={{
-              position: 'absolute',
-              top: insets.top + 16,
-              alignSelf: 'center',
-              borderRadius: 12,
-              backgroundColor: 'rgba(0,0,0,0.45)',
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-            }}>
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-white">
-              Recording {elapsed}s
-            </Text>
-          </View>
         )}
 
         {canStopRecording && (
@@ -2009,8 +1952,8 @@ function DuetRecordingContent() {
                 style={{ fontFamily: 'Inter_600SemiBold' }}
                 className="text-lg text-white">
                 {isCheckIn
-                  ? `Submit Check-In for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`
-                  : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} ${totalPoints === 1 ? 'pt' : 'pts'}`}
+                  ? `Submit Check-In for ${totalPoints} ${pointsLabel(totalPoints)}`
+                  : `Submit Day ${progress?.nextAttemptNumber ?? 1} for ${totalPoints} ${pointsLabel(totalPoints)}`}
               </ButtonText>
             </LoadingButton>
 

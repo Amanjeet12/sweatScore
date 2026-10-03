@@ -224,10 +224,8 @@ export default function TabRank() {
         <View className="mx-4 mt-5 rounded-[24px] bg-[#FFF7F1] px-4 py-3.5">
           <Text className="text-center font-body text-sm text-[#5A5A5A]">
             {otherParticipantCount}{' '}
-            {otherParticipantCount === 1
-              ? 'other is also participating'
-              : 'others are also participating'}{' '}
-            {mode === 'streak' ? 'with an active streak.' : 'in this month’s League.'}
+            {otherParticipantCount === 1 ? 'sister is participating' : 'sisters are participating'}{' '}
+            {mode === 'streak' ? 'with an active streak.' : 'in this month’s challenge.'}
           </Text>
         </View>
       ) : null}

@@ -289,6 +289,84 @@ describe('client meal prompt and provider image contract', () => {
 });
 
 describe('meal draft, scan and share transactions', () => {
+  test('a meal can be shared without AI or a generated plan', async () => {
+    const f = fixture('alice', {
+      coachPlanRevisionsV1: [],
+      coachAssignmentsV1: [
+        {
+          _id: 'assignment',
+          userId: 'alice',
+          day,
+          category: 'meals',
+          recommendation: 'Log a meal',
+        },
+      ],
+      coachProofSubmissionsV1: [
+        {
+          _id: 'sub',
+          userId: 'alice',
+          day,
+          assignmentId: 'assignment',
+          category: 'meals',
+          recommendation: 'Log a meal',
+          slotKey: `${day}:meals:1`,
+          state: 'uploaded',
+          storageId: 'photo',
+          captureSource: 'live_camera',
+        },
+      ],
+    });
+    const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'My meal' });
+    expect(f.rows.coachMealDraftsV1[0].goal).toBe('unavailable');
+    expect(
+      await share._handler(f.ctx, { draftId, caption: 'My meal', skipAnalysis: true })
+    ).toMatchObject({ pointsEarned: 2 });
+  });
+  test('a meal can receive private AI feedback before a plan exists', async () => {
+    const f = fixture('alice', {
+      coachPlanRevisionsV1: [],
+      coachAssignmentsV1: [
+        {
+          _id: 'assignment',
+          userId: 'alice',
+          day,
+          category: 'meals',
+          recommendation: 'Log a meal',
+        },
+      ],
+      coachProofSubmissionsV1: [
+        {
+          _id: 'sub',
+          userId: 'alice',
+          day,
+          assignmentId: 'assignment',
+          category: 'meals',
+          recommendation: 'Log a meal',
+          slotKey: `${day}:meals:1`,
+          state: 'uploaded',
+          storageId: 'photo',
+          captureSource: 'live_camera',
+        },
+      ],
+    });
+    const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'My meal' });
+    const scanId = await reserveScan._handler(f.ctx, {
+      userId: 'alice',
+      draftId,
+      requestKey: 'no_plan_scan',
+    });
+    await claimDispatch._handler(f.ctx, { userId: 'alice', scanId });
+    await finishScan._handler(f.ctx, {
+      userId: 'alice',
+      scanId,
+      result: examples[5],
+      latencyMs: 10,
+    });
+    expect(f.rows.coachMealDraftsV1[0].verdict).toBe('On point');
+    expect(await share._handler(f.ctx, { draftId, caption: 'My meal' })).toMatchObject({
+      pointsEarned: 2,
+    });
+  });
   test('saved context uses completed workout, not planned workout; capture and draft award nothing', async () => {
     const f = fixture();
     const id = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'My plate' });

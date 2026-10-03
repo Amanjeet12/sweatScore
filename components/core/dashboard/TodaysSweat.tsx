@@ -49,6 +49,7 @@ import {
   getLoggedActivity,
   getRandomActivityCaption,
 } from '~/shared/loggedActivities';
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useAuthStore } from '~/store/useAuthStore';
 import { useTabStore } from '~/store/useTabStore';
 import { storage } from '~/utils/storage';
@@ -646,7 +647,7 @@ export default function TodaysSweat({
               {checkInPoints}
             </Text>
             <Text className="ml-1 font-heading text-[12px] font-semibold text-[#FF4B1F]">
-              {checkInPoints === 1 ? 'pt' : 'pts'}
+              {pointsLabel(checkInPoints)}
             </Text>
           </View>
         </View>
@@ -889,7 +890,7 @@ export default function TodaysSweat({
                       {selectedActivity?.detailTitle}
                     </Text>
                     <Text className="font-heading text-xs font-semibold text-[#FF4B1F]">
-                      +{selectedActivity?.basePoints} pts
+                      +{selectedActivity?.basePoints} {pointsLabel(selectedActivity?.basePoints)}
                     </Text>
                   </View>
                   <Text className="mt-1 font-body text-xs leading-[18px] text-[#77716D]">

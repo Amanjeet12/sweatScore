@@ -1,5 +1,14 @@
-export type ResumeScreen = 'bio' | 'profile' | 'health' | 'setup' | 'daily' | 'paywall' | 'today';
+export type ResumeScreen =
+  | 'bio'
+  | 'profile'
+  | 'health'
+  | 'setup'
+  | 'daily'
+  | 'paywall'
+  | 'trial_notifications'
+  | 'today';
 export type ResumeInput = {
+  trialNotificationPending?: boolean;
   hasBio: boolean;
   hasProfile: boolean;
   hasHealthContinuation: boolean;
@@ -59,7 +68,7 @@ export function resumeDecision(input: ResumeInput): {
     };
   if (input.hasTodayRequest || input.hasTodayPlan || input.completedOnboarding)
     return { screen: 'today', question: 0, ...base };
-  return { screen: 'daily', question: firstMissing(dailyKeys, input.dailyDraft), ...base };
+  return { screen: 'today', question: firstMissing(dailyKeys, input.dailyDraft), ...base };
 }
 
 function firstMissing(keys: string[], draft?: Record<string, unknown>): number {

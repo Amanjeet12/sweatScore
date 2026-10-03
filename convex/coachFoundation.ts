@@ -1230,8 +1230,9 @@ export const reserveProof = mutation({
       throw new ConvexError('Assignment does not belong to member');
     if (assignment.day !== (await localDay(ctx, userId)))
       throw new ConvexError('Assignment is not for today');
-    const state = await progress(ctx, userId);
-    if (state?.entitlement !== 'verified' || !(await hasVerifiedPremium(ctx, userId)))
+    // Billing is authoritative, as in myToday and the other proof mutations.
+    // The onboarding snapshot can be absent or stale after verification.
+    if (!(await hasVerifiedPremium(ctx, userId)))
       throw new ConvexError('Verified entitlement required');
     const sameRequest = await ctx.db
       .query('coachProofSubmissionsV1')
@@ -1244,8 +1245,11 @@ export const reserveProof = mutation({
         throw new ConvexError('Request key already belongs to another assignment');
       return sameRequest._id;
     }
-    const revision = await ctx.db.get(assignment.planRevisionId);
-    if (!revision || revision.userId !== userId || revision.day !== assignment.day)
+    const revision = assignment.planRevisionId ? await ctx.db.get(assignment.planRevisionId) : null;
+    if (
+      assignment.planRevisionId &&
+      (!revision || revision.userId !== userId || revision.day !== assignment.day)
+    )
       throw new ConvexError('Assignment plan does not match member/day');
     if (assignment.category === 'workout' && assignment.workout?.type === 'rest')
       throw new ConvexError('Rest guidance has no mandatory workout proof');

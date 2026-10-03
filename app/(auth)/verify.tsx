@@ -221,7 +221,7 @@ export default function Verify() {
         </View>
       </KeyboardStickyView>
 
-      <OnboardingHeroChrome activeStep={2} onBack={router.back} />
+      <OnboardingHeroChrome onBack={router.back} />
     </View>
   );
 }

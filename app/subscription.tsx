@@ -11,7 +11,7 @@ export default function SubscriptionScreen() {
   const { accepted } = useCoachRouteGuard(PAYWALL_ROUTE);
   if (!accepted) return <ScreenLoading />;
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-[#F8FAFB]">
       <Stack.Screen
         options={{
           headerShown: false,

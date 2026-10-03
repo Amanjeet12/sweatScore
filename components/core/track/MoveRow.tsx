@@ -1,3 +1,4 @@
+import { pointsLabel } from '~/shared/pointsLabel';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
@@ -139,7 +140,7 @@ export default function MoveRow({
       <View className="items-end gap-y-2">
         {/* <View className="rounded-full bg-primary-500 px-3 py-1">
           <Text className="font-body text-sm font-bold text-white">
-            {pointsEarned} pts
+            {pointsEarned} {pointsLabel(pointsEarned)}
           </Text>
         </View> */}
 

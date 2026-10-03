@@ -410,16 +410,23 @@ const coachProofUploadEndpoint = httpAction(async (ctx, request) => {
     /* Invalid or stale submission IDs are not disclosed. */
   }
   if (!authorized) return new Response('Proof session unavailable', { status: 403 });
-  if (request.headers.get('Content-Type')?.split(';')[0] !== 'image/jpeg')
-    return new Response('JPEG photo required', { status: 415 });
-  if (Number(request.headers.get('Content-Length') ?? 0) > 12_000_000)
-    return new Response('Invalid photo size', { status: 413 });
+  const contentType = request.headers.get('Content-Type')?.split(';')[0];
+  const isVideo = contentType === 'video/mp4' || contentType === 'video/quicktime';
+  if (contentType !== 'image/jpeg' && !isVideo)
+    return new Response('Unsupported proof format', { status: 415 });
+  const sizeLimit = isVideo ? 19_000_000 : 12_000_000;
+  if (Number(request.headers.get('Content-Length') ?? 0) > sizeLimit)
+    return new Response('Invalid proof size', { status: 413 });
   const blob = await request.blob();
-  if (blob.size < 100 || blob.size > 12_000_000)
-    return new Response('Invalid photo size', { status: 413 });
-  const signature = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
-  if (signature[0] !== 0xff || signature[1] !== 0xd8 || signature[2] !== 0xff)
-    return new Response('Invalid photo format', { status: 415 });
+  if (blob.size < 100 || blob.size > sizeLimit)
+    return new Response('Invalid proof size', { status: 413 });
+  const signature = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+  if (
+    isVideo
+      ? String.fromCharCode(...signature.slice(4, 8)) !== 'ftyp'
+      : signature[0] !== 0xff || signature[1] !== 0xd8 || signature[2] !== 0xff
+  )
+    return new Response('Invalid proof format', { status: 415 });
   const storageId = await ctx.storage.store(blob);
   try {
     await ctx.runMutation(internal.coachCheckIns.attachUploadedInternal, {

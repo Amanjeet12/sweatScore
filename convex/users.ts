@@ -776,3 +776,12 @@ export const deleteAccount = mutation({
     };
   },
 });
+
+export const markNotificationActivityCompleted = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return;
+    await ctx.db.patch(userId, { notificationActivityCompleted: true });
+  },
+});

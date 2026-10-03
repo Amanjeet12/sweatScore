@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Barbell,
   Camera,
-  Check,
   Footprints,
   ForkKnife,
   Heartbeat,
@@ -14,7 +13,7 @@ import {
   MoonStars,
   ShareNetwork,
 } from 'phosphor-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -33,7 +32,7 @@ import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CoachCheckInFlow from '~/components/core/dashboard/CoachCheckInFlow';
-import { checkInPostRoute } from '~/shared/coachCheckInPresentation';
+import TodayPlanSheet from '~/components/core/dashboard/TodayPlanSheet';
 import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
@@ -42,9 +41,11 @@ import { Id } from '~/convex/_generated/dataModel';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { useHealthSync } from '~/hooks/useHealthSync';
 import { TARGETS } from '~/shared/activityGoals';
+import { checkInPostRoute } from '~/shared/coachCheckInPresentation';
 import { COACH_CATEGORIES, CoachCategory } from '~/shared/coachFoundation';
 import {
   activityProgressFraction,
+  bannerAvatarMembers,
   planBannerLabel,
   planBannerState,
   todayTiles,
@@ -52,6 +53,7 @@ import {
   TODAY_PROGRESS_ROUTES,
   progressCardWeek,
 } from '~/shared/coachToday';
+import { pointsLabel } from '~/shared/pointsLabel';
 import { useRefreshStore } from '~/store/useRefreshStore';
 
 const ORANGE = '#FF5C35';
@@ -63,7 +65,7 @@ function localRemaining(nextMidnightAt: number, now: number) {
   const seconds = Math.max(0, Math.ceil((nextMidnightAt - now) / 1000));
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  return `${hours}h ${String(minutes).padStart(2, '0')}m left today`;
+  return `${hours}h ${String(minutes).padStart(2, '0')}m left`;
 }
 function photoDate(weekStart: string) {
   const [year, month, day] = weekStart.split('-').map(Number);
@@ -83,9 +85,10 @@ export default function TodayScreen() {
     api.revenueCatEntitlements.myPlan,
     accepted ? { refresh: dayRefresh } : 'skip'
   );
-  const beginPlanSetup = useMutation(api.coachFoundation.beginReturningPlanSetup);
+  const ensureStandaloneAssignments = useMutation(api.coachCheckIns.ensureStandaloneAssignments);
   const checkIns = useQuery(api.coachCheckIns.myToday, accepted ? { refresh: dayRefresh } : 'skip');
   const banner = useQuery(api.coachToday.myBanner, accepted ? { refresh: dayRefresh } : 'skip');
+  const avatarMembers = bannerAvatarMembers(banner);
   const progress = useQuery(
     api.progressPhotos.getDashboard,
     accepted && plan?.access ? {} : 'skip'
@@ -113,11 +116,10 @@ export default function TodayScreen() {
   );
   const [refreshing, setRefreshing] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [openingSetup, setOpeningSetup] = useState(false);
-  const openingSetupRef = useRef(false);
-  const [setupError, setSetupError] = useState('');
+  const [activeSheet, setActiveSheet] = useState<'plan' | CoachCategory | null>(null);
+  const planSheetOpen = activeSheet === 'plan';
+  const activeCheckIn = activeSheet === 'plan' ? null : activeSheet;
   const [restoreMessage, setRestoreMessage] = useState('');
-  const [activeCheckIn, setActiveCheckIn] = useState<CoachCategory | null>(null);
   const { checkIn } = useLocalSearchParams<{ checkIn?: string }>();
   const [checkInExpanded, setCheckInExpanded] = useState(false);
   const [checkInPreferredHeight, setCheckInPreferredHeight] = useState(0);
@@ -125,10 +127,25 @@ export default function TodayScreen() {
   const [now, setNow] = useState(Date.now());
   const [reduceMotion, setReduceMotion] = useState(true);
   useEffect(() => {
+    if (
+      plan?.access &&
+      !plan.plan &&
+      checkIns?.status === 'no_plan' &&
+      checkIns.assignments.length < 4
+    )
+      void ensureStandaloneAssignments({}).catch(() => {});
+  }, [
+    plan?.access,
+    plan?.plan,
+    checkIns?.status,
+    checkIns?.assignments.length,
+    ensureStandaloneAssignments,
+  ]);
+  useEffect(() => {
     const selected = COACH_CATEGORIES.find((item) => item === checkIn);
     if (!selected || !plan?.access) return;
     setCheckInPreferredHeight(0);
-    setActiveCheckIn(selected);
+    setActiveSheet(selected);
     router.setParams({ checkIn: undefined });
   }, [checkIn, plan?.access]);
   const arrowOffset = useRef(new Animated.Value(0)).current;
@@ -140,7 +157,11 @@ export default function TodayScreen() {
         canRetry: plan.canRetry,
       })
     : 'pending';
-  const tiles = todayTiles(checkIns?.status === 'ready' ? checkIns.assignments : undefined);
+  const tiles = todayTiles(
+    checkIns?.status === 'ready' || checkIns?.status === 'no_plan'
+      ? checkIns.assignments
+      : undefined
+  );
   const stepAssignment = checkIns?.assignments.find((item) => item.category === 'steps');
   const stepTarget = displayStepTarget(stepAssignment);
   const numericStepTarget = stepAssignment?.stepTarget;
@@ -189,48 +210,24 @@ export default function TodayScreen() {
     return () => animation.stop();
   }, [bannerState, reduceMotion, arrowOffset]);
 
-  const openPlanSetup = async (category?: CoachCategory) => {
-    if (openingSetupRef.current) return;
-    openingSetupRef.current = true;
-    setOpeningSetup(true);
-    setSetupError('');
-    try {
-      await beginPlanSetup({});
-      router.push({
-        pathname: '/coach-onboarding',
-        params: category ? { nextCheckIn: category } : {},
-      });
-    } catch {
-      setSetupError('Could not open today’s questions. Please try again.');
-    } finally {
-      openingSetupRef.current = false;
-      setOpeningSetup(false);
-    }
-  };
   const openPlan = () => {
     if (bannerState === 'locked') return;
-    if (bannerState === 'no_plan') void openPlanSetup();
-    else if (bannerState !== 'ready') router.push('/coach-plan-loading');
-    else router.push('/coach-plan');
+    setActiveSheet('plan');
   };
   const openTile = (category: CoachCategory) => {
     if (!plan?.access) return;
-    if (bannerState === 'no_plan') {
-      void openPlanSetup(category);
-      return;
-    }
-    if (bannerState !== 'ready') {
-      router.push('/coach-plan-loading');
-      return;
-    }
-    setCheckInPreferredHeight(0);
-    setActiveCheckIn(category);
-  };
-  const closeCheckIn = () => {
-    setActiveCheckIn(null);
     setCheckInExpanded(false);
     setCheckInPreferredHeight(0);
+    setActiveSheet(category);
   };
+  const closeCheckIn = useCallback(() => {
+    setActiveSheet(null);
+    setCheckInExpanded(false);
+    setCheckInPreferredHeight(0);
+  }, []);
+  const updateCheckInHeight = useCallback((height: number) => {
+    setCheckInPreferredHeight((previous) => (Math.abs(previous - height) > 4 ? height : previous));
+  }, []);
   const refresh = async () => {
     setRefreshing(true);
     try {
@@ -255,7 +252,7 @@ export default function TodayScreen() {
         <View className="mx-5 mb-5 flex-row items-center justify-between">
           <View className="min-w-0 flex-1 pr-3">
             <Text className="font-heading text-xs font-semibold tracking-widest text-[#E9512A]">
-              TODAY · {points ? points.earned : '—'} PTS
+              TODAY · {points ? points.earned : '—'} {points?.earned === 1 ? 'PT' : 'PTS'}
             </Text>
             <Text className="mt-1 font-heading text-[26px] font-semibold leading-8 text-[#1A1A1A]">
               {greeting}, {firstName}
@@ -283,16 +280,16 @@ export default function TodayScreen() {
 
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'No sweat sisters checked in yet' : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
-          accessibilityState={{ disabled: bannerState === 'locked' || openingSetup }}
-          disabled={bannerState === 'locked' || openingSetup}
+          accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'Be the first to check in' : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
+          accessibilityState={{ disabled: bannerState === 'locked' }}
+          disabled={bannerState === 'locked'}
           activeOpacity={0.88}
           onPress={openPlan}
-          className="mx-5 mb-5 overflow-hidden rounded-[28px] bg-[#3B1A08]"
+          className="mx-5 mb-5 overflow-hidden rounded-[28px] bg-[#FF7900]"
           style={{ minHeight: 190 }}>
           <Image
             source={require('~/assets/backgrounds/today-plan-banner.png')}
-            contentFit="cover"
+            contentFit="contain"
             style={{
               position: 'absolute',
               width: planBannerWidth,
@@ -303,8 +300,8 @@ export default function TodayScreen() {
             accessibilityIgnoresInvertColors
           />
           <LinearGradient
-            colors={['#3B1A08', '#3B1A08', '#3B1A08B8', '#3B1A0800']}
-            locations={[0, 0.26, 0.58, 1]}
+            colors={['#48220C', '#48220C', '#48220CAD', '#48220C52', '#48220C1A']}
+            locations={[0, 0.23, 0.45, 0.75, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
@@ -320,29 +317,26 @@ export default function TodayScreen() {
               {banner ? localRemaining(banner.nextMidnightAt, now) : 'Day timer unavailable'}
             </Text>
             <View>
-              {banner?.avatarUrls.length ? (
+              {avatarMembers.length ? (
                 <View className="mb-2 flex-row items-center" accessible={false}>
-                  {banner.avatarUrls.map((url, index) => (
-                    <Image
-                      key={`${url}-${index}`}
-                      source={{ uri: url }}
+                  {avatarMembers.map((member, index) => (
+                    <View
+                      key={member.userId}
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
                         borderWidth: 2,
                         borderColor: 'white',
+                        borderRadius: 18,
                         marginLeft: index ? -8 : 0,
-                      }}
-                      accessibilityIgnoresInvertColors
-                    />
+                      }}>
+                      <Avatar uri={member.imageUrl ?? undefined} name={member.name} size={28} />
+                    </View>
                   ))}
-                  {banner.memberCount > banner.avatarUrls.length ? (
+                  {banner && banner.memberCount > 4 ? (
                     <View
                       className="items-center justify-center border-2 border-white bg-[#D7BBA4]"
                       style={{ width: 32, height: 32, borderRadius: 16, marginLeft: -8 }}>
                       <Text className="font-body text-xs text-white">
-                        +{banner.memberCount - banner.avatarUrls.length}
+                        +{banner.memberCount - 4}
                       </Text>
                     </View>
                   ) : null}
@@ -351,8 +345,8 @@ export default function TodayScreen() {
               <Text className="mb-2 max-w-[82%] font-body text-sm font-medium text-white">
                 {banner
                   ? banner.memberCount === 0
-                    ? 'No sweat sisters checked in yet'
-                    : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`
+                    ? 'Be the first to check in'
+                    : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in`
                   : 'Community check-ins unavailable'}
               </Text>
               <View className="flex-row items-center">
@@ -373,9 +367,6 @@ export default function TodayScreen() {
             </View>
           </View>
         </TouchableOpacity>
-        {setupError ? (
-          <Text className="mx-5 -mt-3 mb-5 font-body text-sm text-red-600">{setupError}</Text>
-        ) : null}
 
         {!plan.access ? (
           <View className="mx-5 mb-5 rounded-2xl bg-white p-4">
@@ -415,45 +406,50 @@ export default function TodayScreen() {
 
         <View className="mx-5 mb-5 rounded-[24px] bg-white p-4">
           <Text className="mb-3 font-heading text-xl font-semibold text-[#1A1A1A]">
-            Your Check-ins
+            Your Check-Ins
           </Text>
           <View className="flex-row flex-wrap justify-between">
             {tiles.map((tile) => {
               const Icon = ICONS[tile.category];
-              const inactive = tile.completed || !tile.available || !plan.plan;
+              const inactive = tile.completed;
               const detail = !plan.access
                 ? 'Premium access unavailable'
-                : tile.category === 'steps' && stepTarget
-                  ? `${stepTarget} steps`
-                  : (tile.assignment?.label ??
-                    (plan.plan ? 'Plan guidance unavailable' : 'Get today’s plan'));
+                : tile.category === 'workout' && !plan.plan
+                  ? 'Log a workout'
+                  : tile.category === 'meals'
+                    ? `${tile.earned} of 3 logged`
+                    : tile.category === 'sleep' && !plan.plan
+                      ? '7 hours sleep'
+                      : tile.category === 'steps'
+                        ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '10,000'} steps`
+                        : (tile.assignment?.label ?? '');
               return (
                 <TouchableOpacity
                   key={tile.category}
                   accessibilityRole="button"
                   accessibilityLabel={`${LABELS[tile.category]}, ${detail}${tile.category === 'meals' ? `, ${tile.earned} of 3 shared` : tile.completed ? ', completed' : ''}`}
-                  accessibilityState={{ disabled: !plan.access || openingSetup }}
-                  disabled={!plan.access || openingSetup}
+                  accessibilityState={{ disabled: !plan.access }}
+                  disabled={!plan.access}
                   onPress={() => openTile(tile.category)}
-                  className="mb-3 min-h-[96px] justify-center rounded-[22px] border border-[#E6E3E0] p-3"
-                  style={{ width: '48.4%', backgroundColor: tile.completed ? '#F3F2F0' : 'white' }}>
+                  className="mb-3 min-h-[96px] justify-center rounded-[22px] p-3"
+                  style={{
+                    width: '48.4%',
+                    backgroundColor: '#FFF7F3',
+                  }}>
                   <View className="mb-1 flex-row items-center justify-between">
                     <View className="h-8 w-8 items-center justify-center rounded-full bg-[#FFF0E8]">
                       <Icon color={inactive ? '#99918C' : ORANGE} size={18} />
                     </View>
-                    {tile.completed ? <Check color="#8E8A86" size={18} weight="bold" /> : null}
                   </View>
                   <Text
                     className="font-heading text-base font-semibold"
                     style={{ color: inactive ? '#77716D' : '#1A1A1A' }}>
                     {LABELS[tile.category]}
                   </Text>
-                  <Text className="mt-1 font-body text-xs text-[#77716D]">
-                    {tile.category === 'meals'
-                      ? `${tile.earned} of 3 shared`
-                      : tile.category === 'workout' && tile.assignment && !tile.assignment.mandatory
-                        ? 'Rest guidance · no proof needed'
-                        : detail}
+                  <Text
+                    className="mt-1 font-body text-xs"
+                    style={{ color: inactive ? '#99918C' : '#77716D' }}>
+                    {detail}
                   </Text>
                 </TouchableOpacity>
               );
@@ -463,7 +459,7 @@ export default function TodayScreen() {
 
         <View className="mx-5 mb-5 rounded-[24px] bg-white p-4">
           <View className="flex-row items-center justify-between">
-            <Text className="font-heading text-xl font-semibold">Your Progress</Text>
+            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Progress</Text>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="See all progress"
@@ -519,9 +515,11 @@ export default function TodayScreen() {
                         )}
                         {index === 0 || nextPhotoAvailable ? (
                           <>
-                            <Text className="mt-3 text-center font-heading text-sm font-semibold text-[#1A1A1A]">
-                              Week {index === 0 ? 1 : progressWeek}
-                            </Text>
+                            {index !== 0 ? (
+                              <Text className="mt-3 text-center font-heading text-sm font-semibold text-[#1A1A1A]">
+                                Week {progressWeek}
+                              </Text>
+                            ) : null}
                             <Text className="mt-1 text-center font-body text-xs text-[#77716D]">
                               {photo ? 'Photo unavailable' : 'Add a photo'}
                             </Text>
@@ -590,7 +588,7 @@ export default function TodayScreen() {
                 accessibilityLabel={`${activity.totalSteps} of ${numericStepTarget ?? 'unavailable target'} steps, ${activity.stepsPoints} points`}
                 className="mb-6 flex-row items-start">
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
-                  <Footprints color={ORANGE} size={23} />
+                  <Footprints color={ORANGE} size={18} />
                 </View>
                 <View className="ml-3 min-w-0 flex-1 pt-1">
                   <View className="flex-row items-start justify-between">
@@ -601,7 +599,7 @@ export default function TodayScreen() {
                       {stepTarget ? ` / ${stepTarget} steps` : ' steps'}
                     </Text>
                     <Text className="font-body text-sm font-semibold text-[#E9512A]">
-                      {activity.stepsPoints} pts
+                      {activity.stepsPoints} {pointsLabel(activity.stepsPoints)}
                     </Text>
                   </View>
                   {numericStepTarget ? (
@@ -622,7 +620,7 @@ export default function TodayScreen() {
                 accessibilityLabel={`${activity.totalZone2Minutes} of ${activeMinuteTarget} active minutes, ${activity.zone2Points} points`}
                 className="flex-row items-start">
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
-                  <Heartbeat color={ORANGE} size={23} />
+                  <Heartbeat color={ORANGE} size={18} />
                 </View>
                 <View className="ml-3 min-w-0 flex-1 pt-1">
                   <View className="flex-row items-start justify-between">
@@ -633,7 +631,7 @@ export default function TodayScreen() {
                       {` / ${activeMinuteTarget} active mins`}
                     </Text>
                     <Text className="font-body text-sm font-semibold text-[#E9512A]">
-                      {activity.zone2Points} pts
+                      {activity.zone2Points} {pointsLabel(activity.zone2Points)}
                     </Text>
                   </View>
                   <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ECE7E3]">
@@ -653,8 +651,9 @@ export default function TodayScreen() {
           )}
         </View>
       </ScrollView>
+      {/* One native host avoids overlapping iOS presentation/dismissal transitions. */}
       <Modal
-        visible={activeCheckIn !== null}
+        visible={activeSheet !== null}
         transparent
         animationType="slide"
         statusBarTranslucent
@@ -662,7 +661,7 @@ export default function TodayScreen() {
         <View className="flex-1 justify-end bg-black/45" accessibilityViewIsModal>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Dismiss check-in"
+            accessibilityLabel={planSheetOpen ? 'Dismiss today’s plan' : 'Dismiss check-in'}
             activeOpacity={1}
             onPress={closeCheckIn}
             style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
@@ -670,17 +669,31 @@ export default function TodayScreen() {
           <View
             className="overflow-hidden rounded-t-[28px] bg-white"
             style={{
-              height: checkInExpanded
-                ? '88%'
-                : Math.min(
-                    Math.max(checkInPreferredHeight + insets.bottom, 360),
-                    screenHeight - insets.top - 20
-                  ),
+              maxHeight: screenHeight - insets.top - 12,
+              height: planSheetOpen
+                ? undefined
+                : checkInExpanded
+                  ? '88%'
+                  : Math.min(
+                      Math.max(checkInPreferredHeight + insets.bottom, 360),
+                      screenHeight - insets.top - 20
+                    ),
               paddingBottom: insets.bottom,
             }}>
-            {activeCheckIn ? (
+            {planSheetOpen ? (
+              <TodayPlanSheet
+                firstName={firstName}
+                plan={plan}
+                checkIns={checkIns}
+                onClose={closeCheckIn}
+                onCheckIn={openTile}
+              />
+            ) : activeCheckIn ? (
               <CoachCheckInFlow
+                key={activeCheckIn}
                 category={activeCheckIn}
+                initialToday={checkIns?.day === decision.day ? checkIns : undefined}
+                initialCurrentUser={currentUser}
                 onClose={closeCheckIn}
                 onCaptured={() => {
                   const selected = activeCheckIn;
@@ -688,15 +701,11 @@ export default function TodayScreen() {
                   router.push(checkInPostRoute(selected));
                 }}
                 onExpandedChange={setCheckInExpanded}
-                onPreferredHeightChange={(height) =>
-                  setCheckInPreferredHeight((previous) =>
-                    Math.abs(previous - height) > 4 ? height : previous
-                  )
-                }
-                onOpenPlan={(status) => {
-                  closeCheckIn();
-                  if (status === 'no_plan') void openPlanSetup(activeCheckIn ?? undefined);
-                  else router.push(status === 'ready' ? '/coach-plan' : '/coach-plan-loading');
+                onPreferredHeightChange={updateCheckInHeight}
+                onOpenPlan={() => {
+                  setCheckInExpanded(false);
+                  setCheckInPreferredHeight(0);
+                  setActiveSheet('plan');
                 }}
               />
             ) : null}

@@ -1,8 +1,6 @@
 // @ts-nocheck -- Bun-only Convex handler fixtures.
 import { describe, expect, test } from 'bun:test';
-import { resumeDecision } from '../shared/coachResume';
-import { myDecision } from '../convex/coachResume';
-import { myPlan } from '../convex/revenueCatEntitlements';
+
 import { DAILY_PLAN_PROMPT_VERSION } from '../convex/coachDailyPrompt';
 import {
   continueAfterHealth,
@@ -10,7 +8,10 @@ import {
   finishDailyAndReserveFirst,
   saveDailyDraft,
 } from '../convex/coachFoundation';
+import { myDecision } from '../convex/coachResume';
+import { myPlan } from '../convex/revenueCatEntitlements';
 import { updateLastActiveAt, updateOnboarded } from '../convex/users';
+import { resumeDecision } from '../shared/coachResume';
 
 const day = new Date().toISOString().slice(0, 10);
 const base = {
@@ -120,7 +121,7 @@ const draft = {
 };
 
 describe('Stage 4 persisted resume', () => {
-  test('new member follows bio, profile, health, setup, paywall, then daily after verification', () => {
+  test('new member follows bio, profile, health, setup, paywall, then Today after verification', () => {
     expect(resumeDecision({ ...base, hasBio: false }).screen).toBe('bio');
     const profileState = resumeDecision({
       ...base,
@@ -135,7 +136,7 @@ describe('Stage 4 persisted resume', () => {
       question: 0,
     });
     expect(resumeDecision({ ...base, verifiedAccess: true, dailyDraft: draft })).toMatchObject({
-      screen: 'daily',
+      screen: 'today',
       question: 4,
     });
     expect(
@@ -150,7 +151,7 @@ describe('Stage 4 persisted resume', () => {
     );
     expect(
       resumeDecision({ ...base, verifiedAccess: true, hasHealthContinuation: false }).screen
-    ).toBe('daily');
+    ).toBe('today');
     expect(
       resumeDecision({
         ...base,
@@ -181,7 +182,7 @@ describe('Stage 4 persisted resume', () => {
     const persisted = { ...base };
     expect(resumeDecision(persisted).screen).toBe('paywall');
     expect(resumeDecision({ ...persisted }).screen).toBe('paywall');
-    expect(resumeDecision({ ...persisted, verifiedAccess: true }).screen).toBe('daily');
+    expect(resumeDecision({ ...persisted, verifiedAccess: true }).screen).toBe('today');
   });
 
   test('member-local day change preserves old plan and resumes fresh daily answers', () => {
@@ -192,7 +193,7 @@ describe('Stage 4 persisted resume', () => {
         changedDay: true,
         dailyDraft: { sleep: 'restful' },
       })
-    ).toMatchObject({ screen: 'daily', question: 1, changedDay: true, requestStatus: 'none' });
+    ).toMatchObject({ screen: 'today', question: 1, changedDay: true, requestStatus: 'none' });
     expect(
       resumeDecision({ ...base, verifiedAccess: true, changedDay: true, completedOnboarding: true })
         .screen
@@ -256,7 +257,7 @@ describe('Stage 4 persisted resume', () => {
     store.rows.coachBillingEntitlementsV1 = [
       { _id: 'billing', userId: 'member_a', status: 'active' },
     ];
-    expect((await myDecision._handler(store.ctx, {})).screen).toBe('daily');
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('today');
   });
 
   test('an unpaid direct final answer cannot reserve or queue a first plan', async () => {
@@ -401,4 +402,22 @@ describe('Stage 4 persisted resume', () => {
     expect(store.scheduled).toHaveLength(0);
     expect(store.writes.map((item) => item.table)).toEqual(['patch']);
   });
+});
+
+test('verified trials go to Home without a post-paywall notification gate', () => {
+  const input = {
+    hasBio: true,
+    hasProfile: true,
+    hasHealthContinuation: true,
+    verifiedAccess: true,
+    hasTodayRequest: false,
+    hasTodayPlan: false,
+    changedDay: false,
+    returningMember: true,
+  };
+  expect(resumeDecision({ ...input, trialNotificationPending: true }).screen).toBe('today');
+  expect(resumeDecision({ ...input, trialNotificationPending: false }).screen).toBe('today');
+  expect(
+    resumeDecision({ ...input, verifiedAccess: false, trialNotificationPending: true }).screen
+  ).toBe('today');
 });
