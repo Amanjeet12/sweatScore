@@ -165,7 +165,7 @@ export default function TabRank() {
 
   if (!leaderboard) {
     return (
-      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      <SafeAreaView className="flex-1 bg-white">
         <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
         <ScreenLoading />
       </SafeAreaView>
@@ -178,12 +178,6 @@ export default function TabRank() {
     : entries;
   const myRank = leaderboard.me?.rank || undefined;
   const userName = currentUser?.name?.trim().split(' ')[0] || 'User';
-
-  const shownParticipantIds = new Set(visibleEntries.map((entry) => entry.userId));
-  if (hasFullAccess && (leaderboard.me?.displayTotalPoints ?? 0) > 0 && currentUser?._id) {
-    shownParticipantIds.add(currentUser._id);
-  }
-  const otherParticipantCount = Math.max(0, leaderboard.totalUsers - shownParticipantIds.size);
 
   const ListHeader = (
     <View>
@@ -217,15 +211,15 @@ export default function TabRank() {
   );
 
   const ListFooter = (
-    <View className={hasFullAccess ? 'bg-[#F9F9F9] pb-6' : 'bg-white pb-4'}>
+    <View className={hasFullAccess ? 'bg-white pb-6' : 'bg-white pb-4'}>
       {!hasFullAccess ? (
         <PaywallOverlay />
-      ) : otherParticipantCount > 0 ? (
-        <View className="mx-4 mt-5 rounded-[24px] bg-[#FFF7F1] px-4 py-3.5">
-          <Text className="text-center font-body text-sm text-[#5A5A5A]">
-            {otherParticipantCount}{' '}
-            {otherParticipantCount === 1 ? 'sister is participating' : 'sisters are participating'}{' '}
-            {mode === 'streak' ? 'with an active streak.' : 'in this month’s challenge.'}
+      ) : leaderboard.totalUsers > 0 ? (
+        <View className="mx-5 mb-6 mt-5 py-3.5">
+          <Text className="text-center font-body text-sm text-[#777777]">
+            {leaderboard.totalUsers}{' '}
+            {leaderboard.totalUsers === 1 ? 'sister is taking part' : 'sisters are taking part'}{' '}
+            {mode === 'streak' ? 'with an active streak.' : 'this month.'}
           </Text>
         </View>
       ) : null}
@@ -233,14 +227,14 @@ export default function TabRank() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
 
       <LegendList
         data={visibleEntries}
         keyExtractor={(item) => item.userId}
         renderItem={({ item }: { item: Entry }) => (
-          <View className="bg-[#F9F9F9]">
+          <View className="bg-white">
             <RankRow
               mode={mode}
               rank={item.rank}

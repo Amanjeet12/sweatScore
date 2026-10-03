@@ -588,8 +588,8 @@ export default function PostRow({
   };
 
   return (
-    <View className="mx-4 mb-4 rounded-[24px]">
-      <View className="overflow-hidden rounded-[24px] bg-white px-4 pb-3 pt-4">
+    <View className="border-b border-[#E8E8E8] bg-white">
+      <View className="bg-white px-5 pb-1 pt-5">
         <View className="flex-row items-start gap-x-3">
           <View>
             <Avatar uri={post.user.imageUrl} size={40} name={post?.user?.name} />
@@ -600,7 +600,7 @@ export default function PostRow({
                 <View className="flex-row items-center gap-x-1">
                   <Text
                     style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="text-sm text-[#1A1A1A]">
+                    className="text-base text-[#1A1A1A]">
                     {post.user.name}
                   </Text>
                   {post.user.hasHit500 && (
@@ -611,7 +611,7 @@ export default function PostRow({
                     />
                   )}
                 </View>
-                <Text className="mt-0.5 font-body text-[10px] text-[#77716D]" numberOfLines={1}>
+                <Text className="mt-0.5 font-body text-xs text-[#777777]" numberOfLines={1}>
                   {formatDistanceToNow(post.createdAt)} ·{' '}
                   {post.challenge
                     ? post.challenge.name
@@ -746,14 +746,14 @@ export default function PostRow({
         ) : null}
         {/* Media — edge to edge */}
         {post.challenge?.compositeVideoUrl ? (
-          <View className="-mx-4 mt-3">
+          <View className="mt-3 overflow-hidden rounded-[16px]">
             <ChallengeVideoPlayer
               videoUrl={post.challenge.compositeVideoUrl}
               thumbnailUrl={post.challenge.thumbnailUrl}
             />
           </View>
         ) : post.mediaUrl && post.mediaType === 'video' ? (
-          <View className="-mx-4 mt-3">
+          <View className="mt-3 overflow-hidden rounded-[16px]">
             <ChallengeVideoPlayer
               videoUrl={post.mediaUrl}
               thumbnailUrl={post.mediaThumbnailUrl}
@@ -762,7 +762,7 @@ export default function PostRow({
           </View>
         ) : (
           post.mediaUrl && (
-            <View className="-mx-4 mt-3">
+            <View className="mt-3 overflow-hidden rounded-[16px]">
               <View className="relative">
                 {imageLoading && !imageError && (
                   <View className="absolute z-10 flex h-full w-full items-center justify-center">
@@ -814,81 +814,63 @@ export default function PostRow({
             </View>
           )
         )}
-        <View className="mt-3 flex-row items-center justify-between">
-          <View className="flex-1 flex-row flex-wrap items-center gap-2 pr-2">
+        <View className="mt-2 flex-row items-center justify-between">
+          <View className="flex-row items-center gap-x-2">
             {[
-              { emoji: '🔥', label: 'Fire', count: optimisticFireCount },
-              { emoji: '💪', label: 'Strong', count: optimisticClapCount },
-              { emoji: '😍', label: 'Love', count: optimisticHeartCount },
-            ].map(({ emoji, label, count }) => (
-              <View
+              { emoji: '🔥', label: 'Fire', reaction: 'fire' as const, count: optimisticFireCount },
+              {
+                emoji: '💪',
+                label: 'Strong',
+                reaction: 'clap' as const,
+                count: optimisticClapCount,
+              },
+              {
+                emoji: '😍',
+                label: 'Love',
+                reaction: 'heart' as const,
+                count: optimisticHeartCount,
+              },
+            ].map(({ emoji, label, reaction, count }) => (
+              <Pressable
                 key={label}
-                accessible
-                accessibilityLabel={`${label}: ${count} reactions`}
-                className="flex-row items-center gap-x-1 rounded-[20px] bg-[#FFF4ED] px-2 py-1">
-                <Text style={{ fontSize: 18, lineHeight: 26 }}>{emoji}</Text>
-                <Text className="font-body text-xs font-semibold leading-5 text-[#4D4946]">
-                  {count.toLocaleString()}
-                </Text>
-              </View>
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}: ${count} reactions${optimisticIsLiked ? ', remove your reaction' : ''}`}
+                onPress={() =>
+                  optimisticIsLiked ? handleLongPress() : handleReactionSelect(reaction)
+                }
+                className="min-h-11 flex-row items-center gap-x-1">
+                <Text style={{ fontSize: 23, lineHeight: 30 }}>{emoji}</Text>
+                <Text className="font-body text-sm text-[#777777]">{intToString(count)}</Text>
+              </Pressable>
             ))}
           </View>
-          <TouchableOpacity onPress={handleViewComments} disabled={isLoading}>
-            <Text className="font-body text-[10px] text-[#77716D]">
-              {intToString(post.commentCount)} {post.commentCount === 1 ? 'comment' : 'comments'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Actions row */}
-        <View className="-mx-4 mt-3 flex-row border-t border-[#EEE8E3] px-2 pt-2">
-          <Pressable
-            disabled={isLoading}
-            ref={likesButtonRef}
-            onPress={handleLongPress}
-            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
-            <Icon.Heart
-              size={17}
-              color={optimisticIsLiked ? '#FF5C35' : '#77716D'}
-              weight={optimisticIsLiked ? 'fill' : 'regular'}
-            />
-            <Text
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-              numberOfLines={1}
-              className={`text-[11px] ${optimisticIsLiked ? 'text-[#FF5C35]' : 'text-[#5A5652]'}`}>
-              Like
-            </Text>
-          </Pressable>
-
-          <TouchableOpacity
-            onPress={handleViewComments}
-            disabled={isLoading}
-            className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
-            <Icon.ChatCircle size={17} color="#77716D" weight="regular" />
-            <Text
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-              className="text-[11px] text-[#5A5652]">
-              Comment
-            </Text>
-          </TouchableOpacity>
-
-          {post.user.isAuthor || currentUser?.isAdmin ? (
+          <View className="flex-row items-center gap-x-3">
             <TouchableOpacity
-              onPress={handleSharePost}
-              disabled={mediaBusy}
-              className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px] active:bg-[#FFF0E8]">
-              {sharing ? (
-                <ActivityIndicator size="small" color="#77716D" />
-              ) : (
-                <Icon.ShareNetwork size={17} color="#77716D" weight="regular" />
-              )}
-              <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="text-[11px] text-[#5A5652]">
-                Share
+              onPress={handleViewComments}
+              accessibilityRole="button"
+              accessibilityLabel={`${post.commentCount} comments`}
+              className="min-h-11 flex-row items-center gap-x-1.5">
+              <Icon.Chat size={20} color="#777777" />
+              <Text className="font-body text-sm text-[#777777]">
+                {intToString(post.commentCount)}
               </Text>
             </TouchableOpacity>
-          ) : null}
+            {post.user.isAuthor || currentUser?.isAdmin ? (
+              <TouchableOpacity
+                onPress={handleSharePost}
+                disabled={mediaBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Share post"
+                className="min-h-11 justify-center">
+                {sharing ? (
+                  <ActivityIndicator size="small" color="#777777" />
+                ) : (
+                  <Icon.ShareNetwork size={20} color="#777777" />
+                )}
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         {post.challengeId && post.challenge?.isCheckIn === false ? (

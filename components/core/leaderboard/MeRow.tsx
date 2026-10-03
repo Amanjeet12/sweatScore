@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { Fire } from 'phosphor-react-native';
 import { useMemo, useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
@@ -33,22 +34,22 @@ function MeAvatar({ avatarUri, userName }: { avatarUri?: string; userName: strin
   return (
     <View
       style={{
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: shouldShowImage ? '#F4D9C2' : '#F76B1C',
-        borderWidth: 0,
-        borderColor: '#FFFFFF',
+        borderWidth: 2,
+        borderColor: '#FF5C35',
       }}>
       {shouldShowImage ? (
         <Image
           source={{ uri: cleanUri }}
           style={{
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
           }}
           contentFit="cover"
           onError={() => setImageFailed(true)}
@@ -73,7 +74,7 @@ export default function MeRow({
 }: MeRowProps) {
   const safeTarget = Math.max(1, targetPoints);
   const pct = Math.min(1, displayTotalPoints / safeTarget);
-  const pctLabel = Math.round(pct * 100);
+  const pctLabel = pct * 100;
 
   const Wrapper: any = onPress ? TouchableOpacity : View;
   const wrapperProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
@@ -81,63 +82,44 @@ export default function MeRow({
   return (
     <Wrapper
       {...wrapperProps}
-      className="mx-5 mt-3 flex-row items-center gap-x-3 rounded-[24px] bg-[#FFF0E8]"
+      className="mx-5 mb-3 mt-1 flex-row items-center gap-x-3 rounded-[18px] bg-white px-4 py-4"
       style={{
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        minHeight: 64,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.09,
+        shadowRadius: 10,
+        elevation: 3,
       }}>
+      <Text className="w-4 text-center font-body text-sm text-[#888888]">{rank ?? '—'}</Text>
       <MeAvatar avatarUri={avatarUri} userName={userName} />
-
-      <View className="flex-1">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1 flex-row items-center gap-x-1">
-            <Text
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-              className="font-body text-base text-[#1A1A1A]">
-              You
-            </Text>
-
-            {rank || mode === 'points' ? (
-              <View className="rounded-full bg-white px-2 py-1">
-                <Text
-                  style={{ fontFamily: 'Inter_600SemiBold' }}
-                  className="text-xs text-[#F76B1C]">
-                  {rank ? `#${rank}` : 'Not ranked'}
-                </Text>
-              </View>
-            ) : null}
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="font-heading text-base font-semibold text-[#1A1A1A]">
+          You
+        </Text>
+        {mode === 'points' ? (
+          <View className="mt-2 h-1 overflow-hidden rounded-full bg-[#EFEFEF]">
+            <View
+              className="h-full rounded-full bg-[#FF5C35]"
+              style={{ width: `${pctLabel}%`, minWidth: displayTotalPoints > 0 ? 2 : 0 }}
+            />
           </View>
-
-          <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-[#1A1A1A]">
+        ) : null}
+      </View>
+      {mode === 'streak' ? (
+        <View className="flex-row items-center gap-x-1.5">
+          <Fire size={16} weight="fill" color={displayTotalPoints > 0 ? '#FF5C35' : '#C4C4C4'} />
+          <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
             {displayTotalPoints}
-            {mode === 'streak' ? (displayTotalPoints === 1 ? ' week' : ' weeks') : ''}
+          </Text>
+          <Text className="font-body text-sm text-[#777777]">
+            {displayTotalPoints === 1 ? 'week' : 'weeks'}
           </Text>
         </View>
-
-        {mode === 'points' && (
-          <View className="mt-1.5 flex-row items-center gap-x-1">
-            <View className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#F4D9C2]">
-              <View
-                className="h-full rounded-full bg-[#F76B1C]"
-                style={{ width: `${pctLabel}%` }}
-              />
-            </View>
-            {pct < 1 ? (
-              <Text className="w-9 text-right font-body text-[11px] text-[#817A76]">
-                {pctLabel}%
-              </Text>
-            ) : null}
-            {pct >= 1 ? (
-              <Image
-                source={require('~/assets/icons/500points.png')}
-                style={{ width: 18, height: 18 }}
-                contentFit="contain"
-              />
-            ) : null}
-          </View>
-        )}
-      </View>
+      ) : (
+        <Text className="font-heading text-base font-semibold text-[#FF5C35]">
+          {displayTotalPoints}
+        </Text>
+      )}
     </Wrapper>
   );
 }

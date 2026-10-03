@@ -29,6 +29,7 @@ function ActiveTabLayout() {
   const setCurrentTab = useTabStore((state) => state.setCurrentTab);
   const currentUser = useAuthStore((state) => state.currentUser);
   const pathname = usePathname();
+  const isWorkoutDetail = pathname.startsWith('/dashboard/creators/');
   const appState = useRef(AppState.currentState);
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const { activateUser } = useActivateUser();
@@ -107,6 +108,7 @@ function ActiveTabLayout() {
           tabBarInactiveTintColor: '#878787',
           headerShown: false,
           tabBarStyle: {
+            display: isWorkoutDetail ? 'none' : 'flex',
             backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
             borderTopColor: '#F0F0F0',

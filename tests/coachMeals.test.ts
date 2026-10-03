@@ -5,6 +5,7 @@ import { validateMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy
 import { analyzeMealPhoto } from '../convex/coachMealProvider';
 import {
   saveCaption,
+  submitReportFeedback,
   myDraft,
   reserveScan,
   scanInput,
@@ -154,6 +155,7 @@ function fixture(member = 'alice', extras: Record<string, any[]> = {}) {
           return q;
         },
         collect: async () => found,
+        take: async (count: number) => found.slice(0, count),
         first: async () => found[0] ?? null,
         unique: async () => {
           if (found.length > 1) throw Error('not unique');
@@ -844,4 +846,77 @@ describe('meal draft, scan and share transactions', () => {
       saveCaption._handler(bob.ctx, { submissionId: 'sub', caption: 'Forgery' })
     ).rejects.toThrow();
   });
+});
+
+describe('private meal report feedback', () => {
+  test('only the owner can rate a finished report, with bounded corrections', async () => {
+    const { ctx, rows } = fixture('alice', {
+      coachMealDraftsV1: [
+        { _id: 'report', userId: 'alice', status: 'ready', feedback: 'Nice plate.' },
+        { _id: 'other', userId: 'bob', status: 'ready', feedback: 'Nice plate.' },
+        { _id: 'pending', userId: 'alice', status: 'analyzing' },
+      ],
+    });
+    await submitReportFeedback._handler(ctx, {
+      draftId: 'report',
+      helpful: false,
+      correction: '  This was avocado.  ',
+    });
+    expect(rows.coachMealDraftsV1[0].memberCorrection).toBe('This was avocado.');
+    await expect(
+      submitReportFeedback._handler(ctx, { draftId: 'other', helpful: true })
+    ).rejects.toThrow();
+    await expect(
+      submitReportFeedback._handler(ctx, { draftId: 'pending', helpful: true })
+    ).rejects.toThrow();
+    await expect(
+      submitReportFeedback._handler(ctx, {
+        draftId: 'report',
+        helpful: false,
+        correction: 'x'.repeat(501),
+      })
+    ).rejects.toThrow();
+  });
+  test('provider receives member feedback as context alongside the current image', async () => {
+    let body;
+    const memberFeedback = [{ helpful: false, correction: 'This was avocado.', report: 'Olives.' }];
+    await analyzeMealPhoto({
+      imageBase64: 'current-photo',
+      mediaType: 'image/jpeg',
+      goal: 'lose',
+      workoutLoggedToday: false,
+      style: { tone: 'supportive', detail: 'concise' },
+      memberFeedback,
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init.body);
+        return providerResponse(examples[0]);
+      },
+    });
+    expect(JSON.parse(body.messages[0].content[1].text).member_feedback).toEqual(memberFeedback);
+    expect(body.messages[0].content[0].source.data).toBe('current-photo');
+    expect(body.system.some((block) => block.text.includes('untrusted personal context'))).toBe(
+      true
+    );
+  });
+});
+
+test('scan context excludes other members feedback and limits history', async () => {
+  const { ctx } = fixture('alice', {
+    coachMealDraftsV1: [
+      { _id: 'current', userId: 'alice' },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        _id: `a${i}`,
+        userId: 'alice',
+        feedback: `report${i}`,
+        memberHelpful: false,
+        memberFeedbackAt: i,
+      })),
+      { _id: 'private', userId: 'bob', feedback: 'private report', memberHelpful: true },
+    ],
+    coachMealScansV1: [{ _id: 'scan', userId: 'alice', draftId: 'current' }],
+  });
+  const result = await scanInput._handler(ctx, { userId: 'alice', scanId: 'scan' });
+  expect(result.memberFeedback).toHaveLength(8);
+  expect(result.memberFeedback[0].report).toBe('report9');
+  expect(result.memberFeedback.some((item) => item.report === 'private report')).toBe(false);
 });

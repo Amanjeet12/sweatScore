@@ -2,7 +2,7 @@ import { useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, ArrowRight, Barbell, PencilSimple, Play } from 'phosphor-react-native';
+import { ArrowLeft, Barbell, PencilSimple, Play } from 'phosphor-react-native';
 import { FlatList, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -47,25 +47,19 @@ function WorkoutCard({ video }: { video: Doc<'creatorVideos'> }) {
             <Barbell size={34} color="#C7BEB8" weight="duotone" />
           </View>
         )}
-        <View className="absolute bottom-3 left-3 h-9 w-9 items-center justify-center rounded-full bg-white">
-          <Play size={16} color="#FF5C35" weight="fill" />
+        <View className="absolute bottom-3 left-3 h-9 w-9 items-center justify-center rounded-full bg-black/50">
+          <Play size={16} color="#FFFFFF" weight="fill" />
         </View>
       </View>
       <View className="min-w-0 flex-1 justify-center px-4 py-3">
-        <Text className="font-body text-[10px] font-semibold uppercase tracking-widest text-[#FF5C35]">
-          {video.title}
-        </Text>
         <Text
           numberOfLines={3}
-          className="mt-1 font-heading text-base font-semibold leading-5 text-[#1A1A1A]">
-          {video.subtitle}
+          className="font-heading text-base font-semibold leading-5 text-[#1A1A1A]">
+          {video.subtitle || video.title}
         </Text>
-        <View className="mt-2 flex-row items-center justify-between">
-          <Text className="font-body text-xs capitalize text-[#77716D]">
-            {video.difficulty ?? video.category ?? 'Workout'}
-          </Text>
-          <ArrowRight size={17} color="#FF5C35" weight="bold" />
-        </View>
+        <Text className="mt-2 font-body text-xs capitalize text-[#77716D]">
+          {video.difficulty ?? video.category ?? 'Workout'}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -108,7 +102,7 @@ export default function TabDashboardCreator() {
                 <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
               </TouchableOpacity>
               <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1A1A1A]">
-                Workout collection
+                Workouts
               </Text>
               <View className="h-12 w-12" />
             </View>
@@ -127,9 +121,10 @@ export default function TabDashboardCreator() {
                 </View>
               )}
               <LinearGradient
-                colors={['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.82)']}
-                locations={[0.2, 1]}
-                className="absolute inset-0"
+                pointerEvents="none"
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0.65)']}
+                locations={[0, 0.5, 1]}
+                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' }}
               />
               {currentUser?.isAdmin ? (
                 <TouchableOpacity
@@ -158,7 +153,7 @@ export default function TabDashboardCreator() {
               </Text>
             ) : null}
 
-            <View className="mb-4 flex-row items-end justify-between">
+            {/* <View className="mb-4 flex-row items-end justify-between">
               <View>
                 <Text className="font-heading text-2xl font-semibold text-[#1A1A1A]">
                   Choose a workout
@@ -172,7 +167,7 @@ export default function TabDashboardCreator() {
                   {videos.length} videos
                 </Text>
               </View>
-            </View>
+            </View> */}
           </View>
         }
         ListEmptyComponent={

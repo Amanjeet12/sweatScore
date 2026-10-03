@@ -1,0 +1,83 @@
+diff --git a/ios/CameraViewModule.swift b/ios/CameraViewModule.swift
+--- a/ios/CameraViewModule.swift
++++ b/ios/CameraViewModule.swift
+@@ -71,6 +71,10 @@
+     // swiftlint:disable:next closure_body_length
+     View(CameraView.self) {
+       Events(cameraEvents)
++
++      OnViewDidUpdateProps { (view: CameraView) in
++        view.initializeCaptureSessionInput()
++      }
+ 
+       Prop("facing") { (view, type: CameraType?) in
+         if let type, view.presetCamera != type.toPosition() {
+diff --git a/ios/Current/CameraView.swift b/ios/Current/CameraView.swift
+--- a/ios/Current/CameraView.swift
++++ b/ios/Current/CameraView.swift
+@@ -27,6 +27,7 @@
+     return mm
+   }()
+   private var isSessionPaused = false
++  private var didInitializeCaptureSession = false
+ 
+   // MARK: Property Observers
+ 
+@@ -87,6 +88,7 @@
+ 
+   var mode = CameraMode.picture {
+     didSet {
++      guard didInitializeCaptureSession else { return }
+       sessionQueue.async {
+         self.setCameraMode()
+       }
+@@ -158,7 +160,6 @@
+       name: UIDevice.orientationDidChangeNotification,
+       object: nil)
+     lifecycleManager?.register(self)
+-    initializeCaptureSessionInput()
+   }
+ 
+   private func setupPreview() {
+@@ -294,11 +295,20 @@
+ 
+     session.sessionPreset = mode == .video ? pictureSize.toCapturePreset() : .photo
+     session.commitConfiguration()
++    // Configure movie output only after the input and video preset are installed.
++    setCameraMode()
++    if mode == .video && videoFileOutput == nil {
++      onMountError(["message": "Video recording output could not be configured."])
++      return
++    }
+     addErrorNotification()
+     changePreviewOrientation()
+     barcodeScanner?.maybeStartBarcodeScanning()
+     updateCameraIsActive()
+-    onCameraReady()
++    // Notify JS after the queued session start has completed.
++    sessionQueue.async {
++      self.onCameraReady()
++    }
+     enableTorch()
+ #endif
+   }
+@@ -590,6 +600,8 @@
+       videoRecordedPromise = promise
+ 
+       videoFileOutput.startRecording(to: fileUrl, recordingDelegate: self)
++    } else {
++      promise.reject(CameraOutputNotReadyException())
+     }
+   }
+ 
+@@ -748,6 +760,10 @@
+   }
+ 
+   func initializeCaptureSessionInput() {
++    // Initial props include event handlers, facing, and capture mode.
++    // Starting in init can emit readiness before JS is listening.
++    guard !didInitializeCaptureSession else { return }
++    didInitializeCaptureSession = true
+     sessionQueue.async {
+       self.updateDevice()
+       self.startSession()

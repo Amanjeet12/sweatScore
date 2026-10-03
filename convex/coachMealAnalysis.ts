@@ -30,7 +30,7 @@ export const analyze = action({
       draftId,
       requestKey,
     });
-    const { scan, draft }: any = await ctx.runQuery(internal.coachMeals.scanInput, {
+    const { scan, draft, memberFeedback }: any = await ctx.runQuery(internal.coachMeals.scanInput, {
       userId,
       scanId,
     });
@@ -61,6 +61,7 @@ export const analyze = action({
         imageBase64,
         mediaType: media as 'image/jpeg',
         goal: draft.goal,
+        memberFeedback,
         workoutLoggedToday: draft.workoutLoggedToday,
         style: { tone: draft.tone, detail: draft.detail },
         config,

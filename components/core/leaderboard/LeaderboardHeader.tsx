@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 
+import TabPageHeader from '~/components/core/TabPageHeader';
 import { Text } from '~/components/ui/text';
 
 type Props = {
@@ -10,29 +11,33 @@ type Props = {
 };
 export default function LeaderboardHeader({ title, mode, timeLeft, onChangeMode }: Props) {
   return (
-    <View className="px-5 pb-4 pt-5">
-      <View className="mb-1 flex-row items-center justify-between gap-x-3">
-        <Text
-          style={{ fontFamily: 'Inter_600SemiBold' }}
-          className="text-[11px] uppercase tracking-[1.8px] text-[#FF4B1F]">
-          {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())}
-        </Text>
-        <Text className="font-body text-[13px] text-[#817A76]">
-          {mode === 'points' ? timeLeft : 'Current Streak'}
-        </Text>
-      </View>
-      <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-[25px] text-[#1A1A1A]">
-        {title}
-      </Text>
-      <View className="mt-4 flex-row rounded-[24px] bg-[#EEEDE8] p-1">
+    <View className="px-5 pb-4">
+      <TabPageHeader
+        title={title}
+        eyebrow={
+          <View className="flex-row items-center justify-between gap-x-3">
+            <Text className="font-body text-[13px] text-[#777777]">
+              {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
+                new Date()
+              )}
+            </Text>
+            <Text className="font-body text-[13px] text-[#817A76]">
+              {mode === 'points' ? timeLeft : 'Current streak'}
+            </Text>
+          </View>
+        }
+      />
+      <View className="mt-5 flex-row border-b border-[#E8E8E8]">
         {(['points', 'streak'] as const).map((value) => (
           <Pressable
             key={value}
             onPress={() => onChangeMode(value)}
             accessibilityRole="tab"
             accessibilityState={{ selected: mode === value }}
-            className={`flex-1 items-center rounded-[20px] py-2 ${mode === value ? 'bg-white' : ''}`}>
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#1A1A1A]">
+            className={`flex-1 items-center border-b-2 py-3 ${mode === value ? 'border-[#FF5C35]' : 'border-transparent'}`}>
+            <Text
+              style={{ fontFamily: 'Inter_600SemiBold' }}
+              className={`text-base ${mode === value ? 'text-[#1A1A1A]' : 'text-[#777777]'}`}>
               {value === 'points' ? 'Points' : 'Streak'}
             </Text>
           </Pressable>

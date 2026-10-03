@@ -455,10 +455,11 @@ export default function ChallengeViewScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView
+      className={challenge?.isCommunityChallenge ? 'flex-1 bg-white' : 'flex-1 bg-[#F9F9F9]'}>
       <Stack.Screen
         options={{
-          headerShown: true,
+          headerShown: challenge?.isCommunityChallenge !== true,
           headerTitleAlign: 'center',
           title: '',
           headerTitle: () =>

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import TabPageHeader from '~/components/core/TabPageHeader';
 import FeaturedRow from '~/components/core/posts/FeaturedRow';
 import PostRow, { stopCurrentVideo } from '~/components/core/posts/Row';
 import { Text } from '~/components/ui/text';
@@ -86,22 +87,16 @@ const TabShare = () => {
   const userImage = currentUser?.image?.trim();
   return (
     <MenuProvider>
-      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      <SafeAreaView className="flex-1 bg-white">
         <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
         <View
           className="flex-1 flex-col"
           style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-          <View className="bg-[#F9F9F9] px-4 pb-3 pt-5">
-            <View>
-              <Text
-                style={{ fontFamily: 'Inter_700Bold' }}
-                className="mt-1 text-[28px] text-[#1A1A1A]">
-                Community
-              </Text>
-            </View>
+          <View className="bg-white px-5 pb-3">
+            <TabPageHeader title="Community" />
           </View>
 
-          <View className="flex-1 flex-col bg-[#F9F9F9]">
+          <View className="flex-1 flex-col bg-white">
             <LegendList
               showsVerticalScrollIndicator={false}
               data={results}
@@ -109,8 +104,8 @@ const TabShare = () => {
               keyExtractor={(item) => item._id.toString()}
               ListHeaderComponent={
                 <>
-                  <View className="px-4 pb-3 pt-5">
-                    <View className="overflow-hidden rounded-[24px] bg-white px-4 pb-2 pt-4">
+                  <View className="border-b border-[#E8E8E8] px-5 pb-2 pt-2">
+                    <View className="bg-white pb-1 pt-1">
                       <TouchableOpacity
                         activeOpacity={0.85}
                         onPress={() => handleCreatePost()}
@@ -132,24 +127,24 @@ const TabShare = () => {
                             </Text>
                           )}
                         </View>
-                        <View className="min-h-11 flex-1 justify-center rounded-[20px] bg-[#FBF9F7] px-4">
-                          <Text className="font-body text-xs text-[#77716D]" numberOfLines={1}>
+                        <View className="min-h-11 flex-1 justify-center rounded-[20px] bg-[#F6F6F6] px-4">
+                          <Text className="font-body text-sm text-[#777777]" numberOfLines={1}>
                             Share something with the community
                           </Text>
                         </View>
                       </TouchableOpacity>
 
-                      <View className="mt-3 flex-row border-t border-[#EEE8E3] pt-2">
+                      <View className="mt-2 flex-row">
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleCreatePost('image')}
                           accessibilityRole="button"
                           accessibilityLabel="Create a post with an image"
                           className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <ImageSquare size={17} color="#FF5C35" weight="bold" />
+                          <ImageSquare size={20} color="#FF5C35" weight="regular" />
                           <Text
                             style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="text-[11px] text-[#4D4946]">
+                            className="font-body text-base text-[#252525]">
                             Photo
                           </Text>
                         </TouchableOpacity>
@@ -159,10 +154,10 @@ const TabShare = () => {
                           accessibilityRole="button"
                           accessibilityLabel="Create a post with a video"
                           className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <VideoCamera size={17} color="#FF5C35" weight="bold" />
+                          <VideoCamera size={20} color="#FF5C35" weight="regular" />
                           <Text
                             style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="text-[11px] text-[#4D4946]">
+                            className="font-body text-base text-[#252525]">
                             Video
                           </Text>
                         </TouchableOpacity>
@@ -172,10 +167,10 @@ const TabShare = () => {
                           accessibilityRole="button"
                           accessibilityLabel="Write a community post"
                           className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <NotePencil size={17} color="#FF5C35" weight="bold" />
+                          <NotePencil size={20} color="#FF5C35" weight="regular" />
                           <Text
                             style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="text-[11px] text-[#4D4946]">
+                            className="font-body text-base text-[#252525]">
                             Write
                           </Text>
                         </TouchableOpacity>
@@ -201,9 +196,9 @@ const TabShare = () => {
 
 const styles = StyleSheet.create({
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 10,
     overflow: 'hidden',
     alignItems: 'center',

@@ -728,6 +728,9 @@ const schema = defineSchema({
       )
     ),
     feedback: v.optional(v.string()),
+    memberHelpful: v.optional(v.boolean()),
+    memberCorrection: v.optional(v.string()),
+    memberFeedbackAt: v.optional(v.number()),
     errorCode: v.optional(v.string()),
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),

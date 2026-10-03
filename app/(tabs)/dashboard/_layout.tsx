@@ -2,7 +2,9 @@ import { Stack } from 'expo-router';
 
 export default function DashboardLayout() {
   return (
-    <Stack>
+    <Stack screenOptions={{ title: '' }}>
+      <Stack.Screen name="creators/[creatorId]" options={{ headerShown: false }} />
+      <Stack.Screen name="creators/videos/[videoId]" options={{ headerShown: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen
         name="challenges"

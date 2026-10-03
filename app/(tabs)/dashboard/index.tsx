@@ -31,6 +31,7 @@ import { Avatar } from '~/components/core/Avatar';
 import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import TabPageHeader from '~/components/core/TabPageHeader';
 import CoachCheckInFlow from '~/components/core/dashboard/CoachCheckInFlow';
 import TodayPlanSheet from '~/components/core/dashboard/TodayPlanSheet';
 import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
@@ -244,25 +245,27 @@ export default function TodayScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
-          paddingTop: Platform.OS === 'android' ? insets.top + 12 : 12,
+          paddingTop: Platform.OS === 'android' ? insets.top : 0,
           paddingBottom: 40,
         }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
-        <View className="mx-5 mb-5 flex-row items-center justify-between">
-          <View className="min-w-0 flex-1 pr-3">
-            <Text className="font-heading text-xs font-semibold tracking-widest text-[#E9512A]">
-              TODAY · {points ? points.earned : '—'} {points?.earned === 1 ? 'PT' : 'PTS'}
-            </Text>
-            <Text className="mt-1 font-heading text-[26px] font-semibold leading-8 text-[#1A1A1A]">
-              {greeting}, {firstName}
-            </Text>
-          </View>
-          <Avatar
-            uri={currentUser.image ?? undefined}
-            size={46}
-            goToSettings
-            name={currentUser.name}
+        <View className="mx-5 mb-5">
+          <TabPageHeader
+            title={`${greeting}, ${firstName}`}
+            eyebrow={
+              <Text className="font-heading text-xs font-semibold tracking-widest text-[#E9512A]">
+                TODAY · {points ? points.earned : '—'} {points?.earned === 1 ? 'PT' : 'PTS'}
+              </Text>
+            }
+            action={
+              <Avatar
+                uri={currentUser.image ?? undefined}
+                size={46}
+                goToSettings
+                name={currentUser.name}
+              />
+            }
           />
         </View>
 
@@ -457,7 +460,81 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        <View className="mx-5 mb-5 rounded-[24px] bg-white p-4">
+        <View className="mx-5 mb-5 rounded-[24px] bg-white p-5">
+          <Text className="mb-6 font-heading text-xl font-semibold text-[#1A1A1A]">
+            Your Activity
+          </Text>
+          {activity ? (
+            <>
+              <View
+                accessible
+                accessibilityLabel={`${activity.totalSteps} of ${numericStepTarget ?? 'unavailable target'} steps, ${activity.stepsPoints} points`}
+                className="mb-6 flex-row items-start">
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
+                  <Footprints color={ORANGE} size={18} />
+                </View>
+                <View className="ml-3 min-w-0 flex-1 pt-1">
+                  <View className="flex-row items-start justify-between">
+                    <Text className="min-w-0 flex-1 pr-2 font-body text-sm text-[#77716D]">
+                      <Text className="font-semibold text-[#1A1A1A]">
+                        {new Intl.NumberFormat('en-US').format(activity.totalSteps)}
+                      </Text>
+                      {stepTarget ? ` / ${stepTarget} steps` : ' steps'}
+                    </Text>
+                    <Text className="font-body text-sm font-semibold text-[#E9512A]">
+                      {activity.stepsPoints} {pointsLabel(activity.stepsPoints)}
+                    </Text>
+                  </View>
+                  {numericStepTarget ? (
+                    <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ECE7E3]">
+                      <View
+                        className="h-full rounded-full bg-[#FF5C35]"
+                        style={{
+                          width:
+                            `${Math.round(activityProgressFraction(activity.totalSteps, numericStepTarget) * 100)}%` as `${number}%`,
+                        }}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+              <View
+                accessible
+                accessibilityLabel={`${activity.totalZone2Minutes} of ${activeMinuteTarget} active minutes, ${activity.zone2Points} points`}
+                className="flex-row items-start">
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
+                  <Heartbeat color={ORANGE} size={18} />
+                </View>
+                <View className="ml-3 min-w-0 flex-1 pt-1">
+                  <View className="flex-row items-start justify-between">
+                    <Text className="min-w-0 flex-1 pr-2 font-body text-sm text-[#77716D]">
+                      <Text className="font-semibold text-[#1A1A1A]">
+                        {activity.totalZone2Minutes}
+                      </Text>
+                      {` / ${activeMinuteTarget} active mins`}
+                    </Text>
+                    <Text className="font-body text-sm font-semibold text-[#E9512A]">
+                      {activity.zone2Points} {pointsLabel(activity.zone2Points)}
+                    </Text>
+                  </View>
+                  <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ECE7E3]">
+                    <View
+                      className="h-full rounded-full bg-[#FF5C35]"
+                      style={{
+                        width:
+                          `${Math.round(activityProgressFraction(activity.totalZone2Minutes, activeMinuteTarget) * 100)}%` as `${number}%`,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            </>
+          ) : (
+            <Text className="text-sm text-[#77716D]">Activity is unavailable right now.</Text>
+          )}
+        </View>
+
+        <View className="mx-5 rounded-[24px] bg-white p-4">
           <View className="flex-row items-center justify-between">
             <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Your Progress</Text>
             <TouchableOpacity
@@ -574,80 +651,6 @@ export default function TodayScreen() {
                 </TouchableOpacity>
               </View>
             </>
-          )}
-        </View>
-
-        <View className="mx-5 rounded-[24px] bg-white p-5">
-          <Text className="mb-6 font-heading text-xl font-semibold text-[#1A1A1A]">
-            Your Activity
-          </Text>
-          {activity ? (
-            <>
-              <View
-                accessible
-                accessibilityLabel={`${activity.totalSteps} of ${numericStepTarget ?? 'unavailable target'} steps, ${activity.stepsPoints} points`}
-                className="mb-6 flex-row items-start">
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
-                  <Footprints color={ORANGE} size={18} />
-                </View>
-                <View className="ml-3 min-w-0 flex-1 pt-1">
-                  <View className="flex-row items-start justify-between">
-                    <Text className="min-w-0 flex-1 pr-2 font-body text-sm text-[#77716D]">
-                      <Text className="font-semibold text-[#1A1A1A]">
-                        {new Intl.NumberFormat('en-US').format(activity.totalSteps)}
-                      </Text>
-                      {stepTarget ? ` / ${stepTarget} steps` : ' steps'}
-                    </Text>
-                    <Text className="font-body text-sm font-semibold text-[#E9512A]">
-                      {activity.stepsPoints} {pointsLabel(activity.stepsPoints)}
-                    </Text>
-                  </View>
-                  {numericStepTarget ? (
-                    <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ECE7E3]">
-                      <View
-                        className="h-full rounded-full bg-[#FF5C35]"
-                        style={{
-                          width:
-                            `${Math.round(activityProgressFraction(activity.totalSteps, numericStepTarget) * 100)}%` as `${number}%`,
-                        }}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-              <View
-                accessible
-                accessibilityLabel={`${activity.totalZone2Minutes} of ${activeMinuteTarget} active minutes, ${activity.zone2Points} points`}
-                className="flex-row items-start">
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFF0E8]">
-                  <Heartbeat color={ORANGE} size={18} />
-                </View>
-                <View className="ml-3 min-w-0 flex-1 pt-1">
-                  <View className="flex-row items-start justify-between">
-                    <Text className="min-w-0 flex-1 pr-2 font-body text-sm text-[#77716D]">
-                      <Text className="font-semibold text-[#1A1A1A]">
-                        {activity.totalZone2Minutes}
-                      </Text>
-                      {` / ${activeMinuteTarget} active mins`}
-                    </Text>
-                    <Text className="font-body text-sm font-semibold text-[#E9512A]">
-                      {activity.zone2Points} {pointsLabel(activity.zone2Points)}
-                    </Text>
-                  </View>
-                  <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ECE7E3]">
-                    <View
-                      className="h-full rounded-full bg-[#FF5C35]"
-                      style={{
-                        width:
-                          `${Math.round(activityProgressFraction(activity.totalZone2Minutes, activeMinuteTarget) * 100)}%` as `${number}%`,
-                      }}
-                    />
-                  </View>
-                </View>
-              </View>
-            </>
-          ) : (
-            <Text className="text-sm text-[#77716D]">Activity is unavailable right now.</Text>
           )}
         </View>
       </ScrollView>

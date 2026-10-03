@@ -173,7 +173,8 @@ export default function Layout() {
                       style={
                         Platform.OS === 'android' ? { paddingBottom: insets.bottom } : undefined
                       }>
-                      <Stack>
+                      <Stack screenOptions={{ title: '' }}>
+                        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                         <Stack.Screen
                           name="subscription"

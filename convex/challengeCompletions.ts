@@ -1256,6 +1256,7 @@ export const getCommunityChallenges = query({
         participantCount: challenge.participantCount ?? recentParticipantRows.length,
         participantAvatars,
         completedToday: userCompletions.some((completion) => completion.date === timing.userToday),
+        nextAvailableAt: getNextMidnightTimestamp(new Date(now), user?.timezone),
         completedDays: completedDays.size,
         completionBankEligible: Boolean(
           participant?.bankEligibleAtJoin &&

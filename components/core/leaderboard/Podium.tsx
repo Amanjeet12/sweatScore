@@ -18,7 +18,7 @@ export type PodiumProps = {
 export default function Podium({ podium, onPressEntry, mode = 'points' }: PodiumProps) {
   const [first, second, third] = podium;
   return (
-    <View className="mx-5 flex-row items-start justify-center rounded-[24px] bg-white px-3 pb-5 pt-4">
+    <View className="mx-5 flex-row items-start justify-between pb-5 pt-2">
       <PodiumSlot mode={mode} rank={2} entry={second} onPress={onPressEntry} />
       <PodiumSlot mode={mode} rank={1} isHero entry={first} onPress={onPressEntry} />
       <PodiumSlot mode={mode} rank={3} entry={third} onPress={onPressEntry} />

@@ -415,7 +415,22 @@ export const scanInput = internalQuery({
     if (!scan || scan.userId !== userId) asError('Scan does not belong to member');
     const draft = await ctx.db.get(scan.draftId);
     if (!draft || draft.userId !== userId) asError('Draft does not belong to member');
-    return { scan, draft };
+    const recentDrafts = await ctx.db
+      .query('coachMealDraftsV1')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .order('desc')
+      .take(50);
+    const memberFeedback = recentDrafts
+      .filter((item) => item.memberHelpful !== undefined)
+      .sort((a, b) => (b.memberFeedbackAt ?? 0) - (a.memberFeedbackAt ?? 0))
+      .slice(0, 8)
+      .map((item) => ({
+        report: item.feedback,
+        verdict: item.verdict,
+        helpful: item.memberHelpful,
+        correction: item.memberCorrection,
+      }));
+    return { scan, draft, memberFeedback };
   },
 });
 export const claimDispatch = internalMutation({
@@ -642,5 +657,27 @@ export const share = mutation({
       date: draft.day,
     });
     return { postId, activityId, pointsEarned: 2 };
+  },
+});
+
+export const submitReportFeedback = mutation({
+  args: {
+    draftId: v.id('coachMealDraftsV1'),
+    helpful: v.boolean(),
+    correction: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await owner(ctx);
+    const draft = await ctx.db.get(args.draftId);
+    if (!draft || draft.userId !== userId) asError('Meal report not found');
+    if (!draft.feedback || !['ready', 'shared'].includes(draft.status))
+      asError('Meal report is not ready');
+    const correction = args.correction?.trim() ?? '';
+    if (correction.length > 500) asError('Please keep feedback to 500 characters');
+    await ctx.db.patch(draft._id, {
+      memberHelpful: args.helpful,
+      memberCorrection: correction,
+      memberFeedbackAt: Date.now(),
+    });
   },
 });

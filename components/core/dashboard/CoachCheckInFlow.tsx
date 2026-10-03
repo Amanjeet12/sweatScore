@@ -18,7 +18,10 @@ import {
   X,
 } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+
+import MealReportFeedback from './MealReportFeedback';
 
 import CoachActionButton from '~/components/core/CoachActionButton';
 import { RecordingOverlay } from '~/components/core/RecordingOverlay';
@@ -105,6 +108,8 @@ export default function CoachCheckInFlow({
   const [queue, setQueue] = useState<ProofQueue | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraAttempt, setCameraAttempt] = useState(0);
+  const [cameraStartupError, setCameraStartupError] = useState('');
   const [photoPreviewError, setPhotoPreviewError] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
   const [recording, setRecording] = useState(false);
@@ -115,6 +120,16 @@ export default function CoachCheckInFlow({
   const recordingStarted = useRef(0);
   const recordingActive = useRef(false);
   const countdownActive = useRef(false);
+  const photoCaptureActive = useRef(false);
+  const cameraSessionKey = `${cameraFacing}-${cameraMode}-${cameraAttempt}`;
+  useEffect(() => {
+    setCameraStartupError('');
+    if (!showCamera || cameraReady || cameraMode === 'picture') return;
+    const timer = setTimeout(() => {
+      setCameraStartupError('Camera is taking too long to get ready. Please retry.');
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, [showCamera, cameraReady, cameraFacing, cameraMode, cameraAttempt]);
   useEffect(() => {
     if (!recording) return;
     const timer = setInterval(() => {
@@ -303,12 +318,21 @@ export default function CoachCheckInFlow({
   };
 
   const capture = async () => {
-    if (!queue || !camera.current || !cameraReady || !FileSystem.documentDirectory) return;
+    if (
+      !queue ||
+      !camera.current ||
+      photoCaptureActive.current ||
+      busy ||
+      !FileSystem.documentDirectory
+    )
+      return;
+    // The native photo output validates readiness even if iOS loses onCameraReady.
+    photoCaptureActive.current = true;
     setBusy(true);
     setError('');
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.8, shutterSound: false });
-      if (!photo?.uri) return;
+      if (!photo?.uri) throw new Error('Camera did not return a photo');
       const capturedFile = await FileSystem.getInfoAsync(photo.uri);
       if (!capturedFile.exists || !capturedFile.size) throw new Error('Empty camera photo');
       const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}.jpg`;
@@ -324,9 +348,10 @@ export default function CoachCheckInFlow({
       setPhotoPreviewError(false);
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
-    } catch (cause) {
+    } catch {
       setError('Could not save the photo. Please try again.');
     } finally {
+      photoCaptureActive.current = false;
       setBusy(false);
     }
   };
@@ -723,20 +748,27 @@ export default function CoachCheckInFlow({
       </View>
       {showCamera ? (
         <View className="flex-1">
-          <CameraView
-            ref={camera}
-            style={{ flex: 1 }}
-            onCameraReady={() => setCameraReady(true)}
-            onMountError={() => {
-              setCameraReady(false);
-              setError('Camera could not start. Please try again.');
-            }}
-            facing={cameraFacing}
-            mode={cameraMode}
-            mute={audioMuted}
-            animateShutter={false}
-            videoBitrate={2_000_000}
-          />
+          <View className="flex-1 overflow-hidden" pointerEvents="none">
+            <CameraView
+              // iOS does not emit onCameraReady again when only facing changes.
+              key={cameraSessionKey}
+              ref={camera}
+              style={StyleSheet.absoluteFillObject}
+              onCameraReady={() => {
+                setCameraReady(true);
+                setCameraStartupError('');
+              }}
+              onMountError={() => {
+                setCameraReady(false);
+                setCameraStartupError('Camera could not start. Please try again.');
+              }}
+              facing={cameraFacing}
+              mode={cameraMode}
+              mute={audioMuted}
+              animateShutter={false}
+              videoBitrate={2_000_000}
+            />
+          </View>
           <RecordingOverlay
             countdown={countdown}
             recording={recording}
@@ -767,34 +799,56 @@ export default function CoachCheckInFlow({
               setCameraFacing((value) => (value === 'back' ? 'front' : 'back'));
             }}
           />
-          <View className="m-5">
-            <CoachActionButton
-              label={
-                cameraMode === 'video'
-                  ? recording
-                    ? 'Stop recording'
-                    : countdown
-                      ? 'Get ready…'
-                      : 'Start recording'
-                  : busy
-                    ? 'Working…'
-                    : 'Take live photo'
-              }
-              disabled={!cameraReady || countdown !== null || (busy && !recording)}
-              onPress={
-                cameraMode === 'video'
-                  ? recording
-                    ? () => camera.current?.stopRecording()
-                    : startCountdown
-                  : capture
-              }
-            />
+          <View className="m-5" style={{ zIndex: 40 }}>
+            {Boolean(cameraStartupError || error) && (
+              <Text accessibilityRole="alert" className="mb-3 text-center text-sm text-red-500">
+                {cameraStartupError || error}
+              </Text>
+            )}
+            {cameraStartupError ? (
+              <CoachActionButton
+                label="Retry camera"
+                onPress={() => {
+                  setCameraReady(false);
+                  setCameraStartupError('');
+                  setCameraAttempt((value) => value + 1);
+                }}
+              />
+            ) : (
+              <CoachActionButton
+                label={
+                  cameraMode === 'video'
+                    ? recording
+                      ? 'Stop recording'
+                      : countdown
+                        ? 'Get ready…'
+                        : 'Start recording'
+                    : busy
+                      ? 'Working…'
+                      : 'Take live photo'
+                }
+                disabled={
+                  (cameraMode === 'video' && !cameraReady && !recording) ||
+                  countdown !== null ||
+                  (busy && !recording)
+                }
+                onPress={
+                  cameraMode === 'video'
+                    ? recording
+                      ? () => camera.current?.stopRecording()
+                      : startCountdown
+                    : capture
+                }
+              />
+            )}
           </View>
         </View>
       ) : (
         <>
-          <ScrollView
-            className="flex-1"
+          <KeyboardAwareScrollView
+            style={{ flex: 1 }}
+            bottomOffset={24}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={(_, height) => setContentHeight(height)}
             contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}>
@@ -937,6 +991,7 @@ export default function CoachCheckInFlow({
                           <Text className="mt-5 font-body text-base leading-6 text-[#514943]">
                             {meal.draft.feedback}
                           </Text>
+                          <MealReportFeedback key={meal.draft._id} draft={meal.draft} />
                         </View>
                       ) : meal?.draft?.status === 'ready' ? (
                         <View className="mt-4 rounded-[20px] bg-[#F7F6F4] p-5">
@@ -1148,7 +1203,7 @@ export default function CoachCheckInFlow({
                 ) : null}
               </>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollView>
           {showFooter ? (
             <View
               onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}

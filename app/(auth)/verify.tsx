@@ -3,7 +3,7 @@ import { useConvex } from 'convex/react';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
 import { OtpInput } from 'react-native-otp-entry';
@@ -16,15 +16,16 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
 import { cn } from '~/utils/cn';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
-import { resumeMember } from '~/utils/coachResumeNavigation';
 
 export default function Verify() {
   const convex = useConvex();
   const numberOfSeconds = 60;
   const { signIn } = useAuthActions();
   const [isLoading, setIsLoading] = useState(false);
+  const authRequestActive = useRef(false);
   const [error, setError] = useState('');
   const [code, setCode] = useState<string>('');
   const [seconds, setSeconds] = useState(0);
@@ -37,42 +38,56 @@ export default function Verify() {
   const otpBoxSize = Math.min(68, (windowWidth - 84) / 4);
 
   const handleResend = async () => {
-    if (!resendActive) return;
+    if (!resendActive || authRequestActive.current) return;
+    authRequestActive.current = true;
     setError('');
     setResendActive(false);
     let provider = 'resend-otp';
     if (email === process.env.EXPO_PUBLIC_TEST_ACCOUNT_EMAIL) {
       provider = 'test-otp';
     }
-    await signIn(provider, { email });
-    setSeconds(numberOfSeconds);
+    try {
+      await signIn(provider, { email });
+      setSeconds(numberOfSeconds);
+    } catch {
+      setError('Could not send a new code. Please try again.');
+      setResendActive(true);
+    } finally {
+      authRequestActive.current = false;
+    }
   };
 
   const handleSubmit = async (submittedCode?: string) => {
-    if (isLoading) return;
+    if (authRequestActive.current) return;
 
     const verificationCode = submittedCode ?? code;
+    if (!/^\d{4}$/.test(verificationCode)) {
+      setError('Enter the 4-digit code from your email.');
+      return;
+    }
+    authRequestActive.current = true;
     setError('');
     setIsLoading(true);
     try {
-      if (verificationCode.length !== 4) {
-        setError('Invalid code');
-        setIsLoading(false);
-        return;
-      }
       let provider = 'resend-otp';
       if (email === process.env.EXPO_PUBLIC_TEST_ACCOUNT_EMAIL) {
         provider = 'test-otp';
       }
-      await signIn(provider, { email, code: verificationCode });
+      try {
+        await signIn(provider, { email, code: verificationCode });
+      } catch {
+        setError('Code is invalid or expired. Enter the latest code or request a new one.');
+        return;
+      }
       await delay(500);
       const user = await convex.query(api.users.current);
       await setCurrentUser(user);
 
       await resumeMember(convex);
     } catch {
-      setError('Invalid code');
+      setError('Could not finish signing in. Please try again.');
     } finally {
+      authRequestActive.current = false;
       setIsLoading(false);
     }
   };

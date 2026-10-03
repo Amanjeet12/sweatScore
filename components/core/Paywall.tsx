@@ -480,8 +480,8 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
               lineHeight: 17,
               color: '#4F4F4F',
             }}>
-            <Text style={{ fontFamily: 'Inter_700Bold' }}>🔖 7 Days Free:</Text> We'll remind you 2
-            days before your trial ends.
+            <Text style={{ fontFamily: 'Inter_700Bold' }}>🔖 7 Days Free:</Text> We'll send an email
+            reminder to you 2 days before your trial ends.
           </Text>
         </View>
 
