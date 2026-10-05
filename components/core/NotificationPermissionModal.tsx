@@ -100,8 +100,7 @@ export default function NotificationPermissionModal({ onClose }: { onClose: () =
                   color: '#55504D',
                   textAlign: 'center',
                 }}>
-                Get reminders for your check-ins and activity. If you're on a free trial, we'll also
-                remind you before your free access ends.
+                Never lose your streak, Turn on reminders so you never miss a check-in or challenge.
               </Text>
             </View>
             {error ? (
