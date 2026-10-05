@@ -1,3 +1,4 @@
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useMutation } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -14,17 +15,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import * as Progress from 'react-native-progress';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
-import { ErrorMessage } from '~/components/core/ErrorMessage';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import { ToastMessage } from '~/components/core/Toast';
+import {
+  communityStyles as community,
+  communityTypography as type,
+} from '~/components/core/design/CommunityStyles';
 import { useCelebration } from '~/components/providers/CelebrationProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Input, InputField } from '~/components/ui/input';
@@ -53,6 +57,8 @@ function getRouteParam(value: RouteParam) {
 
 export default function NewPost() {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const [composerHeight, setComposerHeight] = useState(105);
   const params = useLocalSearchParams<{
     activityKey?: string | string[];
     activityMode?: string | string[];
@@ -427,16 +433,19 @@ export default function NewPost() {
     Boolean(body.trim()) && !isUploading && !isLoading && (!isActivityPost || Boolean(mediaKey));
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView edges={['left', 'right']} className="flex-1 bg-white">
       <Stack.Screen
         options={{
           title: '',
           headerTitleAlign: 'center',
-          headerStyle: { backgroundColor: '#F9F9F9' },
+          headerStyle: { backgroundColor: '#fff' },
           headerShadowVisible: false,
           headerBackVisible: false,
           headerLeft: () => (
             <BackButton
+              iconColor="#2a2a2a"
+              iconSize={22}
+              accessibilityLabel="Go back"
               fallbackHref={isActivityPost ? '/(tabs)/dashboard' : '/(tabs)/share'}
               text=""
             />
@@ -448,7 +457,7 @@ export default function NewPost() {
                   ? 'text-xl text-[#1A1A1A]'
                   : 'font-heading text-xl font-semibold text-[#1A1A1A]'
               }
-              style={isActivityPost ? { fontFamily: 'Inter_700Bold' } : undefined}>
+              style={type.heading}>
               {isActivityPost ? 'Log Activity' : 'New Post'}
             </Text>
           ),
@@ -458,7 +467,7 @@ export default function NewPost() {
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}>
+        keyboardVerticalOffset={headerHeight}>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
@@ -517,56 +526,52 @@ export default function NewPost() {
           ) : null}
 
           {!isActivityPost ? (
-            <View className="mx-4 mt-4 rounded-xl bg-white px-4 py-4">
+            <View className="mx-[22px] mt-4 bg-white py-4">
               <View className="flex-row items-start gap-x-3">
-                <Avatar
-                  uri={currentUser?.image ?? undefined}
-                  size={46}
-                  showGoldBorder
-                  name={currentUser?.name}
-                />
+                <Avatar uri={currentUser?.image ?? undefined} size={44} name={currentUser?.name} />
 
                 <View className="flex-1">
-                  <Text className="font-body text-sm font-bold text-[#1A1A1A]">
-                    {currentUser?.name ?? 'You'}
-                  </Text>
+                  <Text style={type.author}>{currentUser?.name ?? 'You'}</Text>
 
-                  <Input className="mt-1 h-auto border-0 bg-transparent">
-                    <InputField
-                      multiline
-                      autoFocus
-                      className="border-0 bg-transparent px-0 text-base"
-                      placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
-                      value={body}
-                      onChangeText={(text) => {
-                        setError(null);
-                        setBody(text);
-                      }}
-                      style={{
-                        fontSize: 16,
-                        minHeight: 105,
-                        ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
-                      }}
-                    />
-                  </Input>
+                  <TextInput
+                    multiline
+                    accessibilityLabel="Community post"
+                    placeholderTextColor="#8a8a8a"
+                    onContentSizeChange={(event) =>
+                      setComposerHeight(Math.max(105, event.nativeEvent.contentSize.height + 8))
+                    }
+                    scrollEnabled={false}
+                    autoFocus
+                    placeholder={`Share an update with your Sweat Sisters ${userName || 'there'} `}
+                    value={body}
+                    onChangeText={(text) => {
+                      setError(null);
+                      setBody(text);
+                    }}
+                    style={{
+                      ...community.field,
+                      height: composerHeight,
+                      width: '100%',
+                      ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
+                    }}
+                  />
                 </View>
               </View>
 
               {!media && (
-                <View className="mt-4 flex-row gap-x-3">
+                <View className="mt-4 flex-row flex-wrap gap-3">
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={selectImage}
                     disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-lg bg-[#fff] px-4 py-3"
-                    style={{ opacity: isUploading ? 0.5 : 1 }}>
-                    <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
-                      <ImageSquare size={22} color="#FF5C1A" weight="duotone" />
+                    style={[community.mediaAction, { opacity: isUploading ? 0.5 : 1 }]}>
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-[#fff3ea]">
+                      <ImageSquare size={22} color="#ff5a1f" weight="regular" />
                     </View>
 
-                    <View>
-                      <Text className="font-body text-sm font-bold text-[#1A1A1A]">Photo</Text>
-                      <Text className="font-body text-xs text-[#838383]">Upload image</Text>
+                    <View className="flex-1">
+                      <Text style={type.author}>Photo</Text>
+                      <Text style={type.metadata}>Upload image</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -574,15 +579,14 @@ export default function NewPost() {
                     activeOpacity={0.85}
                     onPress={selectVideo}
                     disabled={isUploading}
-                    className="flex-1 flex-row items-center rounded-lg bg-[#fff] px-4 py-3"
-                    style={{ opacity: isUploading ? 0.5 : 1 }}>
-                    <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white">
-                      <VideoCamera size={22} color="#FF5C1A" weight="duotone" />
+                    style={[community.mediaAction, { opacity: isUploading ? 0.5 : 1 }]}>
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-[#fff3ea]">
+                      <VideoCamera size={22} color="#ff5a1f" weight="regular" />
                     </View>
 
-                    <View>
-                      <Text className="font-body text-sm font-bold text-[#1A1A1A]">Video</Text>
-                      <Text className="font-body text-xs text-[#838383]">{videoLimitText}</Text>
+                    <View className="flex-1">
+                      <Text style={type.author}>Video</Text>
+                      <Text style={type.metadata}>{videoLimitText}</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -595,7 +599,9 @@ export default function NewPost() {
               <View
                 className={`h-28 items-center justify-center bg-white ${isActivityPost ? 'rounded-[24px]' : 'rounded-xl'}`}>
                 <ActivityIndicator color={colors.primary} />
-                <Text className="mt-2 font-body text-sm text-[#838383]">Preparing media...</Text>
+                <Text className="mt-2" style={type.metadata}>
+                  Preparing media...
+                </Text>
               </View>
             ) : media && mediaUri ? (
               <View
@@ -669,11 +675,11 @@ export default function NewPost() {
 
                 {!isActivityPost ? (
                   <View className="px-4 py-3">
-                    <Text className="font-body text-sm font-semibold text-[#1A1A1A]">
+                    <Text style={type.author}>
                       {media.type === 'video' ? 'Video attached' : 'Photo attached'}
                     </Text>
 
-                    <Text className="mt-0.5 font-body text-xs text-[#838383]">
+                    <Text className="mt-0.5" style={type.metadata}>
                       {uploadingMedia ? 'Uploading media...' : 'Ready to post'}
                     </Text>
                   </View>
@@ -682,19 +688,19 @@ export default function NewPost() {
             ) : null}
           </View>
 
-          <ErrorMessage error={error ?? null} className="mx-4 mt-4" />
+          {error ? (
+            <Text accessibilityRole="alert" className="mx-[22px] mt-4" style={type.error}>
+              {error}
+            </Text>
+          ) : null}
         </ScrollView>
 
-        <View
-          className="border-t border-t-[#EEEAE5] bg-[#F9F9F9] px-4 pt-3"
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <View style={[community.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {uploadingMedia && (
             <View className="mb-3">
               <View className="mb-1 flex-row items-center justify-between">
-                <Text className="font-body text-xs text-[#838383]">Uploading media...</Text>
-                <Text className="font-body text-xs font-semibold text-[#1A1A1A]">
-                  {Math.round(uploadProgress * 100)}%
-                </Text>
+                <Text style={type.metadata}>Uploading media...</Text>
+                <Text style={type.metadata}>{Math.round(uploadProgress * 100)}%</Text>
               </View>
 
               <View className="h-1.5 w-full overflow-hidden rounded-full bg-[#EEEAE5]">
@@ -712,14 +718,16 @@ export default function NewPost() {
             action="primary"
             className={`h-14 w-full px-[22px] ${isActivityPost ? 'rounded-[20px]' : 'rounded-lg'}`}
             style={{
-              backgroundColor: canSubmit ? '#FF5C1A' : '#F5D5C8',
+              ...community.button,
+              backgroundColor: '#2a2a2a',
+              opacity: canSubmit ? 1 : 0.45,
             }}
             loading={isLoading}
             disabled={!canSubmit}
             onPress={handlePost}>
             <ButtonText
               className={`flex-1 text-left text-white ${isActivityPost ? 'text-lg' : 'text-base'}`}
-              style={{ fontFamily: isActivityPost ? 'Inter_600SemiBold' : 'Inter_700Bold' }}>
+              style={type.button}>
               {isActivityPost ? 'Share activity' : 'Post'}
             </ButtonText>
             <ArrowRight size={23} color="#FFFFFF" weight="bold" />

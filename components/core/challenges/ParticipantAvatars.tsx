@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 
 type ParticipantAvatar = {
@@ -9,7 +10,7 @@ type ParticipantAvatar = {
   initial: string;
 };
 
-const FALLBACK_COLORS = ['#C56A48', '#B94F29', '#D77A4C', '#A8492D'];
+const FALLBACK_COLORS = ['#D4774A', '#B5502F', '#D4774A', '#9C4128'];
 
 export default function ParticipantAvatars({
   avatars,
@@ -20,11 +21,13 @@ export default function ParticipantAvatars({
   count: number;
   size?: number;
 }) {
+  const { fontScale } = useWindowDimensions();
+  size = Math.max(size, 12 * fontScale + 12);
   const visible = avatars.slice(0, 4);
   const remaining = Math.max(0, count - visible.length);
 
   if (count === 0) {
-    return <Text className="font-body text-xs text-[#77716D]">Be the first to join</Text>;
+    return <Text style={type.caption}>Be the first to join</Text>;
   }
 
   return (
@@ -37,25 +40,23 @@ export default function ParticipantAvatars({
             style={{
               width: size,
               height: size,
-              marginLeft: index === 0 ? 0 : -8,
+              marginLeft: index === 0 ? 0 : -10,
               backgroundColor: FALLBACK_COLORS[index % FALLBACK_COLORS.length],
               zIndex: visible.length - index,
             }}>
             {avatar.imageUrl ? (
               <Image source={{ uri: avatar.imageUrl }} style={{ width: '100%', height: '100%' }} />
             ) : (
-              <Text className="font-heading text-xs font-semibold text-white">
-                {avatar.initial}
-              </Text>
+              <Text style={[type.badge, { color: '#fff' }]}>{avatar.initial}</Text>
             )}
           </View>
         ))}
 
         {remaining > 0 ? (
           <View
-            className="items-center justify-center rounded-full bg-[#B94F29]"
-            style={{ width: size, height: size, marginLeft: -8 }}>
-            <Text className="font-heading text-[10px] font-semibold text-white">+{remaining}</Text>
+            className="items-center justify-center rounded-full bg-[#B5502F]"
+            style={{ minWidth: size, minHeight: size, paddingHorizontal: 6, marginLeft: -10 }}>
+            <Text style={[type.badge, { color: '#fff' }]}>+{remaining}</Text>
           </View>
         ) : null}
       </View>

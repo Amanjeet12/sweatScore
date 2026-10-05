@@ -1,18 +1,16 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Link, router, Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
-import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
+import { TextInput, View } from 'react-native';
 import { z } from 'zod';
 
-import { ErrorMessage } from '~/components/core/ErrorMessage';
-import SafeAreaView from '~/components/core/SafeAreaView';
-import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
-import { Input, InputField, InputSlot } from '~/components/ui/input';
+import {
+  PrototypeOnboarding,
+  PrototypeButton,
+  PrototypeError,
+  onboardingStyles as styles,
+} from '~/components/core/auth/PrototypeOnboarding';
 import { Text } from '~/components/ui/text';
 import { CatchPromise } from '~/utils/catch-promise';
 import { getErrorMessage, getZodErrorMessage } from '~/utils/error-message';
@@ -22,15 +20,14 @@ export default function Email() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { height: windowHeight } = useWindowDimensions();
-  const { isVisible: keyboardVisible } = useKeyboardState();
-  const heroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
+  const [focused, setFocused] = useState(false);
 
   const sendOtpSchema = z.object({
     email: z.string().email('Invalid email'),
   });
 
   const handleSubmit = async () => {
+    if (isLoading) return;
     setError(null);
     setIsLoading(true);
 
@@ -69,109 +66,56 @@ export default function Email() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
-
-      <Image
-        source={require('~/assets/onboarding/emailscreen-clean-v2.png')}
-        contentFit="cover"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          height: heroHeight,
-        }}
-      />
-
-      <KeyboardStickyView style={{ flex: 1 }}>
-        <View className="flex-1">
-          <View style={{ width: '100%', height: heroHeight }} />
-
-          {keyboardVisible && <View className="flex-1" />}
-
-          <View
-            className="bg-white"
-            style={{
-              marginTop: -30,
-              borderTopLeftRadius: 32,
-              borderTopRightRadius: 32,
-            }}>
-            <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
-              <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-                Let&apos;s get you set up
-              </Text>
-              <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
-                What&apos;s your email?
-              </Text>
-              <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
-                We&apos;ll send a quick code to make sure it&apos;s really you.
-              </Text>
-
-              <Text className="mb-2 mt-5 font-body text-xs font-bold text-[#4A4745]">
-                Email address
-              </Text>
-              <Input
-                size="xl"
-                variant="outline"
-                isInvalid={!!error}
-                className="h-14 rounded-xl bg-white">
-                <InputSlot className="pl-4">
-                  <Feather name="mail" size={19} color="#FF5C1A" />
-                </InputSlot>
-                <InputField
-                  className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
-                  placeholder="you@example.com"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit}
-                  value={email}
-                  onChangeText={(text) => {
-                    setError(null);
-                    setEmail(text);
-                  }}
-                />
-              </Input>
-              <View className="mt-2 items-center">
-                <ErrorMessage error={error} />
-              </View>
-            </View>
-          </View>
-
-          {!keyboardVisible && <View className="flex-1 bg-white" />}
-
-          {!keyboardVisible && (
-            <SafeAreaView edges={['bottom']} className="bg-white">
-              <View className="bg-white px-6 pb-4 pt-2">
-                <OnboardingPrimaryButton
-                  label="Continue"
-                  onPress={handleSubmit}
-                  isLoading={isLoading}
-                />
-
-                <Text className="mt-4 text-center font-body text-[11px] text-[#838383]">
-                  By continuing, you agree to our{' '}
-                  <Link href="/legals/terms">
-                    <Text className="text-[11px] font-bold text-[#838383] underline">Terms</Text>
-                  </Link>{' '}
-                  and{' '}
-                  <Link href="/legals/privacy-policy">
-                    <Text className="text-[11px] font-bold text-[#838383] underline">
-                      Privacy Policy
-                    </Text>
-                  </Link>
-                </Text>
-              </View>
-            </SafeAreaView>
-          )}
-        </View>
-      </KeyboardStickyView>
-
-      <OnboardingHeroChrome onBack={router.back} />
-    </View>
+    <PrototypeOnboarding
+      stickyFooter
+      image={require('~/assets/onboarding/email-portrait.jpg')}
+      onBack={router.back}
+      footer={
+        <>
+          <PrototypeButton label="Continue" onPress={handleSubmit} loading={isLoading} />
+          <Text style={[styles.small, { textAlign: 'center' }]}>
+            By continuing, you agree to our{' '}
+            <Link href="/legals/terms" style={{ textDecorationLine: 'underline' }}>
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/legals/privacy-policy" style={{ textDecorationLine: 'underline' }}>
+              Privacy Policy
+            </Link>
+          </Text>
+        </>
+      }>
+      <Text style={styles.heading}>What's your email?</Text>
+      <Text style={styles.subtitle}>We'll send a quick code to make sure it's really you.</Text>
+      <Text style={styles.label}>Email address</Text>
+      <View style={{ justifyContent: 'center' }}>
+        <TextInput
+          accessibilityLabel="Email address"
+          style={[
+            styles.field,
+            { paddingLeft: 52, borderColor: error ? '#d92d20' : focused ? '#2a2a2a' : '#ececec' },
+          ]}
+          placeholder="you@example.com"
+          placeholderTextColor="#8a8a8a"
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          returnKeyType="done"
+          editable={!isLoading}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onSubmitEditing={handleSubmit}
+          value={email}
+          onChangeText={(text) => {
+            setError(null);
+            setEmail(text);
+          }}
+        />
+        <Feather name="mail" size={22} color="#e8541e" style={{ position: 'absolute', left: 18 }} />
+      </View>
+      <View style={{ marginTop: 8 }}>
+        <PrototypeError error={error} />
+      </View>
+    </PrototypeOnboarding>
   );
 }

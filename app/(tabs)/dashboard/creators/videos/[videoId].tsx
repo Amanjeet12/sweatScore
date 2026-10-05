@@ -1,13 +1,18 @@
 import { useQuery } from 'convex/react';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, ArrowSquareOut, Play } from 'phosphor-react-native';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { ArrowSquareOut, Play } from 'phosphor-react-native';
 import { useState } from 'react';
-import { Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LinkPreview } from '~/components/core/LinkPreview';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import StartWorkoutPopup from '~/components/core/creators/StartWorkoutPopup';
+import { WorkoutHeader, WorkoutImage } from '~/components/core/creators/WorkoutPresentation';
+import {
+  workoutStyles as styles,
+  workoutTypography as type,
+} from '~/components/core/design/WorkoutStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -16,10 +21,14 @@ import { getData } from '~/utils/storage';
 export default function TabDashboardCreatorVideo() {
   const [showStartWorkoutPopup, setShowStartWorkoutPopup] = useState(false);
   const { videoId } = useLocalSearchParams();
+  const { width, fontScale } = useWindowDimensions();
   const video = useQuery(api.admin.getCreatorVideo, {
     creatorVideoId: videoId as Id<'creatorVideos'>,
   });
-
+  const openVideo = () => {
+    if (getData('skipWorkoutPopup')) Linking.openURL(video?.youtubeUrl || '');
+    else setShowStartWorkoutPopup(true);
+  };
   return (
     <>
       <StartWorkoutPopup
@@ -30,123 +39,109 @@ export default function TabDashboardCreatorVideo() {
           Linking.openURL(video?.youtubeUrl || '');
         }}
       />
-      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
         <Stack.Screen options={{ headerShown: false }} />
-
         {!video ? (
           <ScreenLoading />
         ) : (
-          <View className="flex-1">
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 0 }}
-              showsVerticalScrollIndicator={false}>
-              <View className="mb-5 mt-3 flex-row items-center justify-between">
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to workout collection"
-                  onPress={() =>
-                    router.canGoBack() ? router.back() : router.replace('/(tabs)/workouts')
-                  }
-                  className="h-12 w-12 items-center justify-center rounded-full border border-[#E6E1DD] bg-white">
-                  <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
-                </TouchableOpacity>
-                <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1A1A1A]">
-                  Workout video
-                </Text>
-                <View className="h-12 w-12" />
-              </View>
-
-              <View className="relative overflow-hidden rounded-[26px] bg-[#EDE8E4]">
-                <LinkPreview
-                  text={video.youtubeUrl || ''}
-                  showCloseButton={false}
-                  onlyImage
-                  openLink={false}
-                  containerStyle={{
-                    padding: 0,
-                    backgroundColor: '#EDE8E4',
-                    borderRadius: 26,
-                    width: '100%',
-                  }}
-                />
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Play workout on YouTube"
-                  activeOpacity={0.88}
-                  onPress={() => {
-                    const skipPopup = getData('skipWorkoutPopup');
-                    if (skipPopup) Linking.openURL(video.youtubeUrl || '');
-                    else setShowStartWorkoutPopup(true);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    width: 64,
-                    height: 64,
-                    marginLeft: -32,
-                    marginTop: -32,
-                  }}
-                  className="items-center justify-center rounded-full bg-black/50">
-                  <Play size={27} color="#FFFFFF" weight="fill" />
-                </TouchableOpacity>
-              </View>
-
-              <View className="py-6">
-                <Text className="font-heading text-[28px] font-semibold leading-9 text-[#1A1A1A]">
-                  {video.subtitle || video.title}
-                </Text>
-                {video.description ? (
-                  <Text className="mt-3 font-body text-base leading-6 text-[#716B67]">
-                    {video.description}
-                  </Text>
-                ) : null}
-
-                <View className="mt-5 flex-row gap-3">
-                  {video.difficulty ? (
-                    <View className="min-w-0 flex-1 rounded-[18px] bg-white p-4">
-                      <Text className="font-body text-[10px] uppercase tracking-wider text-[#8A837E]">
-                        Difficulty
-                      </Text>
-                      <Text className="mt-1 font-heading text-base font-semibold capitalize text-[#1A1A1A]">
-                        {video.difficulty}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {video.equipment ? (
-                    <View className="min-w-0 flex-1 rounded-[18px] bg-white p-4">
-                      <Text className="font-body text-[10px] uppercase tracking-wider text-[#8A837E]">
-                        Equipment
-                      </Text>
-                      <Text
-                        numberOfLines={2}
-                        className="mt-1 font-heading text-base font-semibold text-[#1A1A1A]">
-                        {video.equipment}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </ScrollView>
-            <View className="border-t border-[#EEEAE7] bg-[#F9F9F9] px-5 pb-3 pt-3">
-              <TouchableOpacity
-                accessibilityRole="link"
-                accessibilityLabel={`Watch ${video.subtitle} on YouTube`}
-                activeOpacity={0.88}
-                onPress={() => {
-                  const skipPopup = getData('skipWorkoutPopup');
-                  if (skipPopup) Linking.openURL(video.youtubeUrl || '');
-                  else setShowStartWorkoutPopup(true);
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.content, { flexGrow: 1 }]}
+            showsVerticalScrollIndicator={false}>
+            <WorkoutHeader
+              title="Workout Video"
+              backLabel="Back to workout collection"
+              fallback="/(tabs)/workouts"
+            />
+            <View
+              style={[
+                styles.thumbnail,
+                { height: 195, borderRadius: 16, backgroundColor: '#d9c7bf' },
+              ]}>
+              <LinkPreview
+                text={video.youtubeUrl || ''}
+                showCloseButton={false}
+                onlyImage
+                openLink={false}
+                containerStyle={{
+                  padding: 0,
+                  backgroundColor: '#d9c7bf',
+                  width: '100%',
+                  height: 195,
+                  borderRadius: 16,
                 }}
-                className="min-h-14 flex-row items-center justify-center gap-2 rounded-[18px] bg-[#FF5C35] px-5">
-                <Text className="font-heading text-base font-semibold text-white">
-                  Watch on YouTube
-                </Text>
-                <ArrowSquareOut size={20} color="#FFFFFF" weight="bold" />
+                renderImage={(image) => (
+                  <View style={{ width: '100%', height: 195 }}>
+                    <WorkoutImage uri={image.url} />
+                  </View>
+                )}
+              />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Play workout on YouTube"
+                activeOpacity={0.88}
+                onPress={openVideo}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: 56,
+                  height: 56,
+                  marginLeft: -28,
+                  marginTop: -28,
+                  borderRadius: 28,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Play size={22} color="#fff" weight="fill" style={{ marginLeft: 3 }} />
               </TouchableOpacity>
             </View>
-          </View>
+            <View style={{ marginTop: 22 }}>
+              <Text style={type.detail}>{video.subtitle || video.title}</Text>
+              {video.description ? (
+                <Text style={[type.body, { marginTop: 14 }]}>{video.description}</Text>
+              ) : null}
+              <View
+                style={[
+                  styles.metadata,
+                  (width < 350 || fontScale > 1.3) && { flexDirection: 'column' },
+                ]}>
+                {video.difficulty ? (
+                  <View
+                    style={[
+                      styles.tile,
+                      (width < 350 || fontScale > 1.3) && { flexBasis: 'auto', width: '100%' },
+                    ]}>
+                    <Text style={type.caption}>Difficulty</Text>
+                    <Text style={[type.value, { textTransform: 'capitalize' }]}>
+                      {video.difficulty}
+                    </Text>
+                  </View>
+                ) : null}
+                {video.equipment ? (
+                  <View
+                    style={[
+                      styles.tile,
+                      (width < 350 || fontScale > 1.3) && { flexBasis: 'auto', width: '100%' },
+                    ]}>
+                    <Text style={type.caption}>Equipment</Text>
+                    <Text style={type.value}>{video.equipment}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <View style={{ flexGrow: 1, minHeight: 24 }} />
+            <TouchableOpacity
+              accessibilityRole="link"
+              accessibilityLabel={`Watch ${video.subtitle || video.title} on YouTube`}
+              activeOpacity={0.88}
+              onPress={openVideo}
+              style={styles.button}>
+              <Text style={[type.button, { flexShrink: 1 }]}>Watch on YouTube</Text>
+              <ArrowSquareOut size={20} color="#fff" />
+            </TouchableOpacity>
+          </ScrollView>
         )}
       </SafeAreaView>
     </>

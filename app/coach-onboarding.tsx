@@ -1,22 +1,23 @@
 import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
-import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Check } from 'phosphor-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  BackHandler,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
+import { BackHandler, Keyboard, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BuildingRoutine } from '~/components/core/auth/BuildingRoutine';
 import { CoachSurveyBridge } from '~/components/core/auth/CoachSurveyBridge';
-import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import {
+  PrototypeOnboarding,
+  PrototypeButton,
+  PrototypeError,
+  onboardingStyles as surveyStyles,
+} from '~/components/core/auth/PrototypeOnboarding';
+import DailyQuestion from '~/components/core/dashboard/DailyQuestion';
+import {
+  prototypeComponents as chrome,
+  prototypeTypography as type,
+} from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
@@ -26,6 +27,7 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const QUESTION_ROUTES = ['profile', 'daily', 'today'] as const;
+const PROFILE_REVIEW_ROUTES = ['profile', 'health'] as const;
 
 const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
   weight: {
@@ -71,32 +73,10 @@ const PROFILE_OPTION_DESCRIPTIONS: Record<string, Record<string, string>> = {
   },
 };
 
-const DAILY_COPY: Record<string, { eyebrow: string; description: string }> = {
-  sleep: {
-    eyebrow: 'Your recovery',
-    description: 'Choose the answer that best describes last night.',
-  },
-  energy: {
-    eyebrow: 'Your energy',
-    description: 'Tell your Coach how much energy you have to work with today.',
-  },
-  mood: {
-    eyebrow: 'Your mood',
-    description: 'A quick honest answer helps keep today’s plan realistic.',
-  },
-  upFor: {
-    eyebrow: 'Your pace',
-    description: 'Choose what feels achievable for you today.',
-  },
-  body: {
-    eyebrow: 'Your body',
-    description: 'Your Coach will use this to keep today’s guidance appropriate.',
-  },
-};
-
 export default function CoachOnboarding() {
   const convex = useConvex();
   const memberId = useAuthStore((state) => state.currentUser?._id);
+  const [showProfileIntro, setShowProfileIntro] = useState(false);
   const [surveyStartedFor, setSurveyStartedFor] = useState<typeof memberId>(undefined);
   const previousScreen = useRef<{ memberId: typeof memberId; content: ReactNode }>({
     memberId,
@@ -108,13 +88,18 @@ export default function CoachOnboarding() {
     previousScreen.current = { memberId, content };
     return content;
   };
-  const { reanswer, nextCheckIn } = useLocalSearchParams<{
+  const { reanswer, nextCheckIn, reviewProfile } = useLocalSearchParams<{
     reanswer?: string;
     nextCheckIn?: string;
+    reviewProfile?: string;
   }>();
   const selectedCheckIn = COACH_CATEGORIES.find((item) => item === nextCheckIn);
   const reanswerMode = __DEV__ && reanswer === '1';
-  const { decision, accepted } = useCoachRouteGuard(QUESTION_ROUTES);
+  // Health is still a free onboarding boundary; reviewing answers grants no paid access.
+  const { decision, accepted } = useCoachRouteGuard(
+    reviewProfile === '1' ? PROFILE_REVIEW_ROUTES : QUESTION_ROUTES
+  );
+  const reviewingProfile = reviewProfile === '1' && decision?.screen === 'health';
   const foundation = useQuery(api.coachFoundation.getMyFoundation, accepted ? {} : 'skip');
   const currentPlan = useQuery(
     api.revenueCatEntitlements.myPlan,
@@ -129,15 +114,15 @@ export default function CoachOnboarding() {
   const [localStep, setLocalStep] = useState<number | null>(null);
   const [weight, setWeight] = useState('');
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
+  const [completingProfile, setCompletingProfile] = useState(false);
+  const userName = useAuthStore((state) => state.currentUser?.name?.trim());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
   const submissionRef = useRef(false);
   const backHandlerRef = useRef<() => void>(() => {});
-  const profileScrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const { isVisible: keyboardVisible } = useKeyboardState();
+
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       backHandlerRef.current();
@@ -145,14 +130,6 @@ export default function CoachOnboarding() {
     });
     return () => subscription.remove();
   }, []);
-  useEffect(() => {
-    if (!keyboardVisible) return;
-    const timer = setTimeout(
-      () => profileScrollRef.current?.scrollTo({ y: 0, animated: false }),
-      50
-    );
-    return () => clearTimeout(timer);
-  }, [keyboardVisible]);
 
   useEffect(() => {
     setLocalStep(null);
@@ -204,6 +181,8 @@ export default function CoachOnboarding() {
     }
   }, [foundation?.state?.profileDraft?.weight]);
 
+  if (completingProfile) return <BuildingRoutine name={userName} />;
+
   if (
     !accepted ||
     !decision ||
@@ -218,7 +197,8 @@ export default function CoachOnboarding() {
     return previousScreen.current.content;
   const profile =
     !reanswerMode &&
-    (decision.screen === 'profile' ||
+    (reviewingProfile ||
+      decision.screen === 'profile' ||
       (decision.screen === 'today' && !foundation.state?.profileRevisionId));
   const questions = profile ? PROFILE_QUESTIONS : DAILY_QUESTIONS;
   const testDraft = foundation.state?.testReanswerDraft;
@@ -239,11 +219,13 @@ export default function CoachOnboarding() {
         ? nextTestStep < 0
           ? 4
           : nextTestStep
-        : decision.screen === 'today'
-          ? firstUnanswered < 0
-            ? questions.length - 1
-            : firstUnanswered
-          : decision.question),
+        : reviewingProfile
+          ? questions.length - 1
+          : decision.screen === 'today'
+            ? firstUnanswered < 0
+              ? questions.length - 1
+              : firstUnanswered
+            : decision.question),
     questions.length - 1
   );
   const question = questions[step];
@@ -266,6 +248,10 @@ export default function CoachOnboarding() {
       router.replace('/(tabs)/dashboard');
       return;
     }
+    if (profile) {
+      setShowProfileIntro(true);
+      return;
+    }
     router.replace('/(auth)/setup-profile');
   };
   backHandlerRef.current = goBack;
@@ -285,6 +271,7 @@ export default function CoachOnboarding() {
           setLocalStep(step + 1);
         }
       } else if (profile) {
+        if (step === PROFILE_QUESTIONS.length - 1) setCompletingProfile(true);
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
         if (step === PROFILE_QUESTIONS.length - 1) {
           await finishProfile({});
@@ -309,6 +296,8 @@ export default function CoachOnboarding() {
         setLocalStep(step + 1);
       }
     } catch {
+      setCompletingProfile(false);
+      setPendingProfileChoice(null);
       setError('Could not save your answer. Please try again.');
       setLocalStep(null);
     } finally {
@@ -339,282 +328,227 @@ export default function CoachOnboarding() {
   };
 
   if (profile) {
-    if (firstUnanswered === 0 && surveyStartedFor !== memberId) {
+    if (showProfileIntro || (firstUnanswered === 0 && surveyStartedFor !== memberId)) {
       return rememberScreen(
         <View className="flex-1 bg-white">
           <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-          <CoachSurveyBridge onStart={() => setSurveyStartedFor(memberId)} />
+          <CoachSurveyBridge
+            onStart={() => {
+              setShowProfileIntro(false);
+              setSurveyStartedFor(memberId);
+            }}
+          />
         </View>
       );
     }
-    const copy = PROFILE_COPY[question.key] ?? {
-      eyebrow: 'Your profile',
-      description: 'Choose the answer that feels most like you.',
-    };
-    // Match the responsive hero used by the email and OTP onboarding screens.
-    const heroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
-    const panelHeroHeight = keyboardVisible
-      ? Math.min(Math.max(windowHeight * 0.4, 300), 390)
-      : heroHeight;
+    const copy = PROFILE_COPY[question.key];
     const effectiveProfileChoice =
       pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
     const canContinueWeight = Number.isFinite(Number(weight)) && Number(weight) > 0;
     const continueProfile = () => {
+      Keyboard.dismiss();
       saveWeight().catch(() => {});
     };
-
     return rememberScreen(
-      <View className="flex-1 bg-white">
-        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-        <Image
-          source={require('~/assets/onboarding/coach-onboarding.jpg')}
-          contentFit="cover"
-          contentPosition={{ top: '22%', left: '50%' }}
-          accessibilityIgnoresInvertColors
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            left: 0,
-            width: '100%',
-            height: heroHeight,
-          }}
-        />
-        <OnboardingHeroChrome activeStep={step + 1} totalSteps={7} onBack={goBack} />
-
-        <View className="flex-1">
-          <View style={{ width: '100%', height: panelHeroHeight }} />
-          <View
-            className="flex-1 overflow-hidden bg-white"
-            style={{
-              marginTop: -32,
-              borderTopLeftRadius: 34,
-              borderTopRightRadius: 34,
-            }}>
-            <ScrollView
-              ref={profileScrollRef}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                flexGrow: 1,
-                paddingHorizontal: 24,
-                paddingTop: keyboardVisible ? 18 : 28,
-                paddingBottom: Math.max(insets.bottom, 16) + 16,
+      <PrototypeOnboarding
+        key={question.key}
+        image={require('~/assets/onboarding/survey-headphones.jpg')}
+        stickyFooter={question.key === 'weight'}
+        activeStep={step + 1}
+        onBack={goBack}
+        footer={
+          question.key === 'weight' ? (
+            <PrototypeButton
+              label="Continue"
+              onPress={continueProfile}
+              loading={busy}
+              disabled={!canContinueWeight}
+            />
+          ) : (
+            <PrototypeError error={error} />
+          )
+        }>
+        <Stack.Screen options={{ gestureEnabled: false }} />
+        <Text accessibilityRole="header" style={surveyStyles.heading}>
+          {question.title}
+        </Text>
+        {copy?.description ? <Text style={surveyStyles.subtitle}>{copy.description}</Text> : null}
+        {question.key === 'weight' ? (
+          <>
+            <View
+              style={{
+                marginTop: 24,
+                flexDirection: 'row',
+                padding: 4,
+                borderRadius: 16,
+                backgroundColor: '#f5f5f5',
               }}>
-              <View accessibilityRole="progressbar" accessibilityLabel={`Step ${step + 1} of 7`}>
-                {!keyboardVisible ? (
-                  <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-                    {copy.eyebrow}
+              {(['lb', 'kg'] as const).map((choice) => (
+                <TouchableOpacity
+                  key={choice}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: unit === choice, disabled: busy }}
+                  disabled={busy}
+                  onPress={() => {
+                    setError('');
+                    setUnit(choice);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 11,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    backgroundColor: unit === choice ? '#fff' : 'transparent',
+                    shadowColor: '#1e140a',
+                    shadowOpacity: unit === choice ? 0.12 : 0,
+                    shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 1 },
+                    elevation: unit === choice ? 1 : 0,
+                  }}>
+                  <Text
+                    style={{
+                      ...type[unit === choice ? 'selectedUnit' : 'unit'],
+                    }}>
+                    {choice === 'lb' ? 'lbs' : 'kg'}
                   </Text>
-                ) : null}
-                <Text
-                  className={`${keyboardVisible ? '' : 'mt-2'} font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]`}>
-                  {question.title}
-                </Text>
-                {!keyboardVisible && copy.description ? (
-                  <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
-                    {copy.description}
-                  </Text>
-                ) : null}
-              </View>
-
-              <View className={keyboardVisible ? 'mt-3' : 'mt-6'}>
-                {question.key === 'weight' ? (
-                  <>
-                    <View className="mb-4 flex-row gap-3">
-                      {(['lb', 'kg'] as const).map((choice) => (
-                        <TouchableOpacity
-                          key={choice}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: unit === choice }}
-                          disabled={busy}
-                          onPress={() => setUnit(choice)}
-                          className={`flex-1 items-center justify-center rounded-2xl border ${keyboardVisible ? 'min-h-11' : 'min-h-12'} ${unit === choice ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                          <Text className="font-body text-base font-semibold text-[#1A1A1A]">
-                            {choice === 'lb' ? 'lbs' : 'kg'}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                    <TextInput
-                      value={weight}
-                      onChangeText={(value) => {
-                        setError('');
-                        setWeight(value);
-                      }}
-                      editable={!busy}
-                      keyboardType="decimal-pad"
-                      placeholder="e.g. 170"
-                      placeholderTextColor="#AAA5A1"
-                      accessibilityLabel="Current weight"
-                      returnKeyType="done"
-                      onSubmitEditing={continueProfile}
-                      className={`${keyboardVisible ? 'min-h-14' : 'min-h-16'} rounded-2xl border border-[#D9D5D2] bg-white px-5 py-4 font-body text-lg text-[#1A1A1A]`}
-                    />
-                  </>
-                ) : (
-                  question.options.map(([value, label]) => {
-                    const isSelected = effectiveProfileChoice === value;
-                    return (
-                      <TouchableOpacity
-                        key={value}
-                        disabled={busy}
-                        onPress={() => {
-                          setError('');
-                          setPendingProfileChoice(value);
-                          choose(value).catch(() => {});
-                        }}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected, disabled: busy }}
-                        activeOpacity={0.82}
-                        className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                        <View className="flex-1 pr-3">
-                          <Text className="font-body text-base font-semibold leading-6 text-[#1A1A1A]">
-                            {label}
-                          </Text>
-                          {PROFILE_OPTION_DESCRIPTIONS[question.key]?.[value] ? (
-                            <Text className="mt-1 font-body text-sm leading-5 text-[#77716D]">
-                              {PROFILE_OPTION_DESCRIPTIONS[question.key][value]}
-                            </Text>
-                          ) : null}
-                        </View>
-                        {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
-              </View>
-
-              {error ? (
-                <Text
-                  accessibilityLiveRegion="polite"
-                  className="mt-1 font-body text-sm text-red-600">
-                  {error}
-                </Text>
-              ) : null}
-
-              <View className={`${keyboardVisible ? 'pt-1' : 'mt-auto pt-6'}`}>
-                {question.key === 'weight' && !keyboardVisible ? (
-                  <OnboardingPrimaryButton
-                    label="Continue"
-                    onPress={continueProfile}
-                    isLoading={busy}
-                    disabled={!canContinueWeight}
-                    borderRadius={18}
-                    labelFontSize={18}
-                  />
-                ) : null}
-                {!keyboardVisible ? (
-                  <Text className="mt-3 text-center font-body text-xs text-[#77716D]">
-                    {question.key === 'weight'
-                      ? 'Your answers save securely as you go.'
-                      : busy
-                        ? 'Saving your answer…'
-                        : 'Choose one answer to continue.'}
-                  </Text>
-                ) : null}
-              </View>
-            </ScrollView>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ marginTop: 14, justifyContent: 'center' }}>
+              <TextInput
+                value={weight}
+                onChangeText={(value) => {
+                  setError('');
+                  setWeight(value);
+                }}
+                editable={!busy}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 170"
+                placeholderTextColor="#8a8a8a"
+                accessibilityLabel="Current weight"
+                returnKeyType="done"
+                onSubmitEditing={continueProfile}
+                style={[
+                  surveyStyles.field,
+                  { paddingRight: 64, borderColor: error ? '#d92d20' : '#ececec' },
+                ]}
+              />
+              <Text
+                style={{
+                  position: 'absolute',
+                  right: 18,
+                  fontFamily: 'Inter_400Regular',
+                  fontSize: 15,
+                  color: '#8a8a8a',
+                }}>
+                {unit === 'lb' ? 'lbs' : 'kg'}
+              </Text>
+            </View>
+            <PrototypeError error={error} />
+          </>
+        ) : (
+          <View style={{ marginTop: 24, gap: 12 }}>
+            {question.options.map(([value, label]) => {
+              const isSelected = effectiveProfileChoice === value;
+              const description = PROFILE_OPTION_DESCRIPTIONS[question.key]?.[value];
+              return (
+                <TouchableOpacity
+                  key={value}
+                  disabled={busy}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected, disabled: busy }}
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    setError('');
+                    setPendingProfileChoice(value);
+                    choose(value).catch(() => {});
+                  }}
+                  style={{
+                    ...chrome.option,
+                    borderColor: isSelected ? '#ff5a1f' : '#ececec',
+                    backgroundColor: isSelected ? '#fff3ea' : '#fff',
+                    opacity: busy && !isSelected ? 0.65 : 1,
+                  }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...type[isSelected ? 'selectedOption' : 'option'],
+                      }}>
+                      {label}
+                    </Text>
+                    {description ? (
+                      <Text style={[surveyStyles.small, { marginTop: 2 }]}>{description}</Text>
+                    ) : null}
+                  </View>
+                  <View
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      borderWidth: 1.5,
+                      borderColor: isSelected ? '#ff5a1f' : '#d9d9d9',
+                      backgroundColor: isSelected ? '#ff5a1f' : '#fff',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    {isSelected ? <Check size={14} color="#fff" weight="bold" /> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </View>
-      </View>
+        )}
+      </PrototypeOnboarding>
     );
   }
 
-  const dailyCopy = DAILY_COPY[question.key] ?? {
-    eyebrow: 'Today’s plan',
-    description: 'Choose the answer that feels most accurate today.',
-  };
-  const dailyHeroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
   const effectiveDailyChoice =
     pendingProfileChoice ?? (typeof selected === 'string' ? selected : null);
-
   return rememberScreen(
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
-      <Image
-        source={require('~/assets/onboarding/coach-onboarding.jpg')}
-        contentFit="cover"
-        contentPosition={{ top: '22%', left: '50%' }}
-        accessibilityIgnoresInvertColors
-        style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          left: 0,
-          width: '100%',
-          height: dailyHeroHeight,
-        }}
-      />
-      <OnboardingHeroChrome
-        activeStep={step + 1}
-        totalSteps={DAILY_QUESTIONS.length}
-        onBack={goBack}
-      />
-      <View className="flex-1">
-        <View style={{ width: '100%', height: dailyHeroHeight }} />
-        <View
-          className="flex-1 overflow-hidden bg-white"
-          style={{ marginTop: -32, borderTopLeftRadius: 34, borderTopRightRadius: 34 }}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              flexGrow: 1,
-              paddingHorizontal: 24,
-              paddingTop: 28,
-              paddingBottom: Math.max(insets.bottom, 16) + 16,
-            }}>
-            <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-              {reanswerMode ? 'Re-answer today' : dailyCopy.eyebrow}
-            </Text>
-            <Text className="mt-2 font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]">
-              {question.title}
-            </Text>
-            <Text className="mt-2 font-body text-sm leading-6 text-[#77716D]">
-              {decision.changedDay && step === 0
-                ? 'It’s a new day. Your earlier plan is saved; answer for a fresh plan.'
-                : dailyCopy.description}
-            </Text>
-            {decision.changedDay && step === 0 ? (
-              <Text className="mt-4 font-body text-sm text-[#6B665A]">
-                Your answers save securely as you go.
-              </Text>
-            ) : null}
-            <View className="mt-6">
-              {question.options.map(([value, label]) => {
-                const isSelected = effectiveDailyChoice === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    disabled={busy}
-                    onPress={() => {
-                      setError('');
-                      setPendingProfileChoice(value);
-                      choose(value).catch(() => {});
-                    }}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: isSelected, disabled: busy }}
-                    activeOpacity={0.82}
-                    className={`mb-3 min-h-[68px] flex-row items-center rounded-[20px] border px-4 py-3 ${isSelected ? 'border-primary-500 bg-[#FFF3ED]' : 'border-[#E3E1DE] bg-white'}`}>
-                    <Text className="flex-1 pr-3 font-body text-base font-semibold leading-6 text-[#1A1A1A]">
-                      {label}
-                    </Text>
-                    {isSelected ? <Check size={21} color="#FF5C1A" weight="bold" /> : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {error ? <Text className="mt-3 font-body text-sm text-red-600">{error}</Text> : null}
-            <View className="mt-auto py-3">
-              <Text className="text-center font-body text-xs text-[#6B665A]">
-                {busy ? 'Saving your answer…' : 'Choose one answer to continue.'}
-              </Text>
-            </View>
-          </ScrollView>
-        </View>
-      </View>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 22,
+          paddingTop: 18,
+          paddingBottom: insets.bottom + 28,
+        }}>
+        <DailyQuestion
+          index={step}
+          total={DAILY_QUESTIONS.length}
+          title={question.title}
+          description={
+            decision.changedDay && step === 0
+              ? 'It’s a new day. Your earlier plan is saved; answer for a fresh plan.'
+              : reanswerMode
+                ? 'Update your answers for today.'
+                : step === 0
+                  ? 'Answer 5 quick questions to get a personalised plan today.'
+                  : undefined
+          }
+          options={question.options}
+          selected={effectiveDailyChoice}
+          busy={busy}
+          onChoose={(value) => {
+            setError('');
+            setPendingProfileChoice(value);
+            choose(value).catch(() => {});
+          }}
+          onBack={step > 0 ? goBack : undefined}
+          onClose={() => router.replace('/(tabs)/dashboard')}
+        />
+        {error ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+            className="mt-3"
+            style={type.error}>
+            {error}
+          </Text>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }

@@ -1,63 +1,66 @@
 import { useQuery } from 'convex/react';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Barbell, PencilSimple, Play } from 'phosphor-react-native';
-import { FlatList, TouchableOpacity, View } from 'react-native';
+import { router, Stack, useLocalSearchParams, usePathname } from 'expo-router';
+import { Barbell, PencilSimple } from 'phosphor-react-native';
+import { FlatList, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ScreenLoading from '~/components/core/ScreenLoading';
+import {
+  CollectionHero,
+  WorkoutHeader,
+  WorkoutImage,
+  workoutThumbnail,
+} from '~/components/core/creators/WorkoutPresentation';
+import {
+  workoutStyles as styles,
+  workoutTypography as type,
+} from '~/components/core/design/WorkoutStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Doc, Id } from '~/convex/_generated/dataModel';
 import { useAuthStore } from '~/store/useAuthStore';
 
-function youtubeThumbnail(url?: string) {
-  if (!url) return null;
-  const match = url.match(/(?:youtu\.be\/|[?&]v=|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
-  return match ? `https://i.ytimg.com/vi/${match[1]}/mqdefault.jpg` : null;
-}
-
-function openVideo(videoId: Id<'creatorVideos'>) {
-  router.push({
-    pathname: '/dashboard/creators/videos/[videoId]',
-    params: { videoId },
-  });
-}
-
-function WorkoutCard({ video }: { video: Doc<'creatorVideos'> }) {
-  const thumbnail = youtubeThumbnail(video.youtubeUrl);
+function WorkoutCard({
+  video,
+  library = false,
+}: {
+  video: Doc<'creatorVideos'>;
+  library?: boolean;
+}) {
+  const { width, fontScale } = useWindowDimensions();
+  const stacked = width < 350 || fontScale > 1.3;
   return (
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`Open ${video.subtitle || video.title}`}
       activeOpacity={0.88}
-      onPress={() => openVideo(video._id)}
-      className="mb-3 flex-row overflow-hidden rounded-[22px] bg-white">
-      <View className="relative h-[128px] w-[138px] overflow-hidden rounded-[22px] bg-[#F1ECE7]">
-        {thumbnail ? (
-          <Image
-            source={{ uri: thumbnail }}
-            contentFit="cover"
-            transition={180}
-            style={{ width: '100%', height: '100%' }}
-          />
-        ) : (
-          <View className="h-full w-full items-center justify-center">
-            <Barbell size={34} color="#C7BEB8" weight="duotone" />
-          </View>
-        )}
-        <View className="absolute bottom-3 left-3 h-9 w-9 items-center justify-center rounded-full bg-black/50">
-          <Play size={16} color="#FFFFFF" weight="fill" />
+      onPress={() =>
+        router.push({
+          pathname: library
+            ? '/workouts/creators/videos/[videoId]'
+            : '/dashboard/creators/videos/[videoId]',
+          params: { videoId: video._id },
+        })
+      }
+      style={[styles.row, stacked && { flexDirection: 'column' }]}>
+      <View
+        style={{
+          width: stacked ? '100%' : 148,
+          borderRadius: 12,
+          backgroundColor: '#eee',
+          shadowColor: '#1e140a',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 2,
+        }}>
+        <View style={[styles.thumbnail, { width: '100%', aspectRatio: 148 / 83 }]}>
+          <WorkoutImage uri={workoutThumbnail(video.youtubeUrl)} />
         </View>
       </View>
-      <View className="min-w-0 flex-1 justify-center px-4 py-3">
-        <Text
-          numberOfLines={3}
-          className="font-heading text-base font-semibold leading-5 text-[#1A1A1A]">
-          {video.subtitle || video.title}
-        </Text>
-        <Text className="mt-2 font-body text-xs capitalize text-[#77716D]">
+      <View style={{ flex: stacked ? undefined : 1, minWidth: 0, gap: 4, paddingTop: 1 }}>
+        <Text style={type.video}>{video.subtitle || video.title}</Text>
+        <Text style={[type.caption, { textTransform: 'capitalize' }]}>
           {video.difficulty ?? video.category ?? 'Workout'}
         </Text>
       </View>
@@ -66,66 +69,43 @@ function WorkoutCard({ video }: { video: Doc<'creatorVideos'> }) {
 }
 
 export default function TabDashboardCreator() {
-  const { creatorId } = useLocalSearchParams();
+  const { creatorId, fromWorkouts } = useLocalSearchParams();
+  const library = usePathname().startsWith('/workouts/');
   const currentUser = useAuthStore((state) => state.currentUser);
-  const creator = useQuery(api.admin.getCreator, {
-    creatorId: creatorId as Id<'creators'>,
-  });
+  const creator = useQuery(api.admin.getCreator, { creatorId: creatorId as Id<'creators'> });
   const creatorVideos = useQuery(api.admin.getCreatorVideos, {
     creatorId: creatorId as Id<'creators'>,
   });
-
   if (!creator || !creatorVideos) return <ScreenLoading />;
-
   const videos = [...creatorVideos]
     .filter((video) => video.isActive !== false)
     .sort((a, b) => a.order - b.order);
-  const heroImage = creator.posterImageUrl ?? youtubeThumbnail(videos[0]?.youtubeUrl);
-
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
       <FlatList
         data={videos}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => <WorkoutCard video={item} />}
+        renderItem={({ item }) => <WorkoutCard video={item} library={library} />}
+        ItemSeparatorComponent={() => <View style={{ height: 18 }} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 36 }}
+        contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
-            <View className="mb-5 mt-3 flex-row items-center justify-between">
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Back to workout library"
-                onPress={() => (router.canGoBack() ? router.back() : router.replace('/workouts'))}
-                className="h-12 w-12 items-center justify-center rounded-full border border-[#E6E1DD] bg-white">
-                <ArrowLeft size={22} color="#1A1A1A" weight="bold" />
-              </TouchableOpacity>
-              <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1A1A1A]">
-                Workouts
-              </Text>
-              <View className="h-12 w-12" />
-            </View>
-
-            <View className="relative mb-5 h-[220px] overflow-hidden rounded-[26px] bg-[#2D2926]">
-              {heroImage ? (
-                <Image
-                  source={{ uri: heroImage }}
-                  contentFit="cover"
-                  transition={180}
-                  style={{ width: '100%', height: '100%' }}
-                />
-              ) : (
-                <View className="h-full w-full items-center justify-center">
-                  <Barbell size={58} color="#665F5A" weight="duotone" />
-                </View>
-              )}
-              <LinearGradient
-                pointerEvents="none"
-                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0.65)']}
-                locations={[0, 0.5, 1]}
-                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '75%' }}
-              />
+            <WorkoutHeader
+              title="Workouts"
+              backLabel="Back to workout library"
+              fallback="/workouts"
+              onBack={
+                !library && fromWorkouts === '1'
+                  ? () => router.replace('/(tabs)/workouts')
+                  : undefined
+              }
+            />
+            <CollectionHero
+              name={creator.name}
+              uri={creator.posterImageUrl ?? workoutThumbnail(videos[0]?.youtubeUrl)}
+              count={videos.length}>
               {currentUser?.isAdmin ? (
                 <TouchableOpacity
                   accessibilityRole="button"
@@ -133,50 +113,32 @@ export default function TabDashboardCreator() {
                   onPress={() =>
                     router.push({ pathname: '/creator/edit', params: { creatorId: creator._id } })
                   }
-                  className="absolute right-4 top-4 h-11 w-11 items-center justify-center rounded-full bg-black/60">
-                  <PencilSimple size={20} color="#FFFFFF" weight="bold" />
+                  style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: 16,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <PencilSimple size={20} color="#fff" weight="bold" />
                 </TouchableOpacity>
               ) : null}
-              <View className="absolute inset-x-0 bottom-0 p-5">
-                <Text className="font-body text-[10px] font-semibold uppercase tracking-widest text-white/80">
-                  {videos.length} {videos.length === 1 ? 'WORKOUT' : 'WORKOUTS'}
-                </Text>
-                <Text className="mt-1 font-heading text-[28px] font-semibold leading-9 text-white">
-                  {creator.name}
-                </Text>
-              </View>
-            </View>
-
+            </CollectionHero>
             {creator.description ? (
-              <Text className="mb-6 font-body text-base leading-6 text-[#716B67]">
-                {creator.description}
-              </Text>
+              <Text style={[type.supporting, { marginTop: 16 }]}>{creator.description}</Text>
             ) : null}
-
-            {/* <View className="mb-4 flex-row items-end justify-between">
-              <View>
-                <Text className="font-heading text-2xl font-semibold text-[#1A1A1A]">
-                  Choose a workout
-                </Text>
-                <Text className="mt-1 font-body text-sm text-[#77716D]">
-                  Opens safely through YouTube.
-                </Text>
-              </View>
-              <View className="rounded-full bg-[#FFF1E9] px-3 py-2">
-                <Text className="font-body text-xs font-semibold text-[#FF5C35]">
-                  {videos.length} videos
-                </Text>
-              </View>
-            </View> */}
+            <View style={{ height: 22 }} />
           </View>
         }
         ListEmptyComponent={
-          <View className="items-center rounded-[24px] bg-white px-6 py-9">
-            <Barbell size={34} color="#FF5C35" weight="duotone" />
-            <Text className="mt-4 font-heading text-xl font-semibold text-[#1A1A1A]">
-              No workouts yet
-            </Text>
-            <Text className="mt-2 text-center font-body text-sm text-[#77716D]">
+          <View style={{ alignItems: 'center', padding: 24 }}>
+            <Barbell size={34} color="#e8541e" weight="duotone" />
+            <Text style={[type.detail, { marginTop: 16 }]}>No workouts yet</Text>
+            <Text style={[type.supporting, { textAlign: 'center', marginTop: 8 }]}>
               New videos will appear here when they are ready.
             </Text>
           </View>

@@ -1,27 +1,25 @@
 import { useConvex, useMutation, useQuery } from 'convex/react';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
-  ArrowRight,
   Barbell,
-  CaretDown,
-  CaretUp,
   Check,
   Footprints,
   ForkKnife,
   MoonStars,
-  Sparkle,
-  UserCircle,
   YoutubeLogo,
+  MagnifyingGlass,
 } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 
-import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import { PrototypeButton as CoachActionButton } from '~/components/core/auth/PrototypeOnboarding';
 import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
+import PlanExplanation from '~/components/core/dashboard/PlanExplanation';
 import PlanFeedback from '~/components/core/dashboard/PlanFeedback';
+import { PrototypeSheetControl } from '~/components/core/design/PrototypeControl';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
@@ -39,12 +37,7 @@ const actions = {
   sleep: 'Log sleep',
   meals: 'Snap a meal',
 };
-const accents = {
-  workout: { tint: '#FFF0E8', color: '#E9512A' },
-  steps: { tint: '#FFF0E8', color: '#E9512A' },
-  sleep: { tint: '#FFF0E8', color: '#E9512A' },
-  meals: { tint: '#FFF0E8', color: '#E9512A' },
-};
+
 const icons = { workout: Barbell, steps: Footprints, sleep: MoonStars, meals: ForkKnife };
 
 function concisePlanText(value: string) {
@@ -79,7 +72,6 @@ export default function SavedCoachPlan() {
   const [busy, setBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [error, setError] = useState('');
-  const [showWhy, setShowWhy] = useState(false);
   const existingMemberPreparing = Boolean(
     saved?.access &&
     !saved.plan &&
@@ -109,79 +101,65 @@ export default function SavedCoachPlan() {
     day: 'numeric',
   }).format(new Date(`${saved.day}T12:00:00`));
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView className="flex-1 bg-white">
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 56 }}>
-        <Text className="font-heading text-[30px] font-semibold leading-9 text-[#171311]">
-          Today’s plan
-        </Text>
-        <Text className="mb-5 mt-1 font-body text-base text-[#716A66]">
-          Small actions for a healthier, happier you.
-        </Text>
+        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 18, paddingBottom: 56 }}>
+        <View className="mb-4 flex-row items-center justify-between">
+          <View className="min-w-0 flex-1 pr-3">
+            <Text style={type.supporting}>Here’s today’s plan</Text>
+            <Text style={[type.smallCaption, { color: '#8A8A8A' }]} className="mt-1">
+              {planDate}
+            </Text>
+          </View>
+          <PrototypeSheetControl
+            kind="close"
+            label="Back to Today"
+            onPress={() => router.dismissTo('/(tabs)/dashboard')}
+          />
+        </View>
         {output && plan ? (
           <>
             {saved.requestStatus === 'pending' ? (
               <View className="mb-4 rounded-2xl bg-[#FFF0E8] p-4">
-                <Text className="font-body text-sm text-[#71432F]">
+                <Text style={[type.supporting, { color: '#71432F' }]}>
                   Your updated plan is preparing. The previous recommendation stays available until
                   it is ready.
                 </Text>
               </View>
             ) : saved.requestStatus === 'failed' ? (
               <View className="mb-4 rounded-2xl bg-[#FFF0E8] p-4">
-                <Text className="font-body text-sm text-[#71432F]">
+                <Text style={[type.supporting, { color: '#71432F' }]}>
                   The updated plan could not be prepared. Your previous plan and check-in history
                   remain saved.
                 </Text>
               </View>
             ) : null}
-            <LinearGradient
-              colors={['#FF7A3D', '#FF5C1A', '#E9512A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                marginBottom: 24,
-                overflow: 'hidden',
-                borderRadius: 28,
-                padding: 22,
-                shadowColor: '#6B2D16',
-                shadowOpacity: 0.18,
-                shadowRadius: 16,
-                elevation: 5,
-              }}>
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center rounded-full bg-white/20 px-3 py-2">
-                  <Sparkle size={15} color="#FFFFFF" weight="fill" />
-                  <Text className="ml-2 font-body text-xs font-semibold uppercase tracking-wider text-white">
-                    Made for your day
-                  </Text>
-                </View>
-                <Text className="font-body text-xs font-medium text-white/80">{planDate}</Text>
+
+            <Text style={type.planHeading}>{output.headline}</Text>
+            <View className="mb-7 mt-[26px]">
+              <View className="flex-row justify-between">
+                <Text style={[type.progressLabel, { flex: 1, paddingRight: 12 }]}>
+                  Today’s progress
+                </Text>
+                <Text style={[type.progressValue, { flexShrink: 1, textAlign: 'right' }]}>
+                  {completedCategories}/{visibleCategories.length} complete
+                </Text>
               </View>
-              <Text className="mt-6 font-heading text-[30px] font-semibold leading-9 text-white">
-                {output.headline}
-              </Text>
-              <Text className="mt-2 font-body text-sm leading-5 text-white/85">
-                Your Coach has balanced movement, recovery and fuel around today’s check-in.
-              </Text>
-              <View className="mt-6 rounded-2xl bg-black/15 p-4">
-                <View className="flex-row items-center justify-between">
-                  <Text className="font-body text-sm font-semibold text-white">
-                    Today’s progress
-                  </Text>
-                  <Text className="font-body text-sm font-semibold text-white">
-                    {completedCategories}/{visibleCategories.length} complete
-                  </Text>
-                </View>
-                <View className="mt-3 h-2 overflow-hidden rounded-full bg-white/25">
-                  <View
-                    className="h-full rounded-full bg-white"
-                    style={{ width: `${completionPercent}%` }}
-                  />
-                </View>
+              <View
+                className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#F1F1F1]"
+                accessibilityRole="progressbar"
+                accessibilityLabel="Today’s plan progress"
+                accessibilityValue={{ min: 0, max: 100, now: completionPercent }}>
+                <View
+                  style={{
+                    height: '100%',
+                    width: `${completionPercent}%`,
+                    backgroundColor: '#ff5a1f',
+                  }}
+                />
               </View>
-            </LinearGradient>
+            </View>
             {selectedCheckIn && !(selectedCheckIn === 'workout' && rest) ? (
               <CoachActionButton
                 label={`Continue to ${titles[selectedCheckIn]} check-in`}
@@ -190,16 +168,6 @@ export default function SavedCoachPlan() {
                 className="mb-5"
               />
             ) : null}
-            <View className="mb-3 flex-row items-end justify-between px-1">
-              <View>
-                <Text className="font-heading text-xl font-semibold text-[#211C19]">
-                  Your focus
-                </Text>
-                <Text className="mt-1 font-body text-sm text-[#7B716B]">
-                  Small actions chosen for how you feel today.
-                </Text>
-              </View>
-            </View>
             {categories.map((category) => {
               const assignment = checkIns?.assignments.find((item) => item.category === category);
               const state = planCardState(category, rest, assignment?.consumedCount ?? 0);
@@ -218,7 +186,6 @@ export default function SavedCoachPlan() {
               const action = state.canLog ? actions[category] : 'View check-in';
               const completed = (assignment?.consumedCount ?? 0) > 0;
               const Icon = icons[category];
-              const accent = accents[category];
               const workoutSearch =
                 category === 'workout' ? workoutYoutubeSearch(assignment?.label ?? fullBody) : null;
               return (
@@ -229,39 +196,38 @@ export default function SavedCoachPlan() {
                   accessibilityLabel={`${titles[category]}. ${fullBody}. ${state.status}${enabled ? `. ${action}` : ''}`}
                   onPress={() => open(category)}
                   activeOpacity={0.82}
-                  className="mb-3 rounded-[24px] border border-[#ECE6E2] bg-white p-4"
-                  style={{ shadowColor: '#39251D', shadowOpacity: 0.05, shadowRadius: 10 }}>
+                  className="mb-[22px]">
                   <View className="flex-row items-center">
                     <View
-                      className="h-14 w-14 items-center justify-center rounded-2xl"
-                      style={{ backgroundColor: accent.tint }}>
-                      <Icon size={27} color={accent.color} weight="duotone" />
+                      className="h-12 w-12 items-center justify-center rounded-2xl"
+                      style={{ backgroundColor: '#FFF3EA' }}>
+                      <Icon size={24} color="#E8541E" />
                     </View>
-                    <View className="ml-4 min-w-0 flex-1">
+                    <View className="ml-[14px] min-w-0 flex-1">
                       <View className="flex-row items-center justify-between gap-2">
-                        <Text className="font-heading text-lg font-semibold text-[#211C19]">
-                          {titles[category]}
-                        </Text>
+                        <Text style={[type.cardTitle, { flex: 1 }]}>{titles[category]}</Text>
                         <View
                           className="flex-row items-center rounded-full px-2.5 py-1.5"
-                          style={{ backgroundColor: completed ? '#FFF0E8' : '#F5F2F0' }}>
+                          style={{
+                            backgroundColor: completed ? '#FFF0E8' : '#F5F2F0',
+                            flexShrink: 1,
+                            maxWidth: '55%',
+                          }}>
                           {completed ? <Check size={13} color="#E9512A" weight="bold" /> : null}
                           <Text
-                            className="font-body text-[11px] font-semibold"
-                            style={{ color: completed ? '#C64520' : '#756C67' }}>
+                            style={[
+                              type.caption,
+                              { color: completed ? '#C64520' : '#6f6f6f', flexShrink: 1 },
+                            ]}>
                             {state.status}
                           </Text>
                         </View>
                       </View>
-                      <Text
-                        className="mt-1 font-body text-[15px] leading-5 text-[#655B55]"
-                        numberOfLines={2}>
+                      <Text style={type.supporting} className="mt-1">
                         {body}
                       </Text>
                       {supportingBody ? (
-                        <Text
-                          className="mt-1.5 font-body text-[13px] leading-[18px] text-[#8A817C]"
-                          numberOfLines={2}>
+                        <Text style={[type.caption, { color: '#8A817C' }]} className="mt-1.5">
                           {supportingBody}
                         </Text>
                       ) : null}
@@ -278,68 +244,27 @@ export default function SavedCoachPlan() {
                         );
                       }}
                       activeOpacity={0.8}
-                      className="mt-4 min-h-14 flex-row items-center rounded-2xl bg-[#FFF0E8] px-4">
-                      <YoutubeLogo size={22} color="#E9512A" weight="fill" />
-                      <Text className="ml-3 flex-1 text-center font-body text-sm font-semibold text-[#C64520]">
-                        Search workout on YouTube
+                      className="mt-3 min-h-16 flex-row items-center rounded-[32px] bg-[#F5F5F5] px-[22px] py-4">
+                      <MagnifyingGlass size={24} color="#8A8A8A" />
+                      <Text style={type.search} className="ml-3 flex-1">
+                        {workoutSearch.phrase}
                       </Text>
-                      <ArrowRight size={18} color="#E9512A" weight="bold" />
+                      <YoutubeLogo size={32} color="#E8541E" weight="fill" />
                     </TouchableOpacity>
-                  ) : enabled ? (
-                    <View className="mt-4 min-h-14 flex-row items-center justify-between rounded-2xl bg-[#FFF0E8] px-4">
-                      <Text
-                        className="font-body text-sm font-semibold"
-                        style={{ color: accent.color }}>
-                        {action}
-                      </Text>
-                      <ArrowRight size={18} color={accent.color} weight="bold" />
-                    </View>
                   ) : null}
                 </TouchableOpacity>
               );
             })}
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showWhy }}
-              accessibilityLabel={`${showWhy ? 'Hide' : 'Show'} why this plan fits today`}
-              onPress={() => setShowWhy((value) => !value)}
-              activeOpacity={0.85}
-              className="mb-5 overflow-hidden rounded-[24px] border border-[#F1D9CC] bg-[#FFF8F4] p-5">
-              <View className="flex-row items-center">
-                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#FFE9DC]">
-                  <Sparkle size={22} color="#E9512A" weight="duotone" />
-                </View>
-                <View className="ml-3 min-w-0 flex-1">
-                  <Text className="font-heading text-lg font-semibold text-[#2B211D]">
-                    Why this fits you today
-                  </Text>
-                  {!showWhy ? (
-                    <Text className="mt-1 font-body text-sm text-[#766A64]" numberOfLines={1}>
-                      A plan shaped around your latest check-in
-                    </Text>
-                  ) : null}
-                </View>
-                {showWhy ? (
-                  <CaretUp size={20} color="#A14A2C" />
-                ) : (
-                  <CaretDown size={20} color="#A14A2C" />
-                )}
-              </View>
-              {showWhy ? (
-                <Text className="mt-4 font-body text-[15px] leading-6 text-[#594D47]">
-                  {output.why}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
+            <PlanExplanation explanation={output.why} />
             <PlanFeedback revisionId={plan.revisionId} />
           </>
         ) : saved.access && saved.requestStatus === 'pending' ? (
           <View className="mb-5 mt-3">
-            <CoachPlanPreparing />
+            <CoachPlanPreparing prototype />
           </View>
         ) : (
           <View className="mb-5 rounded-2xl bg-white p-5">
-            <Text className="font-heading text-xl font-semibold">
+            <Text style={type.planHeading}>
               {!saved.access
                 ? 'Premium access unavailable'
                 : saved.requestStatus === 'failed'
@@ -348,7 +273,7 @@ export default function SavedCoachPlan() {
                     ? 'No plan for today yet'
                     : 'Preparing your plan'}
             </Text>
-            <Text className="mt-2 text-sm text-[#6B665F]">
+            <Text style={type.supporting} className="mt-2">
               {!saved.access
                 ? 'Your plan remains private until access is verified again.'
                 : saved.requestStatus === 'failed'
@@ -361,30 +286,20 @@ export default function SavedCoachPlan() {
             </Text>
           </View>
         )}
+
         {saved.access ? (
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Update your profile"
             accessibilityHint="Review and change the seven answers used by your AI Coach"
             onPress={() => router.push('/coach-profile')}
-            activeOpacity={0.85}
-            className="mb-5 overflow-hidden rounded-[24px] border border-[#ECE6E2] bg-white p-5"
-            style={{ shadowColor: '#39251D', shadowOpacity: 0.05, shadowRadius: 10 }}>
-            <View className="flex-row items-center">
-              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF0E8]">
-                <UserCircle size={23} color="#E9512A" weight="duotone" />
-              </View>
-              <View className="ml-3 min-w-0 flex-1">
-                <Text className="font-heading text-lg font-semibold text-[#211C19]">
-                  Your AI Coach profile
-                </Text>
-                <Text className="mt-1 font-body text-sm leading-5 text-[#766A64]">
-                  Review or change the seven answers that personalise your guidance.
-                </Text>
-              </View>
-              <ArrowRight size={20} color="#E9512A" weight="bold" />
-            </View>
-            <Text className="mt-3 font-body text-xs leading-5 text-[#8A817C]">
+            className="mb-5 mt-4 min-h-11 items-center justify-center">
+            <Text style={[type.body, { color: '#E8541E', textAlign: 'center' }]}>
+              Update profile to refresh your plan →
+            </Text>
+            <Text
+              style={[type.smallCaption, { color: '#8A8A8A', textAlign: 'center' }]}
+              className="mt-2">
               Saving changes may refresh today’s recommendation once.
             </Text>
           </TouchableOpacity>
@@ -414,13 +329,15 @@ export default function SavedCoachPlan() {
             className="mb-4"
           />
         ) : null}
-        {error ? <Text className="mb-3 text-red-600">{error}</Text> : null}
+        {error ? (
+          <Text style={type.error} accessibilityLiveRegion="polite" className="mb-3">
+            {error}
+          </Text>
+        ) : null}
         {__DEV__ && resetAvailability && saved.requestStatus !== 'none' ? (
           <View className="mt-8 rounded-2xl border border-[#E3E1DE] bg-white p-5">
-            <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
-              Development testing
-            </Text>
-            <Text className="mt-2 font-body text-sm leading-5 text-[#6B665F]">
+            <Text style={[type.cardTitle, { color: '#1A1A1A' }]}>Development testing</Text>
+            <Text style={type.supporting} className="mt-2">
               Clear your own plan and answers for today, then answer today’s questions again.
               Earlier days and your profile stay saved.
             </Text>
@@ -458,7 +375,7 @@ export default function SavedCoachPlan() {
               />
             ) : (
               <>
-                <Text className="mt-3 font-body text-sm text-[#8B5E4B]">
+                <Text style={type.supporting} className="mt-3">
                   {resetAvailability.reason ===
                   'Today has check-in or reward records and cannot be reset safely'
                     ? 'A check-in, meal analysis or reward is linked to this plan. Deleting it would lose its original context or scan count.'

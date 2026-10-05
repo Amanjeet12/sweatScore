@@ -1,36 +1,32 @@
 import { Feather } from '@expo/vector-icons';
 import { useConvex, useMutation } from 'convex/react';
-import { Image } from 'expo-image';
-import { router, Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  AppState,
-  Linking,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, AppState, Linking, Platform, View } from 'react-native';
 
-import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import {
+  PrototypeButton,
+  PrototypeError,
+  PrototypeOnboarding,
+  onboardingStyles,
+} from '~/components/core/auth/PrototypeOnboarding';
+import {
+  prototypeComponents as chrome,
+  prototypeTypography as type,
+} from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 import {
   canBypassAppleHealthAvailabilityCheck,
   initializeAppleHealthKit,
   isAppleHealthAvailable,
 } from '~/utils/apple-health-kit';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 import { healthPermissionsAndroid } from '~/utils/constants';
 import { storeData } from '~/utils/storage';
-import { resumeMember } from '~/utils/coachResumeNavigation';
-import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 
 const HEALTH_ROUTE = ['health'] as const;
 
@@ -64,19 +60,20 @@ export default function AskHealthPermission() {
   const { accepted } = useCoachRouteGuard(HEALTH_ROUTE);
   const appState = useRef(AppState.currentState);
   const convex = useConvex();
-  const { height: windowHeight } = useWindowDimensions();
   const [, setHasPermission] = useState(false);
   const [, setSdkStatus] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
+  const [error, setError] = useState('');
   const healthProviderName = Platform.OS === 'ios' ? 'Apple Health' : 'Health Connect';
-  const heroHeight = Math.min(Math.max(windowHeight * 0.53, 390), 475);
   const continueAfterHealth = useMutation(api.coachFoundation.continueAfterHealth);
   const updateUserAutoSyncEnabled = useMutation(api.users.updateUserAutoSyncEnabled);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
 
   const handleAllow = async () => {
-    if (isConnecting) return;
+    if (isConnecting || isSkipping) return;
 
+    setError('');
     setIsConnecting(true);
 
     try {
@@ -232,95 +229,95 @@ export default function AskHealthPermission() {
     };
   }, []);
 
+  const handleSkipPress = async () => {
+    if (isConnecting || isSkipping) return;
+    setIsSkipping(true);
+    setError('');
+    try {
+      await handleSkip();
+    } catch {
+      setError('Could not continue. Please try again.');
+    } finally {
+      setIsSkipping(false);
+    }
+  };
+
   if (!accepted) return <ScreenLoading />;
+  const busy = isConnecting || isSkipping;
 
   return (
-    <View className="flex-1 bg-white">
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
-
-      <Image
-        source={require('~/assets/onboarding/healthscreen-clean-v2.png')}
-        contentFit="cover"
-        style={{ position: 'absolute', top: 0, right: 0, left: 0, height: heroHeight }}
-      />
-
-      <OnboardingHeroChrome onBack={router.back} />
-
-      <View style={{ height: heroHeight }} />
-
-      <View
-        className="flex-1 bg-white"
-        style={{
-          marginTop: -30,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-        }}>
-        <ScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 28, paddingBottom: 8 }}>
-          <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-            <Feather name="heart" size={20} color="#FF5C1A" />
-          </View>
-
-          <Text className="mt-3 font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-            One more step to complete setup
-          </Text>
-          <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
-            Let&apos;s track your sweat
-          </Text>
-          <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
-            Connect your health data so your steps and active minutes count toward your points.
-          </Text>
-
-          <View className="mt-3 h-[62px] flex-row items-center rounded-xl bg-[#FFF9F6] px-3">
-            <View className="h-10 w-10 items-center justify-center rounded-xl bg-primary-500">
-              <Feather name="heart" size={20} color="#FFFFFF" />
-            </View>
-            <View className="ml-3 flex-1">
-              <Text className="font-body text-sm font-bold text-[#1A1A1A]">
-                {healthProviderName}
-              </Text>
-              <Text className="mt-0.5 font-body text-xs text-[#838383]">
-                Steps · Active minutes
-              </Text>
-            </View>
-            <View className="rounded-lg bg-[#EAF7EC] px-2.5 py-1">
-              <Text className="font-body text-[10px] font-bold uppercase text-[#4D8B59]">
-                Secure
-              </Text>
-            </View>
-          </View>
-
-          <View className="mt-3 flex-row items-center px-1">
-            <Feather name="shield" size={16} color="#FF5C1A" />
-            <Text className="ml-2 flex-1 font-body text-xs leading-4 text-[#838383]">
-              Your health data is private and only used to calculate activity.
-            </Text>
-          </View>
-
-          <OnboardingPrimaryButton
+    <PrototypeOnboarding
+      image={require('~/assets/onboarding/health-watch.jpg')}
+      onBack={() => {
+        if (!busy)
+          router.replace({ pathname: '/coach-onboarding', params: { reviewProfile: '1' } });
+      }}
+      footer={
+        <>
+          <PrototypeError error={error} />
+          <PrototypeButton
             label={`Connect ${healthProviderName}`}
             onPress={handleAllow}
-            isLoading={isConnecting}
-            className="mt-4"
+            loading={isConnecting}
+            disabled={isSkipping}
           />
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
+          <PrototypeButton
+            label="I'll do this later"
+            onPress={handleSkipPress}
+            secondary
+            loading={isSkipping}
             disabled={isConnecting}
-            onPress={handleSkip}
-            className="mt-2 h-14 items-center justify-center rounded-lg bg-white px-[22px]">
-            <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
-              I&apos;ll do this later
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        <SafeAreaView edges={['bottom']} />
+          />
+        </>
+      }>
+      <Text accessibilityRole="header" style={onboardingStyles.heading}>
+        Final step
+      </Text>
+      <Text style={onboardingStyles.subtitle}>
+        Connect your health data so your steps and active minutes count toward your points.
+      </Text>
+      <View style={{ marginTop: 28, flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+        <View
+          style={{
+            ...chrome.iconTile,
+          }}>
+          <Feather name={Platform.OS === 'ios' ? 'heart' : 'activity'} size={24} color="#e8541e" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              ...type.cardTitle,
+            }}>
+            {healthProviderName}
+          </Text>
+          <Text
+            style={{
+              marginTop: 2,
+              ...type.caption,
+            }}>
+            Steps · Active minutes
+          </Text>
+        </View>
+        <View
+          style={{
+            borderRadius: 14,
+            backgroundColor: '#eaf6ee',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+          }}>
+          <Text style={[type.badge, { color: '#2f7d4f' }]}>SECURE</Text>
+        </View>
       </View>
-    </View>
+      <View style={{ marginTop: 24, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <Feather name="shield" size={20} color="#8a8a8a" />
+        <Text
+          style={{
+            flex: 1,
+            ...type.caption,
+          }}>
+          Your health data is private and only used to calculate activity.
+        </Text>
+      </View>
+    </PrototypeOnboarding>
   );
 }

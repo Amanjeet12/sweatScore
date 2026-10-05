@@ -4,13 +4,15 @@ import { Image } from 'expo-image';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ImageSquare, NotePencil, VideoCamera } from 'phosphor-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import TabPageHeader from '~/components/core/TabPageHeader';
+import {
+  communityStyles as community,
+  communityTypography as type,
+} from '~/components/core/design/CommunityStyles';
 import FeaturedRow from '~/components/core/posts/FeaturedRow';
 import PostRow, { stopCurrentVideo } from '~/components/core/posts/Row';
 import { Text } from '~/components/ui/text';
@@ -21,7 +23,6 @@ import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
 const TabShare = () => {
-  const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams<{ postId?: string | string[] }>();
   const [channel] = useState<number>(0);
   const { isPro, requireSubscription } = useSubscriptionGuard();
@@ -87,13 +88,11 @@ const TabShare = () => {
   const userImage = currentUser?.image?.trim();
   return (
     <MenuProvider>
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView edges={['top', 'left', 'right']} className="flex-1 bg-white">
         <Stack.Screen options={{ headerShown: false, headerShadowVisible: false }} />
-        <View
-          className="flex-1 flex-col"
-          style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-          <View className="bg-white px-5 pb-3">
-            <TabPageHeader title="Community" />
+        <View className="flex-1 flex-col">
+          <View style={community.header}>
+            <Text style={type.title}>Community</Text>
           </View>
 
           <View className="flex-1 flex-col bg-white">
@@ -104,7 +103,7 @@ const TabShare = () => {
               keyExtractor={(item) => item._id.toString()}
               ListHeaderComponent={
                 <>
-                  <View className="border-b border-[#E8E8E8] px-5 pb-2 pt-2">
+                  <View style={community.composer}>
                     <View className="bg-white pb-1 pt-1">
                       <TouchableOpacity
                         activeOpacity={0.85}
@@ -127,52 +126,38 @@ const TabShare = () => {
                             </Text>
                           )}
                         </View>
-                        <View className="min-h-11 flex-1 justify-center rounded-[20px] bg-[#F6F6F6] px-4">
-                          <Text className="font-body text-sm text-[#777777]" numberOfLines={1}>
-                            Share something with the community
-                          </Text>
+                        <View style={community.prompt}>
+                          <Text style={type.prompt}>Share something with the community</Text>
                         </View>
                       </TouchableOpacity>
 
-                      <View className="mt-2 flex-row">
+                      <View style={community.actions}>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleCreatePost('image')}
                           accessibilityRole="button"
                           accessibilityLabel="Create a post with an image"
-                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <ImageSquare size={20} color="#FF5C35" weight="regular" />
-                          <Text
-                            style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="font-body text-base text-[#252525]">
-                            Photo
-                          </Text>
+                          style={community.action}>
+                          <ImageSquare size={22} color="#ff5a1f" weight="regular" />
+                          <Text style={type.action}>Photo</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleCreatePost('video')}
                           accessibilityRole="button"
                           accessibilityLabel="Create a post with a video"
-                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <VideoCamera size={20} color="#FF5C35" weight="regular" />
-                          <Text
-                            style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="font-body text-base text-[#252525]">
-                            Video
-                          </Text>
+                          style={community.action}>
+                          <VideoCamera size={22} color="#ff5a1f" weight="regular" />
+                          <Text style={type.action}>Video</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleCreatePost()}
                           accessibilityRole="button"
                           accessibilityLabel="Write a community post"
-                          className="min-h-10 flex-1 flex-row items-center justify-center gap-x-2 rounded-[20px]">
-                          <NotePencil size={20} color="#FF5C35" weight="regular" />
-                          <Text
-                            style={{ fontFamily: 'Inter_600SemiBold' }}
-                            className="font-body text-base text-[#252525]">
-                            Write
-                          </Text>
+                          style={community.action}>
+                          <NotePencil size={22} color="#ff5a1f" weight="regular" />
+                          <Text style={type.action}>Write</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -203,7 +188,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF5C1A',
+    backgroundColor: '#ff5a1f',
   },
 });
 

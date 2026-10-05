@@ -1,8 +1,10 @@
-import { Image } from 'expo-image';
 import { Fire } from 'phosphor-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
+import LeagueAvatar from './LeagueAvatar';
+
+import { leagueTypography as type } from '~/components/core/design/LeagueStyles';
 import { Text } from '~/components/ui/text';
 import { formatName } from '~/utils/formatter';
 
@@ -19,9 +21,8 @@ export type PodiumSlotProps = {
   onPress?: (userId: string) => void;
 };
 
-const RANK_COLORS = { 1: '#F1C56F', 2: '#AAA6A3', 3: '#B87333' } as const;
-const AVATAR_COLORS = { 1: '#FF5C35', 2: '#B4522E', 3: '#D77845' } as const;
-
+const RANK_COLORS = { 1: '#e3b24f', 2: '#a8a8a8', 3: '#b87333' } as const;
+const AVATAR_COLORS = { 1: '#d4774a', 2: '#b5502f', 3: '#d4774a' } as const;
 export default function PodiumSlot({
   rank,
   isHero,
@@ -29,105 +30,90 @@ export default function PodiumSlot({
   onPress,
   mode = 'points',
 }: PodiumSlotProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [entry?.image]);
-
-  const firstLetter = entry?.name ? entry.name.trim().substring(0, 1).toUpperCase() : '?';
-
-  const avatarSize = isHero ? 96 : 72;
-  const ringColor = isHero ? '#FF5C35' : '#FFFFFF';
-
-  const Wrapper: any = entry && onPress ? TouchableOpacity : View;
-
-  const wrapperProps =
-    entry && onPress
-      ? {
-          onPress: () => onPress(entry.userId),
-          activeOpacity: 0.7,
-        }
-      : {};
-
+  const [slotWidth, setSlotWidth] = useState(110);
+  const avatarSize = Math.min(isHero ? 88 : 68, Math.max(44, slotWidth - 14));
+  const Wrapper = entry && onPress ? TouchableOpacity : View;
   return (
     <Wrapper
-      {...wrapperProps}
-      accessible={!entry}
-      accessibilityLabel={!entry ? `Rank ${rank}: empty` : undefined}
-      className="items-center"
-      style={{ flex: 1, minWidth: 0, paddingTop: isHero ? 0 : 22 }}>
+      onPress={entry && onPress ? () => onPress(entry.userId) : undefined}
+      onLayout={(event) => setSlotWidth(event.nativeEvent.layout.width)}
+      accessible
+      accessibilityRole={entry && onPress ? 'button' : undefined}
+      accessibilityLabel={
+        entry
+          ? `Rank ${rank}, ${entry.name}, ${entry.displayTotalPoints} ${mode === 'streak' ? 'weeks' : 'points'}`
+          : `Rank ${rank}: empty`
+      }
+      style={{ flex: 1, minWidth: 0, paddingTop: isHero ? 0 : 22, alignItems: 'center', gap: 8 }}>
       <View
-        className="mb-1 h-6 w-6 items-center justify-center rounded-full"
-        style={{ backgroundColor: RANK_COLORS[rank] }}>
-        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-[11px] text-white">
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: RANK_COLORS[rank],
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Text maxFontSizeMultiplier={1.3} style={type.badge}>
           {rank}
         </Text>
       </View>
-
-      <View className="relative">
-        <View
-          style={{
-            width: avatarSize,
-            height: avatarSize,
-            borderRadius: avatarSize / 2,
-            borderWidth: entry ? 2 : 1,
-            borderStyle: entry ? 'solid' : 'dashed',
-            borderColor: entry ? ringColor : '#D8D2CD',
-            backgroundColor: entry ? AVATAR_COLORS[rank] : '#F4F1EE',
-            overflow: 'hidden',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          {entry ? (
-            entry.image && !imageFailed ? (
-              <Image
-                source={{ uri: entry.image }}
-                style={{
-                  width: avatarSize - 8,
-                  height: avatarSize - 8,
-                  borderRadius: avatarSize / 2,
-                }}
-                contentFit="cover"
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              <Text
-                style={{
-                  fontSize: isHero ? 32 : 28,
-                  lineHeight: isHero ? 40 : 34,
-                  color: '#FFFFFF',
-                  fontFamily: 'Inter_700Bold',
-                  textAlign: 'center',
-                }}>
-                {firstLetter}
-              </Text>
-            )
-          ) : (
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xl text-[#AAA39D]">
-              —
-            </Text>
-          )}
-        </View>
-
+      <View
+        style={{
+          shadowColor: isHero ? '#ff5a1f' : '#1e140a',
+          shadowOffset: { width: 0, height: isHero ? 8 : 6 },
+          shadowOpacity: isHero ? 0.28 : 0.16,
+          shadowRadius: isHero ? 20 : 16,
+          elevation: 3,
+          borderRadius: avatarSize,
+        }}>
+        {entry ? (
+          <LeagueAvatar
+            name={entry.name}
+            uri={entry.image}
+            size={avatarSize}
+            ring={isHero}
+            color={AVATAR_COLORS[rank]}
+          />
+        ) : (
+          <View
+            style={{
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
+              borderWidth: 1,
+              borderStyle: 'dashed',
+              borderColor: '#d8d2cd',
+              backgroundColor: '#f4f1ee',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Text style={type.caption}>—</Text>
+          </View>
+        )}
         {mode === 'streak' && entry ? (
           <View
-            className="absolute -bottom-0.5 right-0 h-7 w-7 items-center justify-center rounded-full border-2 border-white"
-            style={{ backgroundColor: entry.displayTotalPoints > 0 ? '#FF5C35' : '#C4C4C4' }}>
-            <Fire size={17} color="#FFFFFF" weight="fill" />
+            style={{
+              position: 'absolute',
+              right: -2,
+              bottom: -2,
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              borderWidth: 2,
+              borderColor: '#fff',
+              backgroundColor: entry.displayTotalPoints > 0 ? '#ff5a1f' : '#c9c9c9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Fire size={14} color="#fff" weight="fill" />
           </View>
         ) : null}
       </View>
-
       {entry ? (
-        <>
-          <Text
-            style={{ fontFamily: 'Inter_600SemiBold' }}
-            className="mt-2 text-sm text-[#1A1A1A]"
-            numberOfLines={1}>
-            {formatName(entry.name)}
-          </Text>
-          <Text className="mt-0.5 font-body text-xs text-[#817A76]">
+        <View style={{ width: '100%', paddingHorizontal: 2, gap: 2 }}>
+          <Text style={[type.name, { textAlign: 'center' }]}>{formatName(entry.name)}</Text>
+          <Text style={[type.caption, { textAlign: 'center' }]}>
             {entry.displayTotalPoints.toLocaleString()}{' '}
             {mode === 'streak'
               ? entry.displayTotalPoints === 1
@@ -137,9 +123,9 @@ export default function PodiumSlot({
                 ? 'pt'
                 : 'pts'}
           </Text>
-        </>
+        </View>
       ) : (
-        <View className="h-[30px]" />
+        <View style={{ minHeight: 30 }} />
       )}
     </Wrapper>
   );

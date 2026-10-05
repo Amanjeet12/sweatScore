@@ -1,10 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from 'convex/react';
 import { useState } from 'react';
-import { Alert, TouchableOpacity, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Menu, MenuOptions, MenuOption, MenuTrigger } from 'react-native-popup-menu';
 
 import { Avatar } from '~/components/core/Avatar';
+import {
+  communityStyles as community,
+  communityTypography as type,
+} from '~/components/core/design/CommunityStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -50,7 +54,7 @@ export default function CommentRow({ comment, onEdit }: CommentRowProps) {
         style: 'destructive',
         onPress: async () => {
           setIsLoading(true);
-          const [err] = await CatchPromise(deleteComment({ commentId: comment._id }));
+          await CatchPromise(deleteComment({ commentId: comment._id }));
           setIsLoading(false);
         },
       },
@@ -86,16 +90,16 @@ export default function CommentRow({ comment, onEdit }: CommentRowProps) {
   };
 
   return (
-    <View className="mb-4 border-b border-background-100 px-4 pb-4">
+    <View style={community.comment}>
       <View className="flex-row items-start gap-x-3">
-        <Avatar uri={comment.user.imageUrl} size={36} showGoldBorder name={comment.user.name} />
+        <Avatar uri={comment.user.imageUrl} size={44} name={comment.user.name} />
         <View className="flex-1">
           <View className="flex-row items-start justify-between">
             <View className="flex-1">
               <View className="flex-row items-center gap-x-1">
-                <Text className="font-bold text-black">{comment.user.name}</Text>
+                <Text style={type.author}>{comment.user.name}</Text>
               </View>
-              <Text className="text-sm text-hint">{formatDistanceToNow(comment.createdAt)}</Text>
+              <Text style={type.metadata}>{formatDistanceToNow(comment.createdAt)}</Text>
             </View>
             <Menu>
               <MenuTrigger>
@@ -114,13 +118,13 @@ export default function CommentRow({ comment, onEdit }: CommentRowProps) {
                     <MenuOption onSelect={handleEditComment} disabled={isLoading}>
                       <View className="flex-row items-center gap-x-3 px-2 py-2">
                         <Ionicons name="pencil-outline" size={18} color="black" />
-                        <Text className="text-base text-black">Edit</Text>
+                        <Text style={type.action}>Edit</Text>
                       </View>
                     </MenuOption>
                     <MenuOption onSelect={handleDeleteComment} disabled={isLoading}>
                       <View className="flex-row items-center gap-x-3 px-2 py-2">
                         <Ionicons name="trash-outline" size={18} color="red" />
-                        <Text className="text-base text-red-500">Delete</Text>
+                        <Text style={[type.action, { color: '#d92d20' }]}>Delete</Text>
                       </View>
                     </MenuOption>
                   </>
@@ -128,14 +132,16 @@ export default function CommentRow({ comment, onEdit }: CommentRowProps) {
                   <MenuOption onSelect={handleReportComment} disabled={isLoading}>
                     <View className="flex-row items-center gap-x-3 px-2 py-2">
                       <Ionicons name="flag-outline" size={18} color="black" />
-                      <Text className="text-base text-black">Report</Text>
+                      <Text style={type.action}>Report</Text>
                     </View>
                   </MenuOption>
                 )}
               </MenuOptions>
             </Menu>
           </View>
-          <Text className="mt-2 text-base text-black">{comment.body}</Text>
+          <Text className="mt-2" style={type.body}>
+            {comment.body}
+          </Text>
         </View>
       </View>
     </View>

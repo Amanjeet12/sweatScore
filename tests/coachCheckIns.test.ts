@@ -1,5 +1,7 @@
 // @ts-nocheck -- Bun test-only Convex handler fixtures.
 import { describe, expect, test } from 'bun:test';
+
+import { completeChallenge } from '../convex/challengeCompletions';
 import {
   myToday,
   ensureStandaloneAssignments,
@@ -14,8 +16,8 @@ import {
 } from '../convex/coachCheckIns';
 import { reserveProof } from '../convex/coachFoundation';
 import { createPost } from '../convex/posts';
-import { completeChallenge } from '../convex/challengeCompletions';
 import { getStreakEarnedDatesInRange } from '../convex/utils/streak';
+import { getMondayInTZ, addDaysUTC, ymdUTC } from '../convex/utils/timezone';
 import { checkInPostRoute } from '../shared/coachCheckInPresentation';
 
 const day = new Date().toISOString().slice(0, 10);
@@ -151,7 +153,20 @@ function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
           if (found.length > 1) throw Error('not unique');
           return found[0] ?? null;
         },
-        filter: () => chain,
+        filter: (callback: any) => {
+          const value = (term: any, row: any) => (typeof term === 'function' ? term(row) : term);
+          const expressions = {
+            field: (name: string) => (row: any) => row[name],
+            eq: (left: any, right: any) => (row: any) => value(left, row) === value(right, row),
+            neq: (left: any, right: any) => (row: any) => value(left, row) !== value(right, row),
+            or:
+              (...conditions: any[]) =>
+              (row: any) =>
+                conditions.some((condition) => condition(row)),
+          };
+          found = found.filter(callback(expressions));
+          return chain;
+        },
       };
       return chain;
     },
@@ -525,6 +540,43 @@ describe('plan-bound check-ins', () => {
     ]);
     const streakDays = await getStreakEarnedDatesInRange(s.ctx, 'alice', day, '9999-12-31');
     expect([...streakDays]).toEqual([day]);
+  });
+
+  test('a Coach post that reaches five unique streak dates awards the weekly milestone once', async () => {
+    const monday = getMondayInTZ(new Date(`${day}T12:00:00Z`), 'UTC');
+    const otherDays = Array.from({ length: 7 }, (_, i) => ymdUTC(addDaysUTC(monday, i)))
+      .filter((date) => date !== day)
+      .slice(0, 4);
+    const s = fixture({
+      dailyActivities: otherDays.map((date, i) => ({
+        _id: `prior_${i}`,
+        userId: 'alice',
+        date,
+        loggedActivityKey: 'workout',
+        reviewStatus: 'approved',
+      })),
+    });
+    const id = await reserveProof._handler(s.ctx, {
+      assignmentId: 'legs',
+      requestKey: 'weekly_capture_1',
+    });
+    const { token } = await issueUpload._handler(s.ctx, { submissionId: id });
+    s.rows._storage = [
+      { _id: 'weekly_media', _creationTime: Date.now() + 1, contentType: 'image/jpeg', size: 100 },
+    ];
+    await attachUploadedInternal._handler(s.ctx, {
+      userId: 'alice',
+      submissionId: id,
+      token,
+      storageId: 'weekly_media',
+    });
+    const posted = await complete._handler(s.ctx, { submissionId: id });
+    expect(posted.milestones).toEqual([
+      { type: 'weekly_target', current: 5, target: 5, key: ymdUTC(monday) },
+    ]);
+    expect((await complete._handler(s.ctx, { submissionId: id })).milestones).toEqual([]);
+    expect(s.rows.userMilestones).toHaveLength(1);
+    expect(s.rows.posts).toHaveLength(1);
   });
 
   test('one completion awards once, retains context, tracks one category and reversal consumes slot', async () => {

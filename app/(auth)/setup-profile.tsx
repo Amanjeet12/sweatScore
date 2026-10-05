@@ -3,11 +3,9 @@ import { Feather } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useQuery } from '@tanstack/react-query';
 import { useConvex, useMutation } from 'convex/react';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
-import { router, Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { router } from 'expo-router';
 import { Plus } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import {
@@ -15,20 +13,22 @@ import {
   Platform,
   Pressable,
   TouchableOpacity,
-  useWindowDimensions,
+  Keyboard,
+  TextInput,
   View,
 } from 'react-native';
-import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { Avatar } from '~/components/core/Avatar';
-import { ErrorMessage } from '~/components/core/ErrorMessage';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
-import { Button, ButtonText } from '~/components/ui/button';
-import { Input, InputField, InputSlot } from '~/components/ui/input';
+import {
+  PrototypeOnboarding,
+  PrototypeButton,
+  PrototypeError,
+  onboardingStyles as styles,
+} from '~/components/core/auth/PrototypeOnboarding';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
@@ -56,9 +56,7 @@ export default function SetupProfile() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const { isVisible: keyboardVisible } = useKeyboardState();
-  const heroHeight = Math.min(Math.max(windowHeight * 0.53, 360), 465);
+  const [nameFocused, setNameFocused] = useState(false);
 
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const setCurrentUserImage = useAuthStore((state) => state.setCurrentUserImage);
@@ -83,82 +81,90 @@ export default function SetupProfile() {
   const { data: currentUser, isPending } = useQuery(convexQuery(api.users.current, {}));
 
   const handleSubmit = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     setError(null);
+    try {
+      const result = await updateBioSchema.safeParse({ name: name.trim(), birthdate });
 
-    const result = await updateBioSchema.safeParse({ name, birthdate });
-
-    if (!result.success) {
-      setError(getZodErrorMessage(result.error));
-      setIsLoading(false);
-      return;
-    }
-
-    let imageId = undefined;
-
-    if (photo) {
-      const uploadUrl = await generrateUploadUrl();
-      const response = await fetch(photo.uri);
-      const blob = await response.blob();
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: photo.type ? { 'Content-Type': `${photo.type}/*` } : {},
-        body: blob,
-      });
-
-      if (!uploadResponse.ok) {
-        setError('Failed to upload image');
+      if (!result.success) {
+        setError(getZodErrorMessage(result.error));
         setIsLoading(false);
         return;
       }
 
-      const { storageId } = await uploadResponse.json();
-      imageId = storageId;
-    }
+      let imageId = undefined;
 
-    const [err, response] = await CatchPromise(
-      updateUser({
-        storageId: imageId,
-        name,
-        birthdate: date?.getTime(),
-      })
-    );
+      if (photo) {
+        const uploadUrl = await generrateUploadUrl();
+        const response = await fetch(photo.uri);
+        const blob = await response.blob();
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: photo.type ? { 'Content-Type': `${photo.type}/*` } : {},
+          body: blob,
+        });
 
-    if (err) {
-      setError(getErrorMessage(err.data));
+        if (!uploadResponse.ok) {
+          setError('Failed to upload image');
+          setIsLoading(false);
+          return;
+        }
+
+        const { storageId } = await uploadResponse.json();
+        imageId = storageId;
+      }
+
+      const [err, response] = await CatchPromise(
+        updateUser({
+          storageId: imageId,
+          name: name.trim(),
+          birthdate: birthdate?.getTime(),
+        })
+      );
+
+      if (err) {
+        setError(getErrorMessage(err.data));
+        setIsLoading(false);
+        return;
+      }
+
+      if (response) {
+        const user = await convex.query(api.users.current);
+        setCurrentUser(user);
+        await resumeMember(convex);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    if (response) {
-      const user = await convex.query(api.users.current);
-      setCurrentUser(user);
-      await resumeMember(convex);
-    }
-
-    setIsLoading(false);
   };
 
   const selectImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      selectionLimit: 1,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        selectionLimit: 1,
+      });
 
-    if (!result.canceled) {
-      const localphoto = result.assets[0];
-      setPhoto(localphoto);
-      setCurrentUserImage(localphoto.uri);
+      if (!result.canceled) {
+        const localphoto = result.assets[0];
+        setPhoto(localphoto);
+        setCurrentUserImage(localphoto.uri);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
   const onChange = (_event: any, selectedDate: any) => {
     if (!selectedDate) return;
     setDate(selectedDate);
-    if (Platform.OS === 'android') setBirthdate(selectedDate);
+    if (Platform.OS === 'android' && _event.type === 'set') setBirthdate(selectedDate);
   };
 
   useEffect(() => {
@@ -183,162 +189,131 @@ export default function SetupProfile() {
       .map((part) => part.charAt(0).toUpperCase())
       .join('') || 'SS';
 
+  const openDatePicker = () => {
+    Keyboard.dismiss();
+    setError(null);
+    if (Platform.OS === 'ios') setShowDatePicker(true);
+    else
+      DateTimePickerAndroid.open({
+        value: date,
+        onChange,
+        mode: 'date',
+        display: 'spinner',
+        maximumDate: tenYearsAgo,
+        minimumDate: new Date(1900, 0, 1),
+      });
+  };
+
   return (
-    <View className="flex-1 bg-white">
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
-
-      <Image
-        source={require('~/assets/onboarding/setupprofilescreen-clean-v2.png')}
-        contentFit="cover"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          height: heroHeight,
-        }}
-      />
-
-      <KeyboardStickyView style={{ flex: 1 }}>
-        <View className="flex-1">
-          <View style={{ width: '100%', height: heroHeight }} />
-
-          {keyboardVisible && <View className="flex-1" />}
-
-          <View
-            className="bg-white"
-            style={{
-              marginTop: -30,
-              borderTopLeftRadius: 32,
-              borderTopRightRadius: 32,
-            }}>
-            <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
-              {!keyboardVisible && (
-                <>
-                  <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-                    Make it yours
-                  </Text>
-                  <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
-                    Personalise your profile
-                  </Text>
-                  <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
-                    Help your Sweat Sisters recognise you.
-                  </Text>
-                </>
-              )}
-
-              <TouchableOpacity
-                accessibilityRole="button"
-                activeOpacity={0.75}
-                onPress={selectImage}
-                className={`${keyboardVisible ? 'mt-0' : 'mt-3'} h-[68px] flex-row items-center rounded-xl   bg-[#FFF9F6] px-3`}>
-                <View>
-                  {hasAvatar ? (
-                    <Avatar uri={avatarUri} size={48} name={name} />
-                  ) : (
-                    <View className="h-12 w-12 items-center justify-center rounded-full bg-[#FFF0E8]">
-                      <Text className="font-heading text-sm font-semibold text-primary-500">
-                        {initials}
-                      </Text>
-                    </View>
-                  )}
-                  <View className="absolute -bottom-0.5 -right-0.5 h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-primary-500">
-                    <Plus size={11} color="#FFFFFF" weight="bold" />
-                  </View>
-                </View>
-
-                <View className="ml-4 flex-1">
-                  <Text className="font-body text-sm font-bold text-[#1A1A1A]">
-                    {hasAvatar ? 'Change profile photo' : 'Add a profile photo'}
-                  </Text>
-                  <Text className="mt-1 font-body text-xs text-[#838383]">
-                    Optional · JPG or PNG
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <Text className="mb-2 mt-3 font-body text-xs font-bold text-[#4A4745]">
-                Your name
-              </Text>
-              <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
-                <InputField
-                  className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
-                  placeholder="What should we call you?"
-                  autoComplete="name"
-                  returnKeyType="next"
-                  value={name}
-                  onChangeText={(text) => {
-                    setError(null);
-                    setName(text);
-                  }}
-                />
-              </Input>
-
-              <Text className="mb-2 mt-3 font-body text-xs font-bold text-[#4A4745]">
-                Date of birth
-              </Text>
-              {Platform.OS === 'ios' ? (
-                <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
-                  <InputField
-                    className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
-                    placeholder="DD / MM / YYYY"
-                    value={formatDateToLocaleString(birthdate)}
-                    editable={false}
-                    onPressIn={() => setShowDatePicker(true)}
-                  />
-                  <InputSlot className="pr-4" onPress={() => setShowDatePicker(true)}>
-                    <Feather name="calendar" size={19} color="#FF5C1A" />
-                  </InputSlot>
-                </Input>
-              ) : (
-                <Input size="xl" variant="outline" className="h-14 rounded-xl bg-white">
-                  <TouchableOpacity
-                    className="flex-1"
-                    onPress={() =>
-                      DateTimePickerAndroid.open({
-                        value: date,
-                        onChange,
-                        mode: 'date',
-                        display: 'spinner',
-                        maximumDate: tenYearsAgo,
-                        minimumDate: new Date(1900, 0, 1),
-                      })
-                    }>
-                    <InputField
-                      className="font-body text-base text-[#1A1A1A] placeholder:text-[#AAA5A1]"
-                      placeholder="DD / MM / YYYY"
-                      value={formatDateToLocaleString(birthdate)}
-                      editable={false}
-                    />
-                  </TouchableOpacity>
-                  <InputSlot className="pr-4">
-                    <Feather name="calendar" size={19} color="#FF5C1A" />
-                  </InputSlot>
-                </Input>
-              )}
-
-              <View className="mt-2 items-center">
-                <ErrorMessage error={error} />
+    <>
+      <PrototypeOnboarding
+        stickyFooter
+        image={require('~/assets/onboarding/profile-portrait.jpg')}
+        profile
+        onBack={router.back}
+        footer={<PrototypeButton label="Continue" onPress={handleSubmit} loading={isLoading} />}>
+        <Text style={styles.heading}>Personalise your profile</Text>
+        <Text style={styles.subtitle}>Help your Sweat Sisters recognise you.</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={hasAvatar ? 'Change profile photo' : 'Add a profile photo'}
+          disabled={isLoading}
+          activeOpacity={0.75}
+          onPress={selectImage}
+          style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View>
+            {hasAvatar ? (
+              <Avatar uri={avatarUri} size={72} name={name} />
+            ) : (
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: '#fff3ea',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 22, color: '#e8541e' }}>
+                  {initials}
+                </Text>
               </View>
+            )}
+            <View
+              style={{
+                position: 'absolute',
+                right: -2,
+                bottom: -2,
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                borderWidth: 2,
+                borderColor: '#fff',
+                backgroundColor: '#ff5a1f',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Plus size={12} color="#fff" weight="bold" />
             </View>
           </View>
-
-          {!keyboardVisible && <View className="flex-1 bg-white" />}
-
-          <SafeAreaView edges={['bottom']} className="bg-white">
-            <View className="bg-white px-6 pb-4 pt-2">
-              <OnboardingPrimaryButton
-                label="Continue"
-                onPress={handleSubmit}
-                isLoading={isLoading}
-              />
-            </View>
-          </SafeAreaView>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                ...type.cardTitle,
+              }}>
+              {hasAvatar ? 'Change profile photo' : 'Add a profile photo'}
+            </Text>
+            <Text style={[styles.small, { marginTop: 2 }]}>Optional · JPG or PNG</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.label}>Your name</Text>
+        <TextInput
+          accessibilityLabel="Your name"
+          style={[
+            styles.field,
+            {
+              borderColor: error && !name.trim() ? '#d92d20' : nameFocused ? '#2a2a2a' : '#ececec',
+            },
+          ]}
+          placeholder="What should we call you?"
+          placeholderTextColor="#8a8a8a"
+          autoComplete="name"
+          returnKeyType="next"
+          editable={!isLoading}
+          value={name}
+          onFocus={() => setNameFocused(true)}
+          onBlur={() => setNameFocused(false)}
+          onSubmitEditing={openDatePicker}
+          onChangeText={(text) => {
+            setError(null);
+            setName(text);
+          }}
+        />
+        <Text style={styles.label}>Date of birth</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Date of birth"
+          disabled={isLoading}
+          onPress={openDatePicker}
+          style={[
+            styles.fieldContainer,
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+          ]}>
+          <Text
+            style={{
+              ...type.field,
+              flex: 1,
+              marginRight: 12,
+              color: birthdate ? '#2a2a2a' : '#8a8a8a',
+            }}>
+            {birthdate ? formatDateToLocaleString(birthdate) : 'DD / MM / YYYY'}
+          </Text>
+          <Feather name="calendar" size={22} color="#e8541e" />
+        </TouchableOpacity>
+        <View style={{ marginTop: 8 }}>
+          <PrototypeError error={error} />
         </View>
-      </KeyboardStickyView>
-
+      </PrototypeOnboarding>
       {Platform.OS === 'ios' && (
         <Modal
           transparent
@@ -367,25 +342,17 @@ export default function SetupProfile() {
                 maximumDate={tenYearsAgo}
                 minimumDate={new Date(1900, 0, 1)}
               />
-              <Button
-                variant="solid"
-                action="primary"
-                size="xl"
-                className="h-14 rounded-lg"
+              <PrototypeButton
+                label="Confirm"
                 onPress={() => {
                   setBirthdate(date);
                   setShowDatePicker(false);
-                }}>
-                <ButtonText className="font-heading text-base font-semibold text-white">
-                  Confirm
-                </ButtonText>
-              </Button>
+                }}
+              />
             </Pressable>
           </Pressable>
         </Modal>
       )}
-
-      <OnboardingHeroChrome onBack={router.back} />
-    </View>
+    </>
   );
 }

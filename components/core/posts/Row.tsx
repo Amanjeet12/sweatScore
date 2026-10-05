@@ -22,6 +22,10 @@ import Share from 'react-native-share';
 
 import { Avatar } from '~/components/core/Avatar';
 import {
+  communityStyles as community,
+  communityTypography as type,
+} from '~/components/core/design/CommunityStyles';
+import {
   AlertDialog,
   AlertDialogBackdrop,
   AlertDialogBody,
@@ -588,21 +592,17 @@ export default function PostRow({
   };
 
   return (
-    <View className="border-b border-[#E8E8E8] bg-white">
-      <View className="bg-white px-5 pb-1 pt-5">
+    <View style={community.post}>
+      <View style={community.postContent}>
         <View className="flex-row items-start gap-x-3">
           <View>
-            <Avatar uri={post.user.imageUrl} size={40} name={post?.user?.name} />
+            <Avatar uri={post.user.imageUrl} size={44} name={post?.user?.name} />
           </View>
           <View className="flex-1 flex-col">
             <View className="flex-row justify-between gap-x-2">
               <View className="flex-1">
                 <View className="flex-row items-center gap-x-1">
-                  <Text
-                    style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="text-base text-[#1A1A1A]">
-                    {post.user.name}
-                  </Text>
+                  <Text style={[type.author, { flexShrink: 1 }]}>{post.user.name}</Text>
                   {post.user.hasHit500 && (
                     <ExpoImage
                       source={require('~/assets/icons/500points.png')}
@@ -611,7 +611,7 @@ export default function PostRow({
                     />
                   )}
                 </View>
-                <Text className="mt-0.5 font-body text-xs text-[#777777]" numberOfLines={1}>
+                <Text style={type.metadata}>
                   {formatDistanceToNow(post.createdAt)} ·{' '}
                   {post.challenge
                     ? post.challenge.name
@@ -641,7 +641,7 @@ export default function PostRow({
                         <MenuOption onSelect={handleEditPost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="pencil-outline" size={18} color="black" />
-                            <Text className="text-base text-black">Edit</Text>
+                            <Text style={type.action}>Edit</Text>
                           </View>
                         </MenuOption>
                         {currentUser?.isAdmin && (
@@ -654,9 +654,7 @@ export default function PostRow({
                                 size={18}
                                 color="black"
                               />
-                              <Text className="text-base text-black">
-                                {isFeatured ? 'Unpin' : 'Pin'}
-                              </Text>
+                              <Text style={type.action}>{isFeatured ? 'Unpin' : 'Pin'}</Text>
                             </View>
                           </MenuOption>
                         )}
@@ -666,14 +664,14 @@ export default function PostRow({
                             <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
                               <View className="flex-row items-center gap-x-3 px-2 py-2">
                                 <Ionicons size={20} name="download-outline" color="black" />
-                                <Text className="text-base text-black">Download</Text>
+                                <Text style={type.action}>Download</Text>
                               </View>
                             </MenuOption>
                           )}
                         <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="trash-outline" size={18} color="red" />
-                            <Text className="text-base text-red-500">Delete</Text>
+                            <Text style={[type.action, { color: '#d92d20' }]}>Delete</Text>
                           </View>
                         </MenuOption>
                       </>
@@ -683,20 +681,20 @@ export default function PostRow({
                           <MenuOption onSelect={handleUnpinPost} disabled={isLoading}>
                             <View className="flex-row items-center gap-x-3 px-2 py-2">
                               <Ionicons name="close-circle-outline" size={18} color="black" />
-                              <Text className="text-base text-black">Unpin</Text>
+                              <Text style={type.action}>Unpin</Text>
                             </View>
                           </MenuOption>
                         ) : null}
                         <MenuOption onSelect={handleDeletePost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="trash-outline" size={18} color="red" />
-                            <Text className="text-base text-red-500">Delete Post</Text>
+                            <Text style={[type.action, { color: '#d92d20' }]}>Delete Post</Text>
                           </View>
                         </MenuOption>
                         <MenuOption onSelect={handleReportPost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="flag-outline" size={18} color="black" />
-                            <Text className="text-base text-black">Report Post</Text>
+                            <Text style={type.action}>Report Post</Text>
                           </View>
                         </MenuOption>
                         {downloadableVideoUrl &&
@@ -705,14 +703,14 @@ export default function PostRow({
                             <MenuOption onSelect={handleDownloadVideo} disabled={isLoading}>
                               <View className="flex-row items-center gap-x-3 px-2 py-2">
                                 <Ionicons size={20} name="download-outline" color="black" />
-                                <Text className="text-base text-black">Download</Text>
+                                <Text style={type.action}>Download</Text>
                               </View>
                             </MenuOption>
                           )}
                         <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="ban-outline" size={18} color="red" />
-                            <Text className="text-base text-red-500">Block User</Text>
+                            <Text style={[type.action, { color: '#d92d20' }]}>Block User</Text>
                           </View>
                         </MenuOption>
                       </>
@@ -721,13 +719,13 @@ export default function PostRow({
                         <MenuOption onSelect={handleReportPost} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="flag-outline" size={18} color="black" />
-                            <Text className="text-base text-black">Report Post</Text>
+                            <Text style={type.action}>Report Post</Text>
                           </View>
                         </MenuOption>
                         <MenuOption onSelect={handleBlockUser} disabled={isLoading}>
                           <View className="flex-row items-center gap-x-3 px-2 py-2">
                             <Ionicons name="ban-outline" size={18} color="red" />
-                            <Text className="text-base text-red-500">Block User</Text>
+                            <Text style={[type.action, { color: '#d92d20' }]}>Block User</Text>
                           </View>
                         </MenuOption>
                       </>
@@ -740,8 +738,8 @@ export default function PostRow({
         </View>
         {/* Body text */}
         {post.body ? (
-          <View className="mt-4">
-            <Text className="font-body text-[15px] leading-[22px] text-[#252321]">{post.body}</Text>
+          <View className="mt-3">
+            <Text style={type.body}>{post.body}</Text>
           </View>
         ) : null}
         {/* Media — edge to edge */}
@@ -814,8 +812,8 @@ export default function PostRow({
             </View>
           )
         )}
-        <View className="mt-2 flex-row items-center justify-between">
-          <View className="flex-row items-center gap-x-2">
+        <View style={community.reactions}>
+          <View style={community.reactionGroup}>
             {[
               { emoji: '🔥', label: 'Fire', reaction: 'fire' as const, count: optimisticFireCount },
               {
@@ -839,9 +837,9 @@ export default function PostRow({
                 onPress={() =>
                   optimisticIsLiked ? handleLongPress() : handleReactionSelect(reaction)
                 }
-                className="min-h-11 flex-row items-center gap-x-1">
-                <Text style={{ fontSize: 23, lineHeight: 30 }}>{emoji}</Text>
-                <Text className="font-body text-sm text-[#777777]">{intToString(count)}</Text>
+                style={community.reaction}>
+                <Text style={{ fontSize: 22, lineHeight: 26 }}>{emoji}</Text>
+                <Text style={type.count}>{intToString(count)}</Text>
               </Pressable>
             ))}
           </View>
@@ -850,11 +848,9 @@ export default function PostRow({
               onPress={handleViewComments}
               accessibilityRole="button"
               accessibilityLabel={`${post.commentCount} comments`}
-              className="min-h-11 flex-row items-center gap-x-1.5">
-              <Icon.Chat size={20} color="#777777" />
-              <Text className="font-body text-sm text-[#777777]">
-                {intToString(post.commentCount)}
-              </Text>
+              style={community.reaction}>
+              <Icon.Chat size={22} color="#6f6f6f" />
+              <Text style={type.count}>{intToString(post.commentCount)}</Text>
             </TouchableOpacity>
             {post.user.isAuthor || currentUser?.isAdmin ? (
               <TouchableOpacity
@@ -866,7 +862,7 @@ export default function PostRow({
                 {sharing ? (
                   <ActivityIndicator size="small" color="#777777" />
                 ) : (
-                  <Icon.ShareNetwork size={20} color="#777777" />
+                  <Icon.ShareNetwork size={22} color="#6f6f6f" />
                 )}
               </TouchableOpacity>
             ) : null}
@@ -950,16 +946,14 @@ export default function PostRow({
                 style={{ backgroundColor: colors.primary }}>
                 <Icon.Flag size={16} weight="fill" color="white" />
               </View>
-              <Text className="font-bold" size="2xl">
-                Report Post
-              </Text>
+              <Text style={type.heading}>Report Post</Text>
             </View>
           </AlertDialogHeader>
           <AlertDialogBody className="mb-4 mt-4">
-            <Text size="lg" className="mb-2 font-semibold">
+            <Text className="mb-2" style={type.body}>
               Help us understand what's wrong with this post. Your report is anonymous.
             </Text>
-            <Text size="md" className="mb-4 font-semibold text-red-500">
+            <Text className="mb-4" style={type.error}>
               This action is irreversible and you won't see this post again.
             </Text>
             <View className="mt-4 flex-col gap-y-2">
@@ -990,7 +984,7 @@ export default function PostRow({
                 disabled={isLoading || !reportReason}
                 loading={isLoading}
                 onPress={handleReportSubmit}>
-                <ButtonText className="text-xl font-bold text-white">Submit Report</ButtonText>
+                <ButtonText style={type.button}>Submit Report</ButtonText>
               </LoadingButton>
               <Button
                 variant="outline"
@@ -1002,7 +996,7 @@ export default function PostRow({
                   setShowReportModal(false);
                   setReportReason(null);
                 }}>
-                <ButtonText className="text-xl font-bold text-red-500">Cancel</ButtonText>
+                <ButtonText style={[type.button, { color: '#d92d20' }]}>Cancel</ButtonText>
               </Button>
             </View>
           </AlertDialogFooter>
@@ -1026,17 +1020,15 @@ export default function PostRow({
                 style={{ backgroundColor: '#ef4444' }}>
                 <Icon.ProhibitInset size={16} weight="fill" color="white" />
               </View>
-              <Text className="font-bold" size="2xl">
-                Block User
-              </Text>
+              <Text style={type.heading}>Block User</Text>
             </View>
           </AlertDialogHeader>
           <AlertDialogBody className="mb-4 mt-4">
-            <Text size="lg" className="mb-2 font-semibold">
+            <Text className="mb-2" style={type.body}>
               You won't see posts from {post.user.name} anymore. They won't be notified that you've
               blocked them.
             </Text>
-            <Text size="md" className="mb-4 font-semibold text-red-500">
+            <Text className="mb-4" style={type.error}>
               This action is irreversible. You cannot unblock this user later.
             </Text>
             <View className="mt-4 flex-col gap-y-2">
@@ -1067,7 +1059,7 @@ export default function PostRow({
                 disabled={isLoading || !blockReason}
                 loading={isLoading}
                 onPress={handleBlockSubmit}>
-                <ButtonText className="text-xl font-bold text-white">Block User</ButtonText>
+                <ButtonText style={type.button}>Block User</ButtonText>
               </LoadingButton>
               <Button
                 variant="outline"
@@ -1078,7 +1070,7 @@ export default function PostRow({
                   setShowBlockModal(false);
                   setBlockReason(null);
                 }}>
-                <ButtonText className="text-xl font-bold text-gray-500">Cancel</ButtonText>
+                <ButtonText style={[type.button, { color: '#6f6f6f' }]}>Cancel</ButtonText>
               </Button>
             </View>
           </AlertDialogFooter>

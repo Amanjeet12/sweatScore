@@ -5,13 +5,22 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Icon from 'phosphor-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  TouchableOpacity,
+  View,
+  Platform,
+} from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
+import { OnboardingPaywall } from '~/components/core/auth/OnboardingPaywall';
 import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { freeTrialLabel } from '~/shared/subscriptionPresentation';
 import { useAuthStore } from '~/store/useAuthStore';
 import { CatchPromise } from '~/utils/catch-promise';
 import { resumeMember } from '~/utils/coachResumeNavigation';
@@ -140,8 +149,16 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
-  const { packages, purchasePackage, restorePermissions, hasActiveStoreSubscription } =
-    useRevenueCat();
+  const {
+    packages,
+    purchasePackage,
+    restorePermissions,
+    hasActiveStoreSubscription,
+    offeringsLoading,
+    storeUserIdentified,
+    offeringsError,
+    reloadOfferings,
+  } = useRevenueCat();
 
   useEffect(() => {
     // A delayed webhook or a verified restore after restart uses persisted server state.
@@ -162,6 +179,40 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
     () => packages.find((pkg) => pkg.identifier === ANNUAL_PACKAGE_ID),
     [packages]
   );
+
+  const [eligibleProductIds, setEligibleProductIds] = useState<string[]>([]);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  useEffect(() => {
+    if (!onboarding || Platform.OS !== 'ios') return;
+    setEligibleProductIds([]);
+    setCheckingEligibility(Boolean(packages.length && storeUserIdentified));
+    if (!packages.length || !storeUserIdentified) return;
+    let cancelled = false;
+    Purchases.checkTrialOrIntroductoryPriceEligibility(
+      packages.map((pkg) => pkg.product.identifier)
+    )
+      .then((results) => {
+        if (!cancelled)
+          setEligibleProductIds(
+            Object.entries(results)
+              .filter(
+                ([, result]) =>
+                  result.status ===
+                  Purchases.INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+              )
+              .map(([id]) => id)
+          );
+      })
+      .catch(() => {
+        /* Unknown eligibility must never promise a trial. */
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingEligibility(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onboarding, packages, currentUser?._id, storeUserIdentified]);
 
   const isPackagesLoading = !monthlyPackage && !annualPackage;
 
@@ -361,6 +412,44 @@ export default function Paywall({ onboarding = false }: { onboarding?: boolean }
       setIsRestoring(false);
     }
   };
+
+  if (onboarding) {
+    const trial = freeTrialLabel(
+      storeUserIdentified ? selectedPackage?.product : undefined,
+      Platform.OS,
+      storeUserIdentified && eligibleProductIds.includes(selectedPackage?.product.identifier ?? '')
+    );
+    return (
+      <OnboardingPaywall
+        firstName={firstName}
+        annualPackage={annualPackage}
+        monthlyPackage={monthlyPackage}
+        selectedPackage={selectedPackage}
+        selectPackage={setSelectedPackage}
+        annualMonthlyPrice={annualMonthlyPrice}
+        annualOfferLabel={annualOfferLabel}
+        trial={trial}
+        checkingEligibility={checkingEligibility}
+        offeringsLoading={offeringsLoading}
+        offeringsError={offeringsError}
+        reloadOfferings={reloadOfferings}
+        busy={isLoading || isRestoring || isLoggingOut}
+        purchasing={isLoading}
+        restoring={isRestoring}
+        loggingOut={isLoggingOut}
+        hasActiveStoreSubscription={hasActiveStoreSubscription}
+        ctaDisabled={
+          hasActiveStoreSubscription
+            ? isRestoring || isLoggingOut || !restorePermissions
+            : isCtaDisabled || checkingEligibility
+        }
+        restoreDisabled={!restorePermissions || isRestoring || isLoading || isLoggingOut}
+        onPurchase={handlePrimaryAction}
+        onRestore={handleRestore}
+        onBackToLogin={handleBackToLogin}
+      />
+    );
+  }
 
   return (
     <View className="flex-1 bg-[#F8FAFB]">

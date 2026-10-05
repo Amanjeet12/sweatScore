@@ -4,8 +4,8 @@ import { Barbell, CrownSimple, Fire, Rows, Trophy } from 'phosphor-react-native'
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View } from 'react-native';
 
-import UpdateAvailableBanner from '~/components/core/dashboard/UpdateAvailableBanner';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import UpdateAvailableBanner from '~/components/core/dashboard/UpdateAvailableBanner';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useActivateUser } from '~/hooks/useActivateUser';
@@ -29,7 +29,8 @@ function ActiveTabLayout() {
   const setCurrentTab = useTabStore((state) => state.setCurrentTab);
   const currentUser = useAuthStore((state) => state.currentUser);
   const pathname = usePathname();
-  const isWorkoutDetail = pathname.startsWith('/dashboard/creators/');
+  const isWorkoutDetail =
+    pathname.startsWith('/dashboard/creators/') || pathname.startsWith('/workouts/creators/');
   const appState = useRef(AppState.currentState);
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const { activateUser } = useActivateUser();

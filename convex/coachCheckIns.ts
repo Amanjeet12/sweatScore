@@ -1,5 +1,8 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
+
+import { internal } from './_generated/api';
+import { Id } from './_generated/dataModel';
 import {
   mutation,
   query,
@@ -8,8 +11,7 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
-import { internal } from './_generated/api';
-import { Id } from './_generated/dataModel';
+import { evaluateUserMilestones } from './utils/milestones';
 import { formatDateInTZ } from './utils/timezone';
 import { rewardSlotKey } from '../shared/coachFoundation';
 
@@ -331,6 +333,7 @@ export const complete = mutation({
       throw new ConvexError('Submission does not belong to member');
     if (submission.state === 'completed')
       return {
+        milestones: [],
         pointsEarned: POINTS[submission.category],
         activityId: submission.activityId,
         postId: submission.postId,
@@ -425,7 +428,8 @@ export const complete = mutation({
       userId,
       date: submission.day,
     });
-    return { pointsEarned: points, activityId, postId };
+    const milestones = await evaluateUserMilestones(ctx, userId, submission.day);
+    return { pointsEarned: points, activityId, postId, milestones };
   },
 });
 

@@ -1,3 +1,4 @@
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useConvex, useMutation } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -5,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ImagePickerAsset } from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { X } from 'phosphor-react-native';
+import { ImageSquare, VideoCamera, X } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,19 +15,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import * as Progress from 'react-native-progress';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
-import { ErrorMessage } from '~/components/core/ErrorMessage';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import {
+  communityStyles as community,
+  communityTypography as type,
+} from '~/components/core/design/CommunityStyles';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
-import { Input, InputField } from '~/components/ui/input';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -40,6 +43,8 @@ export default function EditPost() {
   const { postId } = useLocalSearchParams();
   const convex = useConvex();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const [composerHeight, setComposerHeight] = useState(105);
   const currentUser = useAuthStore((state) => state.currentUser);
   const { requireSubscription } = useSubscriptionGuard();
 
@@ -298,17 +303,23 @@ export default function EditPost() {
 
   if (pageLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+      <SafeAreaView edges={['left', 'right']} className="flex-1 bg-white">
         <Stack.Screen
           options={{
             title: '',
-            headerStyle: { backgroundColor: '#F9F9F9' },
+            headerStyle: { backgroundColor: '#fff' },
             headerShadowVisible: false,
             headerBackVisible: false,
-            headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
-            headerTitle: () => (
-              <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Edit Post</Text>
+            headerLeft: () => (
+              <BackButton
+                iconColor="#2a2a2a"
+                iconSize={22}
+                accessibilityLabel="Go back"
+                fallbackHref="/(tabs)/share"
+                text=""
+              />
             ),
+            headerTitle: () => <Text style={type.heading}>Edit Post</Text>,
           }}
         />
         <ScreenLoading className="bg-transparent" />
@@ -317,61 +328,67 @@ export default function EditPost() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+    <SafeAreaView edges={['left', 'right']} className="flex-1 bg-white">
       <Stack.Screen
         options={{
           title: '',
           headerTitleAlign: 'center',
-          headerStyle: { backgroundColor: '#F9F9F9' },
+          headerStyle: { backgroundColor: '#fff' },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerLeft: () => <BackButton fallbackHref="/(tabs)/share" text="" />,
-          headerTitle: () => (
-            <Text className="font-heading text-xl font-semibold text-[#1A1A1A]">Edit Post</Text>
+          headerLeft: () => (
+            <BackButton
+              iconColor="#2a2a2a"
+              iconSize={22}
+              accessibilityLabel="Go back"
+              fallbackHref="/(tabs)/share"
+              text=""
+            />
           ),
+          headerTitle: () => <Text style={type.heading}>Edit Post</Text>,
         }}
       />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}>
+        keyboardVerticalOffset={headerHeight}>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {/* Avatar + input */}
-          <View className="flex-row items-start gap-x-3 px-4 pt-4">
-            <Avatar
-              uri={currentUser?.image ?? undefined}
-              size={46}
-              showGoldBorder
-              name={currentUser?.name}
-            />
+          <View className="flex-row items-start gap-x-3 px-[22px] pt-4">
+            <Avatar uri={currentUser?.image ?? undefined} size={44} name={currentUser?.name} />
             <View className="flex-1">
-              <Input className="h-auto border-0 bg-transparent">
-                <InputField
-                  multiline
-                  autoFocus
-                  className="border-0 bg-transparent text-base"
-                  placeholder={`What's on your mind, ${userName}?`}
-                  value={body}
-                  onChangeText={(text) => {
-                    setError(null);
-                    setBody(text);
-                  }}
-                  style={{
-                    fontSize: 16,
-                    minHeight: 80,
-                    ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
-                  }}
-                />
-              </Input>
+              <Text style={type.author}>{currentUser?.name ?? 'You'}</Text>
+              <TextInput
+                multiline
+                accessibilityLabel="Community post"
+                placeholderTextColor="#8a8a8a"
+                onContentSizeChange={(event) =>
+                  setComposerHeight(Math.max(105, event.nativeEvent.contentSize.height + 8))
+                }
+                scrollEnabled={false}
+                autoFocus
+                placeholder={`What's on your mind, ${userName}?`}
+                value={body}
+                onChangeText={(text) => {
+                  setError(null);
+                  setBody(text);
+                }}
+                style={{
+                  ...community.field,
+                  height: composerHeight,
+                  width: '100%',
+                  ...(Platform.OS === 'android' ? { textAlignVertical: 'top' } : {}),
+                }}
+              />
             </View>
           </View>
 
           {/* Media preview */}
-          <View className="mt-4 px-4">
+          <View className="mt-4 px-[22px]">
             {mediaLoading ? (
               <View className="flex h-[50px] w-full items-center justify-center">
                 <ActivityIndicator />
@@ -385,7 +402,7 @@ export default function EditPost() {
                       style={{ width: 48, height: 48 }}
                       resizeMode="contain"
                     />
-                    <Text className="mt-2 font-body text-sm text-[#838383]">
+                    <Text className="mt-2" style={type.metadata}>
                       {uploadingMedia ? 'Uploading video...' : 'Video ready'}
                     </Text>
                   </View>
@@ -397,7 +414,7 @@ export default function EditPost() {
                         width: '100%',
                         height: undefined,
                         aspectRatio: (media?.width ?? 1) / (media?.height ?? 1),
-                        borderRadius: 10,
+                        borderRadius: 16,
                       }}
                       blurRadius={uploadingMedia ? 5 : 0}
                     />
@@ -428,19 +445,21 @@ export default function EditPost() {
             ) : null}
           </View>
 
-          <ErrorMessage error={error ?? null} className="mx-4 mt-4" />
+          {error ? (
+            <Text accessibilityRole="alert" className="mx-[22px] mt-4" style={type.error}>
+              {error}
+            </Text>
+          ) : null}
         </ScrollView>
 
         {/* Bottom bar — media buttons + update */}
-        <View className="border-t border-t-[#EEEAE5] bg-[#F9F9F9] px-4 pb-4 pt-3">
+        <View style={[community.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Upload progress bar */}
           {uploadingMedia && (
             <View className="mb-3">
               <View className="mb-1 flex-row items-center justify-between">
-                <Text className="font-body text-xs text-[#838383]">Uploading...</Text>
-                <Text className="font-body text-xs text-[#1A1A1A]">
-                  {Math.round(uploadProgress * 100)}%
-                </Text>
+                <Text style={type.metadata}>Uploading...</Text>
+                <Text style={type.metadata}>{Math.round(uploadProgress * 100)}%</Text>
               </View>
               <View className="h-1.5 w-full overflow-hidden rounded-full bg-[#EEEAE5]">
                 <View
@@ -450,32 +469,40 @@ export default function EditPost() {
               </View>
             </View>
           )}
-          <View className="mb-4 flex-row items-center gap-x-6">
+          <View className="mb-4 flex-row flex-wrap items-center gap-3">
             {!media && (
               <>
                 <TouchableOpacity
                   onPress={selectImage}
                   disabled={isUploading}
-                  className="items-center">
-                  <Image
-                    source={require('~/assets/post-types/images.png')}
-                    style={{ width: 24, height: 24, opacity: isUploading ? 0.4 : 1 }}
-                    resizeMode="contain"
+                  accessibilityRole="button"
+                  accessibilityLabel="Add photo"
+                  style={community.action}>
+                  <ImageSquare
+                    size={22}
+                    color="#ff5a1f"
+                    style={{ opacity: isUploading ? 0.4 : 1 }}
                   />
-                  <Text className="mt-1 font-body text-xs text-[#838383]">Pic</Text>
+                  <Text className="mt-1" style={type.action}>
+                    Photo
+                  </Text>
                 </TouchableOpacity>
 
                 {currentUser?.isAdmin && (
                   <TouchableOpacity
                     onPress={selectVideo}
                     disabled={isUploading}
-                    className="items-center">
-                    <Image
-                      source={require('~/assets/post-types/video.png')}
-                      style={{ width: 24, height: 24, opacity: isUploading ? 0.4 : 1 }}
-                      resizeMode="contain"
+                    accessibilityRole="button"
+                    accessibilityLabel="Add video"
+                    style={community.action}>
+                    <VideoCamera
+                      size={22}
+                      color="#ff5a1f"
+                      style={{ opacity: isUploading ? 0.4 : 1 }}
                     />
-                    <Text className="mt-1 font-body text-xs text-[#838383]">Vid</Text>
+                    <Text className="mt-1" style={type.action}>
+                      Video
+                    </Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -488,14 +515,14 @@ export default function EditPost() {
             action="primary"
             className="h-14 w-full rounded-full"
             style={{
-              backgroundColor: !body || isUploading || isLoading ? '#F5D5C8' : '#FF5C1A',
+              ...community.button,
+              backgroundColor: '#2a2a2a',
+              opacity: !body || isUploading || isLoading ? 0.45 : 1,
             }}
             loading={isLoading}
             disabled={!body || isUploading || isLoading}
             onPress={handleSubmit}>
-            <ButtonText className="text-lg text-white" style={{ fontFamily: 'Inter_700Bold' }}>
-              Update
-            </ButtonText>
+            <ButtonText style={type.button}>Update</ButtonText>
           </LoadingButton>
         </View>
       </KeyboardAvoidingView>

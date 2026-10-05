@@ -7,7 +7,7 @@ export function CheckInVideoPreview({ uri }: { uri: string }) {
   });
 
   return (
-    <View className="w-full overflow-hidden rounded-[24px] bg-black" style={{ aspectRatio: 4 / 5 }}>
+    <View className="w-full overflow-hidden rounded-[22px] bg-black" style={{ aspectRatio: 4 / 5 }}>
       <VideoView
         player={player}
         style={{ width: '100%', height: '100%' }}

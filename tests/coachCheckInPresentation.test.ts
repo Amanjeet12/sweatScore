@@ -134,9 +134,12 @@ describe('plan-derived check-in presentation', () => {
     expect(source).not.toContain('Start live proof');
     expect(source).not.toContain('Cancel capture');
     expect(source).not.toContain('Cancel camera');
-    expect(source).toContain('accessibilityLabel="Close check-in"');
-    expect(source).toContain('onPress={closeSheet}');
-    expect(source).toContain('Linking.openURL(workoutSearch.url)');
+    const chrome = readFileSync(
+      new URL('../components/core/design/CheckInChrome.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(source).toContain('<CheckInSheetHeader onClose={closeSheet}');
+    expect(chrome).toContain('label="Close check-in"');
     expect(source).toContain("category === 'meals'");
     expect(source).toContain('placeholder="Add a caption"');
     expect(source).toContain('Retake photo');
@@ -144,7 +147,7 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('publishMeal');
     expect(source).toContain("primaryLabel = 'Analyse meal using AI'");
     expect(source).toContain('Share without AI analysis');
-    expect(source).toContain('AI MEAL ANALYSIS');
+    expect(source).toContain("meal?.draft?.status === 'analyzing'");
     expect(source).toContain('mealAnalysisLimitReached');
     expect(source).toContain('Private feedback');
     expect(source).not.toContain('Upload photo to analyse');
@@ -161,7 +164,7 @@ describe('plan-derived check-in presentation', () => {
       new URL('../components/core/dashboard/CoachCheckInFlow.tsx', import.meta.url),
       'utf8'
     );
-    expect(source).toContain('DAILY ACTIVITY');
+    expect(source).toContain('CheckInHeader');
     expect(source).toContain('+{points} {pointsLabel(points)}');
     expect(source).toContain('randomCoachCheckInCaption(category)');
     expect(source).toContain("'Remove photo and retake'");

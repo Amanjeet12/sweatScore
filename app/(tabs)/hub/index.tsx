@@ -1,13 +1,12 @@
 import { useQuery } from 'convex/react';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SectionList, Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SectionList, View } from 'react-native';
 
-import SafeAreaView from '~/components/core/SafeAreaView';
+import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import TabPageHeader from '~/components/core/TabPageHeader';
 import CommunityChallengeCard from '~/components/core/challenges/CommunityChallengeCard';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { Id } from '~/convex/_generated/dataModel';
@@ -16,7 +15,6 @@ import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
 import { useAuthStore } from '~/store/useAuthStore';
 
 export default function ChallengesScreen() {
-  const insets = useSafeAreaInsets();
   const [refreshToken, setRefreshToken] = useState(() => Math.floor(Date.now() / 60000));
   const userId = useAuthStore((state) => state.currentUser?._id);
   const queryResult = useQuery(api.challengeCompletions.getCommunityChallenges, { refreshToken });
@@ -73,30 +71,33 @@ export default function ChallengesScreen() {
           sections={sections}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section }) => (
-            <Text className="mb-4 font-heading text-xl font-semibold text-[#1A1A1A]">
-              {section.title}
-            </Text>
+            <Text style={[type.sectionHeading, { marginBottom: 14 }]}>{section.title}</Text>
           )}
-          renderSectionFooter={() => <View className="h-3" />}
+          renderSectionFooter={() => <View style={{ height: 8 }} />}
           keyExtractor={(item) => item._id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32, paddingHorizontal: 20 }}
+          contentContainerStyle={{ paddingBottom: 32, paddingHorizontal: 22 }}
           ListHeaderComponent={
             <View
-              className="mb-6"
-              style={Platform.OS === 'android' ? { paddingTop: insets.top } : undefined}>
-              <TabPageHeader
-                title="Challenges"
-                action={
-                  <View className="rounded-[20px] bg-[#FFF1E9] px-3 py-2">
-                    <Text
-                      style={{ fontFamily: 'Inter_600SemiBold' }}
-                      className="text-xs text-[#FF5C35]">
-                      {result.summary.liveCount} live
-                    </Text>
-                  </View>
-                }
-              />
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingTop: 12,
+                marginBottom: 24,
+              }}>
+              <Text style={[type.planHeading, { flex: 1 }]}>Challenges</Text>
+              <View
+                style={{
+                  backgroundColor: '#fdebe3',
+                  borderRadius: 15,
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                }}>
+                <Text style={[type.caption, { fontFamily: 'Inter_600SemiBold', color: '#ff5a1f' }]}>
+                  {result.summary.liveCount} live
+                </Text>
+              </View>
             </View>
           }
           renderItem={({ item }) => (
@@ -106,7 +107,7 @@ export default function ChallengesScreen() {
           )}
           ListEmptyComponent={
             <View className="items-center rounded-[24px] bg-white px-6 py-8">
-              <Text className="text-center font-body text-sm text-[#77716D]">
+              <Text style={[type.supporting, { textAlign: 'center' }]}>
                 No challenges available
               </Text>
             </View>

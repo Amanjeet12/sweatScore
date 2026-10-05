@@ -1,8 +1,10 @@
 import { useQuery } from 'convex/react';
 import { Fire } from 'phosphor-react-native';
 import type { RefObject } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 
@@ -19,27 +21,25 @@ export default function TodayWeeklyStreak({
   tourTargetRef?: RefObject<View>;
   refresh?: number;
 }) {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const circleSize = Math.min(40, Math.max(28, (width - insets.left - insets.right - 44) / 8));
   const week = useQuery(api.challengeCompletions.getUserCompletionsForWeek, { refresh });
 
   return (
-    <View
-      ref={tourTargetRef}
-      collapsable={false}
-      className="mx-5 mb-4 rounded-[24px] bg-white px-4 py-4">
+    <View ref={tourTargetRef} collapsable={false} className="mx-[22px] mb-10">
       <View className="flex-row items-center justify-between">
-        <Text className="font-heading text-[11px] font-semibold uppercase tracking-[1.8px] text-[#FF4B1F]">
-          Streak
-        </Text>
-        <Text className="font-heading text-[13px] font-semibold text-[#1A1918]">
+        <Text style={[type.sectionHeading, { flex: 1, paddingRight: 12 }]}>Your streak</Text>
+        <Text style={[type.caption, { flexShrink: 1, textAlign: 'right' }]}>
           {Math.min(daysEarned, target)} of {target} days
         </Text>
       </View>
       {currentWeeklyStreak > 0 ? (
-        <Text className="mt-2 font-body text-xs text-[#807A76]">
+        <Text style={[type.smallCaption, { color: '#807A76' }]} className="mt-2">
           {currentWeeklyStreak} week streak
         </Text>
       ) : null}
-      <View className="mt-3 flex-row justify-between">
+      <View className="mt-4 flex-row justify-between">
         {(
           week?.days ??
           ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayLabel) => ({
@@ -49,15 +49,19 @@ export default function TodayWeeklyStreak({
           }))
         ).map((day) => (
           <View key={day.dayLabel} className="items-center">
-            <Text className="mb-2 font-heading text-xs font-semibold text-[#77716D]">
+            <Text style={type[day.isToday ? 'currentWeekday' : 'weekday']} className="mb-2">
               {day.dayLabel.charAt(0)}
             </Text>
             <View
-              className="h-9 w-9 items-center justify-center rounded-full"
+              className="items-center justify-center rounded-full"
               style={{
-                backgroundColor: day.earned ? '#FF5C35' : '#F7F5F3',
+                width: circleSize,
+                height: circleSize,
+                backgroundColor: day.earned ? '#FFE3D3' : '#F8F8F8',
+                borderWidth: day.isToday ? 2 : 0,
+                borderColor: '#ff5a1f',
               }}>
-              {day.earned ? <Fire size={18} color="#FFFFFF" weight="fill" /> : null}
+              {day.earned ? <Fire size={20} color="#ff5a1f" weight="fill" /> : null}
             </View>
           </View>
         ))}

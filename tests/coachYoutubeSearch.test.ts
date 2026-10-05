@@ -54,23 +54,23 @@ describe('Coach workout YouTube search', () => {
     expect(workoutYoutubeSearch('x'.repeat(300))?.phrase.length).toBe(100);
   });
 
-  test('workout details link is informational; live capture and posting stay separate', () => {
+  test('plan search is informational; live capture and posting stay separate', () => {
     const source = readFileSync(
       new URL('../components/core/dashboard/CoachCheckInFlow.tsx', import.meta.url),
       'utf8'
     );
-    const openSearch = source
-      .split('const openWorkoutSearch = async () => {')[1]
-      .split('\n  };')[0];
-    expect(openSearch).toContain('Linking.openURL(workoutSearch.url)');
-    expect(openSearch).not.toMatch(/reserve\(|complete\(|upload\(|publish|setShowCamera|router\./);
+    const planSource = readFileSync(new URL('../app/coach-plan.tsx', import.meta.url), 'utf8');
+    expect(planSource).toContain('Linking.openURL(workoutSearch.url)');
+    const searchAction = planSource
+      .split('Linking.openURL(workoutSearch.url)')[1]
+      .split('accessibilityRole="link"')[0];
+    expect(searchAction).not.toMatch(/reserve\(|complete\(|upload\(|publish|setShowCamera/);
     expect(source).not.toContain('Moves you could try');
-    expect(source).toContain('workoutYoutubeSearch(queue?.label ?? assignment?.label)');
-    expect(source).toContain('workoutSearch ? (');
+    expect(planSource).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
+    expect(planSource).toContain('workoutSearch ? (');
     expect(source).toContain("start('image')");
     expect(source).toContain('Use the in-app camera');
-    expect(source).toContain('assignment?.mandatory');
-    expect(source).toContain('assignment.consumedCount');
+    expect(source).toContain('canStartCoachLivePhoto(');
     expect(source).not.toContain('Gym Workout');
     expect(source).not.toContain('+4 pts');
     expect(source).toContain("mode === 'post'");

@@ -1,8 +1,12 @@
-import { Image } from 'expo-image';
 import { Fire } from 'phosphor-react-native';
-import { useMemo, useState } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
+import LeagueAvatar from './LeagueAvatar';
+
+import {
+  leagueStyles as styles,
+  leagueTypography as type,
+} from '~/components/core/design/LeagueStyles';
 import { Text } from '~/components/ui/text';
 
 type MeRowProps = {
@@ -15,54 +19,6 @@ type MeRowProps = {
   onPress?: () => void;
 };
 
-const getInitial = (name?: string) => {
-  const safeName = name?.trim();
-
-  if (!safeName) return 'U';
-
-  return safeName.charAt(0).toUpperCase();
-};
-
-function MeAvatar({ avatarUri, userName }: { avatarUri?: string; userName: string }) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  const cleanUri = avatarUri?.trim();
-  const shouldShowImage = !!cleanUri && !imageFailed;
-
-  const initial = useMemo(() => getInitial(userName), [userName]);
-
-  return (
-    <View
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: shouldShowImage ? '#F4D9C2' : '#F76B1C',
-        borderWidth: 2,
-        borderColor: '#FF5C35',
-      }}>
-      {shouldShowImage ? (
-        <Image
-          source={{ uri: cleanUri }}
-          style={{
-            width: 44,
-            height: 44,
-          }}
-          contentFit="cover"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-white">
-          {initial}
-        </Text>
-      )}
-    </View>
-  );
-}
-
 export default function MeRow({
   rank,
   avatarUri,
@@ -72,54 +28,48 @@ export default function MeRow({
   userName,
   onPress,
 }: MeRowProps) {
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width < 350 || fontScale > 1.3;
   const safeTarget = Math.max(1, targetPoints);
-  const pct = Math.min(1, displayTotalPoints / safeTarget);
-  const pctLabel = pct * 100;
-
-  const Wrapper: any = onPress ? TouchableOpacity : View;
-  const wrapperProps = onPress ? { onPress, activeOpacity: 0.7 } : {};
-
+  const pctLabel = Math.min(1, displayTotalPoints / safeTarget) * 100;
+  const Wrapper = onPress ? TouchableOpacity : View;
+  const metric =
+    mode === 'streak' ? (
+      <View style={styles.metric}>
+        <Fire size={20} weight="fill" color={displayTotalPoints > 0 ? '#ff5a1f' : '#c9c9c9'} />
+        <Text style={type.score}>{displayTotalPoints}</Text>
+        <Text style={type.caption}>{displayTotalPoints === 1 ? 'week' : 'weeks'}</Text>
+      </View>
+    ) : (
+      <Text style={type.myScore}>{displayTotalPoints}</Text>
+    );
   return (
     <Wrapper
-      {...wrapperProps}
-      className="mx-5 mb-3 mt-1 flex-row items-center gap-x-3 rounded-[18px] bg-white px-4 py-4"
-      style={{
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.09,
-        shadowRadius: 10,
-        elevation: 3,
-      }}>
-      <Text className="w-4 text-center font-body text-sm text-[#888888]">{rank ?? '—'}</Text>
-      <MeAvatar avatarUri={avatarUri} userName={userName} />
-      <View className="min-w-0 flex-1">
-        <Text numberOfLines={1} className="font-heading text-base font-semibold text-[#1A1A1A]">
-          You
-        </Text>
+      onPress={onPress}
+      accessible
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`Your position, rank ${rank ?? 'unranked'}, ${displayTotalPoints} ${mode === 'streak' ? 'weeks' : 'points'}`}
+      style={styles.me}>
+      <Text style={[type.myRank, styles.rank]}>{rank ?? '—'}</Text>
+      <LeagueAvatar name={userName} uri={avatarUri} ring />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={type.name}>You</Text>
+        {compact ? <View style={{ marginTop: 4 }}>{metric}</View> : null}
         {mode === 'points' ? (
-          <View className="mt-2 h-1 overflow-hidden rounded-full bg-[#EFEFEF]">
+          <View style={styles.progress}>
             <View
-              className="h-full rounded-full bg-[#FF5C35]"
-              style={{ width: `${pctLabel}%`, minWidth: displayTotalPoints > 0 ? 2 : 0 }}
+              style={{
+                height: '100%',
+                borderRadius: 2,
+                backgroundColor: '#ff5a1f',
+                width: `${pctLabel}%`,
+                minWidth: displayTotalPoints > 0 ? 2 : 0,
+              }}
             />
           </View>
         ) : null}
       </View>
-      {mode === 'streak' ? (
-        <View className="flex-row items-center gap-x-1.5">
-          <Fire size={16} weight="fill" color={displayTotalPoints > 0 ? '#FF5C35' : '#C4C4C4'} />
-          <Text className="font-heading text-base font-semibold text-[#1A1A1A]">
-            {displayTotalPoints}
-          </Text>
-          <Text className="font-body text-sm text-[#777777]">
-            {displayTotalPoints === 1 ? 'week' : 'weeks'}
-          </Text>
-        </View>
-      ) : (
-        <Text className="font-heading text-base font-semibold text-[#FF5C35]">
-          {displayTotalPoints}
-        </Text>
-      )}
+      {!compact ? metric : null}
     </Wrapper>
   );
 }

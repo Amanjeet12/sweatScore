@@ -1,5 +1,8 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
+
+import { internal } from './_generated/api';
+import { Doc, Id } from './_generated/dataModel';
 import {
   internalMutation,
   internalQuery,
@@ -8,10 +11,9 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
-import { internal } from './_generated/api';
-import { Doc, Id } from './_generated/dataModel';
-import { formatDateInTZ } from './utils/timezone';
 import { MEAL_PROMPT_VERSION } from './coachMealPrompt';
+import { evaluateUserMilestones } from './utils/milestones';
+import { formatDateInTZ } from './utils/timezone';
 import { rewardSlotKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
 
 async function owner(ctx: QueryCtx | MutationCtx) {
@@ -544,7 +546,12 @@ export const share = mutation({
     const draft = await ctx.db.get(draftId);
     if (!draft || draft.userId !== userId) asError('Meal draft does not belong to member');
     if (draft.status === 'shared' && draft.postId && draft.activityId)
-      return { postId: draft.postId, activityId: draft.activityId, pointsEarned: 2 };
+      return {
+        postId: draft.postId,
+        activityId: draft.activityId,
+        pointsEarned: 2,
+        milestones: [],
+      };
     if (!(await entitled(ctx, userId))) asError('Verified entitlement required');
     if (draft.day !== (await today(ctx, userId))) asError('Meal day has changed');
     const analysed = draft.status === 'ready' && Boolean(draft.verdict && draft.feedback);
@@ -656,7 +663,8 @@ export const share = mutation({
       userId,
       date: draft.day,
     });
-    return { postId, activityId, pointsEarned: 2 };
+    const milestones = await evaluateUserMilestones(ctx, userId, draft.day);
+    return { postId, activityId, pointsEarned: 2, milestones };
   },
 });
 

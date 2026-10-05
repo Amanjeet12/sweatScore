@@ -261,21 +261,15 @@ describe('v2 daily plan contract', () => {
   });
   test('saved plan uses a concise personalised dashboard without changing its actions', () => {
     const source = readFileSync(new URL('../app/coach-plan.tsx', import.meta.url), 'utf8');
-    expect(source).toContain('Made for your day');
     expect(source).toContain('Today’s progress');
-    expect(source).toContain('Your focus');
-    expect(source).toContain('Why this fits you today');
-    expect(source).toContain('numberOfLines={2}');
+    expect(source).toContain('<PlanExplanation explanation={output.why} />');
+    expect(source).not.toContain('numberOfLines={2}');
     expect(source).toContain("router.dismissTo({ pathname: '/(tabs)/dashboard'");
     expect(source).toContain('supportingPlanText(fullBody)');
-    expect(source).toContain('setShowWhy((value) => !value)');
     expect(source).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
-    expect(source).toContain('Search workout on YouTube');
     expect(source).not.toContain('workoutExamples.slice');
     expect(source).toContain('accessibilityLabel="Update your profile"');
     expect(source).toContain("router.push('/coach-profile')");
-    expect(source).toContain('Review or change the seven answers');
-    expect(source).not.toContain('accessibilityLabel="Back to Today"');
     expect(source).not.toContain("tint: '#EDF8F2'");
     expect(source).not.toContain("tint: '#F1EEFF'");
     expect(source).not.toContain('Why this was suggested');
@@ -294,7 +288,9 @@ describe('v2 daily plan contract', () => {
     expect(paywall).toContain('decision?.verifiedAccess');
     expect(loading).toContain('accessibilityRole="progressbar"');
     expect(loading).toContain('isReduceMotionEnabled');
-    expect(loading).not.toMatch(/\d+%/);
+    expect(loading).toContain("accessibilityValue={{ text: 'Preparing' }}");
+    expect(loading).not.toMatch(/>\s*\d+%\s*</);
+    expect(loading).not.toContain('router.replace');
   });
   test('an owned StoreKit subscription verifies instead of reopening checkout', () => {
     const paywall = readFileSync(
@@ -432,12 +428,11 @@ describe('v2 daily plan contract', () => {
     expect(checked).toBe(2304);
   });
 
-  test('daily questions share the image-led Coach setup design and top-only navigation', () => {
+  test('daily questions retain all five questions and draft selection in the shared presentation', () => {
     const source = readFileSync(new URL('../app/coach-onboarding.tsx', import.meta.url), 'utf8');
-    expect(source).toContain('const DAILY_COPY');
-    expect(source).toContain('totalSteps={DAILY_QUESTIONS.length}');
-    expect(source.match(/coach-onboarding\.jpg/g)?.length).toBe(2);
-    expect(source).not.toContain('label="Previous question"');
-    expect(source).toContain("'Choose one answer to continue.'");
+    expect(source).toContain('total={DAILY_QUESTIONS.length}');
+    expect(source).toContain('selected={effectiveDailyChoice}');
+    expect(source).toContain('options={question.options}');
+    expect(source).toContain('onBack={step > 0 ? goBack : undefined}');
   });
 });

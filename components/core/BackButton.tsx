@@ -11,6 +11,8 @@ type FallbackHref = Parameters<typeof router.replace>[0];
 type BackButtonProps = PressableProps & {
   text?: string;
   fallbackHref?: FallbackHref;
+  iconColor?: string;
+  iconSize?: number;
 };
 
 export const goBackOrReplace = (fallbackHref: FallbackHref = '/(tabs)/dashboard') => {
@@ -28,6 +30,8 @@ export const BackButton = ({
   onPress,
   fallbackHref = '/(tabs)/dashboard',
   hitSlop,
+  iconColor = colors.primary,
+  iconSize = 32,
   ...props
 }: BackButtonProps) => {
   const navigation = useNavigation();
@@ -54,7 +58,7 @@ export const BackButton = ({
       onPress={handlePress}
       {...props}>
       <View className="flex-row items-center">
-        <Feather name="chevron-left" size={32} color={colors.primary} />
+        <Feather name="chevron-left" size={iconSize} color={iconColor} />
         {text && <Text className="text-link ml-1 text-xl font-bold text-primary-500">{text}</Text>}
       </View>
     </HeaderButton>

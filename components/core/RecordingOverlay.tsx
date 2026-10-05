@@ -1,6 +1,7 @@
 import { CameraRotate, Microphone, MicrophoneSlash } from 'phosphor-react-native';
 import { View, TouchableOpacity } from 'react-native';
 
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 
 export function RecordingOverlay({
@@ -11,6 +12,7 @@ export function RecordingOverlay({
   audioMuted = false,
   onToggleAudio,
   top = 16,
+  prototype = false,
 }: {
   countdown?: number | null;
   recording: boolean;
@@ -19,6 +21,7 @@ export function RecordingOverlay({
   audioMuted?: boolean;
   onToggleAudio?: () => void;
   top?: number;
+  prototype?: boolean;
 }) {
   return (
     <>
@@ -49,7 +52,9 @@ export function RecordingOverlay({
           ) : (
             <Microphone size={22} color="#FFFFFF" weight="bold" />
           )}
-          <Text className="font-body text-xs font-semibold text-white">
+          <Text
+            className={prototype ? undefined : 'font-body text-xs font-semibold text-white'}
+            style={prototype ? [type.smallCaption, { color: '#fff' }] : undefined}>
             {audioMuted ? 'Audio off' : 'Audio on'}
           </Text>
         </TouchableOpacity>
@@ -89,8 +94,9 @@ export function RecordingOverlay({
           }}>
           <View
             style={{
-              width: 90,
-              height: 90,
+              minWidth: 90,
+              minHeight: 90,
+              padding: prototype ? 18 : 0,
               borderRadius: 45,
               backgroundColor: 'rgba(0,0,0,0.55)',
               alignItems: 'center',
@@ -98,7 +104,15 @@ export function RecordingOverlay({
             }}>
             <Text
               accessibilityLiveRegion="polite"
-              className="font-heading text-4xl font-bold text-white">
+              className={prototype ? undefined : 'font-heading text-4xl font-bold text-white'}
+              style={
+                prototype
+                  ? [
+                      type.planHeading,
+                      { fontSize: 36, lineHeight: undefined, color: '#fff', textAlign: 'center' },
+                    ]
+                  : undefined
+              }>
               {countdown}
             </Text>
           </View>
@@ -119,7 +133,11 @@ export function RecordingOverlay({
             gap: 8,
           }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' }} />
-          <Text className="font-body text-sm font-semibold text-white">Recording {elapsed}s</Text>
+          <Text
+            className={prototype ? undefined : 'font-body text-sm font-semibold text-white'}
+            style={prototype ? [type.progressValue, { color: '#fff' }] : undefined}>
+            Recording {elapsed}s
+          </Text>
         </View>
       )}
     </>

@@ -1,13 +1,15 @@
 import { useConvex } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ImageBackground, View } from 'react-native';
+import { Image, StyleSheet, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { api } from '~/convex/_generated/api';
 import { useActivateUser } from '~/hooks/useActivateUser';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -17,6 +19,11 @@ import { storeData } from '~/utils/storage';
 
 export default function Home() {
   const convex = useConvex();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const welcomeImage = Image.resolveAssetSource(
+    require('~/assets/onboarding/welcome-jump-rope.jpg')
+  );
   const [isLoading, setIsLoading] = useState(true);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const { activateUser } = useActivateUser();
@@ -72,69 +79,94 @@ export default function Home() {
       {isLoading ? (
         <ScreenLoading />
       ) : (
-        <ImageBackground
-          source={require('~/assets/backgrounds/signupscreen.png')}
-          className="flex-1"
-          resizeMode="cover">
-          <LinearGradient
-            pointerEvents="none"
-            colors={[
-              'rgba(20,10,5,0)',
-              'rgba(20,10,5,0.12)',
-              'rgba(20,10,5,0.58)',
-              'rgba(20,10,5,0.84)',
-            ]}
-            locations={[0, 0.34, 0.72, 1]}
+        <View style={styles.welcome}>
+          <StatusBar style="light" />
+          <Image
+            source={require('~/assets/onboarding/welcome-jump-rope.jpg')}
+            accessibilityIgnoresInvertColors
             style={{
               position: 'absolute',
-              right: 0,
-              bottom: 0,
-              left: 0,
-              height: '68%',
+              left: -width * 0.08,
+              top: -72 * (width / 390),
+              width: width * 1.16,
+              height: width * 1.16 * (welcomeImage.height / welcomeImage.width),
             }}
           />
-
-          <SafeAreaView className="flex-1">
-            <View className="flex-1 justify-end px-6 pb-6">
-              {/* Heading */}
-              <View className="mb-6 items-center">
-                <Text className="text-center font-heading text-3xl font-semibold leading-9 text-white">
-                  Movement That's {'\n'}Made For You.
-                </Text>
-              </View>
-
-              {/* Start button */}
-              <OnboardingPrimaryButton label="Get Started" onPress={() => router.push('/email')} />
-
-              {/* Legal */}
-              <View className="mt-4">
-                <Text className="text-center font-body text-[11px] text-white">
-                  By signing up, you agree to our{' '}
-                  <Link href="/legals/terms">
-                    <Text className="text-[11px] font-bold text-white">Terms of Use</Text>
-                  </Link>
-                </Text>
-                <Text className="text-center font-body text-[11px] text-white">
-                  and{' '}
-                  <Link href="/legals/privacy-policy">
-                    <Text className="text-[11px] font-bold text-white">Privacy Policy</Text>
-                  </Link>
-                </Text>
-              </View>
-
-              {/* Login link */}
-              <View className="mt-4 items-center">
-                <Text className="font-body text-sm text-white">
-                  Back for more?{' '}
-                  <Link href="/(auth)/email">
-                    <Text className="text-sm font-bold text-white">Log in here.</Text>
-                  </Link>
-                </Text>
-              </View>
-            </View>
-          </SafeAreaView>
-        </ImageBackground>
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(122,46,16,0)', 'rgba(122,46,16,0.82)', '#7a2e10', '#7a2e10']}
+            locations={[0.61, 0.79, 0.91, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[
+              styles.content,
+              {
+                paddingLeft: 22 + insets.left,
+                paddingRight: 22 + insets.right,
+                paddingBottom: Math.max(34, insets.bottom),
+                paddingTop: insets.top + 12,
+              },
+            ]}>
+            <Text style={styles.heading}>Movement That's{'\n'}Made For You.</Text>
+            <PrototypeButton
+              label="Get Started"
+              welcome
+              onPress={() => router.push('/email')}
+              style={styles.startButton}
+            />
+            <Text style={styles.legal}>
+              By signing up, you agree to our{' '}
+              <Link href="/legals/terms">
+                <Text style={styles.legalLink}>Terms of Use</Text>
+              </Link>{' '}
+              and{' '}
+              <Link href="/legals/privacy-policy">
+                <Text style={styles.legalLink}>Privacy Policy</Text>
+              </Link>
+            </Text>
+            <Text style={styles.login}>
+              Back for more?{' '}
+              <Link href="/(auth)/email">
+                <Text style={styles.loginLink}>Log in here.</Text>
+              </Link>
+            </Text>
+          </ScrollView>
+        </View>
       )}
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  welcome: { flex: 1, backgroundColor: '#7a2e10', overflow: 'hidden' },
+  content: { flexGrow: 1, justifyContent: 'flex-end', alignItems: 'center' },
+  heading: type.welcomeTitle,
+  startButton: {
+    marginTop: 26,
+    width: '100%',
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legal: {
+    marginTop: 16,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+  legalLink: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 18, color: '#fff' },
+  login: {
+    marginTop: 12,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+  loginLink: { fontFamily: 'Inter_600SemiBold', fontSize: 14, lineHeight: 20, color: '#fff' },
+});

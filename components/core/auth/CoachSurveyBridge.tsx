@@ -1,54 +1,66 @@
-import { Image } from 'expo-image';
-import { Sparkle } from 'phosphor-react-native';
-import { ScrollView, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Barbell, ForkKnife, TrendUp } from 'phosphor-react-native';
+import { View } from 'react-native';
 
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import {
+  PrototypeButton,
+  PrototypeOnboarding,
+  onboardingStyles as styles,
+} from '~/components/core/auth/PrototypeOnboarding';
+import {
+  prototypeComponents as chrome,
+  prototypeTypography as type,
+} from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { useAuthStore } from '~/store/useAuthStore';
 
 export function CoachSurveyBridge({ onStart }: { onStart: () => void }) {
-  const { height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const name = useAuthStore((state) => state.currentUser?.name?.trim());
-
   return (
-    <View className="flex-1 bg-white">
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
-        <Image
-          source={require('~/assets/onboarding/coach-onboarding.jpg')}
-          contentFit="cover"
-          contentPosition={{ top: '22%', left: '50%' }}
-          accessibilityIgnoresInvertColors
-          style={{ width: '100%', height: Math.min(height * 0.48, 440) }}
-        />
-        <View
-          className="flex-1 items-start rounded-t-[34px] bg-white px-6 pt-7"
-          style={{ marginTop: -32, paddingBottom: 24 }}>
-          <View className="mb-4 h-14 w-14 items-center justify-center rounded-full bg-[#FFF3ED]">
-            <Sparkle size={32} weight="fill" color="#FF5C1A" />
-          </View>
-          <Text
-            accessibilityRole="header"
-            className="text-left font-body text-base font-semibold text-primary-500">
-            Account Verified!
-          </Text>
-          <Text
-            accessibilityRole="header"
-            className="mt-3 text-left font-heading text-3xl font-semibold leading-10 text-[#1A1A1A]">
-            Let&apos;s personalise your AI Coach{name ? `, ${name}` : ''}
-          </Text>
-          <Text className="mt-4 text-left font-body text-base leading-7 text-[#77716D]">
-            Answer 7 quick questions so your Coach can tailor your workouts, meals, and recovery
-            targets.
-          </Text>
-        </View>
-      </ScrollView>
-      <View
-        className="bg-white px-6 pt-4"
-        style={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
-        <OnboardingPrimaryButton label="Start 2-Minute Survey" onPress={onStart} />
+    <PrototypeOnboarding
+      image={require('~/assets/onboarding/coach-introduction.jpg')}
+      footer={<PrototypeButton label="Start 2-Minute Survey" onPress={onStart} />}>
+      <Text
+        style={{ fontFamily: 'Inter_600SemiBold', fontSize: 14, lineHeight: 20, color: '#e8541e' }}>
+        Account Verified!
+      </Text>
+      <Text accessibilityRole="header" style={[styles.heading, { marginTop: 8 }]}>
+        Let's personalise your AI Coach{name ? `, ${name}` : ''}
+      </Text>
+      <Text
+        style={{
+          marginTop: 14,
+          ...type.loadingBody,
+        }}>
+        Answer 7 quick questions so your Coach can tailor your workouts, meals, and progress.
+      </Text>
+      <View style={{ marginTop: 28, gap: 18 }}>
+        {[
+          [Barbell, 'Personalised daily workouts'],
+          [ForkKnife, 'Smarter meal tracking'],
+          [TrendUp, 'Progress tracking'],
+        ].map(([Icon, label]) => {
+          const FeatureIcon = Icon as typeof Barbell;
+          return (
+            <View
+              key={String(label)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View
+                style={{
+                  ...chrome.iconTile,
+                }}>
+                <FeatureIcon size={24} color="#e8541e" />
+              </View>
+              <Text
+                style={{
+                  flex: 1,
+                  ...type.cardTitle,
+                }}>
+                {String(label)}
+              </Text>
+            </View>
+          );
+        })}
       </View>
-    </View>
+    </PrototypeOnboarding>
   );
 }

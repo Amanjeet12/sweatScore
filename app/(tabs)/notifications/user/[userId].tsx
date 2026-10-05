@@ -2,10 +2,11 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '~/components/core/BackButton';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
+import { leagueTypography as type } from '~/components/core/design/LeagueStyles';
 import Profile from '~/components/core/user/Profile';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
@@ -23,22 +24,28 @@ export default function TabNotificationsUser() {
           headerShown: true,
           headerTitleAlign: 'center',
           title: '',
-          headerTitle: () => (
-            <Text className="text-center text-xl font-bold text-[#1A1A1A]">User Profile</Text>
-          ),
+          headerTitle: () => <Text style={type.heading}>User Profile</Text>,
           headerStyle: {
-            backgroundColor: '#F9F9F9',
+            backgroundColor: '#fff',
           },
           headerShadowVisible: false,
-          headerLeft: () => <BackButton text="Back" fallbackHref="/(tabs)/notifications" />,
+          headerLeft: () => (
+            <BackButton
+              text=""
+              iconColor="#2a2a2a"
+              iconSize={22}
+              accessibilityLabel="Back to League"
+              fallbackHref="/(tabs)/notifications"
+            />
+          ),
         }}
       />
       {isUserLoading || !user ? (
         <ScreenLoading />
       ) : (
-        <SafeAreaView className="flex-1 bg-[#F9F9F9]">
+        <SafeAreaView edges={['left', 'right', 'bottom']} className="flex-1 bg-white">
           <View className="flex-1">
-            <Profile user={user} />
+            <Profile user={user} league />
           </View>
         </SafeAreaView>
       )}

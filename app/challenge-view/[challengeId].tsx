@@ -24,9 +24,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '~/components/core/BackButton';
+import CoachSafeAreaView from '~/components/core/CoachSafeAreaView';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import CommunityChallengeDetail from '~/components/core/challenges/CommunityChallengeDetail';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { useChallengeUploadQueue } from '~/components/providers/ChallengeUploadProvider';
 import { ButtonText, LoadingButton } from '~/components/ui/button';
 import { Text } from '~/components/ui/text';
@@ -454,8 +456,10 @@ export default function ChallengeViewScreen() {
     );
   };
 
+  const ChallengeContainer = challenge?.isCommunityChallenge ? CoachSafeAreaView : SafeAreaView;
+
   return (
-    <SafeAreaView
+    <ChallengeContainer
       className={challenge?.isCommunityChallenge ? 'flex-1 bg-white' : 'flex-1 bg-[#F9F9F9]'}>
       <Stack.Screen
         options={{
@@ -483,7 +487,13 @@ export default function ChallengeViewScreen() {
           <ScreenLoading />
         ) : communityChallenge === null ? (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-base text-gray-500">Challenge not available</Text>
+            <Text style={type.body}>Challenge not available</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/hub'))}
+              style={{ minHeight: 44, justifyContent: 'center', marginTop: 12 }}>
+              <Text style={type.label}>Back to challenges</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <CommunityChallengeDetail
@@ -491,6 +501,16 @@ export default function ChallengeViewScreen() {
             joining={joiningCommunityChallenge}
             onJoin={handleJoinCommunityChallenge}
             onRecord={handleStartChallenge}
+            uploadState={hasFailedUpload ? 'failed' : hasActiveUpload ? 'active' : undefined}
+            onRetry={() => {
+              if (
+                requireSubscription({
+                  redirectTo: `/challenge-view/${challengeId}`,
+                  source: 'challenge_retry_upload',
+                })
+              )
+                retryChallengeUpload(activeChallengeId);
+            }}
           />
         )
       ) : challenge === undefined ||
@@ -500,7 +520,13 @@ export default function ChallengeViewScreen() {
         <ScreenLoading />
       ) : challenge === null ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-base text-gray-500">Challenge not available</Text>
+          <Text style={type.body}>Challenge not available</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/hub'))}
+            style={{ minHeight: 44, justifyContent: 'center', marginTop: 12 }}>
+            <Text style={type.label}>Back to challenges</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
@@ -718,6 +744,6 @@ export default function ChallengeViewScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ChallengeContainer>
   );
 }

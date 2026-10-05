@@ -1,0 +1,86 @@
+import { StyleSheet } from 'react-native';
+
+import { prototypeColors as colors, prototypeTypography } from './prototypeStyles';
+
+// Community values from the prototype; shared by feed and connected interaction screens.
+export const communityTypography = StyleSheet.create({
+  title: prototypeTypography.planHeading,
+  heading: prototypeTypography.compactPageHeading,
+  author: prototypeTypography.compactCardTitle,
+  metadata: prototypeTypography.caption,
+  body: { ...prototypeTypography.body, color: colors.ink },
+  count: { ...prototypeTypography.body, color: colors.muted },
+  action: { ...prototypeTypography.compactAction, fontSize: 15 },
+  prompt: prototypeTypography.supporting,
+  field: { ...prototypeTypography.field, lineHeight: 24 },
+  button: prototypeTypography.button,
+  error: prototypeTypography.error,
+});
+export const communityStyles = StyleSheet.create({
+  header: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 18 },
+  composer: {
+    paddingHorizontal: 22,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  prompt: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 22,
+    backgroundColor: '#f6f6f6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  actions: { marginTop: 14, flexDirection: 'row', flexWrap: 'wrap' },
+  action: {
+    minHeight: 44,
+    flexGrow: 1,
+    flexBasis: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  post: { borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: '#fff' },
+  postContent: { paddingHorizontal: 22, paddingTop: 20, paddingBottom: 8 },
+  reactions: {
+    marginTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: 20,
+  },
+  reactionGroup: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, maxWidth: '100%' },
+  reaction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  field: { ...prototypeTypography.field, lineHeight: 24, textAlignVertical: 'top', minHeight: 105 },
+  mediaAction: {
+    flexGrow: 1,
+    flexBasis: 130,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12,
+    minHeight: 56,
+  },
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: '#fff',
+    paddingHorizontal: 22,
+    paddingTop: 16,
+  },
+  button: { minHeight: 56, height: 'auto', borderRadius: 20, paddingVertical: 14 },
+  comment: {
+    marginHorizontal: 22,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+});

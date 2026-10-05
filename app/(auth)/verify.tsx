@@ -1,23 +1,21 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useConvex } from 'convex/react';
-import { Image } from 'expo-image';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { KeyboardStickyView, useKeyboardState } from 'react-native-keyboard-controller';
+import { View } from 'react-native';
 import { OtpInput } from 'react-native-otp-entry';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ErrorMessage } from '~/components/core/ErrorMessage';
-import { OnboardingHeroChrome } from '~/components/core/auth/OnboardingHeroChrome';
-import { OnboardingPrimaryButton } from '~/components/core/auth/OnboardingPrimaryButton';
+import {
+  PrototypeOnboarding,
+  PrototypeButton,
+  PrototypeError,
+  onboardingStyles as styles,
+} from '~/components/core/auth/PrototypeOnboarding';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useAuthStore } from '~/store/useAuthStore';
-import { cn } from '~/utils/cn';
 import { resumeMember } from '~/utils/coachResumeNavigation';
-import { colors } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
 
 export default function Verify() {
@@ -28,20 +26,18 @@ export default function Verify() {
   const authRequestActive = useRef(false);
   const [error, setError] = useState('');
   const [code, setCode] = useState<string>('');
-  const [seconds, setSeconds] = useState(0);
+  const [seconds, setSeconds] = useState(numberOfSeconds);
+  const [resending, setResending] = useState(false);
   const [resendActive, setResendActive] = useState(false);
   const { email } = useLocalSearchParams();
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
-  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const { isVisible: keyboardVisible } = useKeyboardState();
-  const heroHeight = Math.min(Math.max(windowHeight * 0.57, 380), 500);
-  const otpBoxSize = Math.min(68, (windowWidth - 84) / 4);
 
   const handleResend = async () => {
     if (!resendActive || authRequestActive.current) return;
     authRequestActive.current = true;
     setError('');
     setResendActive(false);
+    setResending(true);
     let provider = 'resend-otp';
     if (email === process.env.EXPO_PUBLIC_TEST_ACCOUNT_EMAIL) {
       provider = 'test-otp';
@@ -54,6 +50,7 @@ export default function Verify() {
       setResendActive(true);
     } finally {
       authRequestActive.current = false;
+      setResending(false);
     }
   };
 
@@ -93,150 +90,93 @@ export default function Verify() {
   };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (seconds > 0) {
-        setSeconds(seconds - 1);
-      }
-      if (seconds === 0) {
-        setResendActive(true);
-        clearInterval(interval);
-      }
-    }, 1000);
-    return () => {
-      clearInterval(interval);
-    };
-  });
-
-  useEffect(() => {
-    setSeconds(numberOfSeconds);
-  }, []);
+    if (seconds === 0) {
+      if (!resending) setResendActive(true);
+      return;
+    }
+    const timeout = setTimeout(() => setSeconds((remaining) => Math.max(0, remaining - 1)), 1000);
+    return () => clearTimeout(timeout);
+  }, [seconds, resending]);
 
   return (
-    <View className="flex-1 bg-white">
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
-
-      <Image
-        source={require('~/assets/onboarding/otpscreen-clean-v2.png')}
-        contentFit="cover"
+    <PrototypeOnboarding
+      stickyFooter
+      image={require('~/assets/onboarding/verification-portrait.jpg')}
+      onBack={router.back}
+      footer={
+        <>
+          <PrototypeButton
+            label="Verify email"
+            onPress={() => handleSubmit()}
+            loading={isLoading}
+            disabled={resending}
+          />
+          <PrototypeButton
+            label="Use a different email"
+            onPress={router.back}
+            secondary
+            disabled={isLoading || resending}
+          />
+        </>
+      }>
+      <Text style={styles.heading}>We emailed you a code</Text>
+      <Text style={styles.subtitle}>
+        Enter the 4-digit code sent to <Text style={styles.link}>{email}</Text>.
+      </Text>
+      <View style={{ marginTop: 28 }}>
+        <OtpInput
+          numberOfDigits={4}
+          autoFocus={false}
+          disabled={isLoading || resending}
+          blurOnFilled
+          focusColor="#2a2a2a"
+          onTextChange={(text) => {
+            setError('');
+            setCode(text);
+          }}
+          onFilled={(text) => {
+            setCode(text);
+            handleSubmit(text);
+          }}
+          theme={{
+            containerStyle: { gap: 12 },
+            pinCodeContainerStyle: {
+              flex: 1,
+              height: 'auto',
+              minHeight: 76,
+              paddingVertical: 20,
+              borderRadius: 20,
+              borderWidth: 1.5,
+              borderColor: error ? '#d92d20' : '#ececec',
+              backgroundColor: '#fff',
+            },
+            focusedPinCodeContainerStyle: { borderColor: '#2a2a2a' },
+            pinCodeTextStyle: type.otp,
+          }}
+        />
+      </View>
+      <View style={{ marginTop: 8 }}>
+        <PrototypeError error={error} />
+      </View>
+      <Text
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          height: heroHeight,
-        }}
-      />
-
-      <KeyboardStickyView style={{ flex: 1 }}>
-        <View className="flex-1">
-          <View style={{ width: '100%', height: heroHeight }} />
-
-          {keyboardVisible && <View className="flex-1" />}
-
-          <View
-            className="bg-white"
-            style={{
-              marginTop: -30,
-              borderTopLeftRadius: 32,
-              borderTopRightRadius: 32,
-            }}>
-            <View className={`px-6 ${keyboardVisible ? 'pt-5' : 'pt-7'}`}>
-              <Text className="font-body text-xs font-bold uppercase tracking-[1.5px] text-primary-500">
-                Check your inbox
-              </Text>
-              <Text className="mt-2 font-heading text-3xl font-semibold leading-9 text-[#1A1A1A]">
-                We emailed you a code
-              </Text>
-              <Text className="mt-2 font-body text-sm leading-5 text-[#838383]">
-                Enter the 4-digit code sent to{' '}
-                <Text className="font-body text-sm font-bold text-[#1A1A1A]">{email}</Text>.
-              </Text>
-
-              <View className={`${keyboardVisible ? 'mt-3' : 'mt-5'} items-center`}>
-                <OtpInput
-                  numberOfDigits={4}
-                  autoFocus={false}
-                  onTextChange={(text) => {
-                    setError('');
-                    setCode(text);
-                  }}
-                  onFilled={(text) => {
-                    setCode(text);
-                    handleSubmit(text);
-                  }}
-                  blurOnFilled
-                  focusColor={colors.primary}
-                  theme={{
-                    containerStyle: { gap: 12 },
-                    pinCodeContainerStyle: {
-                      width: otpBoxSize,
-                      height: Math.min(64, otpBoxSize),
-                      borderRadius: 12,
-
-                      backgroundColor: '#FFF9F6',
-                    },
-                    focusedPinCodeContainerStyle: {
-                      borderWidth: 1.5,
-                      borderColor: colors.primary,
-                    },
-                    pinCodeTextStyle: {
-                      color: '#1A1A1A',
-                      fontFamily: 'Inter_700Bold',
-                      fontSize: 20,
-                    },
-                  }}
-                />
-                <View className="mt-2 items-center">
-                  <ErrorMessage error={error} />
-                </View>
-                {!keyboardVisible && (
-                  <Text className="mt-3 text-center font-body text-sm text-[#838383]">
-                    Didn&apos;t receive it?{' '}
-                    <Text
-                      className={cn('font-bold', {
-                        'text-primary-500': resendActive,
-                        'text-[#838383]': !resendActive,
-                      })}
-                      onPress={handleResend}>
-                      {resendActive
-                        ? 'Resend now'
-                        : `Resend in 00:${String(seconds).padStart(2, '0')}`}
-                    </Text>
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-
-          {!keyboardVisible && <View className="flex-1 bg-white" />}
-
-          {!keyboardVisible && (
-            <SafeAreaView edges={['bottom']} className="bg-white">
-              <View className="bg-white px-6 pb-4 pt-2">
-                <OnboardingPrimaryButton
-                  label="Verify email"
-                  onPress={() => handleSubmit()}
-                  isLoading={isLoading}
-                />
-
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  activeOpacity={0.7}
-                  onPress={router.back}
-                  className="mt-4 items-center py-1">
-                  <Text className="font-body text-sm font-bold text-[#5A5653]">
-                    Use a different email
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          )}
-        </View>
-      </KeyboardStickyView>
-
-      <OnboardingHeroChrome onBack={router.back} />
-    </View>
+          marginTop: 28,
+          textAlign: 'center',
+          ...type.supporting,
+        }}>
+        Didn't receive it?{' '}
+        <Text
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !resendActive || isLoading }}
+          style={[styles.link, { opacity: resendActive ? 1 : 0.65 }]}
+          onPress={handleResend}>
+          {resending
+            ? 'Sending…'
+            : resendActive
+              ? 'Resend now'
+              : `Resend in 00:${String(seconds).padStart(2, '0')}`}
+        </Text>
+      </Text>
+    </PrototypeOnboarding>
   );
 }

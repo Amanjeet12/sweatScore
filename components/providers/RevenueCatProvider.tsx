@@ -38,6 +38,10 @@ interface RevenueCatProps {
   purchasePackage?: (pack: PurchasesPackage) => Promise<'active' | 'inactive' | 'pending'>;
   restorePermissions?: () => Promise<'active' | 'inactive' | 'pending'>;
   packages: PurchasesPackage[];
+  offeringsLoading: boolean;
+  storeUserIdentified: boolean;
+  offeringsError: string | null;
+  reloadOfferings: () => Promise<void>;
   hasActiveStoreSubscription: boolean;
   isPro: boolean;
   redeemWebPurchaseUrl: (url: string) => Promise<RedemptionResult>;
@@ -59,6 +63,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const convex = useConvex();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [offeringsLoading, setOfferingsLoading] = useState(true);
+  const [offeringsError, setOfferingsError] = useState<string | null>(null);
+  const [identifiedMemberId, setIdentifiedMemberId] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
   const [hasActiveStoreSubscription, setHasActiveStoreSubscription] = useState(false);
   const billingStatus = useQuery(api.revenueCatEntitlements.myStatus);
@@ -66,13 +73,19 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const reconcileMine = useAction(api.revenueCatEntitlements.reconcileMine);
 
   const loadOfferings = useCallback(async () => {
+    setOfferingsLoading(true);
+    setOfferingsError(null);
     try {
       const offerings = await Purchases.getOfferings();
-      if (offerings.current) {
-        setPackages(offerings.current.availablePackages);
-      }
+      const available = offerings.current?.availablePackages ?? [];
+      setPackages(available);
+      if (!available.length)
+        setOfferingsError('Subscription plans are unavailable right now. Please try again.');
     } catch (error) {
       console.warn('[RevenueCat] loadOfferings failed', error);
+      setOfferingsError('Could not load subscription plans. Please try again.');
+    } finally {
+      setOfferingsLoading(false);
     }
   }, []);
 
@@ -125,6 +138,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         const apiKey = Platform.OS === 'android' ? APIKeys.google : APIKeys.apple;
 
         if (!apiKey) {
+          setOfferingsLoading(false);
+          setOfferingsError('Subscriptions are unavailable in this build.');
           console.warn('[RevenueCat] API key not configured, skipping initialization');
           return;
         }
@@ -133,6 +148,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         if (!cancelled) setIsConfigured(true);
         await loadOfferings();
       } catch (error) {
+        setOfferingsLoading(false);
+        setOfferingsError('Could not load subscription plans. Please try again.');
         console.warn('[RevenueCat] initialization failed', error);
       }
     };
@@ -166,6 +183,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     const identifyAndSync = async () => {
       try {
         await Purchases.logIn(currentUser._id.toString());
+        if (!cancelled) setIdentifiedMemberId(currentUser._id.toString());
         const info = await Purchases.getCustomerInfo();
         if (!cancelled) await updateCustomerInformation(info);
       } catch (error) {
@@ -242,6 +260,12 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     () => ({
       restorePermissions,
       packages,
+      offeringsLoading,
+      storeUserIdentified: Boolean(
+        currentUser?._id && identifiedMemberId === currentUser._id.toString()
+      ),
+      offeringsError,
+      reloadOfferings: loadOfferings,
       purchasePackage,
       hasActiveStoreSubscription,
       isPro,
@@ -250,6 +274,11 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     [
       restorePermissions,
       packages,
+      offeringsLoading,
+      currentUser?._id,
+      identifiedMemberId,
+      offeringsError,
+      loadOfferings,
       purchasePackage,
       hasActiveStoreSubscription,
       isPro,

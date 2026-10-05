@@ -4,30 +4,38 @@ import { FunctionReturnType } from 'convex/server';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
-import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowSquareOut,
-  Barbell,
-  Camera,
-  Footprints,
-  ForkKnife,
-  MoonStars,
-  PlayCircle,
-  VideoCamera,
-  X,
-} from 'phosphor-react-native';
+import { Camera, VideoCamera, X } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Image, Linking, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MealAnalysisLoading } from './MealAnalysisLoading';
 import MealReportFeedback from './MealReportFeedback';
 
-import CoachActionButton from '~/components/core/CoachActionButton';
+import { MilestoneData } from '~/components/celebration/MilestoneModal';
 import { RecordingOverlay } from '~/components/core/RecordingOverlay';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { ToastMessage } from '~/components/core/Toast';
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
 import { CheckInVideoPreview } from '~/components/core/dashboard/CheckInVideoPreview';
+import {
+  CheckInHeader,
+  CheckInSheetHeader,
+  checkInStyles as chrome,
+} from '~/components/core/design/CheckInChrome';
+import {
+  prototypeTypography as type,
+  prototypeColors as colors,
+  prototypeComponents as components,
+} from '~/components/core/design/prototypeStyles';
 import { useCelebration } from '~/components/providers/CelebrationProvider';
 import { Text } from '~/components/ui/text';
 import { useToast } from '~/components/ui/toast';
@@ -35,12 +43,10 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import {
   canStartCoachLivePhoto,
-  checkInGuide,
   coachCheckInPoints,
   randomCoachCheckInCaption,
 } from '~/shared/coachCheckInPresentation';
 import { CoachCategory } from '~/shared/coachFoundation';
-import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { pointsLabel } from '~/shared/pointsLabel';
 import { getData, removeData, storeData } from '~/utils/storage';
 
@@ -88,7 +94,7 @@ export default function CoachCheckInFlow({
 }) {
   const convex = useConvex();
   const toast = useToast();
-  const { celebrateCompletion } = useCelebration();
+  const { celebrateCompletion, showMilestone } = useCelebration();
   const authToken = useAuthToken();
   const currentUser = useQuery(api.users.current) ?? initialCurrentUser;
   const today = useQuery(api.coachCheckIns.myToday, {}) ?? initialToday;
@@ -104,6 +110,7 @@ export default function CoachCheckInFlow({
   const shareMeal = useMutation(api.coachMeals.share);
   const [permission, requestPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
+  const insets = useSafeAreaInsets();
   const camera = useRef<CameraView>(null);
   const [queue, setQueue] = useState<ProofQueue | null>(null);
   const [showCamera, setShowCamera] = useState(false);
@@ -180,7 +187,7 @@ export default function CoachCheckInFlow({
   const assignment = today?.assignments.find((item) => item.category === category);
   useEffect(() => {
     if (today?.status === 'no_plan' && !assignment)
-      void ensureStandaloneAssignments({}).catch(() =>
+      ensureStandaloneAssignments({}).catch(() =>
         setError('Check-in is unavailable right now. Please try again.')
       );
   }, [today?.status, assignment?._id, ensureStandaloneAssignments]);
@@ -232,10 +239,11 @@ export default function CoachCheckInFlow({
     if (queueKey) storeData(queueKey, next);
   };
 
-  const showPostedSuccess = (pointsEarned: number) => {
+  const showPostedSuccess = (pointsEarned: number, milestones: MilestoneData[] = []) => {
     onClose();
     setTimeout(() => {
       celebrateCompletion({ type: 'check_in', pointsEarned });
+      milestones.forEach(showMilestone);
       toast.show({
         placement: 'top',
         duration: 10000,
@@ -446,7 +454,7 @@ export default function CoachCheckInFlow({
       if (!storageId) throw new Error('Photo upload did not return media identity.');
       persist({ ...queue, storageId });
       return storageId;
-    } catch (cause) {
+    } catch {
       try {
         const saved = await convex.query(api.coachCheckIns.mySubmission, {
           submissionId: queue.submissionId,
@@ -477,8 +485,8 @@ export default function CoachCheckInFlow({
       if (queueKey) removeData(queueKey);
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       setQueue(null);
-      showPostedSuccess(result.pointsEarned);
-    } catch (cause) {
+      showPostedSuccess(result.pointsEarned, result.milestones);
+    } catch {
       setError('Could not post. Your photo is saved for retry.');
     } finally {
       setBusy(false);
@@ -537,8 +545,8 @@ export default function CoachCheckInFlow({
       if (queueKey) removeData(queueKey);
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       setQueue(null);
-      showPostedSuccess(result.pointsEarned);
-    } catch (cause) {
+      showPostedSuccess(result.pointsEarned, result.milestones);
+    } catch {
       setError('Could not share. Your photo and caption are saved.');
     } finally {
       setBusy(false);
@@ -560,7 +568,7 @@ export default function CoachCheckInFlow({
       setCameraReady(false);
       setPhotoPreviewError(false);
       setShowCamera(true);
-    } catch (cause) {
+    } catch {
       setError('Could not retake the photo. Please try again.');
     } finally {
       setBusy(false);
@@ -613,13 +621,6 @@ export default function CoachCheckInFlow({
     primaryLabel = 'Continue check-in';
     primaryAction = () => onCaptured?.();
   }
-  const guide = assignment || queue ? checkInGuide(category, assignment ?? queue!, queue) : null;
-  const workoutDetails = false;
-  const workoutRewardUsed = Boolean(assignment && assignment.consumedCount >= 1);
-  const workoutSearch =
-    workoutDetails && assignment?.mandatory
-      ? workoutYoutubeSearch(queue?.label ?? assignment?.label)
-      : null;
   const canTakeLivePhoto = canStartCoachLivePhoto(
     category,
     mode,
@@ -633,20 +634,6 @@ export default function CoachCheckInFlow({
     category === 'meals' &&
     Boolean(queue?.uri || queue?.storageId) &&
     meal?.draft?.status !== 'analyzing';
-  const openWorkoutSearch = async () => {
-    if (!workoutSearch) return;
-    try {
-      await Linking.openURL(workoutSearch.url);
-    } catch {
-      Alert.alert('YouTube could not be opened. Please try again.');
-    }
-  };
-  const Icon = {
-    workout: Barbell,
-    meals: ForkKnife,
-    sleep: MoonStars,
-    steps: Footprints,
-  }[category];
   const points = coachCheckInPoints(category);
   const fixedTitle =
     category === 'workout'
@@ -665,92 +652,33 @@ export default function CoachCheckInFlow({
           ? 'Snap a picture of your smartwatch showing you met your sleep target.'
           : 'Snap a picture of your meals to check in and get a private portion check using AI.';
   return (
-    <View className="flex-1 bg-white">
-      <View
-        onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
-        className="border-b border-[#F0ECE9] px-6 pb-4 pt-3">
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: '#fff',
+        paddingLeft: mode === 'details' ? insets.left : 0,
+        paddingRight: mode === 'details' ? insets.right : 0,
+      }}>
+      <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
         {mode === 'post' ? (
-          <View className="min-h-14 flex-row items-center justify-between">
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Back to Today"
-              onPress={onClose}
-              className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
-              <ArrowLeft size={21} color="#514943" />
-            </TouchableOpacity>
-            <Text
-              className="flex-1 text-center font-heading text-xl font-semibold text-[#231F1D]"
-              numberOfLines={2}>
-              Log Activity
-            </Text>
-            <View className="w-11" accessibilityElementsHidden />
-          </View>
+          <CheckInHeader
+            title={
+              category === 'meals'
+                ? 'Log a meal'
+                : category === 'workout'
+                  ? 'Log a workout'
+                  : 'Log Activity'
+            }
+            onBack={onClose}
+          />
         ) : (
-          <>
-            <View
-              className="mb-3 h-1 w-10 self-center rounded-full bg-[#DDD8D4]"
-              accessibilityElementsHidden
-            />
-            <View className="flex-row items-start justify-between">
-              {ready ? (
-                <View className="min-w-0 flex-1 flex-row items-center pr-3">
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Back to Today"
-                    onPress={closeSheet}
-                    className="h-11 w-8 items-center justify-center">
-                    <ArrowLeft size={20} color="#FF5C35" />
-                  </TouchableOpacity>
-                  <Text className="ml-2 font-heading text-sm font-semibold tracking-wide text-[#E9512A]">
-                    LOG ACTIVITY
-                  </Text>
-                </View>
-              ) : workoutDetails ? (
-                <View className="min-w-0 flex-1 pr-3">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="font-heading text-xs font-semibold uppercase tracking-wider text-[#F45A2B]">
-                      LOG ACTIVITY
-                    </Text>
-                    <View className="rounded-lg bg-[#F1EFED] px-2.5 py-1">
-                      <Text className="font-body text-xs text-[#655B55]">
-                        {assignment?.mandatory ? 'Required' : 'No proof required'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="mt-2 font-heading text-[22px] font-semibold leading-7 text-[#231F1D]">
-                    Add your proof
-                  </Text>
-                  <Text className="mt-1 font-body text-sm leading-5 text-[#77716D]">
-                    Take a live photo to record today’s workout.
-                  </Text>
-                </View>
-              ) : (
-                <View className="min-w-0 flex-1 flex-row items-center gap-x-3 pr-3">
-                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-                    <Icon size={21} color="#F45A2B" weight="regular" />
-                  </View>
-                  <Text className="flex-1 font-heading text-xl font-semibold text-[#231F1D]">
-                    {category[0].toUpperCase()}
-                    {category.slice(1)} check-in
-                  </Text>
-                </View>
-              )}
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Close check-in"
-                onPress={closeSheet}
-                className="min-h-11 min-w-11 items-center justify-center rounded-full bg-[#F5F2F0]">
-                <X size={20} color="#514943" />
-              </TouchableOpacity>
-            </View>
-          </>
+          <CheckInSheetHeader onClose={closeSheet} />
         )}
       </View>
       {showCamera ? (
-        <View className="flex-1">
-          <View className="flex-1 overflow-hidden" pointerEvents="none">
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
+          <View style={{ flex: 1, overflow: 'hidden' }} pointerEvents="none">
             <CameraView
-              // iOS does not emit onCameraReady again when only facing changes.
               key={cameraSessionKey}
               ref={camera}
               style={StyleSheet.absoluteFillObject}
@@ -770,6 +698,7 @@ export default function CoachCheckInFlow({
             />
           </View>
           <RecordingOverlay
+            prototype
             countdown={countdown}
             recording={recording}
             elapsed={elapsed}
@@ -799,14 +728,14 @@ export default function CoachCheckInFlow({
               setCameraFacing((value) => (value === 'back' ? 'front' : 'back'));
             }}
           />
-          <View className="m-5" style={{ zIndex: 40 }}>
+          <View style={[chrome.footer, { zIndex: 40 }]}>
             {Boolean(cameraStartupError || error) && (
-              <Text accessibilityRole="alert" className="mb-3 text-center text-sm text-red-500">
+              <Text accessibilityRole="alert" style={type.error}>
                 {cameraStartupError || error}
               </Text>
             )}
             {cameraStartupError ? (
-              <CoachActionButton
+              <PrototypeButton
                 label="Retry camera"
                 onPress={() => {
                   setCameraReady(false);
@@ -815,7 +744,7 @@ export default function CoachCheckInFlow({
                 }}
               />
             ) : (
-              <CoachActionButton
+              <PrototypeButton
                 label={
                   cameraMode === 'video'
                     ? recording
@@ -823,10 +752,9 @@ export default function CoachCheckInFlow({
                       : countdown
                         ? 'Get ready…'
                         : 'Start recording'
-                    : busy
-                      ? 'Working…'
-                      : 'Take live photo'
+                    : 'Take live photo'
                 }
+                loading={busy && !recording}
                 disabled={
                   (cameraMode === 'video' && !cameraReady && !recording) ||
                   countdown !== null ||
@@ -847,74 +775,77 @@ export default function CoachCheckInFlow({
         <>
           <KeyboardAwareScrollView
             style={{ flex: 1 }}
-            bottomOffset={24}
+            bottomOffset={footerHeight + 24}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={(_, height) => setContentHeight(height)}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}>
+            contentContainerStyle={{
+              paddingHorizontal: 22,
+              paddingTop: mode === 'post' ? 12 : 16,
+              paddingBottom: mode === 'post' ? 24 : 40,
+            }}>
             {mode === 'post' ? (
               queue && today.status !== 'locked' ? (
                 <>
-                  <View>
-                    <View className="flex-row items-start justify-between gap-4">
-                      <View className="min-w-0 flex-1">
-                        {category !== 'meals' && category !== 'workout' ? (
-                          <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#E9512A]">
-                            DAILY ACTIVITY
-                          </Text>
-                        ) : null}
-                        <Text className="mt-2 font-heading text-xl font-semibold text-[#251E1A]">
-                          {category === 'meals' ? 'Log a meal' : guide?.title}
-                        </Text>
-                      </View>
-                      <Text className="font-heading text-base font-semibold text-[#E9512A]">
-                        +{points} {pointsLabel(points)}
-                      </Text>
-                    </View>
-                    <View className="mt-5 flex-row items-center justify-between">
-                      <Text className="font-body text-sm font-medium text-[#514943]">Caption</Text>
-                      <Text className="font-body text-xs text-[#8B817B]">{caption.length}/150</Text>
-                    </View>
-                    <TextInput
-                      value={caption}
-                      onChangeText={(value) => {
-                        setCaption(value);
-                        persist({ ...queue, caption: value });
-                      }}
-                      onEndEditing={() => {
-                        const save =
-                          category === 'meals'
-                            ? queue.storageId
-                              ? saveMealCaption({ submissionId: queue.submissionId, caption })
-                              : Promise.resolve()
-                            : saveProofCaption({ submissionId: queue.submissionId, caption });
-                        save.catch(() => {});
-                      }}
-                      placeholder="Add a caption"
-                      accessibilityLabel="Check-in caption"
-                      multiline
-                      textAlignVertical="top"
-                      maxLength={150}
-                      className="mt-2 min-h-28 rounded-[24px] border border-[#DCD7D3] bg-white p-4 font-body text-base text-[#251E1A]"
-                    />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                    <Text style={type.supporting}>Caption</Text>
+                    <Text style={[type.caption, { color: colors.subtle }]}>
+                      {caption.length}/150
+                    </Text>
                   </View>
+                  <TextInput
+                    value={caption}
+                    onChangeText={(value) => {
+                      setCaption(value);
+                      persist({ ...queue, caption: value });
+                    }}
+                    onEndEditing={() => {
+                      const save =
+                        category === 'meals'
+                          ? queue.storageId
+                            ? saveMealCaption({ submissionId: queue.submissionId, caption })
+                            : Promise.resolve()
+                          : saveProofCaption({ submissionId: queue.submissionId, caption });
+                      save.catch(() => {});
+                    }}
+                    placeholder="Add a caption"
+                    placeholderTextColor={colors.subtle}
+                    accessibilityLabel="Check-in caption"
+                    multiline
+                    maxLength={150}
+                    style={chrome.caption}
+                  />
                   {queue.uri || proofImage ? (
-                    <View className="relative mt-5">
+                    <View style={{ position: 'relative', marginTop: 20 }}>
                       {queue.mediaType === 'video' ? (
                         <CheckInVideoPreview uri={(queue.uri ?? proofImage)!} />
                       ) : (
                         <Image
                           source={{ uri: queue.uri ?? proofImage ?? undefined }}
-                          className="w-full rounded-[24px] bg-[#F4F1EE]"
-                          style={{ aspectRatio: 4 / 5 }}
+                          style={{
+                            width: '100%',
+                            aspectRatio: 4 / 5,
+                            borderRadius: 22,
+                            backgroundColor: colors.secondary,
+                          }}
                           resizeMode="cover"
                           onLoad={() => setPhotoPreviewError(false)}
                           onError={() => setPhotoPreviewError(true)}
                         />
                       )}
                       {photoPreviewError && queue.mediaType !== 'video' ? (
-                        <View className="absolute inset-0 items-center justify-center rounded-[24px] bg-[#F4F1EE] px-5">
-                          <Text className="text-center font-body text-sm text-[#514943]">
+                        <View
+                          style={[
+                            StyleSheet.absoluteFillObject,
+                            {
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 22,
+                              backgroundColor: colors.secondary,
+                              padding: 20,
+                            },
+                          ]}>
+                          <Text style={[type.supporting, { textAlign: 'center' }]}>
                             Photo preview unavailable. Remove it and take another photo.
                           </Text>
                         </View>
@@ -928,8 +859,26 @@ export default function CoachCheckInFlow({
                         }
                         disabled={busy}
                         onPress={retakePhoto}
-                        className="absolute right-3 top-3 min-h-11 min-w-11 items-center justify-center rounded-full bg-black/75">
-                        <X size={22} color="#FFFFFF" />
+                        style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: 10,
+                          width: 44,
+                          height: 44,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                          <X size={16} color="#fff" />
+                        </View>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -938,88 +887,79 @@ export default function CoachCheckInFlow({
                       accessibilityLabel="Retake missing photo"
                       disabled={busy}
                       onPress={retakePhoto}
-                      className="mt-5 rounded-2xl bg-[#F7F6F4] p-5">
-                      <Text className="font-body text-[#655B55]">
+                      style={{
+                        marginTop: 20,
+                        borderRadius: 22,
+                        backgroundColor: colors.secondary,
+                        padding: 20,
+                      }}>
+                      <Text style={type.body}>
                         The local photo is unavailable. Tap to retake it before posting.
                       </Text>
                     </TouchableOpacity>
                   )}
                   {category === 'meals' ? (
-                    <View className="mt-5">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#C9532B]">
-                          AI MEAL ANALYSIS
-                        </Text>
-                        <Text className="font-body text-xs text-[#817772]">
-                          {meal?.scanCount ?? 0} of 3 checked
-                        </Text>
-                      </View>
-                      {busy ? (
-                        <View className="mt-4 py-5">
-                          <View className="flex-row items-center gap-3">
-                            <View className="flex-1">
-                              <Text className="font-heading text-lg font-semibold text-[#251E1A]">
-                                Looking at your plate
-                              </Text>
-                              <Text className="mt-1 font-body text-sm text-[#655B55]">
-                                Checking the visible balance and portions.
-                              </Text>
-                            </View>
-                          </View>
-                          <View className="mt-4 h-2 overflow-hidden rounded-full bg-[#F0D8CC]">
-                            <View className="h-full w-1/2 rounded-full bg-[#FF5C35]" />
-                          </View>
-                        </View>
-                      ) : null}
+                    <View style={{ marginTop: 26 }}>
+                      {busy || meal?.draft?.status === 'analyzing' ? <MealAnalysisLoading /> : null}
                       {meal?.draft?.status === 'ready' && meal.draft.verdict ? (
-                        <View className="mt-4 rounded-[24px] bg-[#FFF6F1] p-5">
-                          <View className="flex-row items-start justify-between">
-                            <View className="flex-1 pr-3">
-                              <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                                Private feedback
-                              </Text>
-                              <Text className="mt-1 font-body text-xs text-[#817772]">
-                                Based only on food visible in this photo
-                              </Text>
-                            </View>
-                            <View className="overflow-hidden rounded-full bg-[#FF5C35] px-2 py-1">
-                              <Text className="font-heading text-xs font-semibold text-white">
+                        <View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              flexWrap: 'wrap',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                            }}>
+                            <Text style={type.sheetSectionHeading}>Private feedback</Text>
+                            <View style={chrome.badge}>
+                              <Text style={[chrome.badgeText, { fontSize: 13 }]}>
                                 {meal.draft.verdict}
                               </Text>
                             </View>
                           </View>
-                          <Text className="mt-5 font-body text-base leading-6 text-[#514943]">
+                          <Text style={[type.caption, { color: colors.subtle, marginTop: 2 }]}>
+                            {meal.scanCount ?? 0} of 3 checked · Based only on food visible in this
+                            photo
+                          </Text>
+                          <Text style={[type.explanation, { marginTop: 14 }]}>
                             {meal.draft.feedback}
                           </Text>
                           <MealReportFeedback key={meal.draft._id} draft={meal.draft} />
                         </View>
                       ) : meal?.draft?.status === 'ready' ? (
-                        <View className="mt-4 rounded-[20px] bg-[#F7F6F4] p-5">
-                          <Text className="font-heading text-lg">Unable to assess a meal</Text>
-                          <Text className="mt-2">
+                        <View style={{ gap: 8 }}>
+                          <Text style={type.sheetSectionHeading}>Unable to assess a meal</Text>
+                          <Text style={type.body}>
                             Please retake the photo or try the analysis again.
                           </Text>
-                          <Text className="mt-2">
+                          <Text style={type.supporting}>
                             This did not use a successful scan. Retake or try again with a clearer
                             meal photo.
                           </Text>
                         </View>
                       ) : meal?.draft?.status === 'failed' ? (
-                        <View className="mt-4 rounded-[20px] border border-[#E8E2DE] bg-[#FAF8F7] p-4">
-                          <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                            Portion check unavailable
-                          </Text>
-                          <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
+                        <View
+                          style={{
+                            borderRadius: 22,
+                            backgroundColor: colors.secondary,
+                            padding: 18,
+                            gap: 8,
+                          }}>
+                          <Text style={type.sheetSectionHeading}>Portion check unavailable</Text>
+                          <Text style={type.body}>
                             Your photo and caption are safe. Retry the check or share your meal
                             without it.
                           </Text>
                         </View>
+                      ) : !busy && meal?.draft?.status !== 'analyzing' ? (
+                        <Text style={type.caption}>{meal?.scanCount ?? 0} of 3 checked</Text>
                       ) : null}
                     </View>
                   ) : null}
                 </>
               ) : (
-                <Text className="font-body text-base text-[#655B55]">
+                <Text style={type.body}>
                   {today.status === 'locked'
                     ? 'Premium access is required to post this check-in.'
                     : 'No photo is ready for this check-in. Go back and take a live photo.'}
@@ -1027,214 +967,117 @@ export default function CoachCheckInFlow({
               )
             ) : ready ? (
               <>
-                <View className="flex-row items-start justify-between gap-x-4">
-                  <Text className="min-w-0 flex-1 font-heading text-[22px] font-semibold text-black">
-                    {fixedTitle}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    justifyContent: 'space-between',
+                  }}>
+                  <Text style={[type.checkInSheetHeading, { flex: 1 }]}>
+                    {category === 'workout'
+                      ? 'Log a workout'
+                      : category === 'meals'
+                        ? 'Log a meal'
+                        : fixedTitle}
                   </Text>
-                  <Text className="shrink-0 pt-0.5 font-body text-lg text-[#E9512A]">
-                    +{points} {pointsLabel(points)}
-                  </Text>
+                  <View style={[chrome.badge, { marginTop: 4 }]}>
+                    <Text style={chrome.badgeText}>
+                      +{points} {pointsLabel(points)}
+                    </Text>
+                  </View>
                 </View>
-                <Text className="mt-4 font-body text-base leading-6 text-[#77716D]">
-                  {fixedInstruction}
-                </Text>
-                {canTakeLivePhoto ? (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Take live photo"
-                    disabled={busy}
-                    onPress={() => void start('image')}
-                    className="mt-5 min-h-[80px] flex-row items-center rounded-[24px] border border-[#E6E2DF] bg-white px-4">
-                    <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-[#FFF5F0]">
-                      <Camera size={25} color="#FF5C35" />
-                    </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="font-heading text-base font-semibold">Take live photo</Text>
-                      <Text className="mt-1 font-body text-sm text-[#77716D]">
-                        Use the in-app camera
-                      </Text>
-                    </View>
-                    <ArrowRight size={22} color="#FF5C35" />
-                  </TouchableOpacity>
+                {category === 'workout' && assignment?.label ? (
+                  <Text style={[type.supporting, { marginTop: 8 }]}>{assignment.label}</Text>
                 ) : null}
-                {category === 'workout' && canTakeLivePhoto ? (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Record video"
-                    disabled={busy}
-                    onPress={() => void start('video')}
-                    className="mt-2 min-h-[80px] flex-row items-center rounded-[24px] border border-[#E6E2DF] bg-white px-4">
-                    <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-[#FFF5F0]">
-                      <VideoCamera size={25} color="#FF5C35" />
-                    </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="font-heading text-base font-semibold">Record video</Text>
-                      <Text className="mt-1 font-body text-sm text-[#77716D]">
-                        Record your proof · 1min max
-                      </Text>
-                    </View>
-                    <ArrowRight size={22} color="#FF5C35" />
-                  </TouchableOpacity>
-                ) : null}
-                {error ? (
-                  <Text
-                    accessibilityLiveRegion="polite"
-                    className="mt-3 font-body text-sm text-[#B8462A]">
+                <Text style={[type.body, { marginTop: 10 }]}>{fixedInstruction}</Text>
+                <View style={{ marginTop: 24, gap: 12 }}>
+                  {canTakeLivePhoto ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Take live photo"
+                      accessibilityState={{ disabled: busy, busy }}
+                      disabled={busy}
+                      onPress={() => {
+                        start('image').catch(() => {});
+                      }}
+                      style={[chrome.actionCard, busy && { opacity: 0.6 }]}>
+                      <View style={components.iconTile}>
+                        <Camera size={24} color={colors.icon} />
+                      </View>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={type.cardTitle}>Take live photo</Text>
+                        <Text style={type.caption}>Use the in-app camera</Text>
+                      </View>
+                      {busy ? <ActivityIndicator color={colors.ink} /> : null}
+                    </TouchableOpacity>
+                  ) : null}
+                  {category === 'workout' && canTakeLivePhoto ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Record video"
+                      accessibilityState={{ disabled: busy, busy }}
+                      disabled={busy}
+                      onPress={() => {
+                        start('video').catch(() => {});
+                      }}
+                      style={[chrome.actionCard, busy && { opacity: 0.6 }]}>
+                      <View style={components.iconTile}>
+                        <VideoCamera size={24} color={colors.icon} />
+                      </View>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={type.cardTitle}>Record video</Text>
+                        <Text style={type.caption}>Record your proof · 1min max</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                {error && !showFooter ? (
+                  <Text accessibilityRole="alert" style={[type.error, { marginTop: 12 }]}>
                     {error}
                   </Text>
                 ) : null}
               </>
-            ) : today.status !== 'ready' || !assignment ? (
-              <>
-                <Text className="font-heading text-2xl">Get today’s plan first</Text>
-                <Text className="mt-3">A ready plan is needed for personalised check-ins.</Text>
-              </>
             ) : (
-              <>
-                {workoutDetails ? (
-                  <View className="rounded-2xl bg-[#FFF8F4] p-4">
-                    <View className="flex-row items-start gap-3">
-                      <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
-                        <Barbell size={22} color="#F45A2B" />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                          {guide?.title}
-                        </Text>
-                        <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
-                          {queue?.recommendation ?? assignment.recommendation}
-                        </Text>
-                        <Text className="mt-2 font-body text-xs font-semibold text-[#C9532B]">
-                          {workoutRewardUsed
-                            ? 'Today’s workout reward has been used'
-                            : assignment.mandatory
-                              ? 'Reward available after live proof and posting'
-                              : 'Rest guidance · no proof required'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  <View className="rounded-3xl border border-[#F6DFD2] bg-[#FFF8F4] p-5">
-                    <Text className="font-body text-xs font-semibold uppercase tracking-widest text-[#CA4E25]">
-                      TODAY’S {category === 'meals' ? 'MEAL GUIDANCE' : 'RECOMMENDATION'}
-                    </Text>
-                    <Text className="mt-2 font-heading text-[23px] font-semibold leading-7 text-[#251E1A]">
-                      {guide?.title}
-                    </Text>
-                    {guide?.recommendation ? (
-                      <Text className="mt-3 font-body text-base leading-6 text-[#5F5752]">
-                        {guide.recommendation}
-                      </Text>
-                    ) : null}
-                  </View>
-                )}
-                {workoutSearch ? (
-                  <View className="mt-4 rounded-2xl border border-[#E9DCD5] bg-white p-4">
-                    <View className="flex-row items-start gap-3">
-                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#FFF0E8]">
-                        <PlayCircle size={23} color="#F45A2B" />
-                      </View>
-                      <View className="min-w-0 flex-1">
-                        <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                          Find a guided workout
-                        </Text>
-                        <Text className="mt-1 font-body text-sm leading-5 text-[#655B55]">
-                          Search YouTube for “{workoutSearch.phrase}”
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      accessibilityRole="link"
-                      accessibilityLabel={`Search on YouTube for ${workoutSearch.phrase}. Opens an external service.`}
-                      onPress={openWorkoutSearch}
-                      className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-xl border border-[#F0B99F] bg-[#FFF8F4] px-4 py-3">
-                      <Text className="font-body text-sm font-semibold text-[#C9532B]">
-                        Search on YouTube
-                      </Text>
-                      <ArrowSquareOut size={18} color="#C9532B" />
-                    </TouchableOpacity>
-                    <Text className="mt-2 font-body text-xs leading-4 text-[#77716D]">
-                      Opens YouTube. Videos are provided by third parties.
-                    </Text>
-                  </View>
-                ) : null}
-                {guide?.reason ? (
-                  <View className="mt-5 rounded-2xl bg-[#F7F6F4] p-4">
-                    <Text className="font-body text-xs font-semibold uppercase tracking-wide text-[#817772]">
-                      WHY THIS FITS TODAY
-                    </Text>
-                    <Text className="mt-2 font-body text-sm leading-5 text-[#504943]">
-                      {guide.reason}
-                    </Text>
-                  </View>
-                ) : null}
-                {category === 'workout' && !assignment.mandatory && !workoutDetails ? (
-                  <Text className="mt-4">Rest guidance is not a mandatory workout check-in.</Text>
-                ) : null}
-                {assignment.consumedCount >= (category === 'meals' ? 3 : 1) ? (
-                  <Text className="mt-4">
-                    This category’s daily reward slot has already been used.
-                  </Text>
-                ) : null}
-                {canTakeLivePhoto ? (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Take live photo using the in-app camera"
-                    disabled={busy}
-                    onPress={() => void start('image')}
-                    className="mt-4 min-h-[72px] flex-row items-center gap-3 rounded-2xl border border-[#E3E1DE] bg-white px-4 py-3">
-                    <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#FFF0E8]">
-                      <Camera size={23} color="#F45A2B" />
-                    </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="font-heading text-base font-semibold text-[#251E1A]">
-                        Take live photo
-                      </Text>
-                      <Text className="font-body text-sm text-[#77716D]">
-                        Use the in-app camera
-                      </Text>
-                    </View>
-                    <ArrowRight size={20} color="#F45A2B" />
-                  </TouchableOpacity>
-                ) : null}
-                {error && !showFooter ? (
-                  <Text className="mt-3 font-body text-sm text-[#B8462A]">{error}</Text>
-                ) : null}
-              </>
+              <View style={{ gap: 12 }}>
+                <Text style={type.checkInSheetHeading}>Get today’s plan first</Text>
+                <Text style={type.body}>A ready plan is needed for personalised check-ins.</Text>
+              </View>
             )}
           </KeyboardAwareScrollView>
           {showFooter ? (
-            <View
-              onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-              className="border-t border-[#EEE9E5] bg-white px-6 pb-4 pt-3">
-              {error ? <Text className="mb-3 text-sm text-[#B8462A]">{error}</Text> : null}
-              {showPrimaryAction ? (
-                <CoachActionButton
-                  label={busy ? 'Working…' : primaryLabel}
-                  disabled={
-                    busy ||
-                    (mode === 'post' &&
+            <KeyboardStickyView offset={{ opened: insets.bottom }}>
+              <View
+                onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+                style={chrome.footer}>
+                {error ? (
+                  <Text accessibilityRole="alert" style={type.error}>
+                    {error}
+                  </Text>
+                ) : null}
+                {showPrimaryAction ? (
+                  <PrototypeButton
+                    label={primaryLabel}
+                    loading={busy}
+                    disabled={
+                      mode === 'post' &&
                       (!queue ||
                         today.status === 'locked' ||
-                        (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
-                  }
-                  onPress={primaryAction}
-                />
-              ) : null}
-              {canShareMealWithoutAnalysis ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Share without AI analysis"
-                  disabled={busy}
-                  onPress={() => publishMeal(true)}
-                  className="mt-3 min-h-14 items-center justify-center rounded-[20px] border border-[#FF5C35] bg-white px-5 py-3.5">
-                  <Text className="font-body text-base font-semibold text-[#E9512A]">
-                    Share without AI analysis
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+                        (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis))
+                    }
+                    onPress={primaryAction}
+                  />
+                ) : null}
+                {canShareMealWithoutAnalysis ? (
+                  <PrototypeButton
+                    label="Share without AI analysis"
+                    secondary
+                    disabled={busy}
+                    onPress={() => publishMeal(true)}
+                  />
+                ) : null}
+              </View>
+            </KeyboardStickyView>
           ) : null}
         </>
       )}

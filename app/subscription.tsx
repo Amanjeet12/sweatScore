@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
+import { View } from 'react-native';
 
 import Paywall from '~/components/core/Paywall';
-import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 
@@ -11,7 +11,7 @@ export default function SubscriptionScreen() {
   const { accepted } = useCoachRouteGuard(PAYWALL_ROUTE);
   if (!accepted) return <ScreenLoading />;
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFB]">
+    <View className="flex-1 bg-white">
       <Stack.Screen
         options={{
           headerShown: false,
@@ -20,6 +20,6 @@ export default function SubscriptionScreen() {
       />
 
       <Paywall onboarding />
-    </SafeAreaView>
+    </View>
   );
 }

@@ -2,21 +2,25 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { router } from 'expo-router';
 import {
-  ArrowLeft,
-  ArrowRight,
   Barbell,
   Check,
   Footprints,
   ForkKnife,
   MoonStars,
-  X,
+  MagnifyingGlass,
   YoutubeLogo,
 } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
 
+import CoachPlanPreparing from './CoachPlanPreparing';
+import DailyQuestion from './DailyQuestion';
+import PlanExplanation from './PlanExplanation';
+
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
 import PlanFeedback from '~/components/core/dashboard/PlanFeedback';
+import { PrototypeSheetControl } from '~/components/core/design/PrototypeControl';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { CoachCategory } from '~/shared/coachFoundation';
@@ -39,41 +43,9 @@ const ROWS = [
   { category: 'meals', title: 'Meals', Icon: ForkKnife },
   { category: 'sleep', title: 'Sleep', Icon: MoonStars },
 ] as const;
-const ORANGE = '#FF5C35';
+const ORANGE = '#E8541E';
 function concise(value: string) {
   return value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || value;
-}
-
-function Sparkles() {
-  return (
-    <View className="h-20 items-center justify-center" accessibilityElementsHidden>
-      <Svg width={80} height={80} viewBox="0 0 500 500">
-        <Defs>
-          <LinearGradient id="sparkleGradient" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#FF5C00" />
-            <Stop offset="0.45" stopColor="#FF8A00" />
-            <Stop offset="1" stopColor="#FFE600" />
-          </LinearGradient>
-        </Defs>
-        <Path
-          fill="url(#sparkleGradient)"
-          d="M72 53 C64 94 43 110 0 120 C46 130 65 152 77 218 C83 160 102 134 148 119 C104 111 83 92 72 53 Z"
-        />
-        <Path
-          fill="url(#sparkleGradient)"
-          d="M237 133 C220 215 189 239 105 262 C184 282 218 323 241 442 C257 337 291 285 380 261 C292 243 256 216 237 133 Z"
-        />
-        <Path
-          fill="url(#sparkleGradient)"
-          d="M406 94 C396 140 370 162 322 176 C374 190 398 218 414 292 C421 230 445 192 498 174 C447 163 420 141 406 94 Z"
-        />
-        <Path
-          fill="url(#sparkleGradient)"
-          d="M126 315 C119 344 102 359 72 369 C105 379 121 398 131 442 C136 404 151 381 183 370 C151 362 135 345 126 315 Z"
-        />
-      </Svg>
-    </View>
-  );
 }
 
 export default function TodayPlanSheet({
@@ -82,12 +54,14 @@ export default function TodayPlanSheet({
   checkIns,
   onClose,
   onCheckIn,
+  onContentHeight,
 }: {
   firstName: string;
   plan: Plan;
   checkIns: CheckIns;
   onClose: () => void;
   onCheckIn: (category: CoachCategory) => void;
+  onContentHeight?: (height: number) => void;
 }) {
   const foundation = useQuery(api.coachFoundation.getMyFoundation, {});
   const begin = useMutation(api.coachFoundation.beginReturningPlanSetup);
@@ -108,7 +82,7 @@ export default function TodayPlanSheet({
     if (!foundation || plan.requestStatus !== 'none' || beganRef.current) return;
     if (!foundation.state?.profileRevisionId) {
       beganRef.current = true;
-      void begin({})
+      begin({})
         .then(() => {
           onClose();
           router.push('/coach-onboarding');
@@ -160,18 +134,6 @@ export default function TodayPlanSheet({
     plan.requestStatus === 'pending' ||
     (submitting && plan.requestStatus === 'none') ||
     Boolean(retryRequestId && plan.requestId !== retryRequestId);
-  const loadingProgress = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!pending) return;
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(loadingProgress, { toValue: 1, duration: 1900, useNativeDriver: false }),
-        Animated.timing(loadingProgress, { toValue: 0, duration: 350, useNativeDriver: false }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [pending, loadingProgress]);
   const ready = Boolean(plan.plan) && plan.requestStatus === 'ready';
   const completed = ROWS.filter(
     ({ category }) =>
@@ -185,113 +147,110 @@ export default function TodayPlanSheet({
   const search = output ? workoutYoutubeSearch(workoutTarget ?? output.workout) : null;
 
   return (
-    <View>
+    <View style={{ flex: 1 }}>
       <View
-        className="mt-3 h-1 w-12 self-center rounded-full bg-[#CBC7C3]"
+        className="mt-2.5 h-1 w-10 self-center rounded-full bg-[#D9D9D9]"
         accessibilityElementsHidden
       />
-      <View className="absolute left-5 right-5 top-7 z-10 flex-row justify-between">
-        {!pending && !ready && plan.requestStatus === 'none' && index > 0 ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Previous question"
-            onPress={() => {
-              setError('');
-              setStep(index - 1);
-            }}
-            className="h-11 w-11 items-center justify-center">
-            <ArrowLeft color={ORANGE} size={25} />
-          </TouchableOpacity>
-        ) : (
-          <View className="h-11 w-11" />
-        )}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Close today’s plan"
-          onPress={onClose}
-          className="h-11 w-11 items-center justify-center rounded-full bg-[#F7F4F2]">
-          <X color="#625C58" size={24} />
-        </TouchableOpacity>
-      </View>
       <ScrollView
+        onContentSizeChange={(_, height) => onContentHeight?.(height + 14)}
+        style={{ flex: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 35, paddingBottom: 28 }}>
-        {!pending ? <Sparkles /> : null}
+        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 18, paddingBottom: 30 }}>
         {ready && output ? (
           <>
-            <Text className="mt-3 text-center font-heading text-[34px] font-semibold leading-10 text-black">
-              Hey {firstName},
-            </Text>
-            <Text className="text-center font-heading text-[22px] font-semibold text-black">
-              here’s today’s plan
-            </Text>
-            <Text className="mb-7 mt-7 text-center font-heading text-[26px] font-semibold leading-8 text-black">
+            <View className="flex-row items-center justify-between">
+              <Text style={type.supporting} className="min-w-0 flex-1 pr-3">
+                Hey {firstName}, here’s today’s plan
+              </Text>
+              <PrototypeSheetControl kind="close" label="Close today’s plan" onPress={onClose} />
+            </View>
+            <Text style={type.planHeading} className="mt-3.5">
               {output.headline}
             </Text>
-            <View className="mb-4 rounded-[22px] bg-[#FFF6F1] p-5">
+            <View className="mt-[26px]">
               <View className="flex-row justify-between">
-                <Text>Today’s progress</Text>
-                <Text>{completed}/4 complete</Text>
+                <Text style={[type.progressLabel, { flex: 1, paddingRight: 12 }]}>
+                  Today’s progress
+                </Text>
+                <Text style={[type.progressValue, { flexShrink: 1, textAlign: 'right' }]}>
+                  {completed}/4 complete
+                </Text>
               </View>
-              <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#FCE2D2]">
+              <View
+                accessibilityRole="progressbar"
+                accessibilityLabel="Today’s plan progress"
+                accessibilityValue={{ min: 0, max: 4, now: completed }}
+                className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#F1F1F1]">
                 <View
-                  style={{ width: `${completed * 25}%`, backgroundColor: ORANGE, height: '100%' }}
+                  style={{
+                    width: `${completed * 25}%`,
+                    backgroundColor: '#ff5a1f',
+                    height: '100%',
+                  }}
                 />
               </View>
             </View>
-            {ROWS.map(({ category, title, Icon }) => {
-              const assignment = checkIns?.assignments.find((item) => item.category === category);
-              const target =
-                category === 'steps'
-                  ? `${plan.plan?.stepTarget.toLocaleString('en-US')} steps`
-                  : category === 'workout' && workoutTarget
-                    ? workoutTarget
-                    : category === 'meals'
-                      ? mealPlanSummary(output.meals)
-                      : concise(output[category]);
-              const done = (assignment?.consumedCount ?? 0) > 0;
-              return (
-                <TouchableOpacity
-                  key={category}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${title}: ${target}`}
-                  onPress={() => onCheckIn(category)}
-                  className="mb-3 rounded-[22px] border border-[#E6E2DF] bg-white p-4">
-                  <View className="flex-row items-center">
-                    <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-[#FFF5F0]">
-                      <Icon color={ORANGE} size={25} weight="fill" />
+            <View className="mt-7 gap-[22px]">
+              {ROWS.map(({ category, title, Icon }) => {
+                const assignment = checkIns?.assignments.find((item) => item.category === category);
+                const target =
+                  category === 'steps'
+                    ? `${plan.plan?.stepTarget.toLocaleString('en-US')} steps`
+                    : category === 'workout' && workoutTarget
+                      ? workoutTarget
+                      : category === 'meals'
+                        ? mealPlanSummary(output.meals)
+                        : concise(output[category]);
+                const done = (assignment?.consumedCount ?? 0) > 0;
+                return (
+                  <TouchableOpacity
+                    key={category}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${title}: ${target}`}
+                    onPress={() => onCheckIn(category)}
+                    className="flex-row items-center">
+                    <View className="mr-[14px] h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF3EA]">
+                      <Icon size={24} color={ORANGE} />
                     </View>
-                    <View className="min-w-0 flex-1">
-                      <Text className="font-heading font-semibold">{title}</Text>
-                      <Text className="mt-1 font-body text-sm text-[#77716D]">{target}</Text>
+                    <View className="min-w-0 flex-1 pr-3">
+                      <Text style={type.cardTitle}>{title}</Text>
+                      <Text style={type.supporting} className="mt-1">
+                        {target}
+                      </Text>
                     </View>
-                    {done ? (
-                      <Check color={ORANGE} size={23} />
-                    ) : (
-                      <ArrowRight color={ORANGE} size={22} />
-                    )}
-                  </View>
-                  {category === 'workout' && search ? (
-                    <TouchableOpacity
-                      accessibilityRole="link"
-                      accessibilityLabel={`Search ${search.phrase} on YouTube`}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        Linking.openURL(search.url).catch(() => {});
-                      }}
-                      className="mt-3 min-h-12 flex-row items-center justify-center rounded-xl bg-[#FFF0E8]">
-                      <YoutubeLogo color={ORANGE} size={22} weight="fill" />
-                      <Text className="ml-3 text-sm text-[#655B55]">Search {search.phrase}</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-            <View className="mt-3 rounded-[22px] bg-[#FFF6F1] p-5">
-              <Text className="font-heading font-semibold">Why this was recommended</Text>
-              <Text className="mt-2 font-body text-sm leading-5 text-[#77716D]">{output.why}</Text>
+                    <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
+                      {done ? <Check size={17} color="#8A8A8A" /> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+            {search ? (
+              <View className="mt-[34px]">
+                <Text style={type.sheetSectionHeading}>Find your workout on YouTube</Text>
+                <Text style={type.supporting} className="mt-1">
+                  Search for a workout that fits today’s plan.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  accessibilityLabel={`Search ${search.phrase} on YouTube`}
+                  onPress={() =>
+                    Linking.openURL(search.url).catch(() =>
+                      Alert.alert('YouTube could not be opened. Please try again.')
+                    )
+                  }
+                  className="mt-3 min-h-16 flex-row items-center rounded-[32px] bg-[#F5F5F5] px-[22px] py-4">
+                  <MagnifyingGlass size={24} color="#8A8A8A" />
+                  <Text style={type.search} className="mx-3 min-w-0 flex-1">
+                    {search.phrase}
+                  </Text>
+                  <YoutubeLogo size={32} color={ORANGE} weight="fill" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            <PlanExplanation explanation={output.why} />
             <PlanFeedback revisionId={plan.plan!.revisionId} />
             <TouchableOpacity
               accessibilityRole="button"
@@ -299,104 +258,81 @@ export default function TodayPlanSheet({
                 onClose();
                 router.push('/coach-profile');
               }}
-              className="min-h-14 items-center justify-center">
-              <Text className="text-sm text-[#E9512A]">Update profile to refresh your plan →</Text>
+              className="mt-4 min-h-11 items-center justify-center">
+              <Text style={[type.body, { color: '#E8541E', textAlign: 'center' }]}>
+                Update profile to refresh your plan →
+              </Text>
             </TouchableOpacity>
           </>
-        ) : pending ? (
+        ) : pending || plan.requestStatus === 'failed' ? (
           <>
-            <Text className="mt-5 text-center font-heading text-[34px] font-semibold leading-10 text-black">
-              Creating today’s{`\n`}plan, {firstName}
-            </Text>
-            <Text className="mt-5 text-center font-body text-lg leading-7">
-              Your answers are saved and{`\n`}your plan is being built.
-            </Text>
-            <View className="my-7 rounded-[22px] bg-[#FFF6F1] p-5">
-              <Text>This may take a moment</Text>
-              <View
-                accessibilityRole="progressbar"
-                accessibilityLabel="Creating today’s plan"
-                className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#FCE2D2]">
-                <Animated.View
-                  style={{
-                    width: loadingProgress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['8%', '92%'],
-                    }),
-                    height: '100%',
-                    borderRadius: 8,
-                    backgroundColor: ORANGE,
-                  }}
-                />
-              </View>
-            </View>
-          </>
-        ) : plan.requestStatus === 'failed' ? (
-          <>
-            <Text className="mt-5 text-center font-heading text-[30px] font-semibold">
-              Your answers are saved
-            </Text>
-            <Text className="mt-4 text-center font-body text-base">
-              We could not prepare today’s plan. Please try again.
-            </Text>
-            {plan.canRetry && plan.requestId ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                disabled={busy}
-                onPress={async () => {
-                  setBusy(true);
-                  setError('');
-                  try {
-                    const requestId = await retry({
-                      failedRequestId: plan.requestId!,
-                      requestKey: `retry_${plan.day.replaceAll('-', '')}_${Date.now()}`,
-                    });
-                    setRetryRequestId(requestId);
-                  } catch {
-                    setError('Could not retry right now. Please try again.');
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                className="mt-8 min-h-14 items-center justify-center rounded-full bg-[#FF5C35]">
-                <Text className="font-heading font-semibold text-white">
-                  {busy ? 'Retrying…' : 'Retry plan preparation'}
+            <PrototypeSheetControl
+              kind="close"
+              label="Close today’s plan"
+              onPress={onClose}
+              style={{ alignSelf: 'flex-end' }}
+            />
+            {pending ? (
+              <CoachPlanPreparing prototype firstName={firstName} />
+            ) : (
+              <View className="py-8">
+                <Text style={type.planHeading}>Your answers are saved</Text>
+                <Text style={type.loadingBody} className="mt-4">
+                  We could not prepare today’s plan. Please try again.
                 </Text>
-              </TouchableOpacity>
-            ) : null}
+                {plan.canRetry && plan.requestId ? (
+                  <PrototypeButton
+                    label="Retry plan preparation"
+                    loading={busy}
+                    disabled={busy}
+                    onPress={async () => {
+                      setBusy(true);
+                      setError('');
+                      try {
+                        const requestId = await retry({
+                          failedRequestId: plan.requestId!,
+                          requestKey: `retry_${plan.day.replaceAll('-', '')}_${Date.now()}`,
+                        });
+                        setRetryRequestId(requestId);
+                      } catch {
+                        setError('Could not retry right now. Please try again.');
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                    style={{ marginTop: 32 }}
+                  />
+                ) : null}
+              </View>
+            )}
           </>
         ) : (
-          <>
-            <Text className="mt-5 text-center font-heading text-[38px] font-semibold leading-[44px] text-black">
-              Hey, {firstName}
-            </Text>
-            <Text className="mb-11 mt-7 text-center font-body text-lg leading-7 text-black">
-              Answer 5 quick questions to get{`\n`}a personalised plan today.
-            </Text>
-            <Text className="mb-7 text-center font-heading text-xl font-semibold text-black">
-              {question.key === 'mood' ? 'How’s your mood today?' : question.title}
-            </Text>
-            {question.options.map(([value, label]) => (
-              <TouchableOpacity
-                key={value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: draft?.[question.key] === value, disabled: busy }}
-                disabled={busy}
-                onPress={() => void choose(value)}
-                className="mb-3 min-h-[76px] justify-center rounded-[24px] border px-6"
-                style={{
-                  borderColor: draft?.[question.key] === value ? ORANGE : '#E5E2DF',
-                  backgroundColor: draft?.[question.key] === value ? '#FFF6F1' : '#FFFFFF',
-                }}>
-                <Text className="font-body text-lg text-black">{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </>
+          <DailyQuestion
+            index={index}
+            total={QUESTIONS.length}
+            title={question.key === 'mood' ? 'How’s your mood today?' : question.title}
+            description={
+              index === 0 ? 'Answer 5 quick questions to get a personalised plan today.' : undefined
+            }
+            options={question.options}
+            selected={typeof draft?.[question.key] === 'string' ? draft[question.key] : undefined}
+            busy={busy}
+            onChoose={(value) => {
+              choose(value).catch(() => {});
+            }}
+            onBack={
+              index > 0
+                ? () => {
+                    setError('');
+                    setStep(index - 1);
+                  }
+                : undefined
+            }
+            onClose={onClose}
+          />
         )}
         {error ? (
-          <Text
-            accessibilityLiveRegion="polite"
-            className="mt-4 text-center font-body text-sm text-[#B8462A]">
+          <Text style={type.error} accessibilityLiveRegion="polite" className="mt-4">
             {error}
           </Text>
         ) : null}

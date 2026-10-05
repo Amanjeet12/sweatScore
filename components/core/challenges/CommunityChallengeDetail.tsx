@@ -1,19 +1,14 @@
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { ArrowLeft, Camera, Play } from 'phosphor-react-native';
+import { ArrowLeft, Play } from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
 import ParticipantAvatars from '~/components/core/challenges/ParticipantAvatars';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 
 export default function CommunityChallengeDetail({
@@ -21,11 +16,15 @@ export default function CommunityChallengeDetail({
   joining,
   onJoin,
   onRecord,
+  uploadState,
+  onRetry,
 }: {
   challenge: any;
   joining: boolean;
   onJoin: () => void;
   onRecord: () => void;
+  uploadState?: 'failed' | 'active';
+  onRetry?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,30 +48,34 @@ export default function CommunityChallengeDetail({
 
   return (
     <View className="flex-1 bg-white">
-      <View className="mx-5 mb-4 mt-3 flex-row items-center justify-between">
+      <View
+        style={{
+          marginHorizontal: 22,
+          marginBottom: 16,
+          marginTop: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back to challenges"
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/hub'))}
-          className="h-11 w-11 items-center justify-center rounded-full border border-[#E5E5E5]">
-          <ArrowLeft size={22} color="#252525" />
+          className="h-11 w-11 items-center justify-center rounded-full border border-[#EBE6E2]">
+          <ArrowLeft size={22} color="#2a2a2a" />
         </Pressable>
-        <Text
-          numberOfLines={1}
-          className="mx-3 min-w-0 flex-1 text-center font-heading text-lg font-semibold text-[#252525]">
-          {challenge.name}
-        </Text>
+        <Text style={[type.challengeHeading, { flex: 1 }]}>{challenge.name}</Text>
         <View className="h-11 w-11" />
       </View>
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 24 }}>
+        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 0, paddingBottom: 24 }}>
         {challenge.instructionalVideoUrl ? (
           <View className="relative overflow-hidden rounded-[16px] bg-[#E8E8E8]">
             <VideoView
               player={player}
-              style={{ width: '100%', aspectRatio: 0.87 }}
+              style={{ width: '100%', aspectRatio: 346 / 400 }}
               contentFit="cover"
               nativeControls={isPlaying}
               allowsFullscreen
@@ -86,51 +89,75 @@ export default function CommunityChallengeDetail({
                 }}
                 style={StyleSheet.absoluteFillObject}
                 className="items-center justify-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-black/50">
+                <View className="h-[52px] w-[52px] items-center justify-center rounded-full bg-black/45">
                   <Play size={21} color="#FFFFFF" weight="fill" />
                 </View>
               </Pressable>
             ) : null}
           </View>
+        ) : challenge.coverImageUrl ? (
+          <Image
+            source={{ uri: challenge.coverImageUrl }}
+            contentFit="cover"
+            style={{ width: '100%', aspectRatio: 346 / 400, borderRadius: 16 }}
+          />
         ) : null}
 
-        <View className="mt-4 flex-row items-center justify-between gap-x-3">
-          <Text className="font-body text-sm text-[#777777]">
-            {challenge.durationDays}-day challenge
-          </Text>
+        <View
+          style={{
+            marginTop: 14,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}>
+          <Text style={type.caption}>{challenge.durationDays}-day challenge</Text>
           <ParticipantAvatars
             avatars={challenge.participantAvatars}
             count={challenge.participantCount}
-            size={28}
+            size={32}
           />
         </View>
-        <Text className="mt-4 font-body text-base leading-6 text-[#252525]">
+        <Text style={[type.body, { marginTop: 14, color: '#2a2a2a' }]}>
           {challenge.description}
         </Text>
 
         {challenge.isJoined ? (
-          <View className="mt-4 rounded-[24px] bg-white px-4 py-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="font-body text-xs text-[#77716D]">Your progress</Text>
-              <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-xs text-[#313131]">
-                {challenge.completedDays} of {challenge.durationDays}
+          <View style={{ marginTop: 22 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}>
+              <Text style={type.challengeProgress}>Your progress</Text>
+              <Text style={type.challengeProgressValue}>
+                {challenge.completedDays} of {challenge.durationDays} days
               </Text>
             </View>
-            <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#E5DFDB]">
+            <View
+              accessibilityRole="progressbar"
+              accessibilityValue={{ min: 0, max: 100, now: progress }}
+              accessibilityLabel="Challenge progress"
+              className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#F0F0F0]">
               <View
-                className="h-full rounded-full bg-[#FF5C35]"
+                className="h-full rounded-full bg-[#FF5A1F]"
                 style={{ width: `${progress}%` }}
               />
             </View>
             {!challenge.completionBankEligible && !challenge.completionBankAwarded ? (
-              <Text className="mt-2 font-body text-[10px] text-[#A65B45]">
+              <Text style={[type.caption, { marginTop: 8, color: '#A65B45' }]}>
                 Daily points remain available, but the completion bank is no longer eligible.
               </Text>
             ) : null}
             {challenge.completionBankAwarded ? (
               <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="mt-2 text-[10px] text-[#21875F]">
+                style={[
+                  type.caption,
+                  { fontFamily: 'Inter_600SemiBold', marginTop: 8, color: '#21875F' },
+                ]}>
                 Completion bank earned
               </Text>
             ) : null}
@@ -138,59 +165,62 @@ export default function CommunityChallengeDetail({
         ) : null}
       </ScrollView>
       <View
-        className="bg-white px-5 pt-3"
-        style={{ paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 12) : 12 }}>
-        {!challenge.isJoined ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.88}
-            onPress={onJoin}
-            disabled={joining || challenge.status === 'ended'}
-            className="min-h-14 flex-row items-center justify-center gap-2 rounded-[18px] bg-[#FF5C35] px-5">
-            {joining ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="font-heading text-base font-semibold text-white">
-                Join challenge
-              </Text>
-            )}
-          </TouchableOpacity>
-        ) : challenge.status === 'upcoming' ? (
-          <View
-            accessibilityRole="button"
-            accessibilityState={{ disabled: true }}
-            className="h-14 items-center justify-center rounded-full border border-[#E2E2E2] bg-white">
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-[#919191]">
-              Starts in {challenge.daysUntilStart} {challenge.daysUntilStart === 1 ? 'day' : 'days'}
-            </Text>
-          </View>
-        ) : challenge.status === 'ended' ? (
-          <View className="h-14 items-center justify-center rounded-full bg-[#E8E3DF]">
-            <Text style={{ fontFamily: 'Inter_600SemiBold' }} className="text-sm text-[#77716D]">
-              Challenge ended
-            </Text>
-          </View>
-        ) : (
-          <Pressable
-            onPress={onRecord}
-            disabled={challenge.completedToday}
-            className={`h-14 flex-row items-center justify-center rounded-full ${
-              challenge.completedToday ? 'bg-[#E8E3DF]' : 'bg-[#FF5C35]'
-            }`}>
-            <Camera
-              size={18}
-              color={challenge.completedToday ? '#77716D' : '#FFFFFF'}
-              weight="bold"
-            />
-            <Text
-              style={{ fontFamily: 'Inter_600SemiBold' }}
-              className={`ml-2 text-sm ${
-                challenge.completedToday ? 'text-[#77716D]' : 'text-white'
-              }`}>
-              {recordLabel}
-            </Text>
-          </Pressable>
-        )}
+        style={{
+          backgroundColor: '#fff',
+          paddingHorizontal: 22,
+          paddingTop: 24,
+          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 24) : 24,
+        }}>
+        <PrototypeButton
+          label={
+            !challenge.isJoined
+              ? challenge.status === 'ended'
+                ? 'Challenge ended'
+                : 'Join challenge'
+              : uploadState === 'failed'
+                ? 'Retry upload'
+                : uploadState === 'active'
+                  ? 'Uploading…'
+                  : challenge.status === 'upcoming'
+                    ? `Starts in ${challenge.daysUntilStart} ${challenge.daysUntilStart === 1 ? 'day' : 'days'}`
+                    : challenge.status === 'ended'
+                      ? 'Challenge ended'
+                      : recordLabel
+          }
+          loading={!challenge.isJoined && joining}
+          secondary={
+            challenge.status === 'ended' ||
+            (challenge.isJoined &&
+              (challenge.status === 'upcoming' ||
+                challenge.completedToday ||
+                uploadState === 'active'))
+          }
+          disabled={
+            challenge.status === 'ended' ||
+            (challenge.isJoined &&
+              (challenge.status === 'upcoming' ||
+                challenge.completedToday ||
+                uploadState === 'active'))
+          }
+          onPress={() => {
+            player.pause();
+            setIsPlaying(false);
+            if (!challenge.isJoined) onJoin();
+            else if (uploadState === 'failed') onRetry?.();
+            else onRecord();
+          }}
+        />
+        {challenge.isJoined && uploadState ? (
+          <Text
+            style={[
+              uploadState === 'failed' ? type.error : type.caption,
+              { marginTop: 8, textAlign: 'center' },
+            ]}>
+            {uploadState === 'failed'
+              ? 'Upload failed. Tap retry and keep the app open while your video uploads.'
+              : 'Please keep the app open while your video uploads.'}
+          </Text>
+        ) : null}
       </View>
     </View>
   );

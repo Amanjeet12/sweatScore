@@ -1,23 +1,20 @@
 import { useQuery } from 'convex/react';
-import {
-  Stack,
-  useFocusEffect,
-  useLocalSearchParams,
-} from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { ScrollView, View } from 'react-native';
 import { MenuProvider } from 'react-native-popup-menu';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '~/components/core/BackButton';
 import ScreenLoading from '~/components/core/ScreenLoading';
-import PostRow, {
-  stopCurrentVideo,
-} from '~/components/core/posts/Row';
+import { communityTypography as type } from '~/components/core/design/CommunityStyles';
+import PostRow, { stopCurrentVideo } from '~/components/core/posts/Row';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 
 export default function SinglePost() {
+  const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams<{
     postId?: string;
   }>();
@@ -39,31 +36,34 @@ export default function SinglePost() {
       : 'skip'
   );
 
-  const isLoading =
-    Boolean(postId) && post === undefined;
+  const isLoading = Boolean(postId) && post === undefined;
 
   return (
     <MenuProvider>
-      <View className="flex-1 bg-[#F9F9F9]">
+      <View className="flex-1 bg-[#fff]">
         <Stack.Screen
           options={{
             title: '',
+            headerTitle: () => <Text style={type.heading}>Post</Text>,
             headerTitleAlign: 'center',
             headerStyle: {
-              backgroundColor: '#F9F9F9',
+              backgroundColor: '#fff',
             },
             headerShadowVisible: false,
             headerBackVisible: false,
             headerLeft: () => (
               <BackButton
+                iconColor="#2a2a2a"
+                iconSize={22}
+                accessibilityLabel="Go back"
                 fallbackHref="/(tabs)/share"
-                text="Back"
+                text=""
               />
             ),
           }}
         />
 
-        <View className="flex-1 bg-[#F9F9F9]">
+        <View className="flex-1 bg-[#fff]">
           {isLoading ? (
             <ScreenLoading className="bg-transparent" />
           ) : post ? (
@@ -74,22 +74,16 @@ export default function SinglePost() {
               automaticallyAdjustContentInsets={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
-                paddingBottom: 24,
+                paddingBottom: Math.max(insets.bottom, 24),
               }}>
-              <PostRow
-                post={post}
-                menuMarginTop={0}
-              />
+              <PostRow post={post} menuMarginTop={0} />
             </ScrollView>
           ) : (
             <View className="flex-1 items-center justify-center px-8">
-              <Text className="text-center text-xl text-hint">
-                Post not found
-              </Text>
+              <Text style={[type.heading, { color: '#6f6f6f' }]}>Post not found</Text>
 
-              <Text className="mt-2 text-center text-base text-hint">
-                This post may have been deleted or you
-                don&apos;t have access to it.
+              <Text className="mt-2" style={[type.body, { color: '#6f6f6f', textAlign: 'center' }]}>
+                This post may have been deleted or you don&apos;t have access to it.
               </Text>
             </View>
           )}

@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { pointsLabel } from '~/shared/pointsLabel';
 
@@ -20,7 +21,7 @@ export default function CommunityChallengeCard({
         ? `Available in ${Math.max(1, Math.ceil((challenge.nextAvailableAt - Date.now()) / 3600000))}h`
         : 'Available tomorrow';
   const statusLabel = challenge.isJoined
-    ? `${challenge.completedDays} of ${challenge.durationDays} days complete`
+    ? `${challenge.completedDays} of ${challenge.durationDays} completed`
     : challenge.status === 'upcoming'
       ? challenge.daysUntilStart === 1
         ? 'Starts tomorrow'
@@ -37,38 +38,51 @@ export default function CommunityChallengeCard({
       accessibilityState={{ disabled: completedToday }}
       accessibilityLabel={`${challenge.name}, ${statusLabel}${completedToday ? `, ${availabilityLabel}` : ''}`}
       className="relative w-full overflow-hidden rounded-[16px] bg-[#56504B]"
-      style={{ aspectRatio: 1.73 }}>
+      style={{ minHeight: 200 }}>
       {challenge.coverImageUrl ? (
         <Image
           source={{ uri: challenge.coverImageUrl }}
           style={StyleSheet.absoluteFillObject}
           contentFit="cover"
+          contentPosition={{ top: '40%', left: '50%' }}
         />
       ) : null}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(0,0,0,0.28)', 'rgba(0,0,0,0.02)', 'rgba(0,0,0,0.65)']}
-        locations={[0, 0.4, 1]}
-        style={StyleSheet.absoluteFillObject}
+        colors={['rgba(0,0,0,0.32)', 'transparent']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '35%' }}
       />
-      <View className="flex-1 justify-between p-4">
-        <View className="flex-row items-start justify-between gap-x-2">
-          <Text className="min-w-0 flex-1 pt-1 font-heading text-sm font-semibold text-white">
-            {statusLabel}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['transparent', 'rgba(0,0,0,0.55)']}
+        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%' }}
+      />
+      <View style={{ flex: 1, justifyContent: 'space-between', gap: 48, padding: 16 }}>
+        <View
+          style={{
+            alignSelf: 'flex-end',
+            borderRadius: 14,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            paddingHorizontal: 12,
+            paddingVertical: 5,
+            marginTop: -4,
+            marginRight: -4,
+          }}>
+          <Text style={[type.caption, { fontFamily: 'Inter_600SemiBold', color: '#fff' }]}>
+            {challenge.totalAvailablePoints} {pointsLabel(challenge.totalAvailablePoints)}
           </Text>
-          <View className="rounded-full bg-black/50 px-3 py-1.5">
-            <Text className="font-heading text-sm font-semibold text-white">
-              {challenge.totalAvailablePoints} {pointsLabel(challenge.totalAvailablePoints)}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12 }}>
+          <View style={{ flexGrow: 1, flexBasis: '50%' }}>
+            <Text style={[type.sectionHeading, { color: '#fff' }]}>{challenge.name}</Text>
+            <Text style={[type.caption, { marginTop: 4, color: 'rgba(255,255,255,0.92)' }]}>
+              {challenge.participantCount}{' '}
+              {challenge.participantCount === 1 ? 'sweat sister' : 'sweat sisters'} joined
             </Text>
           </View>
-        </View>
-        <View>
-          <Text numberOfLines={2} className="font-heading text-xl font-semibold text-white">
-            {challenge.name}
-          </Text>
-          <Text className="mt-1 font-body text-sm text-white/90">
-            {challenge.participantCount}{' '}
-            {challenge.participantCount === 1 ? 'sweat sister' : 'sweat sisters'} joined
+          <Text
+            style={[type.caption, { fontFamily: 'Inter_500Medium', color: '#fff', flexShrink: 1 }]}>
+            {statusLabel}
           </Text>
         </View>
       </View>
@@ -77,7 +91,9 @@ export default function CommunityChallengeCard({
           pointerEvents="none"
           style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.35)' }]}
           className="items-center justify-center px-4">
-          <Text className="text-center font-body text-sm text-white">{availabilityLabel}</Text>
+          <Text style={[type.supporting, { color: '#fff', textAlign: 'center' }]}>
+            {availabilityLabel}
+          </Text>
         </View>
       ) : null}
     </Pressable>

@@ -1,7 +1,8 @@
 // @ts-nocheck -- Bun Convex handler fixtures.
 import { describe, expect, test } from 'bun:test';
-import { MEAL_SYSTEM_PROMPT } from '../convex/coachMealPrompt';
+
 import { validateMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy';
+import { MEAL_SYSTEM_PROMPT } from '../convex/coachMealPrompt';
 import { analyzeMealPhoto } from '../convex/coachMealProvider';
 import {
   saveCaption,
@@ -16,6 +17,7 @@ import {
   retake,
   resetMyMealAnalysisCountForTesting,
 } from '../convex/coachMeals';
+import { getMondayInTZ, addDaysUTC, ymdUTC } from '../convex/utils/timezone';
 
 const day = new Date().toISOString().slice(0, 10);
 const examples = [
@@ -145,13 +147,31 @@ function fixture(member = 'alice', extras: Record<string, any[]> = {}) {
         withIndex: (_: string, cb?: any) => {
           const predicates: any[] = [];
           const ops: any = {};
-          for (const op of ['eq'])
+          for (const op of ['eq', 'gte', 'lt'])
             ops[op] = (key: string, value: any) => {
-              predicates.push([key, value]);
+              predicates.push([op, key, value]);
               return ops;
             };
           cb?.(ops);
-          found = found.filter((row) => predicates.every(([key, value]) => row[key] === value));
+          found = found.filter((row) =>
+            predicates.every(([op, key, value]) =>
+              op === 'eq' ? row[key] === value : op === 'gte' ? row[key] >= value : row[key] < value
+            )
+          );
+          return q;
+        },
+        filter: (callback: any) => {
+          const value = (term: any, row: any) => (typeof term === 'function' ? term(row) : term);
+          const expressions = {
+            field: (name: string) => (row: any) => row[name],
+            eq: (left: any, right: any) => (row: any) => value(left, row) === value(right, row),
+            neq: (left: any, right: any) => (row: any) => value(left, row) !== value(right, row),
+            or:
+              (...conditions: any[]) =>
+              (row: any) =>
+                conditions.some((condition) => condition(row)),
+          };
+          found = found.filter(callback(expressions));
           return q;
         },
         collect: async () => found,
@@ -704,6 +724,31 @@ describe('meal draft, scan and share transactions', () => {
     expect(f.rows.posts).toHaveLength(1);
     expect(f.rows.coachRewardSlotsV1[0].state).toBe('earned');
   });
+  test('a meal completing the fifth streak date returns the weekly milestone only once', async () => {
+    const monday = getMondayInTZ(new Date(`${day}T12:00:00Z`), 'UTC');
+    const otherDays = Array.from({ length: 7 }, (_, i) => ymdUTC(addDaysUTC(monday, i)))
+      .filter((date) => date !== day)
+      .slice(0, 4);
+    const f = fixture('alice', {
+      dailyActivities: otherDays.map((date, i) => ({
+        _id: `prior_${i}`,
+        userId: 'alice',
+        date,
+        loggedActivityKey: 'workout',
+        reviewStatus: 'approved',
+      })),
+    });
+    const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Meal' });
+    const result = await share._handler(f.ctx, { draftId, caption: 'Meal', skipAnalysis: true });
+    expect(result.milestones).toEqual([
+      { type: 'weekly_target', current: 5, target: 5, key: ymdUTC(monday) },
+    ]);
+    expect(
+      (await share._handler(f.ctx, { draftId, caption: 'Meal', skipAnalysis: true })).milestones
+    ).toEqual([]);
+    expect(f.rows.userMilestones).toHaveLength(1);
+  });
+
   test('a member can share an uploaded live meal without using AI analysis', async () => {
     const f = fixture();
     const draftId = await saveCaption._handler(f.ctx, {
