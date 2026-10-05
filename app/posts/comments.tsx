@@ -5,13 +5,13 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
   TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { KeyboardAccessoryView } from 'react-native-keyboard-accessory';
 import { MenuProvider } from 'react-native-popup-menu';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -141,98 +141,98 @@ export default function PostComments() {
             ),
           }}
         />
-        <View className="flex-1 flex-col">
-          {isLoading ? (
-            <View className="flex-1 items-center justify-center">
-              <ActivityIndicator size="large" />
-              <Text className="mt-4" style={type.metadata}>
-                Loading comments...
-              </Text>
-            </View>
-          ) : comments.length === 0 ? (
-            <View className="flex-1 items-center justify-center px-8">
-              <Text style={[type.heading, { color: '#6f6f6f' }]}>No comments yet</Text>
-              <Text className="mt-2" style={[type.body, { color: '#6f6f6f', textAlign: 'center' }]}>
-                Be the first to share your thoughts!
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={comments}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={{ paddingBottom: composerHeight + insets.bottom + 24 }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              renderItem={({ item }) => <CommentRow comment={item} onEdit={handleEditComment} />}
-            />
-          )}
-        </View>
-
-        {/* Comment Input */}
-        <KeyboardAccessoryView
-          avoidKeyboard
-          alwaysVisible
-          bumperHeight={20}
-          hideBorder
-          androidAdjustResize={false}
-          style={{ backgroundColor: 'white', paddingBottom: insets.bottom }}>
-          <View
-            onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
-            className="border-t border-background-100 bg-white px-[22px] py-3">
-            <View className="flex-row items-center gap-x-3">
-              <Avatar uri={currentUser?.image ?? undefined} size={40} name={currentUser?.name} />
-              <View className="flex-1 flex-row items-center rounded-[22px] bg-[#f6f6f6] px-4 py-2">
-                <TextInput
-                  ref={inputRef}
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  placeholder=""
-                  placeholderTextColor="#8a8a8a"
-                  accessibilityLabel={editingCommentId ? 'Edit comment' : 'Write a comment'}
-                  multiline
-                  style={{
-                    flex: 1,
-                    ...type.field,
-                    maxHeight: maxInputHeight,
-                    minHeight: minInputHeight,
-                    height: Math.max(minInputHeight, Math.min(maxInputHeight, inputHeight)),
-                    paddingTop: Platform.OS === 'ios' ? 8 : 6,
-                    paddingBottom: Platform.OS === 'ios' ? 8 : 6,
-                  }}
-                  onContentSizeChange={(event) => {
-                    setInputHeight(
-                      Math.max(44, Math.min(maxInputHeight, event.nativeEvent.contentSize.height))
-                    );
-                  }}
-                />
-                {!commentText ? (
-                  <View
-                    pointerEvents="none"
-                    style={{ position: 'absolute', left: 16, right: 16, top: 16 }}>
-                    <Text
-                      accessible={false}
-                      onLayout={(event) => setPlaceholderHeight(event.nativeEvent.layout.height)}
-                      style={[type.field, { color: '#8a8a8a' }]}>
-                      {placeholder}
-                    </Text>
-                  </View>
-                ) : null}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1">
+          <View className="flex-1 flex-col">
+            {isLoading ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" />
+                <Text className="mt-4" style={type.metadata}>
+                  Loading comments...
+                </Text>
               </View>
-              <TouchableOpacity
-                onPress={handleSendComment}
-                disabled={!commentText.trim() || isSubmitting}
-                accessibilityRole="button"
-                accessibilityLabel={editingCommentId ? 'Save comment' : 'Send comment'}
-                className="h-11 w-11 items-center justify-center rounded-full bg-[#2a2a2a] disabled:opacity-50">
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Ionicons name="send" size={18} color="white" />
-                )}
-              </TouchableOpacity>
+            ) : comments.length === 0 ? (
+              <View className="flex-1 items-center justify-center px-8">
+                <Text style={[type.heading, { color: '#6f6f6f' }]}>No comments yet</Text>
+                <Text
+                  className="mt-2"
+                  style={[type.body, { color: '#6f6f6f', textAlign: 'center' }]}>
+                  Be the first to share your thoughts!
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={comments}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={{ paddingBottom: composerHeight + insets.bottom + 24 }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                renderItem={({ item }) => <CommentRow comment={item} onEdit={handleEditComment} />}
+              />
+            )}
+          </View>
+
+          {/* Comment Input */}
+          <View style={{ backgroundColor: 'white' }}>
+            <View
+              onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
+              className="border-t border-background-100 bg-white px-[22px] py-3">
+              <View className="flex-row items-center gap-x-3">
+                <Avatar uri={currentUser?.image ?? undefined} size={40} name={currentUser?.name} />
+                <View className="flex-1 flex-row items-center rounded-[22px] bg-[#f6f6f6] px-4 py-2">
+                  <TextInput
+                    ref={inputRef}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    placeholder=""
+                    placeholderTextColor="#8a8a8a"
+                    accessibilityLabel={editingCommentId ? 'Edit comment' : 'Write a comment'}
+                    multiline
+                    style={{
+                      flex: 1,
+                      ...type.field,
+                      maxHeight: maxInputHeight,
+                      minHeight: minInputHeight,
+                      height: Math.max(minInputHeight, Math.min(maxInputHeight, inputHeight)),
+                      paddingTop: Platform.OS === 'ios' ? 8 : 6,
+                      paddingBottom: Platform.OS === 'ios' ? 8 : 6,
+                    }}
+                    onContentSizeChange={(event) => {
+                      setInputHeight(
+                        Math.max(44, Math.min(maxInputHeight, event.nativeEvent.contentSize.height))
+                      );
+                    }}
+                  />
+                  {!commentText ? (
+                    <View
+                      pointerEvents="none"
+                      style={{ position: 'absolute', left: 16, right: 16, top: 16 }}>
+                      <Text
+                        accessible={false}
+                        onLayout={(event) => setPlaceholderHeight(event.nativeEvent.layout.height)}
+                        style={[type.field, { color: '#8a8a8a' }]}>
+                        {placeholder}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  onPress={handleSendComment}
+                  disabled={!commentText.trim() || isSubmitting}
+                  accessibilityRole="button"
+                  accessibilityLabel={editingCommentId ? 'Save comment' : 'Send comment'}
+                  className="h-11 w-11 items-center justify-center rounded-full bg-[#2a2a2a] disabled:opacity-50">
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons name="send" size={18} color="white" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </KeyboardAccessoryView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </MenuProvider>
   );

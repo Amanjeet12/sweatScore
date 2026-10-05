@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { View, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { View, KeyboardAvoidingView, ScrollView, Platform, Text } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
@@ -23,15 +23,24 @@ export default function ProfileEditField() {
           <Stack.Screen
             options={{
               headerShown: true,
-              title: '',
+              headerTitle: () => (
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#2a2a2a' }}>
+                  {field === PROFILE_FIELD.FULL_NAME ? 'Edit name' : 'Edit birthdate'}
+                </Text>
+              ),
               headerTitleAlign: 'center',
               headerShadowVisible: false,
               headerLeft: () => (
-                <BackButton fallbackHref="/(tabs)/dashboard/settings/profile/edit" text="Back" />
+                <BackButton
+                  fallbackHref="/(tabs)/dashboard/settings/profile/edit"
+                  iconColor="#2a2a2a"
+                  iconSize={22}
+                  text=""
+                />
               ),
             }}
           />
-          <View className="mx-4 mt-4 flex-1 flex-col gap-y-12">
+          <View className="mx-[22px] mt-8 flex-1">
             <EditProfileField field={field} />
           </View>
         </ScrollView>

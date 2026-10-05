@@ -107,12 +107,12 @@ export default function ProfileEditGoal() {
               <TouchableOpacity
                 key={goal}
                 onPress={() => setActivityGoal(goal)}
-                className={cn('w-full gap-x-2 rounded-[20px] p-3', {
-                  'bg-[#FFF0E8]': activityGoal === goal,
+                className={cn('min-h-14 w-full justify-center rounded-[18px] border border-[#2a2a2a] bg-[#f6f6f6] px-4 py-3', {
+                  'bg-[#2a2a2a]': activityGoal === goal,
                 })}>
                 <Text
-                  className={cn('text-center text-lg font-bold text-[#5A5551]', {
-                    'text-primary-500': activityGoal === goal,
+                  className={cn('text-center text-base font-semibold text-[#2a2a2a]', {
+                    'text-white': activityGoal === goal,
                   })}>
                   {goal}
                 </Text>
@@ -125,10 +125,11 @@ export default function ProfileEditGoal() {
                 variant="solid"
                 size="xl"
                 action="primary"
-                className="h-16 w-full rounded-[20px]"
+                className="h-14 w-full rounded-[20px]"
+                style={{ backgroundColor: '#2a2a2a' }}
                 onPress={handleSubmit}
                 loading={isLoading}>
-                <ButtonText className="text-xl font-bold text-white">Update goal</ButtonText>
+                <ButtonText className="text-base font-semibold text-white">Update goal</ButtonText>
               </LoadingButton>
             </ButtonGroup>
           </View>

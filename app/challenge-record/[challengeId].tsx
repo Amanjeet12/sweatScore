@@ -1734,6 +1734,7 @@ function DuetRecordingContent() {
               size="xl"
               action="primary"
               className="h-14 w-full rounded-[20px]"
+              style={{ backgroundColor: '#2a2a2a' }}
               onPress={stopRecording}>
               <ButtonText
                 style={{ fontFamily: 'Inter_600SemiBold' }}
@@ -1766,6 +1767,7 @@ function DuetRecordingContent() {
               size="xl"
               action="primary"
               className="mt-5 h-14 w-full rounded-[20px]"
+              style={{ backgroundColor: '#2a2a2a' }}
               disabled={dailyLimitReached}
               onPress={startCountdown}>
               <View className="flex-row items-center gap-x-2">
@@ -1945,6 +1947,7 @@ function DuetRecordingContent() {
               size="xl"
               action="primary"
               className="h-14 w-full rounded-[20px]"
+              style={{ backgroundColor: '#2a2a2a' }}
               loading={isSubmitting}
               disabled={isSubmitting || isCaptionMissing}
               onPress={handleSubmit}>

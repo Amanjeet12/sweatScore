@@ -165,7 +165,6 @@ export default function TodayScreen() {
   );
   const stepAssignment = checkIns?.assignments.find((item) => item.category === 'steps');
   const stepTarget = displayStepTarget(stepAssignment);
-  const numericStepTarget = stepAssignment?.stepTarget;
   const activeMinuteTarget = TARGETS.week.activeMinutes;
   const firstName = currentUser?.name?.trim().split(' ')[0] || 'there';
   const hour = Number(
@@ -530,29 +529,6 @@ export default function TodayScreen() {
                   </Text>
                 </View>
               </View>
-              <View
-                className="mt-[18px] flex-row items-start justify-between gap-3"
-                accessible
-                accessibilityLabel={`${activity.totalSteps} of ${numericStepTarget ?? 'unavailable target'} steps, ${activity.stepsPoints} points`}>
-                <Text style={[type.caption, { color: 'rgba(255,255,255,0.8)' }]} className="flex-1">
-                  {new Intl.NumberFormat('en-US').format(activity.totalSteps)}
-                  {stepTarget ? ` / ${stepTarget}` : ''} steps
-                </Text>
-                <Text style={[type.caption, { color: '#FFD9B8' }]}>
-                  {activity.stepsPoints} {pointsLabel(activity.stepsPoints)}
-                </Text>
-              </View>
-              {numericStepTarget ? (
-                <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
-                  <View
-                    style={{
-                      height: '100%',
-                      width: `${Math.round(activityProgressFraction(activity.totalSteps, numericStepTarget) * 100)}%`,
-                      backgroundColor: '#FFD9B8',
-                    }}
-                  />
-                </View>
-              ) : null}
             </>
           ) : (
             <Text style={[type.supporting, { color: 'rgba(255,255,255,0.8)' }]} className="mt-4">

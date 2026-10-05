@@ -2,7 +2,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useConvex, useMutation } from 'convex/react';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, TextInput, View } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 import { z } from 'zod';
 
 import { ErrorMessage } from '~/components/core/ErrorMessage';
@@ -137,12 +137,26 @@ export const EditProfileField = ({ field }: { field: PROFILE_FIELD }) => {
   return (
     <View>
       {field === PROFILE_FIELD.FULL_NAME && (
-        <View className="flex-row">
-          <View className="flex-1 flex-col gap-y-1">
-            <Input size="xl" variant="rounded" isInvalid={!!error}>
+        <View>
+          <Text
+            style={{
+              fontFamily: 'Inter_600SemiBold',
+              fontSize: 15,
+              color: '#2a2a2a',
+              marginBottom: 10,
+            }}>
+            Name
+          </Text>
+          <View>
+            <Input
+              size="xl"
+              variant="rounded"
+              isInvalid={!!error}
+              className="h-14 rounded-[18px] border-[#e5e5e5] bg-[#f6f6f6]">
               <InputField
                 placeholder="Name"
                 value={name}
+                className="text-base text-[#2a2a2a]"
                 onChangeText={(text) => {
                   setError(null);
                   setName(text);
@@ -155,7 +169,10 @@ export const EditProfileField = ({ field }: { field: PROFILE_FIELD }) => {
 
       {field === PROFILE_FIELD.BIRTHDATE ? (
         Platform.OS === 'ios' ? (
-          <View className="flex-row items-center justify-center">
+          <View>
+            <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: '#2a2a2a' }}>
+              Date of birth
+            </Text>
             <DateTimePicker
               testID="dateTimePicker"
               value={date}
@@ -169,17 +186,18 @@ export const EditProfileField = ({ field }: { field: PROFILE_FIELD }) => {
         ) : null
       ) : null}
 
-      <ErrorMessage error={error} className="mt-6" />
+      <ErrorMessage error={error} className="mt-3" />
 
-      <View className="flex-0 mt-4 items-end justify-end">
+      <View className="mt-6">
         <LoadingButton
           variant="solid"
-          size="sm"
-          className="h-16 w-full rounded-lg"
+          size="xl"
+          className="h-14 w-full rounded-[20px]"
+          style={{ backgroundColor: '#2a2a2a' }}
           onPress={handleSubmit}
           disabled={!isFormValid || isLoading}
           loading={isLoading}>
-          <ButtonText className="text-xl font-bold text-white">
+          <ButtonText style={{ fontFamily: 'Inter_600SemiBold' }} className="text-base text-white">
             Update {field === PROFILE_FIELD.FULL_NAME ? 'name' : 'birthdate'}
           </ButtonText>
         </LoadingButton>

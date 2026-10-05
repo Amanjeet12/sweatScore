@@ -40,11 +40,11 @@ const StartWorkoutPopup = ({
               <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF1E9]">
                 <Watch size={24} color="#FF5C35" weight="duotone" />
               </View>
-              <Text style={type.heading}>Earn points for this workout</Text>
+              <Text style={[type.heading, { textAlign: 'left' }]}>Earn points for this workout</Text>
             </View>
           </AlertDialogHeader>
           <AlertDialogBody className="mb-5 mt-3">
-            <Text style={type.supporting}>
+            <Text style={[type.supporting, { textAlign: 'left' }]}>
               Start a workout on your fitness watch before you begin. That&apos;s how we track your
               heart rate and give you Sweat Points.
             </Text>
