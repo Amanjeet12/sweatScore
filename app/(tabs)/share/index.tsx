@@ -32,11 +32,11 @@ const TabShare = () => {
   const { results, status, loadMore } = usePaginatedQuery(
     api.posts.getLatestPosts,
     { channel },
-    { initialNumItems: 15 }
+    { initialNumItems: 8 }
   );
 
   const loadMorePages = () => {
-    if (status === 'CanLoadMore') loadMore(15);
+    if (status === 'CanLoadMore') loadMore(8);
   };
 
   const handleCreatePost = (initialMediaType?: 'image' | 'video') => {
@@ -170,7 +170,7 @@ const TabShare = () => {
               }
               ListFooterComponent={<View className="mb-6" />}
               onEndReached={loadMorePages}
-              onEndReachedThreshold={2}
+              onEndReachedThreshold={0.5}
             />
           </View>
         </View>

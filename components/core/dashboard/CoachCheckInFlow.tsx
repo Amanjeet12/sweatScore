@@ -128,7 +128,7 @@ export default function CoachCheckInFlow({
   const recordingActive = useRef(false);
   const countdownActive = useRef(false);
   const photoCaptureActive = useRef(false);
-  const cameraSessionKey = `${cameraFacing}-${cameraMode}-${cameraAttempt}`;
+  const cameraSessionKey = `${cameraMode}-${cameraAttempt}`;
   useEffect(() => {
     setCameraStartupError('');
     if (!showCamera || cameraReady || cameraMode === 'picture') return;

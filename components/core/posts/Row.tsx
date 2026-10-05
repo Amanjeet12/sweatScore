@@ -7,7 +7,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as Icon from 'phosphor-react-native';
-import { useState, useRef, useEffect } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
   View,
@@ -179,38 +179,8 @@ function ChallengeVideoPlayer({
 }) {
   const [isActive, setIsActive] = useState(false);
 
-  const fallbackRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 9 / 16;
-
-  const [resolvedAspectRatio, setResolvedAspectRatio] = useState(fallbackRatio);
-
-  /*
-   * Use the thumbnail's exact visible ratio.
-   *
-   * Do not clamp it to 9:16 because many
-   * phones record taller videos such as
-   * 9:19.5 or 9:20.
-   */
-  useEffect(() => {
-    if (!thumbnailUrl) {
-      setResolvedAspectRatio(fallbackRatio);
-
-      return;
-    }
-
-    Image.getSize(
-      thumbnailUrl,
-
-      (width, height) => {
-        if (width > 0 && height > 0) {
-          setResolvedAspectRatio(width / height);
-        }
-      },
-
-      () => {
-        setResolvedAspectRatio(fallbackRatio);
-      }
-    );
-  }, [thumbnailUrl, fallbackRatio]);
+  const resolvedAspectRatio =
+    Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 9 / 16;
 
   const handlePlay = () => {
     stopCurrentVideo?.();
@@ -240,10 +210,6 @@ function ChallengeVideoPlayer({
           style={{
             width: '100%',
 
-            /*
-             * Exact ratio from the generated
-             * thumbnail.
-             */
             aspectRatio: resolvedAspectRatio,
 
             backgroundColor: '#000',
@@ -283,7 +249,7 @@ function ChallengeVideoPlayer({
   );
 }
 
-export default function PostRow({
+function PostRow({
   post,
   menuMarginTop = 25,
   isFeatured = false,
@@ -300,6 +266,7 @@ export default function PostRow({
   const [imageError, setImageError] = useState(false);
   const [imageRetry, setImageRetry] = useState(0);
   const [loadedImageAspectRatio, setLoadedImageAspectRatio] = useState<number | null>(null);
+  const [imageWidth, setImageWidth] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -760,43 +727,45 @@ export default function PostRow({
           </View>
         ) : (
           post.mediaUrl && (
-            <View className="mt-3 overflow-hidden rounded-[16px]">
+            <View
+              className="mt-3 overflow-hidden rounded-[16px]"
+              onLayout={(event) => setImageWidth(event.nativeEvent.layout.width)}>
               <View className="relative">
                 {imageLoading && !imageError && (
                   <View className="absolute z-10 flex h-full w-full items-center justify-center">
                     <ActivityIndicator size="large" />
                   </View>
                 )}
-                <ExpoImage
-                  source={{ uri: post.mediaUrl }}
-                  key={`${post.mediaUrl}-${imageRetry}`}
-                  recyclingKey={`${post._id}-${post.mediaUrl}-${imageRetry}`}
-                  contentFit="contain"
-                  onLoadStart={() => {
-                    setImageError(false);
-                    setImageLoading(true);
-                  }}
-                  onLoad={(event) => {
-                    setImageLoading(false);
-                    if (event.source.width > 0 && event.source.height > 0) {
-                      setLoadedImageAspectRatio(event.source.width / event.source.height);
-                    }
-                  }}
-                  onError={(event) => {
-                    console.warn('Community post image failed to load:', event.error);
-                    setImageLoading(false);
-                    setImageError(true);
-                  }}
-                  cachePolicy="memory-disk"
-                  transition={200}
-                  style={{
-                    width: '100%',
-                    height: undefined,
-                    resizeMode: 'contain',
-                    aspectRatio:
-                      loadedImageAspectRatio ?? (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1),
-                  }}
-                />
+                {imageWidth > 0 && (
+                  <Image
+                    source={{ uri: post.mediaUrl }}
+                    key={`${post.mediaUrl}-${imageRetry}`}
+                    resizeMode="contain"
+                    onLoadStart={() => {
+                      setImageError(false);
+                      setImageLoading(true);
+                    }}
+                    onLoad={(event) => {
+                      setImageLoading(false);
+                      const { width, height } = event.nativeEvent.source;
+                      if (width > 0 && height > 0) {
+                        setLoadedImageAspectRatio(width / height);
+                      }
+                    }}
+                    onError={(event) => {
+                      console.warn('Community post image failed to load:', event.nativeEvent.error);
+                      setImageLoading(false);
+                      setImageError(true);
+                    }}
+                    style={{
+                      width: imageWidth,
+                      height:
+                        imageWidth /
+                        (loadedImageAspectRatio ??
+                          (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1)),
+                    }}
+                  />
+                )}
                 {imageError && (
                   <TouchableOpacity
                     accessibilityRole="button"
@@ -1079,3 +1048,5 @@ export default function PostRow({
     </View>
   );
 }
+
+export default memo(PostRow);
