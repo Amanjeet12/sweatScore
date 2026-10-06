@@ -21,6 +21,12 @@ import {
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
+import {
+  bodySelections,
+  isUnanswered,
+  toggleBodyFeeling,
+  type BodyFeeling,
+} from '~/shared/coachBodyFeeling';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -119,6 +125,9 @@ export default function CoachOnboarding() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
+  const [pendingBody, setPendingBody] = useState<{ scope: string; values: BodyFeeling[] } | null>(
+    null
+  );
   const submissionRef = useRef(false);
   const backHandlerRef = useRef<() => void>(() => {});
   const insets = useSafeAreaInsets();
@@ -203,15 +212,15 @@ export default function CoachOnboarding() {
   const questions = profile ? PROFILE_QUESTIONS : DAILY_QUESTIONS;
   const testDraft = foundation.state?.testReanswerDraft;
   const nextTestStep = reanswerMode
-    ? DAILY_QUESTIONS.findIndex((item) => testDraft?.[item.key] === undefined)
+    ? DAILY_QUESTIONS.findIndex((item) => isUnanswered(testDraft?.[item.key]))
     : -1;
   const currentDraft = profile
     ? foundation.state?.profileDraft
     : foundation.state?.dailyDraftDay === decision.day
       ? foundation.state?.dailyDraft
       : undefined;
-  const firstUnanswered = questions.findIndex(
-    (item) => (currentDraft as Record<string, unknown> | undefined)?.[item.key] === undefined
+  const firstUnanswered = questions.findIndex((item) =>
+    isUnanswered((currentDraft as Record<string, unknown> | undefined)?.[item.key])
   );
   const step = Math.min(
     localStep ??
@@ -231,6 +240,60 @@ export default function CoachOnboarding() {
   const question = questions[step];
   const saved = reanswerMode ? testDraft : currentDraft;
   const selected = saved?.[question.key as keyof typeof saved];
+  const bodyScope = `${decision.day}:${reanswerMode ? foundation.state?.testReanswerKey : 'daily'}`;
+  const selectedBody =
+    pendingBody?.scope === bodyScope
+      ? pendingBody.values
+      : bodySelections(
+          reanswerMode
+            ? testDraft?.body
+            : foundation.state?.dailyDraftDay === decision.day
+              ? foundation.state.dailyDraft?.body
+              : undefined
+        );
+  const chooseBody = async (value: BodyFeeling) => {
+    if (busy || submissionRef.current) return;
+    submissionRef.current = true;
+    const values = toggleBodyFeeling(selectedBody, value);
+    setPendingBody({ scope: bodyScope, values });
+    setBusy(true);
+    setError('');
+    try {
+      if (reanswerMode) await saveReanswer({ body: values });
+      else await saveDaily({ body: values });
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      submissionRef.current = false;
+      setBusy(false);
+    }
+  };
+  const submitBody = async () => {
+    if (busy || submissionRef.current || selectedBody.length === 0) return;
+    submissionRef.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      if (reanswerMode) {
+        await finishReanswer({ body: selectedBody });
+        router.replace('/coach-plan');
+      } else {
+        await submitDaily({
+          body: selectedBody,
+          requestKey: `first_${decision.day.replaceAll('-', '')}`,
+        });
+        router.replace({
+          pathname: '/coach-plan-loading',
+          params: selectedCheckIn ? { nextCheckIn: selectedCheckIn } : {},
+        });
+      }
+    } catch {
+      setError('Could not prepare today’s plan. Your selections are kept here. Please try again.');
+    } finally {
+      submissionRef.current = false;
+      setBusy(false);
+    }
+  };
 
   const goBack = () => {
     if (busy) return;
@@ -263,13 +326,8 @@ export default function CoachOnboarding() {
     setError('');
     try {
       if (reanswerMode) {
-        if (step === DAILY_QUESTIONS.length - 1) {
-          await finishReanswer({ body: value as 'fine' });
-          router.replace('/coach-plan');
-        } else {
-          await saveReanswer({ [question.key]: value } as Parameters<typeof saveReanswer>[0]);
-          setLocalStep(step + 1);
-        }
+        await saveReanswer({ [question.key]: value } as Parameters<typeof saveReanswer>[0]);
+        setLocalStep(step + 1);
       } else if (profile) {
         if (step === PROFILE_QUESTIONS.length - 1) setCompletingProfile(true);
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
@@ -281,15 +339,6 @@ export default function CoachOnboarding() {
           setPendingProfileChoice(null);
           setLocalStep(step + 1);
         }
-      } else if (step === DAILY_QUESTIONS.length - 1) {
-        await submitDaily({
-          body: value as 'fine',
-          requestKey: `first_${decision.day.replaceAll('-', '')}`,
-        });
-        router.replace({
-          pathname: '/coach-plan-loading',
-          params: selectedCheckIn ? { nextCheckIn: selectedCheckIn } : {},
-        });
       } else {
         await saveDaily({ [question.key]: value } as Parameters<typeof saveDaily>[0]);
         setPendingProfileChoice(null);
@@ -529,9 +578,21 @@ export default function CoachOnboarding() {
                   : undefined
           }
           options={question.options}
-          selected={effectiveDailyChoice}
+          selected={question.key === 'body' ? selectedBody : effectiveDailyChoice}
+          multiple={question.key === 'body'}
+          onContinue={
+            question.key === 'body'
+              ? () => {
+                  submitBody().catch(() => {});
+                }
+              : undefined
+          }
           busy={busy}
           onChoose={(value) => {
+            if (question.key === 'body') {
+              chooseBody(value as BodyFeeling).catch(() => {});
+              return;
+            }
             setError('');
             setPendingProfileChoice(value);
             choose(value).catch(() => {});

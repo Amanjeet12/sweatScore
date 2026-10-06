@@ -1,6 +1,7 @@
-import { DAILY_PLAN_COPY_LIMITS, mealPlanSummary } from '../shared/coachPlanCopy';
 import { dailyPolicy, validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
 import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
+import { hasBodyFeeling } from '../shared/coachBodyFeeling';
+import { DAILY_PLAN_COPY_LIMITS, mealPlanSummary } from '../shared/coachPlanCopy';
 import { addDaysToDateKey } from './utils/timezone';
 
 export type DailyOutputV2 = DailyOutput & {
@@ -90,7 +91,8 @@ export function validateDailyPlanOutputV2(
     )
       throw new Error('invalid_output');
   }
-  if (mealPlanSummary(six.meals as string) !== (six.meals as string).trim()) throw new Error('invalid_output');
+  if (mealPlanSummary(six.meals as string) !== (six.meals as string).trim())
+    throw new Error('invalid_output');
   const base = validateDailyPlanOutput(six, snapshot, day, recentPlans);
   if (!Array.isArray(workoutExamples) || workoutExamples.some((item) => typeof item !== 'string'))
     throw new Error('invalid_output');
@@ -125,13 +127,13 @@ export function validateDailyPlanOutputV2(
     )
       throw new Error('invalid_output');
     if (
-      snapshot.daily.body === 'sore_upper' &&
+      hasBodyFeeling(snapshot.daily.body, 'sore_upper') &&
       (!/(?:upper[- ]body|arms?)/i.test(workoutExplanation) ||
         !/recover|rest|avoid/i.test(workoutExplanation))
     )
       throw new Error('invalid_output');
     if (
-      snapshot.daily.body === 'sore_lower' &&
+      hasBodyFeeling(snapshot.daily.body, 'sore_lower') &&
       (!/(?:legs?|lower[- ]body)/i.test(workoutExplanation) ||
         !/recover|rest|avoid/i.test(workoutExplanation))
     )
@@ -205,7 +207,7 @@ export function validateDailyPlanOutputV2(
   )
     throw new Error('invalid_output');
   if (
-    snapshot.daily.body === 'pain_unwell' &&
+    hasBodyFeeling(snapshot.daily.body, 'pain_unwell') &&
     /\b(?:exercise|squats|push-ups|planks)\b/i.test(`${workoutExplanation} ${base.output.why}`)
   )
     throw new Error('invalid_output');
@@ -246,16 +248,15 @@ export function buildDeterministicDailyPlanV2(
       : Math.max(500, Math.floor((average + 2000) / 500) * 500);
   const steps = `${stepTarget.toLocaleString('en-US')} steps`;
   const rest = policy.rest;
-  let type =
-    snapshot.daily.body === 'sore_upper'
-      ? 'lower_body_strength'
-      : snapshot.daily.body === 'sore_lower'
-        ? 'upper_body_strength'
-        : 'full_body_strength';
+  let type = hasBodyFeeling(snapshot.daily.body, 'sore_upper')
+    ? 'lower_body_strength'
+    : hasBodyFeeling(snapshot.daily.body, 'sore_lower')
+      ? 'upper_body_strength'
+      : 'full_body_strength';
   const yesterday = recentPlans.find((plan) => plan.day === addDaysToDateKey(day, -1));
   if (
     !rest &&
-    snapshot.daily.body === 'fine' &&
+    hasBodyFeeling(snapshot.daily.body, 'fine') &&
     yesterday?.output.workout.includes('full body strength')
   )
     type = 'upper_body_strength';
@@ -275,9 +276,9 @@ export function buildDeterministicDailyPlanV2(
     : `Log a ${duration}-minute ${workoutNames[type]} workout today.`;
   const workoutReason = rest
     ? 'Rest gives your body time to recover today.'
-    : snapshot.daily.body === 'sore_upper'
+    : hasBodyFeeling(snapshot.daily.body, 'sore_upper')
       ? 'A lower-body session lets your upper body recover today.'
-      : snapshot.daily.body === 'sore_lower'
+      : hasBodyFeeling(snapshot.daily.body, 'sore_lower')
         ? 'An upper-body session lets your lower body recover today.'
         : 'This session fits your energy and readiness today.';
   const stepsReason =

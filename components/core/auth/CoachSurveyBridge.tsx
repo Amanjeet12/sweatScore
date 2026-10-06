@@ -37,7 +37,7 @@ export function CoachSurveyBridge({ onStart }: { onStart: () => void }) {
         {[
           [Barbell, 'Personalised daily workouts'],
           [ForkKnife, 'Smarter meal tracking'],
-          [TrendUp, 'Progress tracking'],
+          [TrendUp, 'Progress guidance'],
         ].map(([Icon, label]) => {
           const FeatureIcon = Icon as typeof Barbell;
           return (

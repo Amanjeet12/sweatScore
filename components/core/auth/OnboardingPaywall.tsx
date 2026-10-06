@@ -285,7 +285,7 @@ export function OnboardingPaywall(props: Props) {
             <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#2a2a2a' }}>
               {props.trial} free:{' '}
             </Text>
-            Enable notifications after setup for a reminder 2 days before your trial ends.
+            We'll remind you 2 days before your trial ends.
           </Text>
         )}
         <View style={{ marginTop: 'auto', paddingTop: 20, gap: 12 }}>

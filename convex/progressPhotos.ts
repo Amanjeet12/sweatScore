@@ -239,7 +239,7 @@ export const getDashboard = query({
 export const create = mutation({
   args: {
     frontPhoto: v.id('_storage'),
-    sidePhoto: v.optional(v.id('_storage')),
+    sidePhoto: v.id('_storage'),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -263,7 +263,7 @@ export const create = mutation({
       userId,
       weekStart,
       frontPhoto: args.frontPhoto,
-      ...(args.sidePhoto ? { sidePhoto: args.sidePhoto } : {}),
+      sidePhoto: args.sidePhoto,
       createdAt: Date.now(),
     });
   },

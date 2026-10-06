@@ -34,6 +34,12 @@ export const weightAnswer = v.object({
   value: v.number(),
   unit: v.union(v.literal('kg'), v.literal('lb')),
 });
+const bodyFeeling = v.union(
+  v.literal('fine'),
+  v.literal('sore_upper'),
+  v.literal('sore_lower'),
+  v.literal('pain_unwell')
+);
 export const dailyAnswers = v.object({
   sleep: v.union(v.literal('barely_rested'), v.literal('rested_enough'), v.literal('restful')),
   energy: v.union(v.literal('flat'), v.literal('steady'), v.literal('full')),
@@ -44,12 +50,7 @@ export const dailyAnswers = v.object({
     v.literal('something_light'),
     v.literal('rest_day')
   ),
-  body: v.union(
-    v.literal('fine'),
-    v.literal('sore_upper'),
-    v.literal('sore_lower'),
-    v.literal('pain_unwell')
-  ),
+  body: v.union(bodyFeeling, v.array(bodyFeeling)),
 });
 export const planOutput = v.object({
   headline: v.string(),

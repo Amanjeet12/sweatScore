@@ -1,3 +1,5 @@
+import { isUnanswered } from './coachBodyFeeling';
+
 export type ResumeScreen =
   | 'bio'
   | 'profile'
@@ -85,6 +87,6 @@ export function resumeDecision(input: ResumeInput): {
 }
 
 function firstMissing(keys: string[], draft?: Record<string, unknown>): number {
-  const missing = keys.findIndex((key) => draft?.[key] === undefined);
+  const missing = keys.findIndex((key) => isUnanswered(draft?.[key]));
   return missing < 0 ? keys.length - 1 : missing;
 }

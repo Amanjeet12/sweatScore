@@ -403,7 +403,7 @@ export const completeChallenge = mutation({
           ? ('live_video' as const)
           : ('uploaded_video' as const)
       : undefined;
-    const musicTrackId = !isCheckIn ? args.musicTrackId : undefined;
+    // Legacy musicTrackId input is accepted but never applied to new media.
 
     if (!args.videoStorageId) {
       throw new ConvexError(isCheckIn ? 'A photo or video is required' : 'A video is required');
@@ -591,7 +591,6 @@ export const completeChallenge = mutation({
             videoStorageId: args.videoStorageId,
             mediaType,
             ...(checkInSubmissionType ? { checkInSubmissionType } : {}),
-            ...(musicTrackId ? { musicTrackId } : {}),
           }
         : {}),
 
@@ -697,13 +696,8 @@ export const completeChallenge = mutation({
       // single-video processing. Side-by-side challenges wait until Trigger.dev
       // creates the composite so the raw recording never appears in the feed.
       const needsProcessing =
-        !(isCheckIn && !musicTrackId) &&
-        !(
-          !isCheckIn &&
-          isCommunityChallenge &&
-          challenge.outputType === 'single_video' &&
-          !musicTrackId
-        );
+        !isCheckIn &&
+        !(!isCheckIn && isCommunityChallenge && challenge.outputType === 'single_video');
       if (needsProcessing && !isSideBySideChallenge) {
         await ctx.db.insert('posts', {
           userId,
@@ -722,7 +716,7 @@ export const completeChallenge = mutation({
        * CHECK-IN:
        * Post the original user video directly.
        */
-      if (isCheckIn && !musicTrackId) {
+      if (isCheckIn) {
         const postId = await ctx.db.insert('posts', {
           userId,
           createdAt: Date.now(),
@@ -758,39 +752,23 @@ export const completeChallenge = mutation({
           postId,
         });
       } else if (!isCheckIn && isCommunityChallenge && challenge.outputType === 'single_video') {
-        const userVideoUrl = await ctx.storage.getUrl(args.videoStorageId);
+        const postId = await ctx.db.insert('posts', {
+          userId,
+          createdAt: now,
+          body: args.caption?.trim() || `${challenge.name} · Day ${communityChallengeDay}`,
+          media: args.videoStorageId,
+          ...(args.thumbnailStorageId ? { mediaThumbnail: args.thumbnailStorageId } : {}),
+          mediaWidth: args.mediaWidth && args.mediaWidth > 0 ? args.mediaWidth : 1080,
+          mediaHeight: args.mediaHeight && args.mediaHeight > 0 ? args.mediaHeight : 1350,
+          mediaType: 'video',
+          challengeId: args.challengeId,
+          challengeCompletionId: completionId,
+        });
 
-        if (musicTrackId && userVideoUrl) {
-          // Reuse the existing single-video processor so the selected
-          // challenge music is present in the final feed video.
-          await ctx.scheduler.runAfter(0, internal.triggerMerge.triggerVideoMerge, {
-            userVideoUrl,
-            challengeCompletionId: completionId,
-            userId,
-            caption: args.caption?.trim() || '',
-            challengeId: args.challengeId,
-            musicTrackId,
-            checkInMusicOnly: true,
-          });
-        } else {
-          const postId = await ctx.db.insert('posts', {
-            userId,
-            createdAt: now,
-            body: args.caption?.trim() || `${challenge.name} · Day ${communityChallengeDay}`,
-            media: args.videoStorageId,
-            ...(args.thumbnailStorageId ? { mediaThumbnail: args.thumbnailStorageId } : {}),
-            mediaWidth: args.mediaWidth && args.mediaWidth > 0 ? args.mediaWidth : 1080,
-            mediaHeight: args.mediaHeight && args.mediaHeight > 0 ? args.mediaHeight : 1350,
-            mediaType: 'video',
-            challengeId: args.challengeId,
-            challengeCompletionId: completionId,
-          });
-
-          await ctx.scheduler.runAfter(0, internal.http.sendChallengeNotification, {
-            userId,
-            postId,
-          });
-        }
+        await ctx.scheduler.runAfter(0, internal.http.sendChallengeNotification, {
+          userId,
+          postId,
+        });
       } else if (!isCheckIn) {
         /*
          * NORMAL CHALLENGE:
@@ -856,7 +834,6 @@ export const completeChallenge = mutation({
               : {}),
 
             rightLabel,
-            ...(musicTrackId ? { musicTrackId } : {}),
           });
         }
       } else {
@@ -868,7 +845,7 @@ export const completeChallenge = mutation({
             userId,
             caption: args.caption?.trim() || '',
             challengeId: args.challengeId,
-            musicTrackId,
+
             checkInMusicOnly: true,
           });
         }

@@ -1,20 +1,12 @@
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import {
-  Barbell,
-  Check,
-  Footprints,
-  ForkKnife,
-  MoonStars,
-  YoutubeLogo,
-  MagnifyingGlass,
-} from 'phosphor-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { PrototypeButton as CoachActionButton } from '~/components/core/auth/PrototypeOnboarding';
+import CoachPlanItems from '~/components/core/dashboard/CoachPlanItems';
 import CoachPlanPreparing from '~/components/core/dashboard/CoachPlanPreparing';
 import PlanExplanation from '~/components/core/dashboard/PlanExplanation';
 import PlanFeedback from '~/components/core/dashboard/PlanFeedback';
@@ -26,31 +18,10 @@ import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { planCardState } from '~/shared/coachPlanCards';
-import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const categories = ['workout', 'steps', 'sleep', 'meals'] as const;
 const titles = { workout: 'Workout', steps: 'Steps', sleep: 'Sleep', meals: 'Meals' };
-const actions = {
-  workout: 'Log workout',
-  steps: 'Log steps',
-  sleep: 'Log sleep',
-  meals: 'Snap a meal',
-};
-
-const icons = { workout: Barbell, steps: Footprints, sleep: MoonStars, meals: ForkKnife };
-
-function concisePlanText(value: string) {
-  const firstSentence = value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim();
-  return firstSentence || value;
-}
-
-function supportingPlanText(value: string) {
-  const primary = concisePlanText(value);
-  const remaining = value.slice(primary.length).trim();
-  return remaining ? concisePlanText(remaining) : '';
-}
-
 export default function SavedCoachPlan() {
   const { nextCheckIn } = useLocalSearchParams<{ nextCheckIn?: string }>();
   const selectedCheckIn = COACH_CATEGORIES.find((item) => item === nextCheckIn);
@@ -168,93 +139,20 @@ export default function SavedCoachPlan() {
                 className="mb-5"
               />
             ) : null}
-            {categories.map((category) => {
-              const assignment = checkIns?.assignments.find((item) => item.category === category);
-              const state = planCardState(category, rest, assignment?.consumedCount ?? 0);
-              const fullBody =
-                category === 'steps'
-                  ? `${plan.stepTarget.toLocaleString('en-US')} steps`
-                  : output[category];
-              const body = concisePlanText(fullBody);
-              const supportingBody =
-                category === 'workout'
-                  ? (plan.detailsV2?.workoutReason ?? supportingPlanText(fullBody))
-                  : category === 'steps'
-                    ? (plan.detailsV2?.stepsReason ?? supportingPlanText(output.steps))
-                    : supportingPlanText(fullBody);
-              const enabled = state.canOpen && Boolean(assignment);
-              const action = state.canLog ? actions[category] : 'View check-in';
-              const completed = (assignment?.consumedCount ?? 0) > 0;
-              const Icon = icons[category];
-              const workoutSearch =
-                category === 'workout' ? workoutYoutubeSearch(assignment?.label ?? fullBody) : null;
-              return (
-                <TouchableOpacity
-                  key={category}
-                  disabled={!enabled}
-                  accessibilityRole={enabled ? 'button' : 'text'}
-                  accessibilityLabel={`${titles[category]}. ${fullBody}. ${state.status}${enabled ? `. ${action}` : ''}`}
-                  onPress={() => open(category)}
-                  activeOpacity={0.82}
-                  className="mb-[22px]">
-                  <View className="flex-row items-center">
-                    <View
-                      className="h-12 w-12 items-center justify-center rounded-2xl"
-                      style={{ backgroundColor: '#FFF3EA' }}>
-                      <Icon size={24} color="#E8541E" />
-                    </View>
-                    <View className="ml-[14px] min-w-0 flex-1">
-                      <View className="flex-row items-center justify-between gap-2">
-                        <Text style={[type.cardTitle, { flex: 1 }]}>{titles[category]}</Text>
-                        <View
-                          className="flex-row items-center rounded-full px-2.5 py-1.5"
-                          style={{
-                            backgroundColor: completed ? '#FFF0E8' : '#F5F2F0',
-                            flexShrink: 1,
-                            maxWidth: '55%',
-                          }}>
-                          {completed ? <Check size={13} color="#E9512A" weight="bold" /> : null}
-                          <Text
-                            style={[
-                              type.caption,
-                              { color: completed ? '#C64520' : '#6f6f6f', flexShrink: 1 },
-                            ]}>
-                            {state.status}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={type.supporting} className="mt-1">
-                        {body}
-                      </Text>
-                      {supportingBody ? (
-                        <Text style={[type.caption, { color: '#8A817C' }]} className="mt-1.5">
-                          {supportingBody}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                  {enabled && workoutSearch ? (
-                    <TouchableOpacity
-                      accessibilityRole="link"
-                      accessibilityLabel={`Search YouTube for ${workoutSearch.phrase}`}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        Linking.openURL(workoutSearch.url).catch(() =>
-                          Alert.alert('YouTube could not be opened. Please try again.')
-                        );
-                      }}
-                      activeOpacity={0.8}
-                      className="mt-3 min-h-16 flex-row items-center rounded-[32px] bg-[#F5F5F5] px-[22px] py-4">
-                      <MagnifyingGlass size={24} color="#8A8A8A" />
-                      <Text style={type.search} className="ml-3 flex-1">
-                        {workoutSearch.phrase}
-                      </Text>
-                      <YoutubeLogo size={32} color="#E8541E" weight="fill" />
-                    </TouchableOpacity>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
+            <CoachPlanItems
+              plan={plan}
+              checkIns={checkIns}
+              onCheckIn={open}
+              canOpen={(category) =>
+                planCardState(
+                  category,
+                  rest,
+                  checkIns?.assignments.find((item) => item.category === category)?.consumedCount ??
+                    0
+                ).canOpen &&
+                Boolean(checkIns?.assignments.some((item) => item.category === category))
+              }
+            />
             <PlanExplanation explanation={output.why} />
             <PlanFeedback revisionId={plan.revisionId} />
           </>

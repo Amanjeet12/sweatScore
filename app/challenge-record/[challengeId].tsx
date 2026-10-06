@@ -42,11 +42,7 @@ import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
-import {
-  BACKGROUND_MUSIC_VOLUME,
-  BackgroundMusicTrack,
-  getRandomBackgroundMusicTrack,
-} from '~/utils/backgroundMusic';
+
 import { getErrorMessage } from '~/utils/error-message';
 import { ensureRuntimePermission } from '~/utils/runtimePermissions';
 
@@ -131,53 +127,19 @@ function getCheckInCaption() {
   return CHECK_IN_CAPTION_TEMPLATES[randomIndex];
 }
 
-function SingleVideoPreview({
-  videoUrl,
-  musicTrack,
-}: {
-  videoUrl: string;
-  musicTrack?: BackgroundMusicTrack;
-}) {
+function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
   const player = useVideoPlayer(videoUrl, (videoPlayer) => {
     videoPlayer.loop = false;
-    videoPlayer.volume = musicTrack ? 0 : 1;
+    videoPlayer.volume = 1;
   });
-
-  useEffect(() => {
-    if (!musicTrack) return;
-    let disposed = false;
-    let sound: Audio.Sound | null = null;
-
-    Audio.Sound.createAsync(musicTrack.source, {
-      shouldPlay: false,
-      isLooping: true,
-      volume: BACKGROUND_MUSIC_VOLUME,
-    }).then(({ sound: loadedSound }) => {
-      if (disposed) {
-        loadedSound.unloadAsync().catch(() => {});
-        return;
-      }
-      sound = loadedSound;
-    });
-
-    const playingSubscription = player.addListener('playingChange', ({ isPlaying }) => {
-      if (!sound) return;
-      if (isPlaying) {
-        sound
-          .setPositionAsync(Math.max(0, player.currentTime * 1000))
-          .then(() => sound?.playAsync());
-      } else {
-        sound.pauseAsync().catch(() => {});
-      }
-    });
-
-    return () => {
-      disposed = true;
-      playingSubscription.remove();
-      sound?.stopAsync().catch(() => {});
-      sound?.unloadAsync().catch(() => {});
-    };
-  }, [musicTrack, player]);
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        player.pause();
+      },
+      [player]
+    )
+  );
 
   return (
     <View
@@ -285,10 +247,6 @@ function DuetRecordingContent() {
 
   const countdownSoundPlaybackTokenRef = useRef(0);
   const handledCheckInModeRef = useRef(false);
-  const [selectedMusicTrack, setSelectedMusicTrack] = useState<BackgroundMusicTrack | null>(null);
-  const selectedMusicTrackRef = useRef<BackgroundMusicTrack | null>(null);
-  const backgroundMusicRef = useRef<Audio.Sound | null>(null);
-  const backgroundMusicLoadingPromiseRef = useRef<Promise<Audio.Sound | null> | null>(null);
 
   const [cameraPermission, requestCameraPermission, getCameraPermission] = useCameraPermissions();
 
@@ -330,68 +288,6 @@ function DuetRecordingContent() {
   const isCommunityChallenge = challenge?.isCommunityChallenge === true;
   const requiresSubscription = !isCommunityChallenge || challenge?.isLocked === true;
 
-  const selectMusicTrackForSession = useCallback(() => {
-    if (selectedMusicTrackRef.current) return selectedMusicTrackRef.current;
-    const track = getRandomBackgroundMusicTrack();
-    selectedMusicTrackRef.current = track;
-    setSelectedMusicTrack(track);
-    return track;
-  }, []);
-
-  const ensureBackgroundMusicLoaded = useCallback(async () => {
-    if (backgroundMusicRef.current) return backgroundMusicRef.current;
-    if (backgroundMusicLoadingPromiseRef.current) return backgroundMusicLoadingPromiseRef.current;
-    const track = selectedMusicTrackRef.current;
-    if (!track) return null;
-
-    backgroundMusicLoadingPromiseRef.current = (async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
-        const { sound } = await Audio.Sound.createAsync(track.source, {
-          shouldPlay: false,
-          isLooping: true,
-          volume: BACKGROUND_MUSIC_VOLUME,
-        });
-        backgroundMusicRef.current = sound;
-        return sound;
-      } finally {
-        backgroundMusicLoadingPromiseRef.current = null;
-      }
-    })();
-    return backgroundMusicLoadingPromiseRef.current;
-  }, []);
-
-  const stopBackgroundMusic = useCallback(async () => {
-    const sound = backgroundMusicRef.current;
-    if (!sound) return;
-    try {
-      await sound.stopAsync();
-      await sound.setPositionAsync(0);
-    } catch {}
-  }, []);
-
-  const startBackgroundMusic = useCallback(async () => {
-    const sound = await ensureBackgroundMusicLoaded();
-    if (!sound) return;
-    await sound.stopAsync();
-    await sound.setPositionAsync(0);
-    await sound.playAsync();
-  }, [ensureBackgroundMusicLoaded]);
-
-  const unloadBackgroundMusic = useCallback(async () => {
-    const sound = backgroundMusicRef.current;
-    backgroundMusicRef.current = null;
-    if (!sound) return;
-    try {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-    } catch {}
-  }, []);
-
   const { enqueueChallengeUpload, getJobForChallenge } = useChallengeUploadQueue();
 
   const existingUploadJob = getJobForChallenge(challengeId ?? '');
@@ -406,11 +302,7 @@ function DuetRecordingContent() {
     }
 
     setAllowRepost(challenge.type !== 'check_in');
-    if (challenge.type !== 'check_in') {
-      selectMusicTrackForSession();
-      ensureBackgroundMusicLoaded().catch(() => {});
-    }
-  }, [challengeId, challenge?.type, ensureBackgroundMusicLoaded, selectMusicTrackForSession]);
+  }, [challengeId, challenge?.type]);
 
   const debugRecordingState = useCallback(
     (label: string) => {
@@ -529,7 +421,6 @@ function DuetRecordingContent() {
       countdownSoundPlaybackTokenRef.current += 1;
 
       stopCountdownSound().catch(() => {});
-      stopBackgroundMusic().catch(() => {});
 
       if (isRecordingRef.current) {
         cancelledByUserRef.current = true;
@@ -549,7 +440,7 @@ function DuetRecordingContent() {
 
       cancelledByBackgroundRef.current = false;
     },
-    [stopBackgroundMusic, stopCountdownSound]
+    [stopCountdownSound]
   );
 
   useFocusEffect(
@@ -606,9 +497,8 @@ function DuetRecordingContent() {
       });
 
       cleanupRecordingRefs('screen unmount');
-      unloadBackgroundMusic().catch(() => {});
     };
-  }, [cleanupRecordingRefs, unloadBackgroundMusic]);
+  }, [cleanupRecordingRefs]);
 
   useEffect(() => {
     return () => {
@@ -652,8 +542,6 @@ function DuetRecordingContent() {
         return;
       }
 
-      stopBackgroundMusic().catch(() => {});
-
       if (countdownRef.current) {
         clearInterval(countdownRef.current);
 
@@ -695,10 +583,9 @@ function DuetRecordingContent() {
     });
 
     return () => subscription.remove();
-  }, [state, stopBackgroundMusic]);
+  }, [state]);
 
   const stopRecording = useCallback(() => {
-    stopBackgroundMusic().catch(() => {});
     console.log('[RecordingDebug] stopRecording called', {
       elapsedRef: elapsedRef.current,
 
@@ -739,7 +626,7 @@ function DuetRecordingContent() {
     } catch {
       // Camera may already be stopped.
     }
-  }, [stopBackgroundMusic]);
+  }, []);
 
   const startRecording = useCallback(async () => {
     console.log('[RecordingDebug] startRecording called', {
@@ -781,7 +668,7 @@ function DuetRecordingContent() {
 
       appMaxDuration: MAX_RECORDING_SECONDS,
 
-      nativeMaxDuration: null,
+      nativeMaxDuration: MAX_RECORDING_SECONDS,
 
       videoQuality: RECORDING_VIDEO_QUALITY,
 
@@ -831,17 +718,15 @@ function DuetRecordingContent() {
     }, MAX_RECORDING_SECONDS * 1000);
 
     try {
-      if (!isCheckIn) {
-        await startBackgroundMusic();
-      }
       const video = await cameraRef.current.recordAsync({
+        maxDuration: MAX_RECORDING_SECONDS,
+        ...(Platform.OS === 'ios' ? { codec: 'h264' as const } : {}),
         maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
       });
 
       const recordedDurationSeconds = recordingStartedAtRef.current
         ? (Date.now() - recordingStartedAtRef.current) / 1000
         : elapsedRef.current;
-      await stopBackgroundMusic();
 
       const wasManualStop = manualStopRequestedRef.current;
 
@@ -1002,7 +887,6 @@ function DuetRecordingContent() {
         Alert.alert('Recording failed', 'Could not save the recording. Please try again.');
       }
     } catch (error) {
-      await stopBackgroundMusic();
       console.log('[RecordingDebug] recordAsync error', {
         error,
 
@@ -1055,8 +939,6 @@ function DuetRecordingContent() {
     communityChallenge?.currentDay,
     isCheckIn,
     progress?.nextAttemptNumber,
-    startBackgroundMusic,
-    stopBackgroundMusic,
   ]);
 
   const playCountdownSound = useCallback(
@@ -1397,8 +1279,6 @@ function DuetRecordingContent() {
 
         mediaType: selectedMediaType,
         checkInSubmissionType: isCheckIn ? checkInSubmissionType : undefined,
-        musicTrackId:
-          selectedMediaType === 'video' && !isCheckIn ? selectedMusicTrack?.id : undefined,
         mediaWidth: isCheckIn ? selectedMediaDimensions?.width : undefined,
         mediaHeight: isCheckIn ? selectedMediaDimensions?.height : undefined,
         mimeType: selectedMimeType,
@@ -1438,7 +1318,6 @@ function DuetRecordingContent() {
     checkInSubmissionType,
     selectedMediaDimensions,
     selectedMimeType,
-    selectedMusicTrack,
   ]);
 
   const handleCaptionFocus = useCallback(() => {
@@ -1594,7 +1473,7 @@ function DuetRecordingContent() {
           mode="video"
           videoQuality={RECORDING_VIDEO_QUALITY}
           videoBitrate={RECORDING_VIDEO_BITRATE}
-          mute={!isCheckIn || isCheckInAudioMuted}
+          mute={isCheckInAudioMuted}
         />
 
         <View
@@ -1615,15 +1494,15 @@ function DuetRecordingContent() {
           top={insets.top + 16}
         />
 
-        {state === 'pre-record' && isCheckIn && (
+        {state === 'pre-record' && (
           <TouchableOpacity
             activeOpacity={0.78}
             accessibilityRole="switch"
             accessibilityLabel="Record microphone audio"
             accessibilityHint={
               isCheckInAudioMuted
-                ? 'Turns on the original audio for your check-in video'
-                : 'Mutes the original audio in your check-in video'
+                ? 'Turns on the original audio for your video'
+                : 'Mutes the original audio in your video'
             }
             accessibilityState={{ checked: !isCheckInAudioMuted }}
             onPress={() => setIsCheckInAudioMuted((current) => !current)}
@@ -1842,10 +1721,7 @@ function DuetRecordingContent() {
                   contentPosition="center"
                 />
               ) : isCheckIn || (isCommunityChallenge && challenge.outputType === 'single_video') ? (
-                <SingleVideoPreview
-                  videoUrl={recordedVideoUri}
-                  musicTrack={isCommunityChallenge ? (selectedMusicTrack ?? undefined) : undefined}
-                />
+                <SingleVideoPreview videoUrl={recordedVideoUri} />
               ) : currentChallengeDay === 1 ? (
                 <CompositeVideoPlayer
                   leftVideoUrl={FIRST_ATTEMPT_VIDEO_URL}
@@ -1853,8 +1729,6 @@ function DuetRecordingContent() {
                   leftLabel=""
                   rightLabel="Day 1"
                   mirrorRight={false}
-                  backgroundMusicSource={selectedMusicTrack?.source}
-                  backgroundMusicVolume={BACKGROUND_MUSIC_VOLUME}
                 />
               ) : progress?.day1VideoUrl ? (
                 <CompositeVideoPlayer
@@ -1863,8 +1737,6 @@ function DuetRecordingContent() {
                   leftLabel="Day 1"
                   rightLabel={`Day ${currentChallengeDay}`}
                   mirrorRight={false}
-                  backgroundMusicSource={selectedMusicTrack?.source}
-                  backgroundMusicVolume={BACKGROUND_MUSIC_VOLUME}
                 />
               ) : (
                 <CompositeVideoPlayer
@@ -1873,8 +1745,6 @@ function DuetRecordingContent() {
                   leftLabel="Challenge"
                   rightLabel={`Day ${currentChallengeDay}`}
                   mirrorRight={false}
-                  backgroundMusicSource={selectedMusicTrack?.source}
-                  backgroundMusicVolume={BACKGROUND_MUSIC_VOLUME}
                 />
               )}
             </View>

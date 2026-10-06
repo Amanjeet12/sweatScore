@@ -1,18 +1,10 @@
 import { useAction, useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { router } from 'expo-router';
-import {
-  Barbell,
-  Check,
-  Footprints,
-  ForkKnife,
-  MoonStars,
-  MagnifyingGlass,
-  YoutubeLogo,
-} from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 
+import CoachPlanItems, { PLAN_ROWS } from './CoachPlanItems';
 import CoachPlanPreparing from './CoachPlanPreparing';
 import DailyQuestion from './DailyQuestion';
 import PlanExplanation from './PlanExplanation';
@@ -23,10 +15,15 @@ import { PrototypeSheetControl } from '~/components/core/design/PrototypeControl
 import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import {
+  bodySelections,
+  isUnanswered,
+  toggleBodyFeeling,
+  type BodyFeeling,
+} from '~/shared/coachBodyFeeling';
 import type { CoachCategory } from '~/shared/coachFoundation';
-import { mealPlanSummary } from '~/shared/coachPlanCopy';
 import { DAILY_QUESTIONS } from '~/shared/coachQuestions';
-import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
+import { planBannerState } from '~/shared/coachToday';
 
 type Plan = FunctionReturnType<typeof api.revenueCatEntitlements.myPlan>;
 type CheckIns = FunctionReturnType<typeof api.coachCheckIns.myToday> | undefined;
@@ -37,17 +34,6 @@ const QUESTIONS = [
   DAILY_QUESTIONS[3],
   DAILY_QUESTIONS[4],
 ];
-const ROWS = [
-  { category: 'workout', title: 'Workout', Icon: Barbell },
-  { category: 'steps', title: 'Steps', Icon: Footprints },
-  { category: 'meals', title: 'Meals', Icon: ForkKnife },
-  { category: 'sleep', title: 'Sleep', Icon: MoonStars },
-] as const;
-const ORANGE = '#E8541E';
-function concise(value: string) {
-  return value.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || value;
-}
-
 export default function TodayPlanSheet({
   firstName,
   plan,
@@ -69,6 +55,9 @@ export default function TodayPlanSheet({
   const submit = useAction(api.coachDailyService.submitDailyAnswersAndGenerate);
   const retry = useMutation(api.coachDailyService.retryFailedPlan);
   const [step, setStep] = useState<number | null>(null);
+  const [pendingBody, setPendingBody] = useState<{ day: string; values: BodyFeeling[] } | null>(
+    null
+  );
   const [submitting, setSubmitting] = useState(false);
   const [retryRequestId, setRetryRequestId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,20 +80,35 @@ export default function TodayPlanSheet({
     }
   }, [foundation, plan.requestStatus, begin, onClose]);
 
-  const firstUnanswered = QUESTIONS.findIndex((question) => draft?.[question.key] === undefined);
+  const firstUnanswered = QUESTIONS.findIndex((question) => isUnanswered(draft?.[question.key]));
   const index = step ?? (firstUnanswered < 0 ? QUESTIONS.length - 1 : firstUnanswered);
   const question = QUESTIONS[index];
-  const choose = async (value: string) => {
+  const selectedBody =
+    pendingBody?.day === plan.day ? pendingBody.values : bodySelections(draft?.body);
+  const chooseBody = async (value: BodyFeeling) => {
     if (busyRef.current) return;
+    busyRef.current = true;
+    const values = toggleBodyFeeling(selectedBody, value);
+    setPendingBody({ day: plan.day, values });
+    setBusy(true);
+    setError('');
+    try {
+      await save({ body: values });
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+  const choose = async (value: string | BodyFeeling[]) => {
+    if (busyRef.current || (Array.isArray(value) && value.length === 0)) return;
     busyRef.current = true;
     setBusy(true);
     setError('');
-    let finalAnswerSaved = false;
     try {
       if (index === QUESTIONS.length - 1) {
         setSubmitting(true);
-        await save({ body: value as Parameters<typeof submit>[0]['body'] });
-        finalAnswerSaved = true;
         await submit({
           body: value as Parameters<typeof submit>[0]['body'],
           requestKey: `first_${plan.day.replaceAll('-', '')}`,
@@ -117,9 +121,7 @@ export default function TodayPlanSheet({
       setSubmitting(false);
       setError(
         index === QUESTIONS.length - 1
-          ? finalAnswerSaved
-            ? 'We could not prepare today’s plan. Your answers are saved. Please try again.'
-            : 'Could not save your answer. Please try again.'
+          ? 'We could not prepare today’s plan. Your selections are kept here. Please try again.'
           : 'Could not save your answer. Please try again.'
       );
     } finally {
@@ -134,17 +136,18 @@ export default function TodayPlanSheet({
     plan.requestStatus === 'pending' ||
     (submitting && plan.requestStatus === 'none') ||
     Boolean(retryRequestId && plan.requestId !== retryRequestId);
-  const ready = Boolean(plan.plan) && plan.requestStatus === 'ready';
-  const completed = ROWS.filter(
+  const ready =
+    planBannerState({
+      access: plan.access,
+      hasPlan: Boolean(plan.plan),
+      requestStatus: plan.requestStatus,
+      canRetry: plan.canRetry,
+    }) === 'ready';
+  const completed = PLAN_ROWS.filter(
     ({ category }) =>
       (checkIns?.assignments.find((item) => item.category === category)?.consumedCount ?? 0) > 0
   ).length;
   const output = plan.plan?.output;
-  const workoutTarget =
-    checkIns?.status === 'ready'
-      ? checkIns.assignments.find((item) => item.category === 'workout')?.label
-      : undefined;
-  const search = output ? workoutYoutubeSearch(workoutTarget ?? output.workout) : null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -166,6 +169,15 @@ export default function TodayPlanSheet({
               </Text>
               <PrototypeSheetControl kind="close" label="Close today’s plan" onPress={onClose} />
             </View>
+            {plan.requestStatus === 'pending' || plan.requestStatus === 'failed' ? (
+              <View className="mt-4 rounded-2xl bg-[#FFF0E8] p-4">
+                <Text style={[type.supporting, { color: '#71432F' }]}>
+                  {plan.requestStatus === 'pending'
+                    ? 'Your updated plan is preparing. The previous recommendation stays available until it is ready.'
+                    : 'The updated plan could not be prepared. Your previous plan and check-in history remain saved.'}
+                </Text>
+              </View>
+            ) : null}
             <Text style={type.planHeading} className="mt-3.5">
               {output.headline}
             </Text>
@@ -192,64 +204,7 @@ export default function TodayPlanSheet({
                 />
               </View>
             </View>
-            <View className="mt-7 gap-[22px]">
-              {ROWS.map(({ category, title, Icon }) => {
-                const assignment = checkIns?.assignments.find((item) => item.category === category);
-                const target =
-                  category === 'steps'
-                    ? `${plan.plan?.stepTarget.toLocaleString('en-US')} steps`
-                    : category === 'workout' && workoutTarget
-                      ? workoutTarget
-                      : category === 'meals'
-                        ? mealPlanSummary(output.meals)
-                        : concise(output[category]);
-                const done = (assignment?.consumedCount ?? 0) > 0;
-                return (
-                  <TouchableOpacity
-                    key={category}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${title}: ${target}`}
-                    onPress={() => onCheckIn(category)}
-                    className="flex-row items-center">
-                    <View className="mr-[14px] h-12 w-12 items-center justify-center rounded-2xl bg-[#FFF3EA]">
-                      <Icon size={24} color={ORANGE} />
-                    </View>
-                    <View className="min-w-0 flex-1 pr-3">
-                      <Text style={type.cardTitle}>{title}</Text>
-                      <Text style={type.supporting} className="mt-1">
-                        {target}
-                      </Text>
-                    </View>
-                    <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
-                      {done ? <Check size={17} color="#8A8A8A" /> : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {search ? (
-              <View className="mt-[34px]">
-                <Text style={type.sheetSectionHeading}>Find your workout on YouTube</Text>
-                <Text style={type.supporting} className="mt-1">
-                  Search for a workout that fits today’s plan.
-                </Text>
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  accessibilityLabel={`Search ${search.phrase} on YouTube`}
-                  onPress={() =>
-                    Linking.openURL(search.url).catch(() =>
-                      Alert.alert('YouTube could not be opened. Please try again.')
-                    )
-                  }
-                  className="mt-3 min-h-16 flex-row items-center rounded-[32px] bg-[#F5F5F5] px-[22px] py-4">
-                  <MagnifyingGlass size={24} color="#8A8A8A" />
-                  <Text style={type.search} className="mx-3 min-w-0 flex-1">
-                    {search.phrase}
-                  </Text>
-                  <YoutubeLogo size={32} color={ORANGE} weight="fill" />
-                </TouchableOpacity>
-              </View>
-            ) : null}
+            <CoachPlanItems plan={plan.plan!} checkIns={checkIns} onCheckIn={onCheckIn} />
             <PlanExplanation explanation={output.why} />
             <PlanFeedback revisionId={plan.plan!.revisionId} />
             <TouchableOpacity
@@ -315,10 +270,25 @@ export default function TodayPlanSheet({
               index === 0 ? 'Answer 5 quick questions to get a personalised plan today.' : undefined
             }
             options={question.options}
-            selected={typeof draft?.[question.key] === 'string' ? draft[question.key] : undefined}
+            selected={
+              question.key === 'body'
+                ? selectedBody
+                : typeof draft?.[question.key] === 'string'
+                  ? draft[question.key]
+                  : undefined
+            }
+            multiple={question.key === 'body'}
+            onContinue={
+              question.key === 'body'
+                ? () => {
+                    choose(selectedBody).catch(() => {});
+                  }
+                : undefined
+            }
             busy={busy}
             onChoose={(value) => {
-              choose(value).catch(() => {});
+              if (question.key === 'body') chooseBody(value as BodyFeeling).catch(() => {});
+              else choose(value).catch(() => {});
             }}
             onBack={
               index > 0

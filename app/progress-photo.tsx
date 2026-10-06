@@ -2,13 +2,16 @@ import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Camera, ImageSquare, Plus } from 'phosphor-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, TouchableOpacity, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BackButton } from '~/components/core/BackButton';
-import SafeAreaView from '~/components/core/SafeAreaView';
+import { goBackOrReplace } from '~/components/core/BackButton';
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
+import { CheckInHeader } from '~/components/core/design/CheckInChrome';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
@@ -24,13 +27,15 @@ export default function ProgressPhotoScreen() {
   const [frontPhoto, setFrontPhoto] = useState<PickedPhoto | null>(null);
   const [sidePhoto, setSidePhoto] = useState<PickedPhoto | null>(null);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const canLog = progress?.canLogCurrentWeek ?? true;
 
   if (!isPro)
     return (
       <SafeAreaView className="flex-1 bg-[#F9F9F9] p-5">
-        <Stack.Screen options={{ title: 'Weekly progress' }} />
+        <Stack.Screen options={{ headerShown: false }} />
+        <CheckInHeader title="Weekly progress" onBack={() => goBackOrReplace()} />
         <View className="rounded-2xl bg-white p-5">
           <Text className="font-heading text-lg font-semibold">Progress access unavailable</Text>
           <Text className="mt-2 text-sm text-[#77716D]">
@@ -89,44 +94,47 @@ export default function ProgressPhotoScreen() {
   };
 
   const save = async () => {
-    if (!frontPhoto || saving || !canLog) return;
+    if (savingRef.current || !canLog) return;
+    if (!frontPhoto || !sidePhoto) {
+      Alert.alert(
+        'Photos required',
+        `Add ${!frontPhoto ? 'a front' : 'a side'} photo before saving weekly progress.`
+      );
+      return;
+    }
+    savingRef.current = true;
     setSaving(true);
     try {
       const frontStorageId = await upload(frontPhoto);
-      const sideStorageId = sidePhoto ? await upload(sidePhoto) : undefined;
+      const sideStorageId = await upload(sidePhoto);
       await createProgressPhoto({
         frontPhoto: frontStorageId,
-        ...(sideStorageId ? { sidePhoto: sideStorageId } : {}),
+        sidePhoto: sideStorageId,
       });
       Alert.alert('Week logged', 'Your progress photos have been added to your profile.');
-      router.back();
+      goBackOrReplace();
     } catch (error) {
       Alert.alert(
         'Could not save photos',
         error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-[#F9F9F9]">
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTitle: 'Weekly progress',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: '#F9F9F9' },
-          headerTitleStyle: {
-            fontFamily: 'Inter_700Bold',
-            fontSize: 20,
-            color: '#1A1A1A',
-          },
-          headerLeft: () => <BackButton />,
-        }}
-      />
-      <View className="flex-1 px-5 pb-7 pt-5">
+      <Stack.Screen options={{ headerShown: false }} />
+      <CheckInHeader title="Weekly progress" onBack={() => goBackOrReplace()} />
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: 20,
+          paddingBottom: 28,
+          paddingTop: 20,
+        }}>
         <View className="rounded-[24px] bg-white px-5 py-6">
           <View className="h-14 w-14 items-center justify-center rounded-full bg-[#FFF0E9]">
             <Camera size={27} color="#FF5C35" weight="duotone" />
@@ -145,13 +153,16 @@ export default function ProgressPhotoScreen() {
           <View className="mt-5 flex-row gap-x-3">
             {(
               [
-                ['front', frontPhoto, 'Front view', true],
-                ['side', sidePhoto, 'Side view', false],
+                ['front', frontPhoto, 'Front view'],
+                ['side', sidePhoto, 'Side view'],
               ] as const
-            ).map(([kind, photo, label, required]) => (
+            ).map(([kind, photo, label]) => (
               <TouchableOpacity
                 key={kind}
                 activeOpacity={0.8}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}, ${photo ? 'photo added' : 'required photo missing'}`}
                 onPress={() => openPicker(kind)}
                 className="h-[210px] flex-1 overflow-hidden rounded-[20px] bg-white">
                 {photo ? (
@@ -175,7 +186,7 @@ export default function ProgressPhotoScreen() {
                       {label}
                     </Text>
                     <Text className="mt-1 text-center font-body text-[11px] text-[#77716D]">
-                      {required ? 'Required' : 'Optional'}
+                      Required
                     </Text>
                   </View>
                 )}
@@ -197,21 +208,23 @@ export default function ProgressPhotoScreen() {
         )}
 
         <View className="flex-1" />
-        <TouchableOpacity
-          activeOpacity={0.84}
-          disabled={!frontPhoto || saving || !canLog}
+        {canLog && (!frontPhoto || !sidePhoto) ? (
+          <Text style={[type.caption, { textAlign: 'center', marginTop: 20, marginBottom: 12 }]}>
+            {!frontPhoto && !sidePhoto
+              ? 'Add front and side photos to save.'
+              : !frontPhoto
+                ? 'Add a front photo to save.'
+                : 'Add a side photo to save.'}
+          </Text>
+        ) : null}
+        <PrototypeButton
+          label="Save weekly progress"
+          disabled={!frontPhoto || !sidePhoto || !canLog}
+          loading={saving}
           onPress={save}
-          className="h-[54px] items-center justify-center rounded-[20px]"
-          style={{ backgroundColor: frontPhoto && canLog ? '#FF5C35' : '#DED9D5' }}>
-          {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-base text-white" style={{ fontFamily: 'Inter_600SemiBold' }}>
-              Save weekly progress
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          style={{ marginTop: 16 }}
+        />
+      </ScrollView>
     </SafeAreaView>
   );
 }

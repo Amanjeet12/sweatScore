@@ -127,7 +127,7 @@ const TabShare = () => {
                           )}
                         </View>
                         <View style={community.prompt}>
-                          <Text style={type.prompt}>Share something with the community</Text>
+                          <Text style={type.prompt}>{`Share an update, ${userName}`}</Text>
                         </View>
                       </TouchableOpacity>
 

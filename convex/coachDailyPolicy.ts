@@ -1,3 +1,4 @@
+import { hasBodyFeeling } from '../shared/coachBodyFeeling';
 import type { Doc } from './_generated/dataModel';
 import { addDaysToDateKey } from './utils/timezone';
 
@@ -83,21 +84,24 @@ export type DailyPolicy = {
 
 export function dailyPolicy(snapshot: DailySnapshot, day: string): DailyPolicy {
   const today = snapshot.daily;
-  const pain = today.body === 'pain_unwell';
+  const pain = hasBodyFeeling(today.body, 'pain_unwell');
   const recovery = consecutiveCompletedWorkoutDays(snapshot, day) >= 3;
   const poor = today.sleep === 'barely_rested' || today.energy === 'flat';
-  const sore = today.body === 'sore_upper' || today.body === 'sore_lower';
+  const upperSore = hasBodyFeeling(today.body, 'sore_upper');
+  const lowerSore = hasBodyFeeling(today.body, 'sore_lower');
+  const sore = upperSore || lowerSore;
+  const bothSore = upperSore && lowerSore;
   // Completed-workout recovery takes precedence over an opposite-body soreness
   // suggestion. On a full-session request with poor readiness, use the already
   // established short-session duration instead of requiring a new threshold.
-  const rest = pain || today.upFor === 'rest_day' || (recovery && sore);
+  const rest = pain || bothSore || today.upFor === 'rest_day' || (recovery && sore);
   const stepAverage = verifiedStepAverage(snapshot);
   // "Well above average" has no approved numeric threshold. Observed high
   // steps alone therefore never block generation or assert recovery. The
   // verified average and its +2,000 cap still constrain the target.
   const headline = pain
     ? HEADLINES.pain
-    : today.upFor === 'rest_day'
+    : bothSore || today.upFor === 'rest_day'
       ? HEADLINES.rest
       : rest && recovery
         ? HEADLINES.ease
@@ -194,11 +198,11 @@ export function validateDailyPlanOutput(
     )
       throw new Error('invalid_output');
     if (
-      (snapshot.daily.body === 'sore_lower' && type !== 'upper_body_strength') ||
-      (snapshot.daily.body === 'sore_upper' && type !== 'lower_body_strength')
+      (hasBodyFeeling(snapshot.daily.body, 'sore_lower') && type !== 'upper_body_strength') ||
+      (hasBodyFeeling(snapshot.daily.body, 'sore_upper') && type !== 'lower_body_strength')
     )
       throw new Error('invalid_output');
-    if (policy.headline === HEADLINES.push && snapshot.daily.body === 'fine') {
+    if (policy.headline === HEADLINES.push && hasBodyFeeling(snapshot.daily.body, 'fine')) {
       const last = recentPlans.find((plan) => plan.day === addDaysToDateKey(day, -1));
       const lastType = last?.output.workout.match(
         /\b(full body strength|upper body strength|lower body strength|core|jump rope|cardio) workout today\./
@@ -232,10 +236,11 @@ export function buildDailyProviderInput(
   const steps = observedSteps(snapshot);
   const average = verifiedStepAverage(snapshot);
   const policy = dailyPolicy(snapshot, day);
-  const sorenessWorkoutType =
-    snapshot.daily.body === 'sore_lower'
+  const sorenessWorkoutType = policy.rest
+    ? null
+    : hasBodyFeeling(snapshot.daily.body, 'sore_lower')
       ? 'upper body strength'
-      : snapshot.daily.body === 'sore_upper'
+      : hasBodyFeeling(snapshot.daily.body, 'sore_upper')
         ? 'lower body strength'
         : null;
   const requiredWorkout = policy.rest

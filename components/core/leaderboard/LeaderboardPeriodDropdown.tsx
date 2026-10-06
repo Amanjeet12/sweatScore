@@ -23,11 +23,13 @@ const LABELS: Record<LeaderboardPeriod, string> = {
 type LeaderboardPeriodDropdownProps = {
   value: LeaderboardPeriod;
   onChange: (period: LeaderboardPeriod) => void;
+  timeLeft: string;
 };
 
 export default function LeaderboardPeriodDropdown({
   value,
   onChange,
+  timeLeft,
 }: LeaderboardPeriodDropdownProps) {
   const insets = useSafeAreaInsets();
   const [isOpen, setIsOpen] = useState(false);
@@ -41,13 +43,13 @@ export default function LeaderboardPeriodDropdown({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Leaderboard period: ${LABELS[value]}`}
+        accessibilityLabel={`Leaderboard period: ${LABELS[value]}, ${timeLeft}`}
         accessibilityHint="Opens the leaderboard period options"
         onPress={() => setIsOpen(true)}
         hitSlop={6}
-        className="min-h-11 flex-row items-center justify-center gap-x-2 rounded-[20px] bg-[#f5f5f5] px-3 py-2">
-        <Text style={type.name}>{LABELS[value]}</Text>
+        className="min-h-11 flex-row items-center justify-center gap-x-2 py-2">
         <CaretDown size={15} color="#6f6f6f" weight="bold" />
+        <Text style={type.caption}>{timeLeft}</Text>
       </Pressable>
 
       <Modal

@@ -1,7 +1,7 @@
+import { useFocusEffect } from 'expo-router';
 import { VideoPlayer, useVideoPlayer, VideoView } from 'expo-video';
-import { Audio } from 'expo-av';
 import { Play } from 'phosphor-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Dimensions, Pressable, Text, View } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -19,8 +19,6 @@ interface CompositeVideoPlayerProps {
   aspectRatio?: number;
   existingLeftPlayer?: VideoPlayer;
   mirrorRight?: boolean;
-  backgroundMusicSource?: number;
-  backgroundMusicVolume?: number;
 }
 
 export default function CompositeVideoPlayer({
@@ -31,32 +29,8 @@ export default function CompositeVideoPlayer({
   aspectRatio = 1,
   existingLeftPlayer,
   mirrorRight = false,
-  backgroundMusicSource,
-  backgroundMusicVolume = 0.7,
 }: CompositeVideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const backgroundMusicRef = useRef<Audio.Sound | null>(null);
-
-  useEffect(() => {
-    if (!backgroundMusicSource) return;
-    let disposed = false;
-    Audio.Sound.createAsync(backgroundMusicSource, {
-      shouldPlay: false,
-      isLooping: true,
-      volume: backgroundMusicVolume,
-    }).then(({ sound }) => {
-      if (disposed) sound.unloadAsync().catch(() => {});
-      else backgroundMusicRef.current = sound;
-    });
-    return () => {
-      disposed = true;
-      const sound = backgroundMusicRef.current;
-      backgroundMusicRef.current = null;
-      sound?.stopAsync().catch(() => {});
-      sound?.unloadAsync().catch(() => {});
-    };
-  }, [backgroundMusicSource, backgroundMusicVolume]);
-
   const ownLeftPlayer = useVideoPlayer(existingLeftPlayer ? null : leftVideoUrl, (player) => {
     player.loop = true;
     player.volume = 0;
@@ -66,8 +40,18 @@ export default function CompositeVideoPlayer({
 
   const rightPlayer = useVideoPlayer(rightVideoUrl, (player) => {
     player.loop = false;
-    player.volume = 0;
+    player.volume = 1;
   });
+
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        leftPlayer.pause();
+        rightPlayer.pause();
+      },
+      [leftPlayer, rightPlayer]
+    )
+  );
 
   const halfWidth = SCREEN_WIDTH / 2;
   const height = SCREEN_WIDTH * aspectRatio;
@@ -76,7 +60,6 @@ export default function CompositeVideoPlayer({
     if (isPlaying) {
       leftPlayer.pause();
       rightPlayer.pause();
-      backgroundMusicRef.current?.pauseAsync().catch(() => {});
       setIsPlaying(false);
       return;
     }
@@ -89,12 +72,9 @@ export default function CompositeVideoPlayer({
     leftPlayer.loop = true;
     rightPlayer.loop = false;
 
+    leftPlayer.volume = 0;
     leftPlayer.play();
     rightPlayer.play();
-    backgroundMusicRef.current
-      ?.setPositionAsync(Math.max(0, rightPlayer.currentTime * 1000))
-      .then(() => backgroundMusicRef.current?.playAsync());
-
     setIsPlaying(true);
   };
 

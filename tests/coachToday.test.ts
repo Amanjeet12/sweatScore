@@ -57,6 +57,8 @@ describe('Stage 7 Today model', () => {
   test('ready, no-plan, pending, failed and expired access are distinct', () => {
     for (const [requestStatus, hasPlan, access, canRetry, expected, label] of [
       ['ready', true, true, false, 'ready', 'View today’s plan'],
+      ['pending', true, true, false, 'ready', 'View today’s plan'],
+      ['failed', true, true, true, 'ready', 'View today’s plan'],
       ['none', false, true, false, 'no_plan', 'Get today’s plan'],
       ['pending', false, true, false, 'pending', 'Preparing today’s plan'],
       ['failed', false, true, true, 'failed', 'Retry today’s plan'],
@@ -230,4 +232,20 @@ test('banner avatars support loading, legacy and current server responses', () =
   expect(bannerAvatarMembers({ memberCount: 5, avatarUrls: [] })).toHaveLength(4);
   const members = [{ userId: 'alice', name: 'Alice', imageUrl: null }];
   expect(bannerAvatarMembers({ memberCount: 1, avatarMembers: members })).toEqual(members);
+});
+
+test('Meals check marks are independent of completion, remaining slots and count', () => {
+  for (const consumedCount of [0, 1, 2, 3]) {
+    const tile = todayTiles([{ ...meals, consumedCount }])[1];
+    expect(tile.checked).toBe(consumedCount > 0);
+    expect(tile.completed).toBe(consumedCount === 3);
+    expect(tile.available).toBe(consumedCount < 3);
+    expect(tile.earned).toBe(consumedCount);
+    expect(tile.total).toBe(3);
+  }
+  expect(todayTiles(undefined)[1].checked).toBe(false);
+  expect(todayTiles([{ ...steps, consumedCount: 1 }])[3]).toMatchObject({
+    checked: true,
+    completed: true,
+  });
 });

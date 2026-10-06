@@ -10,7 +10,6 @@ import {
   Check,
   LockSimple,
   MoonStars,
-  ShareNetwork,
 } from 'phosphor-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -180,7 +179,9 @@ export default function TodayScreen() {
   const latestPhoto = photos.length > 1 ? photos[photos.length - 1] : undefined;
   const canLogProgress = Boolean(progress?.canLogCurrentWeek);
   const progressWeek = progressCardWeek(photos.length, canLogProgress);
-  const canShareProgress = Boolean(firstPhoto?.frontUrl && latestPhoto?.frontUrl);
+  const comparisonBaseline =
+    photoView === 'side' ? photos.find((photo) => photo.sideUrl) : firstPhoto;
+  const baselineWeek = comparisonBaseline ? photos.indexOf(comparisonBaseline) + 1 : 1;
   const nextPhotoAvailable = Boolean(
     firstPhoto && !latestPhoto && progressWeek > 1 && canLogProgress
   );
@@ -424,7 +425,7 @@ export default function TodayScreen() {
                   ? 'Log a workout'
                   : tile.category === 'meals'
                     ? `${tile.earned} of 3 logged`
-                    : tile.category === 'sleep' && !plan.plan
+                    : tile.category === 'sleep'
                       ? '7 hours sleep'
                       : tile.category === 'steps'
                         ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '10,000'} steps`
@@ -453,7 +454,7 @@ export default function TodayScreen() {
                     </Text>
                   </View>
                   <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
-                    {inactive ? <Check size={17} color="#8A8A8A" /> : null}
+                    {tile.checked ? <Check size={17} color="#8A8A8A" /> : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -587,13 +588,13 @@ export default function TodayScreen() {
           ) : (
             <>
               <View className="flex-row justify-between gap-3">
-                {[firstPhoto, latestPhoto].map((photo, index) => (
+                {[comparisonBaseline, latestPhoto].map((photo, index) => (
                   <View
                     key={index}
                     accessible
                     accessibilityLabel={
                       photo
-                        ? `Week ${index === 0 ? 1 : photos.length} progress photo, ${photoDate(photo.weekStart)}`
+                        ? `Week ${index === 0 ? baselineWeek : photos.length} progress photo, ${photoDate(photo.weekStart)}`
                         : index === 0 || nextPhotoAvailable
                           ? `Week ${index === 0 ? 1 : progressWeek}, add a photo`
                           : 'Next progress comparison unlocks after Week 1'
@@ -656,7 +657,7 @@ export default function TodayScreen() {
                           paddingTop: 40,
                         }}>
                         <Text style={[type.compactCardTitle, { color: '#fff' }]}>
-                          Week {index === 0 ? 1 : photos.length}
+                          Week {index === 0 ? baselineWeek : photos.length}
                         </Text>
                         <Text style={[type.smallCaption, { color: 'rgba(255,255,255,0.8)' }]}>
                           {photoDate(photo.weekStart)}
@@ -666,7 +667,7 @@ export default function TodayScreen() {
                   </View>
                 ))}
               </View>
-              <View className="mt-5 flex-row justify-between">
+              <View className="mt-5 flex-row justify-center">
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={
@@ -682,19 +683,6 @@ export default function TodayScreen() {
                   <Camera size={20} color={ORANGE} />
                   <Text style={type.compactAction} className="ml-2">
                     {canLogProgress ? `Log Week ${progressWeek}` : `Week ${progressWeek} logged`}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Share or save progress comparison"
-                  accessibilityState={{ disabled: !canShareProgress }}
-                  disabled={!canShareProgress}
-                  onPress={() => router.push(TODAY_PROGRESS_ROUTES.share as any)}
-                  className="min-h-11 flex-1 flex-row items-center justify-center p-2"
-                  style={{ opacity: canShareProgress ? 1 : 0.45 }}>
-                  <ShareNetwork size={20} color={ORANGE} />
-                  <Text style={type.compactAction} className="ml-2">
-                    Share / Save
                   </Text>
                 </TouchableOpacity>
               </View>

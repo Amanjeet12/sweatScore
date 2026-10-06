@@ -32,11 +32,14 @@ export default function LeaderboardHeader({
         <Text style={type.caption}>
           {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now)}
         </Text>
-        <Text style={type.caption}>{mode === 'points' ? timeLeft : 'Current streak'}</Text>
+        <LeaderboardPeriodDropdown
+          value={period}
+          onChange={onChangePeriod}
+          timeLeft={mode === 'points' ? timeLeft : 'Current streak'}
+        />
       </View>
       <View style={[styles.period, { marginTop: 4 }]}>
         <Text style={[type.title, { flexShrink: 1 }]}>{title}</Text>
-        <LeaderboardPeriodDropdown value={period} onChange={onChangePeriod} />
       </View>
       <View style={styles.tabs}>
         {(['points', 'streak'] as const).map((value) => (

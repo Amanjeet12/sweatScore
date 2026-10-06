@@ -51,7 +51,7 @@ export default function MeRow({
       accessibilityLabel={`Your position, rank ${rank ?? 'unranked'}, ${displayTotalPoints} ${mode === 'streak' ? 'weeks' : 'points'}`}
       style={styles.me}>
       <Text style={[type.myRank, styles.rank]}>{rank ?? '—'}</Text>
-      <LeagueAvatar name={userName} uri={avatarUri} ring />
+      <LeagueAvatar name={userName} uri={avatarUri} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={type.name}>You</Text>
         {compact ? <View style={{ marginTop: 4 }}>{metric}</View> : null}

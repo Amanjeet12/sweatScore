@@ -503,7 +503,16 @@ export const finishScan = internalMutation({
     const scan = await ctx.db.get(args.scanId);
     if (!scan || scan.userId !== args.userId || scan.status !== 'dispatched') return 'ignored';
     const draft = await ctx.db.get(scan.draftId);
-    if (!draft || draft.userId !== args.userId || draft.scanId !== scan._id) return 'ignored';
+    if (
+      !draft ||
+      draft.userId !== args.userId ||
+      draft.scanId !== scan._id ||
+      draft.status !== 'analyzing'
+    )
+      return 'ignored';
+    const submission = await ctx.db.get(draft.submissionId);
+    if (!submission || submission.storageId !== draft.storageId || submission.state !== 'uploaded')
+      return 'ignored';
     const now = Date.now();
     const unclear = Boolean(args.result?.verdict && UNCLEAR_IMAGE.test(args.result.feedback));
     const usable = Boolean(args.result?.verdict) && !unclear;
@@ -682,6 +691,12 @@ export const submitReportFeedback = mutation({
       asError('Meal report is not ready');
     const correction = args.correction?.trim() ?? '';
     if (correction.length > 500) asError('Please keep feedback to 500 characters');
+    if (
+      draft.memberHelpful === args.helpful &&
+      (draft.memberCorrection ?? '') === correction &&
+      draft.memberFeedbackAt !== undefined
+    )
+      return;
     await ctx.db.patch(draft._id, {
       memberHelpful: args.helpful,
       memberCorrection: correction,

@@ -965,3 +965,89 @@ test('scan context excludes other members feedback and limits history', async ()
   expect(result.memberFeedback[0].report).toBe('report9');
   expect(result.memberFeedback.some((item) => item.report === 'private report')).toBe(false);
 });
+
+test('retake A then analyze and share B never revives A or exposes private correction', async () => {
+  const f = fixture();
+  const draftA = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'A' });
+  const scanA = await reserveScan._handler(f.ctx, {
+    userId: 'alice',
+    draftId: draftA,
+    requestKey: 'scan_photo_a',
+  });
+  await claimDispatch._handler(f.ctx, { userId: 'alice', scanId: scanA });
+  await finishScan._handler(f.ctx, {
+    userId: 'alice',
+    scanId: scanA,
+    result: examples[0],
+    latencyMs: 10,
+  });
+  await retake._handler(f.ctx, { submissionId: 'sub' });
+  await f.ctx.db.patch('sub', { state: 'uploaded', storageId: 'photo-B' });
+  const draftB = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Public B' });
+  expect(draftB).not.toBe(draftA);
+  const scanB = await reserveScan._handler(f.ctx, {
+    userId: 'alice',
+    draftId: draftB,
+    requestKey: 'scan_photo_b',
+  });
+  await claimDispatch._handler(f.ctx, { userId: 'alice', scanId: scanB });
+  expect(
+    await finishScan._handler(f.ctx, {
+      userId: 'alice',
+      scanId: scanA,
+      result: examples[5],
+      latencyMs: 99,
+    })
+  ).toBe('ignored');
+  const before = await myDraft._handler(f.ctx, { submissionId: 'sub' });
+  expect(before.draft._id).toBe(draftB);
+  expect(before.draft.feedback).toBeUndefined();
+  await finishScan._handler(f.ctx, {
+    userId: 'alice',
+    scanId: scanB,
+    result: examples[5],
+    latencyMs: 10,
+  });
+  await share._handler(f.ctx, { draftId: draftB, caption: 'Public B' });
+  await submitReportFeedback._handler(f.ctx, {
+    draftId: draftB,
+    helpful: false,
+    correction: 'PRIVATE CORRECTION',
+  });
+  expect(f.rows.posts).toHaveLength(1);
+  expect(f.rows.posts[0].media).toBe('photo-B');
+  expect(f.rows.posts[0].body).toBe('Public B');
+  expect(JSON.stringify(f.rows.posts)).not.toContain('PRIVATE CORRECTION');
+  expect(JSON.stringify(f.rows.dailyActivities)).not.toContain('PRIVATE CORRECTION');
+  const stored = f.rows.coachMealDraftsV1.find((d) => d._id === draftB);
+  const firstFeedbackAt = stored.memberFeedbackAt;
+  stored.memberFeedbackAt = firstFeedbackAt - 1000;
+  await submitReportFeedback._handler(f.ctx, {
+    draftId: draftB,
+    helpful: false,
+    correction: '  PRIVATE CORRECTION  ',
+  });
+  expect(stored.memberFeedbackAt).toBe(firstFeedbackAt - 1000); // no repeated write on retry
+});
+
+test('a dispatched result cannot attach to media that no longer matches its draft', async () => {
+  const f = fixture();
+  const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'A' });
+  const scanId = await reserveScan._handler(f.ctx, {
+    userId: 'alice',
+    draftId,
+    requestKey: 'scan_old_photo',
+  });
+  await claimDispatch._handler(f.ctx, { userId: 'alice', scanId });
+  // Simulate an obsolete provider response crossing a media transition.
+  await f.ctx.db.patch('sub', { storageId: 'photo-B' });
+  expect(
+    await finishScan._handler(f.ctx, {
+      userId: 'alice',
+      scanId,
+      result: examples[0],
+      latencyMs: 10,
+    })
+  ).toBe('ignored');
+  expect(f.rows.coachMealDraftsV1[0].feedback).toBeUndefined();
+});

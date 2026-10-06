@@ -47,6 +47,7 @@ export function todayTiles(assignments: TileInput[] | undefined) {
       assignment,
       earned: Math.min(assignment?.consumedCount ?? 0, total),
       total,
+      checked: Boolean(assignment && assignment.consumedCount > 0),
       completed: Boolean(assignment && assignment.consumedCount >= total),
       available: Boolean(assignment && assignment.mandatory && assignment.consumedCount < total),
     };

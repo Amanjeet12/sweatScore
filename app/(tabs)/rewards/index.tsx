@@ -14,12 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Share from 'react-native-share';
 import Svg, { Line } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 
-import SafeAreaView from '~/components/core/SafeAreaView';
+import { BackButton, goBackOrReplace } from '~/components/core/BackButton';
+import { CheckInHeader, checkInStyles } from '~/components/core/design/CheckInChrome';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import TrendRangeDropdown from '~/components/core/track/TrendRangeDropdown';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -95,21 +97,14 @@ function formatWeekStart(weekStart: string) {
 function Stat({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
     <View className="min-w-0 flex-1 px-2">
-      <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        className="font-body text-[10px] leading-4 text-[#817A76]">
+      <Text numberOfLines={1} adjustsFontSizeToFit style={type.smallCaption}>
         {label}
       </Text>
-      <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        className="my-1 text-lg leading-6 text-[#1D1B1A]"
-        style={{ fontFamily: 'Inter_600SemiBold' }}>
+      <Text numberOfLines={1} adjustsFontSizeToFit className="my-1" style={type.sectionHeading}>
         {value}
       </Text>
       {unit ? (
-        <Text numberOfLines={1} className="font-body text-[10px] leading-4 text-[#817A76]">
+        <Text numberOfLines={1} adjustsFontSizeToFit style={type.smallCaption}>
           {unit}
         </Text>
       ) : null}
@@ -119,7 +114,6 @@ function Stat({ label, value, unit }: { label: string; value: string | number; u
 
 export default function TabTrack() {
   const { openShare } = useLocalSearchParams<{ openShare?: string }>();
-  const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((state) => state.currentUser);
   const { isPro, requireSubscription } = useSubscriptionGuard();
   const progress = useQuery(
@@ -155,8 +149,12 @@ export default function TabTrack() {
   const photos = progress?.photos ?? [];
   const currentWeekIndex = selectedWeekIndex ?? photos.length - 1;
   const currentPhoto = photos[currentWeekIndex] ?? photos[photos.length - 1];
-  const baselinePhoto = photos[0];
-  const showSide = view === 'side' && Boolean(baselinePhoto?.sideUrl && currentPhoto?.sideUrl);
+  const frontBaseline = photos[0];
+  const sideBaseline = photos.find((photo) => photo.sideUrl);
+  const canCompareSide = Boolean(sideBaseline?.sideUrl && currentPhoto?.sideUrl);
+  const showSide = view === 'side' && canCompareSide;
+  const baselinePhoto = showSide ? sideBaseline : frontBaseline;
+  const baselineWeekNumber = baselinePhoto ? photos.indexOf(baselinePhoto) + 1 : 1;
   const comparisonLeft = showSide ? baselinePhoto?.sideUrl : baselinePhoto?.frontUrl;
   const comparisonRight = showSide ? currentPhoto?.sideUrl : currentPhoto?.frontUrl;
   const currentWeekNumber = currentPhoto
@@ -301,7 +299,8 @@ export default function TabTrack() {
       !shareLoadedUrls.includes(comparisonLeft) ||
       !shareLoadedUrls.includes(comparisonRight) ||
       !shareLogoLoaded
-    ) return;
+    )
+      return;
     autoShareOpened.current = true;
     router.setParams({ openShare: undefined });
     handleShare();
@@ -310,7 +309,8 @@ export default function TabTrack() {
   if (!isPro)
     return (
       <SafeAreaView className="flex-1 bg-[#F9F9F9] px-5 pt-8">
-        <Text className="font-heading text-2xl font-semibold">Your Progress</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <CheckInHeader title="Progress" onBack={() => goBackOrReplace()} />
         <View className="mt-6 rounded-2xl bg-white p-5">
           <Text className="font-heading text-lg font-semibold">Progress access unavailable</Text>
           <Text className="mt-2 text-sm text-[#77716D]">
@@ -358,7 +358,7 @@ export default function TabTrack() {
               <Text
                 style={{ fontFamily: 'Inter_700Bold' }}
                 className="text-[10px] uppercase text-[#FF7048]">
-                Week {index === 0 ? 1 : currentWeekNumber}
+                Week {index === 0 ? baselineWeekNumber : currentWeekNumber}
               </Text>
               <Text className="mt-0.5 font-body text-[9px] text-white">
                 Week of{' '}
@@ -382,21 +382,17 @@ export default function TabTrack() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}>
-        <View
-          style={Platform.OS === 'android' ? { paddingTop: insets.top + 12 } : undefined}
-          className="bg-[#F9F9F9] px-5">
-          <View className="mt-3 flex-row items-end justify-between">
-            <View>
-              <Text
-                style={{ fontFamily: 'Inter_700Bold' }}
-                className="mt-1 text-[26px] text-[#1A1918]">
-                Progress
-              </Text>
-            </View>
+        <View className="bg-[#F9F9F9] px-5">
+          <View className="mt-3 flex-row items-center gap-3">
+            <BackButton
+              accessibilityLabel="Go back"
+              iconColor="#2a2a2a"
+              iconSize={22}
+              style={[checkInStyles.back, { minWidth: 44, minHeight: 44 }]}
+            />
+            <Text style={[type.todayTitle, { flex: 1 }]}>Progress</Text>
             <View className="mb-1 rounded-[20px] bg-[#FFF0E8] px-3 py-1.5">
-              <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="text-[11px] text-[#FF4B1F]">
+              <Text style={[type.badge, { color: '#FF4B1F' }]}>
                 {progress ? monthName(progress.currentMonth) : 'This month'}
               </Text>
             </View>
@@ -425,14 +421,12 @@ export default function TabTrack() {
           <View className="mt-4 rounded-[24px] bg-white px-4 pb-4 pt-5">
             <View className="flex-row items-center justify-between">
               <View>
-                <Text
-                  style={{ fontFamily: 'Inter_700Bold' }}
-                  className="mt-1 text-lg text-[#1D1B1A]">
+                <Text style={type.sectionHeading} className="mt-1">
                   Your Progress Pics
                 </Text>
               </View>
             </View>
-            <Text className="mt-2 font-body text-[11px] leading-4 text-[#77716D]">
+            <Text className="mt-2" style={type.body}>
               Compare your progress over time.
             </Text>
 
@@ -463,19 +457,22 @@ export default function TabTrack() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                {baselinePhoto?.sideUrl && currentPhoto?.sideUrl ? (
+                {canCompareSide ? (
                   <View className="mt-3 flex-row rounded-[20px] bg-[#F3F0ED] p-1">
                     {(['front', 'side'] as const).map((option) => (
                       <Pressable
                         key={option}
                         onPress={() => setView(option)}
                         className="flex-1 items-center rounded-[20px] py-1.5"
-                        style={{ backgroundColor: view === option ? '#FFFFFF' : 'transparent' }}>
+                        style={{
+                          backgroundColor:
+                            (showSide ? 'side' : 'front') === option ? '#FFFFFF' : 'transparent',
+                        }}>
                         <Text
                           className="text-[10px] font-semibold"
                           style={{
                             fontFamily: 'Inter_600SemiBold',
-                            color: view === option ? '#1D1B1A' : '#817A76',
+                            color: (showSide ? 'side' : 'front') === option ? '#1D1B1A' : '#817A76',
                           }}>
                           {option === 'front' ? 'Front view' : 'Side view'}
                         </Text>
@@ -498,8 +495,8 @@ export default function TabTrack() {
                       <View className="absolute left-2 top-2 rounded-[20px] bg-[#382C25] px-2 py-1">
                         <Text
                           style={{ fontFamily: 'Inter_600SemiBold' }}
-                          className="text-[9px] text-white">
-                          Week {index === 0 ? 1 : currentWeekNumber}
+                          className="text-xs text-white">
+                          Week {index === 0 ? baselineWeekNumber : currentWeekNumber}
                         </Text>
                       </View>
                     </View>
@@ -512,16 +509,16 @@ export default function TabTrack() {
                   onPress={openProgressPhoto}
                   className="h-[160px] flex-1 items-center justify-center rounded-[24px]    bg-[#FFF9F6]">
                   <Camera size={28} color={PRIMARY} />
-                  <Text
-                    style={{ fontFamily: 'Inter_600SemiBold' }}
-                    className="mt-2 text-[11px] text-[#1D1B1A]">
+                  <Text style={type.compactCardTitle} className="mt-2">
                     Week 1
                   </Text>
-                  <Text className="mt-1 font-body text-[10px] text-[#77716D]">Add a photo</Text>
+                  <Text className="mt-1" style={type.smallCaption}>
+                    Add a photo
+                  </Text>
                 </TouchableOpacity>
                 <View className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#F3F0ED]">
                   <LockSimple size={22} color={PRIMARY} weight="regular" />
-                  <Text className="mt-2 font-body text-[10px] text-[#817A76]">
+                  <Text className="mt-2 text-center" style={type.smallCaption}>
                     Unlocks after Week 1
                   </Text>
                 </View>
@@ -530,27 +527,23 @@ export default function TabTrack() {
             <View className="mt-4 flex-row gap-x-2">
               <TouchableOpacity
                 onPress={openProgressPhoto}
-                className="h-10 flex-1 flex-row items-center justify-center rounded-[20px] bg-white">
+                className="min-h-11 flex-1 flex-row items-center justify-center rounded-[20px] bg-white py-2">
                 <Camera size={15} color={PRIMARY} />
-                <Text
-                  style={{ fontFamily: 'Inter_600SemiBold' }}
-                  className="ml-2 text-[11px] text-[#1D1B1A]">
+                <Text style={[type.compactAction, { flexShrink: 1 }]} className="ml-2">
                   Log Week {nextWeekNumber}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 disabled={!photos.length || sharing}
                 onPress={handleShare}
-                className="h-10 flex-1 flex-row items-center justify-center rounded-[20px] bg-white"
+                className="min-h-11 flex-1 flex-row items-center justify-center rounded-[20px] bg-white py-2"
                 style={{ opacity: photos.length ? 1 : 0.45 }}>
                 {sharing ? (
                   <ActivityIndicator size="small" color={PRIMARY} />
                 ) : (
                   <>
                     <ShareNetwork size={15} color={PRIMARY} />
-                    <Text
-                      style={{ fontFamily: 'Inter_600SemiBold' }}
-                      className="ml-2 text-[11px] text-[#1D1B1A]">
+                    <Text style={[type.compactAction, { flexShrink: 1 }]} className="ml-2">
                       Share / Save
                     </Text>
                   </>
@@ -562,9 +555,7 @@ export default function TabTrack() {
           <View className="mt-4 rounded-[24px] bg-white px-4 pb-4 pt-5">
             <View className="flex-row items-center justify-between" style={{ zIndex: 10 }}>
               <View>
-                <Text
-                  style={{ fontFamily: 'Inter_700Bold' }}
-                  className="mt-1 text-lg text-[#1D1B1A]">
+                <Text style={type.sectionHeading} className="mt-1">
                   Your consistency
                 </Text>
               </View>
@@ -597,25 +588,21 @@ export default function TabTrack() {
             </View>
             <View className="mt-3 flex-row rounded-[24px] bg-white px-3 py-3">
               <View className="flex-1">
-                <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1D1B1A]">
+                <Text style={type.sectionHeading}>
                   {formatNumber(periodTotal)}{' '}
                   {metric === 'points' ? (periodTotal === 1 ? 'pt' : 'pts') : ''}
                 </Text>
-                <Text className="mt-1 font-body text-[10px] text-[#817A76]">
+                <Text className="mt-1" style={type.caption}>
                   {trendLabel} total {periodLabel}
                 </Text>
               </View>
-              <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="text-[10px] text-[#16865B]">
-                Live data
-              </Text>
+              <Text style={[type.smallCaption, { color: '#16865B' }]}>Live data</Text>
             </View>
             <View className="mb-2 mt-4 flex-row items-center justify-end gap-x-2">
               <Svg width={20} height={2}>
                 <Line x1={0} y1={1} x2={20} y2={1} stroke="#999999" strokeDasharray="4 3" />
               </Svg>
-              <Text className="font-body text-[10px] leading-4 text-[#817A76]">
+              <Text style={[type.smallCaption, { flexShrink: 1 }]}>
                 Goal: {formatNumber(trendTarget)}{' '}
                 {metric === 'challenges' && trendTarget === 1 ? 'challenge' : trendLabel} per{' '}
                 {range === 'week' ? 'day' : range === 'month' ? 'week' : 'month'}
@@ -671,9 +658,7 @@ export default function TabTrack() {
           </View>
 
           <View className="mt-4 rounded-[24px] bg-white px-4 py-5">
-            <Text style={{ fontFamily: 'Inter_700Bold' }} className="text-lg text-[#1D1B1A]">
-              Lifetime stats
-            </Text>
+            <Text style={type.sectionHeading}>Lifetime stats</Text>
             <View className="mt-4 flex-row">
               <Stat
                 label="Points"

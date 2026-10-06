@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import * as Icon from 'phosphor-react-native';
 import { useMemo } from 'react';
-import { Platform, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { Doc } from '~/convex/_generated/dataModel';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -62,12 +63,12 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
   };
 
   return (
-    <View className="mx-4 flex-row items-center rounded-lg py-2">
+    <View className="mx-4 mb-5 flex-row items-center rounded-lg py-3">
       <View className="flex-1">
-        <View className="z-50 flex-col gap-y-1">
+        <View className="flex-col gap-y-2">
           <View className="mx-4 flex-row gap-x-2">
             <View className="flex-1 flex-row items-center gap-x-1">
-              <Text className="text-lg font-bold">{formattedDate}</Text>
+              <Text style={[type.cardTitle, { flexShrink: 1 }]}>{formattedDate}</Text>
             </View>
             <View className="flex-row items-center gap-x-2">
               {canEdit ? (
@@ -104,6 +105,9 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
                     // For Android
                   }}>
                   <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.5}
                     className="text-6xl font-bold leading-tight"
                     style={{
                       color: colors.primary,
@@ -120,32 +124,26 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
               </View>
             </View>
           </View>
-          {/* Points breakdown */}
-          <View className="mx-4 flex-row gap-x-2">
-            <View className="flex-1 flex-row items-center justify-center gap-x-2 rounded-xl py-3">
-              <View className="h-8 w-8 flex-row items-center justify-center rounded-full bg-primary-200">
-                <Icon.CheckFat size={14} weight="fill" color="black" />
+          {/* Wrap the existing breakdown instead of squeezing four groups into one row. */}
+          <View className="mx-4 mt-3 flex-row flex-wrap gap-3">
+            {[
+              { key: 'checkIn', Icon: Icon.CheckFat, points: activity.checkInPoints },
+              { key: 'steps', Icon: Icon.Footprints, points: activity.stepsPoints },
+              { key: 'zone2', Icon: Icon.Drop, points: activity.zone2Points },
+              { key: 'challenge', Icon: Icon.Trophy, points: activity.challengePoints },
+            ].map(({ key, Icon: ActivityIcon, points }) => (
+              <View
+                key={key}
+                style={{ flexBasis: 128, flexGrow: 1, flexShrink: 0 }}
+                className="min-h-12 flex-row items-center gap-x-3 py-2">
+                <View className="h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-200">
+                  <ActivityIcon size={16} weight="fill" color="black" />
+                </View>
+                <Text style={[type.body, { flex: 1, color: '#374151' }]}>
+                  {pointText(points, false)}
+                </Text>
               </View>
-              <Text className="text-gray-700">{pointText(activity.checkInPoints, false)}</Text>
-            </View>
-            <View className="flex-1 flex-row items-center justify-center gap-x-2 rounded-xl py-3">
-              <View className="h-8 w-8 flex-row items-center justify-center rounded-full bg-primary-200">
-                <Icon.Footprints size={14} weight="fill" color="black" />
-              </View>
-              <Text className="text-gray-700">{pointText(activity.stepsPoints, false)}</Text>
-            </View>
-            <View className="flex-1 flex-row items-center justify-center gap-x-2 rounded-xl py-3">
-              <View className="h-8 w-8 flex-row items-center justify-center rounded-full bg-primary-200">
-                <Icon.Drop size={14} weight="fill" color="black" />
-              </View>
-              <Text className="text-gray-700">{pointText(activity.zone2Points, false)}</Text>
-            </View>
-            <View className="flex-1 flex-row items-center justify-center gap-x-2 rounded-xl py-3">
-              <View className="h-8 w-8 flex-row items-center justify-center rounded-full bg-primary-200">
-                <Icon.Trophy size={14} weight="fill" color="black" />
-              </View>
-              <Text className="text-gray-700">{pointText(activity.challengePoints, false)}</Text>
-            </View>
+            ))}
           </View>
         </View>
       </View>

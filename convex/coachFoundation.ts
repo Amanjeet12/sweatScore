@@ -1,7 +1,16 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
-import { mutation, internalMutation, query, MutationCtx, QueryCtx } from './_generated/server';
+
+import { internal } from './_generated/api';
 import { Doc, Id } from './_generated/dataModel';
+import { mutation, internalMutation, query, MutationCtx, QueryCtx } from './_generated/server';
+import { validateDailyPlanOutput } from './coachDailyPolicy';
+import {
+  validateDailyPlanOutputV2,
+  workoutRecommendationV2,
+  stepsRecommendationV2,
+} from './coachDailyPolicyV2';
+import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
 import {
   dailyAnswers,
   profileAnswers,
@@ -13,6 +22,7 @@ import {
   detail,
   toneScope,
 } from './coachFoundationValidators';
+import { bodySelections, isUnanswered, type BodyAnswer } from '../shared/coachBodyFeeling';
 import {
   assertDay,
   assertRequestKey,
@@ -21,14 +31,6 @@ import {
   DEFAULT_COACH_TONE,
 } from '../shared/coachFoundation';
 import { addDaysToDateKey, formatDateInTZ } from './utils/timezone';
-import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
-import { validateDailyPlanOutput } from './coachDailyPolicy';
-import {
-  validateDailyPlanOutputV2,
-  workoutRecommendationV2,
-  stepsRecommendationV2,
-} from './coachDailyPolicyV2';
-import { internal } from './_generated/api';
 
 const profileDraftFields = {
   weight: v.optional(weightAnswer),
@@ -115,8 +117,15 @@ function completeProfile(draft: Doc<'coachOnboardingV1'>['profileDraft']) {
     biggestChallenge: draft.biggestChallenge,
   };
 }
+function validatedBody(answer: BodyAnswer) {
+  const selected = bodySelections(answer);
+  if (selected.includes('fine') && selected.length > 1)
+    throw new ConvexError('Fine cannot be combined with soreness or pain');
+  // Preserve legacy scalar answers; store every selection for new submissions.
+  return typeof answer === 'string' ? answer : selected;
+}
 function completeDaily(draft: Doc<'coachOnboardingV1'>['dailyDraft']) {
-  if (!draft?.sleep || !draft.energy || !draft.mood || !draft.upFor || !draft.body) {
+  if (!draft?.sleep || !draft.energy || !draft.mood || !draft.upFor || isUnanswered(draft.body)) {
     throw new ConvexError('Five daily answers required');
   }
   return {
@@ -124,8 +133,22 @@ function completeDaily(draft: Doc<'coachOnboardingV1'>['dailyDraft']) {
     energy: draft.energy,
     mood: draft.mood,
     upFor: draft.upFor,
-    body: draft.body,
+    body: validatedBody(draft.body!),
   };
+}
+
+function sameDailyAnswers(
+  left: Doc<'coachDailyAnswersV1'>['answers'],
+  right: Doc<'coachDailyAnswersV1'>['answers']
+) {
+  return (
+    left.sleep === right.sleep &&
+    left.energy === right.energy &&
+    left.mood === right.mood &&
+    left.upFor === right.upFor &&
+    JSON.stringify(bodySelections(left.body).sort()) ===
+      JSON.stringify(bodySelections(right.body).sort())
+  );
 }
 
 async function planSnapshot(
@@ -381,6 +404,7 @@ export const saveMyTodayReanswerDraftForTesting = mutation({
     const fields = Object.fromEntries(
       Object.entries(args).filter(([, value]) => value !== undefined)
     );
+    if (args.body !== undefined) fields.body = validatedBody(args.body);
     await ctx.db.patch(state._id, {
       testReanswerDraft: { ...state.testReanswerDraft, ...fields },
       updatedAt: Date.now(),
@@ -425,7 +449,7 @@ export const finishMyTodayReanswerForTesting = mutation({
     const previousAnswers = await ctx.db
       .get(previousPlan.requestId)
       .then((request) => (request ? ctx.db.get(request.dailyAnswerId) : null));
-    if (previousAnswers && JSON.stringify(previousAnswers.answers) === JSON.stringify(answers))
+    if (previousAnswers && sameDailyAnswers(previousAnswers.answers, answers))
       throw new ConvexError('Change at least one answer to prepare a new plan');
     const profile = await ctx.db.get(state.profileRevisionId);
     if (!profile || profile.userId !== userId) throw new ConvexError('Coach profile missing');
@@ -730,6 +754,7 @@ export const saveDailyDraft = mutation({
       Object.entries(args).filter(([, value]) => value !== undefined)
     );
     const draft = state.dailyDraftDay === day ? state.dailyDraft : undefined;
+    if (args.body !== undefined) fields.body = validatedBody(args.body);
     await ctx.db.patch(state._id, {
       dailyDraft: { ...draft, ...fields },
       dailyDraftDay: day,
@@ -761,7 +786,7 @@ export const finishDailyAnswers = mutation({
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
       .order('desc')
       .first();
-    if (latest && JSON.stringify(latest.answers) === JSON.stringify(answers)) {
+    if (latest && sameDailyAnswers(latest.answers, answers)) {
       await ctx.db.patch(state._id, { dailyAnswerId: latest._id, updatedAt: Date.now() });
       return latest._id;
     }
@@ -812,7 +837,7 @@ export const finishDailyAndReserveFirst = mutation({
       .first();
     const now = Date.now();
     const dailyAnswerId =
-      latest && JSON.stringify(latest.answers) === JSON.stringify(answers)
+      latest && sameDailyAnswers(latest.answers, answers)
         ? latest._id
         : await ctx.db.insert('coachDailyAnswersV1', {
             userId,

@@ -837,30 +837,6 @@ function PostRow({
             ) : null}
           </View>
         </View>
-
-        {post.challengeId && post.challenge?.isCheckIn === false ? (
-          <View className="-mx-4 border-t border-[#F2EDE9] px-4 pt-2">
-            <TouchableOpacity
-              className="min-h-9 flex-row items-center justify-end gap-x-1"
-              onPress={() => {
-                const redirectTo = `/challenge-view/${post.challengeId}`;
-                if (!requireSubscription({ redirectTo, source: 'feed_do_this' })) return;
-
-                router.push({
-                  pathname: '/challenge-view/[challengeId]' as any,
-                  params: { challengeId: post.challengeId },
-                });
-              }}>
-              <Text
-                style={{ fontFamily: 'Inter_600SemiBold' }}
-                className="text-[11px] text-primary-500">
-                Do This
-              </Text>
-
-              <Icon.CaretRight size={16} weight="bold" color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-        ) : null}
       </View>
 
       {/* Reaction Picker Modal */}

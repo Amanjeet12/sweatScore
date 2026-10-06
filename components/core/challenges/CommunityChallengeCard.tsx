@@ -20,14 +20,13 @@ export default function CommunityChallengeCard({
       : challenge.nextAvailableAt
         ? `Available in ${Math.max(1, Math.ceil((challenge.nextAvailableAt - Date.now()) / 3600000))}h`
         : 'Available tomorrow';
-  const statusLabel = challenge.isJoined
-    ? `${challenge.completedDays} of ${challenge.durationDays} completed`
-    : challenge.status === 'upcoming'
-      ? challenge.daysUntilStart === 1
-        ? 'Starts tomorrow'
-        : `Starts in ${challenge.daysUntilStart} days`
+  const statusLabel =
+    challenge.status === 'upcoming'
+      ? `Starts in ${challenge.daysUntilStart} ${challenge.daysUntilStart === 1 ? 'day' : 'days'}`
       : challenge.status === 'ended'
-        ? 'Challenge ended'
+        ? challenge.isJoined
+          ? `${challenge.completedDays} of ${challenge.durationDays} completed`
+          : 'Challenge ended'
         : `Day ${Math.max(1, challenge.currentDay)}`;
 
   return (
@@ -81,7 +80,16 @@ export default function CommunityChallengeCard({
             </Text>
           </View>
           <Text
-            style={[type.caption, { fontFamily: 'Inter_500Medium', color: '#fff', flexShrink: 1 }]}>
+            style={[
+              type.caption,
+              {
+                fontFamily: 'Inter_500Medium',
+                color: '#fff',
+                flexShrink: 1,
+                marginLeft: 'auto',
+                textAlign: 'right',
+              },
+            ]}>
             {statusLabel}
           </Text>
         </View>

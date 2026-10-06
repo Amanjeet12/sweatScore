@@ -19,7 +19,6 @@ import { useToast } from '~/components/ui/toast';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { getErrorMessage } from '~/utils/error-message';
-import { BackgroundMusicTrackId, isBackgroundMusicTrackId } from '~/utils/backgroundMusic';
 import { getData, storeData } from '~/utils/storage';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
@@ -35,7 +34,7 @@ export interface ChallengeUploadJob {
   videoUri: string;
   mediaType: 'image' | 'video';
   checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
-  musicTrackId?: BackgroundMusicTrackId;
+
   mediaWidth?: number;
   mediaHeight?: number;
   mimeType: string;
@@ -57,7 +56,7 @@ interface EnqueueChallengeUploadInput {
   videoUri: string;
   mediaType?: 'image' | 'video';
   checkInSubmissionType?: 'live_video' | 'uploaded_video' | 'photo';
-  musicTrackId?: BackgroundMusicTrackId;
+
   mediaWidth?: number;
   mediaHeight?: number;
   mimeType?: string;
@@ -124,9 +123,6 @@ function normalizeStoredJobs(raw: unknown): ChallengeUploadJob[] {
           candidate.checkInSubmissionType === 'photo'
             ? candidate.checkInSubmissionType
             : undefined,
-        musicTrackId: isBackgroundMusicTrackId(candidate.musicTrackId)
-          ? candidate.musicTrackId
-          : undefined,
         mediaWidth:
           typeof candidate.mediaWidth === 'number' && candidate.mediaWidth > 0
             ? candidate.mediaWidth
@@ -428,7 +424,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
 
           mediaType: job.mediaType,
           checkInSubmissionType: job.checkInSubmissionType,
-          musicTrackId: job.musicTrackId,
+
           mediaWidth: job.mediaWidth,
           mediaHeight: job.mediaHeight,
 
@@ -573,7 +569,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
       videoUri,
       mediaType = 'video',
       checkInSubmissionType,
-      musicTrackId,
+
       mediaWidth,
       mediaHeight,
       mimeType = mediaType === 'image' ? 'image/jpeg' : 'video/mp4',
@@ -602,7 +598,7 @@ export function ChallengeUploadProvider({ children }: { children: ReactNode }) {
         videoUri,
         mediaType,
         checkInSubmissionType,
-        musicTrackId,
+
         mediaWidth,
         mediaHeight,
         mimeType,

@@ -1,6 +1,7 @@
 import { Check } from 'phosphor-react-native';
 import { TouchableOpacity, View } from 'react-native';
 
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
 import { PrototypeSheetControl } from '~/components/core/design/PrototypeControl';
 import {
   prototypeComponents as chrome,
@@ -16,8 +17,10 @@ export default function DailyQuestion({
   description,
   options,
   selected,
+  multiple = false,
   busy,
   onChoose,
+  onContinue,
   onBack,
   onClose,
 }: {
@@ -26,9 +29,11 @@ export default function DailyQuestion({
   title: string;
   description?: string;
   options: readonly (readonly [string, string])[];
-  selected?: string | null;
+  selected?: string | readonly string[] | null;
+  multiple?: boolean;
   busy: boolean;
   onChoose: (value: string) => void;
+  onContinue?: () => void;
   onBack?: () => void;
   onClose: () => void;
 }) {
@@ -70,12 +75,16 @@ export default function DailyQuestion({
       ) : null}
       <View className="mt-6 gap-3">
         {options.map(([value, label]) => {
-          const active = selected === value;
+          const active = Array.isArray(selected) ? selected.includes(value) : selected === value;
           return (
             <TouchableOpacity
               key={value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active, disabled: busy }}
+              accessibilityRole={multiple ? 'checkbox' : 'radio'}
+              accessibilityState={{
+                selected: active,
+                checked: multiple ? active : undefined,
+                disabled: busy,
+              }}
               disabled={busy}
               onPress={() => onChoose(value)}
               activeOpacity={0.8}
@@ -103,10 +112,13 @@ export default function DailyQuestion({
           );
         })}
       </View>
-      {busy ? (
-        <Text style={type.supporting} accessibilityLiveRegion="polite" className="mt-3">
-          Saving your answer…
-        </Text>
+      {multiple && onContinue ? (
+        <PrototypeButton
+          label="Get today’s plan"
+          onPress={onContinue}
+          disabled={busy || !selected || selected.length === 0}
+          style={{ marginTop: 24 }}
+        />
       ) : null}
     </View>
   );

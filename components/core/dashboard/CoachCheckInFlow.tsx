@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -47,6 +48,13 @@ import {
   randomCoachCheckInCaption,
 } from '~/shared/coachCheckInPresentation';
 import { CoachCategory } from '~/shared/coachFoundation';
+import {
+  createCheckInOperationGuard,
+  mealReportMatchesPhoto,
+  reconcileCapture,
+  shareMealWithFeedback,
+  type MealFeedbackInput,
+} from '~/shared/coachMealFlow';
 import { pointsLabel } from '~/shared/pointsLabel';
 import { getData, removeData, storeData } from '~/utils/storage';
 
@@ -65,6 +73,10 @@ type ProofQueue = {
     workoutReason: string;
     stepsReason: string;
   };
+  captureId?: string;
+  mealFeedback?: MealFeedbackInput & { draftId: Id<'coachMealDraftsV1'> };
+  shareWithoutAnalysis?: boolean;
+  postedMeal?: FunctionReturnType<typeof api.coachMeals.share>;
   uri?: string;
   storageId?: Id<'_storage'>;
   mediaType?: 'image' | 'video';
@@ -112,6 +124,10 @@ export default function CoachCheckInFlow({
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const insets = useSafeAreaInsets();
   const camera = useRef<CameraView>(null);
+  const operations = useRef(createCheckInOperationGuard()).current;
+  const queueRef = useRef<ProofQueue | null>(null);
+  useEffect(() => () => operations.invalidate(), [operations]);
+  const submitMealFeedback = useMutation(api.coachMeals.submitReportFeedback);
   const [queue, setQueue] = useState<ProofQueue | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -166,21 +182,46 @@ export default function CoachCheckInFlow({
   useEffect(() => {
     onExpandedChange?.(showCamera);
   }, [showCamera, onExpandedChange]);
-  const meal = useQuery(
+  const rawMeal = useQuery(
     api.coachMeals.myDraft,
     category === 'meals' && queue?.submissionId
       ? { submissionId: queue.submissionId, refresh: mealRefresh }
       : 'skip'
   );
+  const matchingMealPhoto = mealReportMatchesPhoto(queue?.storageId, rawMeal);
+  // Daily allowance/counts remain available before upload; only the report is photo-bound.
+  const meal = rawMeal
+    ? {
+        ...rawMeal,
+        draft: matchingMealPhoto ? rawMeal.draft : null,
+        canRetryAnalysis: matchingMealPhoto && rawMeal.canRetryAnalysis,
+      }
+    : undefined;
   useEffect(() => {
     if (meal?.draft?.status !== 'analyzing') return;
     const timer = setInterval(() => setMealRefresh((value) => value + 1), 15_000);
     return () => clearInterval(timer);
   }, [meal?.draft?.status]);
-  const proofImage = useQuery(
-    api.coachCheckIns.myProofImage,
-    mode === 'post' && queue?.storageId ? { submissionId: queue.submissionId } : 'skip'
-  );
+  const [remotePreview, setRemotePreview] = useState<{
+    storageId: string;
+    uri: string | null;
+  } | null>(null);
+  useEffect(() => {
+    if (mode !== 'post' || !queue?.storageId) return;
+    const storageId = queue.storageId;
+    let cancelled = false;
+    convex
+      .query(api.coachCheckIns.myProofImage, { submissionId: queue.submissionId })
+      .then((uri) => {
+        if (!cancelled && queueRef.current?.storageId === storageId)
+          setRemotePreview({ storageId, uri });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, queue?.submissionId, queue?.storageId, convex, operations]);
+  const proofImage = queue?.storageId === remotePreview?.storageId ? remotePreview?.uri : null;
   useEffect(() => {
     if (meal?.draft?.caption && !caption) setCaption(meal.draft.caption);
   }, [meal?.draft?._id]);
@@ -206,17 +247,24 @@ export default function CoachCheckInFlow({
       saved.category !== category
     )
       return;
+    const token = operations.snapshot();
+    let cancelled = false;
     convex
       .query(api.coachCheckIns.mySubmission, { submissionId: saved.submissionId })
       .then((server) => {
+        if (cancelled || !operations.isCurrent(token)) return;
+        const pendingFeedback =
+          category === 'meals' &&
+          saved.shareWithoutAnalysis !== true &&
+          saved.mealFeedback?.helpful !== undefined;
         if (
           server.assignmentId === saved.assignmentId &&
           server.planRevisionId === saved.planRevisionId &&
           server.recommendation === saved.recommendation &&
-          server.state !== 'completed' &&
+          (server.state !== 'completed' || pendingFeedback) &&
           server.state !== 'reversed'
         ) {
-          const recovered = server.storageId ? { ...saved, storageId: server.storageId } : saved;
+          const recovered = reconcileCapture(saved, server.storageId);
           const recoveredCaption =
             recovered.caption ??
             server.caption ??
@@ -224,6 +272,7 @@ export default function CoachCheckInFlow({
               ? 'Plate full of goodness ✌️'
               : randomCoachCheckInCaption(category));
           const nextRecovered = { ...recovered, caption: recoveredCaption };
+          queueRef.current = nextRecovered;
           setQueue(nextRecovered);
           setCaption(recoveredCaption);
           storeData(queueKey, nextRecovered);
@@ -232,9 +281,13 @@ export default function CoachCheckInFlow({
       .catch(() => {
         // A temporary entitlement or network failure must not erase pinned local proof.
       });
-  }, [category, convex, currentUser?._id, queueKey, today?.day]);
+    return () => {
+      cancelled = true;
+    };
+  }, [category, convex, currentUser?._id, queueKey, today?.day, operations]);
 
   const persist = (next: ProofQueue) => {
+    queueRef.current = next;
     setQueue(next);
     if (queueKey) storeData(queueKey, next);
   };
@@ -260,6 +313,8 @@ export default function CoachCheckInFlow({
   const closeSheet = () => {
     if (closing.current) return;
     closing.current = true;
+    operations.invalidate();
+    photoCaptureActive.current = false;
     countdownActive.current = false;
     setCountdown(null);
     // A reserved slot is intentionally reused on reopening. Cancelling it here
@@ -272,6 +327,9 @@ export default function CoachCheckInFlow({
 
   const start = async (mediaType: 'image' | 'video' = 'image') => {
     if (!currentUser || !today || !category || !queueKey) return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     setBusy(true);
     setError('');
     try {
@@ -302,6 +360,7 @@ export default function CoachCheckInFlow({
         requestKey: Crypto.randomUUID().replaceAll('-', ''),
       });
       const server = await convex.query(api.coachCheckIns.mySubmission, { submissionId: id });
+      if (!operations.isCurrent(operation)) return;
       persist({
         userId: currentUser._id,
         day: server.day,
@@ -319,9 +378,13 @@ export default function CoachCheckInFlow({
       setCameraReady(false);
       setShowCamera(true);
     } catch {
+      if (!operations.isCurrent(operation)) return;
       setError('Could not start check-in. Please try again.');
     } finally {
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        setBusy(false);
+      }
     }
   };
 
@@ -334,6 +397,9 @@ export default function CoachCheckInFlow({
       !FileSystem.documentDirectory
     )
       return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     // The native photo output validates readiness even if iOS loses onCameraReady.
     photoCaptureActive.current = true;
     setBusy(true);
@@ -343,24 +409,42 @@ export default function CoachCheckInFlow({
       if (!photo?.uri) throw new Error('Camera did not return a photo');
       const capturedFile = await FileSystem.getInfoAsync(photo.uri);
       if (!capturedFile.exists || !capturedFile.size) throw new Error('Empty camera photo');
-      const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}.jpg`;
+      const captureId = Crypto.randomUUID().replaceAll('-', '');
+      const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}-${captureId}.jpg`;
       await FileSystem.deleteAsync(uri, { idempotent: true });
       await FileSystem.copyAsync({ from: photo.uri, to: uri });
+      if (!operations.isCurrent(operation)) {
+        await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        return;
+      }
       const nextCaption = caption.trim()
         ? caption
         : category === 'meals'
           ? 'Plate full of goodness ✌️'
           : randomCoachCheckInCaption(category);
       setCaption(nextCaption);
-      persist({ ...queue, uri, caption: nextCaption });
+      persist({
+        ...queue,
+        captureId,
+        uri,
+        storageId: undefined,
+        mealFeedback: undefined,
+        postedMeal: undefined,
+        shareWithoutAnalysis: undefined,
+        caption: nextCaption,
+      });
       setPhotoPreviewError(false);
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
     } catch {
+      if (!operations.isCurrent(operation)) return;
       setError('Could not save the photo. Please try again.');
     } finally {
-      photoCaptureActive.current = false;
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        photoCaptureActive.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -373,29 +457,43 @@ export default function CoachCheckInFlow({
       recordingActive.current
     )
       return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     recordingActive.current = true;
     recordingStarted.current = Date.now();
     setElapsed(0);
     setRecording(true);
     setError('');
     try {
-      const video = await camera.current.recordAsync({ maxDuration: 60, maxFileSize: 19_000_000 });
+      const video = await camera.current.recordAsync({
+        maxDuration: 60,
+        maxFileSize: 19_000_000,
+        // iOS applies videoBitrate only when an explicit codec is selected.
+        ...(Platform.OS === 'ios' ? { codec: 'h264' as const } : {}),
+      });
       if (!video?.uri) return;
       const extension = video.uri.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-      const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}.${extension}`;
+      const captureId = Crypto.randomUUID().replaceAll('-', '');
+      const uri = `${FileSystem.documentDirectory}coach-proof-${queue.submissionId}-${captureId}.${extension}`;
       await FileSystem.deleteAsync(uri, { idempotent: true });
       await FileSystem.copyAsync({ from: video.uri, to: uri });
+      if (!operations.isCurrent(operation)) return;
       const nextCaption = caption.trim() ? caption : randomCoachCheckInCaption(category);
       setCaption(nextCaption);
-      persist({ ...queue, uri, caption: nextCaption, mediaType: 'video' });
+      persist({ ...queue, captureId, uri, caption: nextCaption, mediaType: 'video' });
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
     } catch {
+      if (!operations.isCurrent(operation)) return;
       setError('Could not save the video. Please try again.');
     } finally {
-      recordingActive.current = false;
-      setRecording(false);
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        recordingActive.current = false;
+        setRecording(false);
+        setBusy(false);
+      }
     }
   };
 
@@ -420,10 +518,8 @@ export default function CoachCheckInFlow({
     setCountdown(5);
   };
 
-  const upload = async (): Promise<Id<'_storage'> | null> => {
+  const upload = async (operation: number): Promise<Id<'_storage'> | null> => {
     if (!queue?.uri) return null;
-    setBusy(true);
-    setError('');
     try {
       if (!authToken) throw new Error('Sign in again before uploading proof.');
       const siteUrl = process.env.EXPO_PUBLIC_CONVEX_URL?.replace('.convex.cloud', '.convex.site');
@@ -432,6 +528,7 @@ export default function CoachCheckInFlow({
         submissionId: queue.submissionId,
         mediaType: queue.mediaType ?? 'image',
       });
+      if (!operations.isCurrent(operation)) return null;
       const task = FileSystem.createUploadTask(`${siteUrl}/api/coach-proof-upload`, queue.uri, {
         httpMethod: 'POST',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -452,15 +549,18 @@ export default function CoachCheckInFlow({
         throw new Error('Photo upload failed. Retry when connected.');
       const storageId = JSON.parse(result.body).storageId as Id<'_storage'> | undefined;
       if (!storageId) throw new Error('Photo upload did not return media identity.');
-      persist({ ...queue, storageId });
+      if (!operations.isCurrent(operation)) return null;
+      persist({ ...(queueRef.current ?? queue), storageId });
       return storageId;
     } catch {
+      if (!operations.isCurrent(operation)) return null;
       try {
         const saved = await convex.query(api.coachCheckIns.mySubmission, {
           submissionId: queue.submissionId,
         });
+        if (!operations.isCurrent(operation)) return null;
         if (saved.state === 'uploaded' && saved.storageId) {
-          persist({ ...queue, storageId: saved.storageId });
+          persist({ ...(queueRef.current ?? queue), storageId: saved.storageId });
           return saved.storageId;
         }
       } catch {
@@ -468,18 +568,19 @@ export default function CoachCheckInFlow({
       }
       setError('Upload failed. Your photo is saved for retry.');
       return null;
-    } finally {
-      setBusy(false);
     }
   };
 
   const publishProof = async () => {
     if (!queue || category === 'meals') return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     setBusy(true);
     setError('');
     try {
       await saveProofCaption({ submissionId: queue.submissionId, caption });
-      const storageId = queue.storageId ?? (await upload());
+      const storageId = queue.storageId ?? (await upload(operation));
       if (!storageId) return;
       const result = await complete({ submissionId: queue.submissionId, caption });
       if (queueKey) removeData(queueKey);
@@ -487,24 +588,33 @@ export default function CoachCheckInFlow({
       setQueue(null);
       showPostedSuccess(result.pointsEarned, result.milestones);
     } catch {
+      if (!operations.isCurrent(operation)) return;
       setError('Could not post. Your photo is saved for retry.');
     } finally {
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        setBusy(false);
+      }
     }
   };
 
   const scanMeal = async () => {
     if (!queue) return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     setBusy(true);
     setError('');
     try {
-      const storageId = queue.storageId ?? (await upload());
-      if (!storageId) return;
+      const storageId = queue.storageId ?? (await upload(operation));
+      if (!storageId || !operations.isCurrent(operation)) return;
       const draftId = await saveMealCaption({ submissionId: queue.submissionId, caption });
+      if (!operations.isCurrent(operation)) return;
       const result = await analyzeMeal({
         draftId,
         requestKey: Crypto.randomUUID().replaceAll('-', ''),
       });
+      if (!operations.isCurrent(operation)) return;
       if (result.status === 'failed')
         setError(
           result.errorCode === 'provider_timeout'
@@ -516,6 +626,7 @@ export default function CoachCheckInFlow({
                 : 'Meal analysis is temporarily unavailable. Retry when connected; no successful scan was used.'
         );
     } catch (cause) {
+      if (!operations.isCurrent(operation)) return;
       const message = cause instanceof Error ? cause.message : '';
       if (message.includes('Three successful meal scans')) {
         setError(
@@ -528,33 +639,96 @@ export default function CoachCheckInFlow({
         setError('We could not start the portion check. Your photo is safe—please try again.');
       }
     } finally {
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        setBusy(false);
+      }
     }
   };
 
   const publishMeal = async (skipAnalysis = false) => {
-    if (!queue) return;
+    if (!queue || closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     setBusy(true);
     setError('');
     try {
-      const storageId = queue.storageId ?? (await upload());
-      if (!storageId) return;
+      const storageId = queue.storageId ?? (await upload(operation));
+      if (!storageId || !operations.isCurrent(operation)) return;
       const draftId =
         meal?.draft?._id ?? (await saveMealCaption({ submissionId: queue.submissionId, caption }));
-      const result = await shareMeal({ draftId, caption, skipAnalysis: skipAnalysis || undefined });
+      if (!operations.isCurrent(operation)) return;
+      const feedback =
+        !skipAnalysis && queueRef.current?.mealFeedback?.draftId === draftId
+          ? queueRef.current.mealFeedback
+          : undefined;
+      // A lost share response may be confirmed by the live owner-bound draft.
+      const postedMeal =
+        queue.postedMeal ??
+        (meal?.draft?.status === 'shared' && meal.draft.postId && meal.draft.activityId
+          ? {
+              postId: meal.draft.postId,
+              activityId: meal.draft.activityId,
+              pointsEarned: coachCheckInPoints('meals'),
+              milestones: [],
+            }
+          : undefined);
+      persist({ ...(queueRef.current ?? queue), shareWithoutAnalysis: skipAnalysis });
+      const result = await shareMealWithFeedback({
+        posted: postedMeal,
+        share: () =>
+          shareMeal({
+            draftId,
+            caption: queueRef.current?.caption ?? caption,
+            skipAnalysis: skipAnalysis || undefined,
+          }),
+        onPosted: (postedMeal) => {
+          if (operations.isCurrent(operation))
+            persist({ ...(queueRef.current ?? queue), postedMeal });
+        },
+        feedback,
+        submitFeedback: async (value) => {
+          if (!operations.isCurrent(operation)) throw new Error('Meal screen closed');
+          const latest = await convex.query(api.coachMeals.myDraft, {
+            submissionId: queue.submissionId,
+          });
+          if (!operations.isCurrent(operation)) throw new Error('Meal screen closed');
+          if (latest.draft?._id !== draftId || latest.draft.storageId !== storageId)
+            throw new Error('Meal report changed');
+          if (
+            latest.draft.memberHelpful === value.helpful &&
+            (latest.draft.memberCorrection ?? '') === value.correction.trim()
+          )
+            return;
+          await submitMealFeedback({ draftId, ...value });
+        },
+      });
+      if (!operations.isCurrent(operation)) return;
       if (queueKey) removeData(queueKey);
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
+      queueRef.current = null;
       setQueue(null);
       showPostedSuccess(result.pointsEarned, result.milestones);
     } catch {
-      setError('Could not share. Your photo and caption are saved.');
+      if (!operations.isCurrent(operation)) return;
+      setError(
+        queueRef.current?.postedMeal
+          ? 'Your meal is shared. Private feedback could not be saved. Tap Share meal to retry only your feedback.'
+          : 'Could not share. Your photo, caption and private feedback are saved for retry.'
+      );
     } finally {
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        setBusy(false);
+      }
     }
   };
 
   const retakePhoto = async () => {
-    if (!queue) return;
+    if (!queue || queue.postedMeal || meal?.draft?.status === 'shared') return;
+    if (closing.current) return;
+    const operation = operations.begin();
+    if (operation === null) return;
     setBusy(true);
     setError('');
     try {
@@ -562,16 +736,30 @@ export default function CoachCheckInFlow({
         if (category === 'meals') await retakeMeal({ submissionId: queue.submissionId });
         else await retakeProof({ submissionId: queue.submissionId });
       }
+      if (!operations.isCurrent(operation)) return;
+      persist({
+        ...queue,
+        storageId: undefined,
+        uri: undefined,
+        captureId: undefined,
+        mealFeedback: undefined,
+        postedMeal: undefined,
+        shareWithoutAnalysis: undefined,
+      });
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
-      persist({ ...queue, storageId: undefined, uri: undefined });
+      if (!operations.isCurrent(operation)) return;
       setCameraMode(queue.mediaType === 'video' ? 'video' : 'picture');
       setCameraReady(false);
       setPhotoPreviewError(false);
       setShowCamera(true);
     } catch {
+      if (!operations.isCurrent(operation)) return;
       setError('Could not retake the photo. Please try again.');
     } finally {
-      setBusy(false);
+      if (operations.isCurrent(operation)) {
+        operations.end(operation);
+        setBusy(false);
+      }
     }
   };
 
@@ -591,9 +779,13 @@ export default function CoachCheckInFlow({
         setShowCamera(true);
       };
     } else if (category === 'meals') {
-      if (meal?.draft?.status === 'ready' && meal.draft.verdict) {
+      if (
+        meal?.draft?.status === 'shared' ||
+        (meal?.draft?.status === 'ready' && meal.draft.verdict)
+      ) {
         primaryLabel = 'Share meal';
-        primaryAction = () => publishMeal(false);
+        primaryAction = () =>
+          publishMeal(meal?.draft?.status === 'shared' && queue.shareWithoutAnalysis === true);
       } else if (mealAnalysisLimitReached) {
         showPrimaryAction = false;
       } else if (!queue.storageId && queue.uri) {
@@ -650,7 +842,7 @@ export default function CoachCheckInFlow({
         ? 'Snap a picture of your smartwatch showing you met your steps target.'
         : category === 'sleep'
           ? 'Snap a picture of your smartwatch showing you met your sleep target.'
-          : 'Snap a picture of your meals to check in and get a private portion check using AI.';
+          : 'Snap a picture of your meals to get a private analysis using AI.';
   return (
     <View
       style={{
@@ -694,6 +886,7 @@ export default function CoachCheckInFlow({
               mode={cameraMode}
               mute={audioMuted}
               animateShutter={false}
+              videoQuality="720p"
               videoBitrate={2_000_000}
             />
           </View>
@@ -794,15 +987,16 @@ export default function CoachCheckInFlow({
                     </Text>
                   </View>
                   <TextInput
+                    editable={!busy && !queue.postedMeal && meal?.draft?.status !== 'shared'}
                     value={caption}
                     onChangeText={(value) => {
                       setCaption(value);
-                      persist({ ...queue, caption: value });
+                      persist({ ...(queueRef.current ?? queue), caption: value });
                     }}
                     onEndEditing={() => {
                       const save =
                         category === 'meals'
-                          ? queue.storageId
+                          ? queue.storageId && !queue.postedMeal && meal?.draft?.status !== 'shared'
                             ? saveMealCaption({ submissionId: queue.submissionId, caption })
                             : Promise.resolve()
                           : saveProofCaption({ submissionId: queue.submissionId, caption });
@@ -821,6 +1015,7 @@ export default function CoachCheckInFlow({
                         <CheckInVideoPreview uri={(queue.uri ?? proofImage)!} />
                       ) : (
                         <Image
+                          key={queue.captureId ?? queue.uri ?? queue.storageId}
                           source={{ uri: queue.uri ?? proofImage ?? undefined }}
                           style={{
                             width: '100%',
@@ -829,8 +1024,20 @@ export default function CoachCheckInFlow({
                             backgroundColor: colors.secondary,
                           }}
                           resizeMode="cover"
-                          onLoad={() => setPhotoPreviewError(false)}
-                          onError={() => setPhotoPreviewError(true)}
+                          onLoad={() => {
+                            if (
+                              queueRef.current?.uri === queue.uri &&
+                              queueRef.current?.storageId === queue.storageId
+                            )
+                              setPhotoPreviewError(false);
+                          }}
+                          onError={() => {
+                            if (
+                              queueRef.current?.uri === queue.uri &&
+                              queueRef.current?.storageId === queue.storageId
+                            )
+                              setPhotoPreviewError(true);
+                          }}
                         />
                       )}
                       {photoPreviewError && queue.mediaType !== 'video' ? (
@@ -857,7 +1064,9 @@ export default function CoachCheckInFlow({
                             ? 'Remove video and retake'
                             : 'Remove photo and retake'
                         }
-                        disabled={busy}
+                        disabled={
+                          busy || Boolean(queue.postedMeal) || meal?.draft?.status === 'shared'
+                        }
                         onPress={retakePhoto}
                         style={{
                           position: 'absolute',
@@ -901,7 +1110,8 @@ export default function CoachCheckInFlow({
                   {category === 'meals' ? (
                     <View style={{ marginTop: 26 }}>
                       {busy || meal?.draft?.status === 'analyzing' ? <MealAnalysisLoading /> : null}
-                      {meal?.draft?.status === 'ready' && meal.draft.verdict ? (
+                      {(meal?.draft?.status === 'ready' || meal?.draft?.status === 'shared') &&
+                      meal.draft.verdict ? (
                         <View>
                           <View
                             style={{
@@ -919,13 +1129,31 @@ export default function CoachCheckInFlow({
                             </View>
                           </View>
                           <Text style={[type.caption, { color: colors.subtle, marginTop: 2 }]}>
-                            {meal.scanCount ?? 0} of 3 checked · Based only on food visible in this
-                            photo
+                            {meal.scanCount ?? 0} of 3 checked
                           </Text>
                           <Text style={[type.explanation, { marginTop: 14 }]}>
                             {meal.draft.feedback}
                           </Text>
-                          <MealReportFeedback key={meal.draft._id} draft={meal.draft} />
+                          <MealReportFeedback
+                            key={meal.draft._id}
+                            draft={meal.draft}
+                            busy={busy}
+                            value={
+                              queue.mealFeedback?.draftId === meal.draft._id
+                                ? queue.mealFeedback
+                                : {
+                                    helpful: meal.draft.memberHelpful,
+                                    correction: meal.draft.memberCorrection ?? '',
+                                  }
+                            }
+                            onChange={(value) => {
+                              if (queueRef.current?.storageId !== meal.draft?.storageId) return;
+                              persist({
+                                ...(queueRef.current ?? queue),
+                                mealFeedback: { draftId: meal.draft!._id, ...value },
+                              });
+                            }}
+                          />
                         </View>
                       ) : meal?.draft?.status === 'ready' ? (
                         <View style={{ gap: 8 }}>
@@ -1060,10 +1288,11 @@ export default function CoachCheckInFlow({
                     label={primaryLabel}
                     loading={busy}
                     disabled={
-                      mode === 'post' &&
-                      (!queue ||
-                        today.status === 'locked' ||
-                        (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis))
+                      busy ||
+                      (mode === 'post' &&
+                        (!queue ||
+                          today.status === 'locked' ||
+                          (meal?.draft?.status === 'analyzing' && !meal.canRetryAnalysis)))
                     }
                     onPress={primaryAction}
                   />
@@ -1072,7 +1301,9 @@ export default function CoachCheckInFlow({
                   <PrototypeButton
                     label="Share without AI analysis"
                     secondary
-                    disabled={busy}
+                    disabled={
+                      busy || Boolean(queue?.postedMeal) || meal?.draft?.status === 'shared'
+                    }
                     onPress={() => publishMeal(true)}
                   />
                 ) : null}

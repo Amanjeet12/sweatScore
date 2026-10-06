@@ -46,16 +46,6 @@ type MergeVideosPayload = {
   triggerSecret: string;
 };
 
-const FINAL_MUSIC_VOLUME = 0.65;
-
-const SERVER_MUSIC_TRACKS = {
-  audio_1: 'audio1.mp3',
-  audio_2: 'audio2.mp3',
-  audio_3: 'audio3.mp3',
-  audio_4: 'audio4.mp3',
-  audio_5: 'audio5.mp3',
-} as const;
-
 /**
  * Trigger.dev runs local tasks from a generated `.trigger/tmp/build-*`
  * directory, while deployed `additionalFiles` live under the task cwd.
@@ -80,18 +70,6 @@ function resolveBundledAsset(...relativeSegments: string[]): string {
   }
 
   throw new Error(`Bundled asset was not found. Checked: ${attemptedPaths.join(', ')}`);
-}
-
-function resolveMusicFile(trackId: keyof typeof SERVER_MUSIC_TRACKS): string {
-  try {
-    return resolveBundledAsset('assets', 'audio', SERVER_MUSIC_TRACKS[trackId]);
-  } catch (error) {
-    throw new Error(
-      `Background music asset was not found for ${trackId}. ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
 }
 
 /**
@@ -219,7 +197,7 @@ async function downloadFile(
 
 /**
  * Read the video duration so every FFmpeg output has a finite upper bound.
- * This is especially important when a background-music input is looped.
+ * This bounds the output to the existing video-duration policy.
  */
 async function getVideoDuration(filePath: string, description: string): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
@@ -354,31 +332,18 @@ export const mergeVideosTask = task({
        * Each side is 540 × 960.
        * Final video is 1080 × 960.
        */
-      const musicFile = payload.musicTrackId ? resolveMusicFile(payload.musicTrackId) : undefined;
+      // Ignore legacy music metadata; retain only the current recording audio.
 
       await new Promise<void>((resolve, reject) => {
         const command = ffmpeg();
         if (!payload.checkInMusicOnly) command.input(adminVideoPath);
         command.input(userVideoPath);
-        if (musicFile) command.input(musicFile).inputOptions(['-stream_loop', '-1']);
 
-        if (payload.checkInMusicOnly) {
-          if (musicFile) {
-            command.complexFilter([
-              `[1:a]atrim=duration=${outputDurationArg},asetpts=PTS-STARTPTS,volume=${FINAL_MUSIC_VOLUME}[music]`,
-            ]);
-          }
-        } else {
-          const musicInputIndex = 2;
+        if (!payload.checkInMusicOnly) {
           command.complexFilter([
             `[0:v]${leftVideoFilter}[left]`,
             `[1:v]${rightVideoFilter}[right]`,
             '[left][right]hstack=inputs=2:shortest=1[v]',
-            ...(musicFile
-              ? [
-                  `[${musicInputIndex}:a]atrim=duration=${outputDurationArg},asetpts=PTS-STARTPTS,volume=${FINAL_MUSIC_VOLUME}[music]`,
-                ]
-              : []),
           ]);
         }
 
@@ -389,11 +354,11 @@ export const mergeVideosTask = task({
             payload.checkInMusicOnly ? '0:v' : '[v]',
 
             /**
-             * Keep audio from the left video when present.
+             * Keep audio from the user's latest recording when present.
              * The question mark makes the audio stream optional.
              */
             '-map',
-            musicFile ? '[music]' : payload.checkInMusicOnly ? '0:a?' : '0:a?',
+            payload.checkInMusicOnly ? '0:a?' : '1:a?',
 
             '-c:v',
             'libx264',
@@ -416,7 +381,7 @@ export const mergeVideosTask = task({
             '-movflags',
             '+faststart',
 
-            // Do not let an infinitely-looped music input keep the task alive.
+            // Keep the existing output duration bound.
             '-t',
             outputDurationArg,
 
