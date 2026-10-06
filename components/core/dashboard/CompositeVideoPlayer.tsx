@@ -1,7 +1,6 @@
-import { useFocusEffect } from 'expo-router';
 import { VideoPlayer, useVideoPlayer, VideoView } from 'expo-video';
 import { Play } from 'phosphor-react-native';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Dimensions, Pressable, Text, View } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -42,16 +41,6 @@ export default function CompositeVideoPlayer({
     player.loop = false;
     player.volume = 1;
   });
-
-  useFocusEffect(
-    useCallback(
-      () => () => {
-        leftPlayer.pause();
-        rightPlayer.pause();
-      },
-      [leftPlayer, rightPlayer]
-    )
-  );
 
   const halfWidth = SCREEN_WIDTH / 2;
   const height = SCREEN_WIDTH * aspectRatio;

@@ -86,6 +86,7 @@ export default function TodayScreen() {
   const ensureStandaloneAssignments = useMutation(api.coachCheckIns.ensureStandaloneAssignments);
   const checkIns = useQuery(api.coachCheckIns.myToday, accepted ? { refresh: dayRefresh } : 'skip');
   const banner = useQuery(api.coachToday.myBanner, accepted ? { refresh: dayRefresh } : 'skip');
+  const bannerImageUrl = useQuery(api.coachToday.bannerImage, accepted ? {} : 'skip');
   const avatarMembers = bannerAvatarMembers(banner);
   const progress = useQuery(
     api.progressPhotos.getDashboard,
@@ -289,7 +290,7 @@ export default function TodayScreen() {
           className="mx-[22px] mb-10 overflow-hidden rounded-[22px] bg-[#3A3A40]"
           style={{ minHeight: 240 }}>
           <Image
-            source={require('~/assets/backgrounds/today-plan-gym.jpg')}
+            source={bannerImageUrl ? { uri: bannerImageUrl } : require('~/assets/backgrounds/today-plan-gym.jpg')}
             contentFit="cover"
             contentPosition={{ left: '50%', top: '40%' }}
             style={{ position: 'absolute', width: '100%', height: '100%' }}

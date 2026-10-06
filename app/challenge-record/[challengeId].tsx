@@ -1,4 +1,4 @@
-import { pointsLabel } from '~/shared/pointsLabel';
+import { useIsFocused } from '@react-navigation/native';
 import { useQuery } from 'convex/react';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
@@ -42,6 +42,7 @@ import { Textarea, TextareaInput } from '~/components/ui/textarea';
 import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
+import { pointsLabel } from '~/shared/pointsLabel';
 
 import { getErrorMessage } from '~/utils/error-message';
 import { ensureRuntimePermission } from '~/utils/runtimePermissions';
@@ -132,14 +133,6 @@ function SingleVideoPreview({ videoUrl }: { videoUrl: string }) {
     videoPlayer.loop = false;
     videoPlayer.volume = 1;
   });
-  useFocusEffect(
-    useCallback(
-      () => () => {
-        player.pause();
-      },
-      [player]
-    )
-  );
 
   return (
     <View
@@ -180,6 +173,7 @@ export default function DuetRecordingScreen() {
 
 function DuetRecordingContent() {
   useKeepAwake();
+  const isFocused = useIsFocused();
 
   const { challengeId, checkInMode } = useLocalSearchParams<{
     challengeId: string;
@@ -1711,7 +1705,8 @@ function DuetRecordingContent() {
             </View>
           </View>
 
-          {recordedVideoUri && (
+          {/* Unmount video previews on blur so useVideoPlayer releases them without a late pause call. */}
+          {recordedVideoUri && (selectedMediaType === 'image' || isFocused) && (
             <View className="mx-5 mt-5 overflow-hidden rounded-[24px] bg-black">
               {isCheckIn && selectedMediaType === 'image' ? (
                 <Image

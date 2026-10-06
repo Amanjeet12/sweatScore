@@ -108,6 +108,14 @@ export default function AdminView() {
             </View>
           </View>
         </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => router.push('/dashboard/settings/admin/today-banner' as any)}>
+          <View className="flex-row items-center gap-x-4">
+            <Ionicons size={25} name="image-outline" />
+            <Text className="font-lsBold text-2xl">Today Plan Banner</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Group chat temporarily disabled.
         <TouchableOpacity

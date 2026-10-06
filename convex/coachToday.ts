@@ -1,12 +1,48 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
-import { query } from './_generated/server';
+import { mutation, MutationCtx, query } from './_generated/server';
 import {
   formatDateInTZ,
   getDateStartTimestampInTimezone,
   addDaysToDateKey,
 } from './utils/timezone';
 import { Id } from './_generated/dataModel';
+
+async function requireAdmin(ctx: MutationCtx) {
+  const userId = await getAuthUserId(ctx);
+  const user = userId ? await ctx.db.get(userId) : null;
+  if (!user?.isAdmin) throw new ConvexError('Admin required');
+}
+
+export const bannerImage = query({
+  args: {},
+  handler: async (ctx) => {
+    const setting = await ctx.db.query('coachTodayBannerImage').first();
+    return setting ? await ctx.storage.getUrl(setting.image) : null;
+  },
+});
+
+export const generateBannerUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return ctx.storage.generateUploadUrl();
+  },
+});
+
+export const setBannerImage = mutation({
+  args: { image: v.union(v.id('_storage'), v.null()) },
+  handler: async (ctx, { image }) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.query('coachTodayBannerImage').first();
+    if (image && !(await ctx.storage.getMetadata(image))) {
+      throw new ConvexError('Uploaded image was not found');
+    }
+    if (existing && image) await ctx.db.patch(existing._id, { image });
+    else if (existing) await ctx.db.delete(existing._id);
+    else if (image) await ctx.db.insert('coachTodayBannerImage', { image });
+  },
+});
 
 // Banner statistics use completed records only. Members without photos use initials.
 export const myBanner = query({

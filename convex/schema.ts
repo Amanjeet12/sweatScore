@@ -168,6 +168,9 @@ const schema = defineSchema({
     title: v.optional(v.string()),
     targetPoints: v.optional(v.number()),
   }),
+  coachTodayBannerImage: defineTable({
+    image: v.id('_storage'),
+  }),
   posts: defineTable({
     userId: v.id('users'),
     createdAt: v.number(),

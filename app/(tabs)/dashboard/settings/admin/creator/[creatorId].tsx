@@ -14,13 +14,15 @@ import { Id } from '~/convex/_generated/dataModel';
 
 export default function AdminViewCreator() {
   const { creatorId } = useLocalSearchParams();
-  const creator = useQuery(api.admin.getCreator, {
-    creatorId: creatorId as Id<'creators'>,
-  });
+  const creator = useQuery(
+    api.admin.getCreator,
+    typeof creatorId === 'string' ? { creatorId: creatorId as Id<'creators'> } : 'skip'
+  );
 
-  const creatorVideos = useQuery(api.admin.getCreatorVideos, {
-    creatorId: creatorId as Id<'creators'>,
-  });
+  const creatorVideos = useQuery(
+    api.admin.getCreatorVideos,
+    typeof creatorId === 'string' ? { creatorId: creatorId as Id<'creators'> } : 'skip'
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-white">

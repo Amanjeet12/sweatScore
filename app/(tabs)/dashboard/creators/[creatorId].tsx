@@ -72,10 +72,14 @@ export default function TabDashboardCreator() {
   const { creatorId, fromWorkouts } = useLocalSearchParams();
   const library = usePathname().startsWith('/workouts/');
   const currentUser = useAuthStore((state) => state.currentUser);
-  const creator = useQuery(api.admin.getCreator, { creatorId: creatorId as Id<'creators'> });
-  const creatorVideos = useQuery(api.admin.getCreatorVideos, {
-    creatorId: creatorId as Id<'creators'>,
-  });
+  const creator = useQuery(
+    api.admin.getCreator,
+    typeof creatorId === 'string' ? { creatorId: creatorId as Id<'creators'> } : 'skip'
+  );
+  const creatorVideos = useQuery(
+    api.admin.getCreatorVideos,
+    typeof creatorId === 'string' ? { creatorId: creatorId as Id<'creators'> } : 'skip'
+  );
   if (!creator || !creatorVideos) return <ScreenLoading />;
   const videos = [...creatorVideos]
     .filter((video) => video.isActive !== false)
