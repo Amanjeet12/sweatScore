@@ -107,13 +107,11 @@ export default function ProfileEditGoal() {
               <TouchableOpacity
                 key={goal}
                 onPress={() => setActivityGoal(goal)}
-                className={cn('min-h-14 w-full justify-center rounded-[18px] border border-[#2a2a2a] bg-[#f6f6f6] px-4 py-3', {
-                  'bg-[#2a2a2a]': activityGoal === goal,
+                className={cn('min-h-14 w-full justify-center rounded-[18px] border bg-[#f6f6f6] px-4 py-3', {
+                  'border-[#2a2a2a]': activityGoal === goal,
+                  'border-transparent': activityGoal !== goal,
                 })}>
-                <Text
-                  className={cn('text-center text-base font-semibold text-[#2a2a2a]', {
-                    'text-white': activityGoal === goal,
-                  })}>
+                <Text className="text-center text-base font-semibold text-[#2a2a2a]">
                   {goal}
                 </Text>
               </TouchableOpacity>

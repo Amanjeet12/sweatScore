@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   TextInput,
@@ -40,10 +42,30 @@ export default function PostComments() {
   const [placeholderHeight, setPlaceholderHeight] = useState(24);
   const minInputHeight = Math.max(44, commentText ? 24 * fontScale + 16 : placeholderHeight + 16);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [androidKeyboardInset, setAndroidKeyboardInset] = useState(0);
   const [editingCommentId, setEditingCommentId] = useState<Id<'postComments'> | null>(null);
   const placeholder = editingCommentId ? 'Edit comment...' : 'Write a comment...';
 
   const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    let fullWindowHeight = Dimensions.get('window').height;
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
+      const resizedBy = Math.max(0, fullWindowHeight - Dimensions.get('window').height);
+      setAndroidKeyboardInset(Math.max(0, event.endCoordinates.height - resizedBy));
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setAndroidKeyboardInset(0);
+      fullWindowHeight = Dimensions.get('window').height;
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const comments = useQuery(api.posts.getComments, {
     postId: postId as Id<'posts'>,
@@ -142,8 +164,9 @@ export default function PostComments() {
           }}
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1">
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          className="flex-1"
+          style={{ paddingBottom: androidKeyboardInset }}>
           <View className="flex-1 flex-col">
             {isLoading ? (
               <View className="flex-1 items-center justify-center">
