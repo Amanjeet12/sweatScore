@@ -1,6 +1,7 @@
 import { useAuthToken } from '@convex-dev/auth/react';
 import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { FunctionReturnType } from 'convex/server';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
@@ -38,6 +39,7 @@ import {
   prototypeComponents as components,
 } from '~/components/core/design/prototypeStyles';
 import { useCelebration } from '~/components/providers/CelebrationProvider';
+import { useWorkoutUploadQueue } from '~/components/providers/WorkoutUploadProvider';
 import { Text } from '~/components/ui/text';
 import { useToast } from '~/components/ui/toast';
 import { api } from '~/convex/_generated/api';
@@ -56,6 +58,7 @@ import {
   type MealFeedbackInput,
 } from '~/shared/coachMealFlow';
 import { pointsLabel } from '~/shared/pointsLabel';
+import { getErrorMessage } from '~/utils/error-message';
 import { getData, removeData, storeData } from '~/utils/storage';
 
 type ProofQueue = {
@@ -105,6 +108,7 @@ export default function CoachCheckInFlow({
   initialCurrentUser?: FunctionReturnType<typeof api.users.current>;
 }) {
   const convex = useConvex();
+  const { enqueue: enqueueWorkoutUpload, pending: workoutUploadPending } = useWorkoutUploadQueue();
   const toast = useToast();
   const { celebrateCompletion, showMilestone } = useCelebration();
   const authToken = useAuthToken();
@@ -144,13 +148,73 @@ export default function CoachCheckInFlow({
   const recordingActive = useRef(false);
   const countdownActive = useRef(false);
   const photoCaptureActive = useRef(false);
-  const cameraSessionKey = `${cameraMode}-${cameraAttempt}`;
+  const countdownSound = useRef<Audio.Sound | null>(null);
+  const stopCountdownSound = async () => {
+    const sound = countdownSound.current;
+    countdownSound.current = null;
+    if (!sound) return;
+    await sound.stopAsync().catch(() => {});
+    await sound.unloadAsync().catch(() => {});
+  };
+  const countingDown = countdown !== null;
+  useEffect(() => {
+    if (!countingDown) return;
+    let cancelled = false;
+    const play = async () => {
+      try {
+        await Audio.setIsEnabledAsync(true);
+        await Audio.setAudioModeAsync({
+          // CameraView already owns an input-capable session. Playback-only
+          // mode cannot activate while that microphone input is attached.
+          allowsRecordingIOS: true,
+          interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+          shouldDuckAndroid: false,
+          playThroughEarpieceAndroid: false,
+        });
+        if (cancelled) return;
+        const { sound } = await Audio.Sound.createAsync(require('~/assets/beep.mp3'), {
+          shouldPlay: false,
+          isLooping: false,
+          positionMillis: 0,
+          volume: 1,
+        });
+        if (cancelled) {
+          await sound.unloadAsync();
+          return;
+        }
+        countdownSound.current = sound;
+        await sound.playAsync();
+      } catch (soundError) {
+        console.warn('[CoachVideo] Countdown sound unavailable', soundError);
+      }
+    };
+    play().catch(() => {});
+    return () => {
+      cancelled = true;
+      stopCountdownSound().catch(() => {});
+    };
+  }, [countingDown]);
+  const cameraSessionKey = `${cameraFacing}-${cameraMode}-${cameraAttempt}`;
+  const activeCameraSession = useRef(cameraSessionKey);
+  activeCameraSession.current = cameraSessionKey;
+  const startupRecoveryAttempts = useRef(0);
+  useEffect(() => {
+    if (!showCamera) startupRecoveryAttempts.current = 0;
+  }, [showCamera]);
   useEffect(() => {
     setCameraStartupError('');
     if (!showCamera || cameraReady || cameraMode === 'picture') return;
     const timer = setTimeout(() => {
-      setCameraStartupError('Camera is taking too long to get ready. Please retry.');
-    }, 12000);
+      if (startupRecoveryAttempts.current === 0) {
+        startupRecoveryAttempts.current += 1;
+        setCameraAttempt((value) => value + 1);
+      } else {
+        setCameraStartupError('Camera could not get ready. Tap Retry camera to restart it.');
+      }
+    }, 8000);
     return () => clearTimeout(timer);
   }, [showCamera, cameraReady, cameraFacing, cameraMode, cameraAttempt]);
   useEffect(() => {
@@ -454,7 +518,8 @@ export default function CoachCheckInFlow({
       !camera.current ||
       !FileSystem.documentDirectory ||
       closing.current ||
-      recordingActive.current
+      recordingActive.current ||
+      !cameraReady
     )
       return;
     if (closing.current) return;
@@ -470,7 +535,7 @@ export default function CoachCheckInFlow({
         maxDuration: 60,
         maxFileSize: 19_000_000,
         // iOS applies videoBitrate only when an explicit codec is selected.
-        ...(Platform.OS === 'ios' ? { codec: 'h264' as const } : {}),
+        ...(Platform.OS === 'ios' ? { codec: 'avc1' as const } : {}),
       });
       if (!video?.uri) return;
       const extension = video.uri.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
@@ -484,9 +549,10 @@ export default function CoachCheckInFlow({
       persist({ ...queue, captureId, uri, caption: nextCaption, mediaType: 'video' });
       setShowCamera(false);
       if (mode === 'details' && !closing.current) onCaptured?.();
-    } catch {
+    } catch (recordingError) {
       if (!operations.isCurrent(operation)) return;
-      setError('Could not save the video. Please try again.');
+      console.warn('[CoachVideo] Recording failed', recordingError);
+      setError('Could not record the video. Please try again.');
     } finally {
       if (operations.isCurrent(operation)) {
         operations.end(operation);
@@ -505,19 +571,30 @@ export default function CoachCheckInFlow({
       else {
         countdownActive.current = false;
         setCountdown(null);
-        captureVideo().catch(() => {});
+        stopCountdownSound().finally(() => {
+          if (!closing.current) captureVideo().catch(() => {});
+        });
       }
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown]);
 
   const startCountdown = () => {
-    if (!camera.current || busy || countdownActive.current || recordingActive.current) return;
+    if (
+      !camera.current ||
+      !cameraReady ||
+      busy ||
+      countdownActive.current ||
+      recordingActive.current
+    )
+      return;
     countdownActive.current = true;
     setError('');
     setCountdown(5);
   };
 
+  const expiredProofMessage =
+    'This check-in belongs to yesterday. Start a new check-in for today. Your recording is still saved on this device.';
   const upload = async (operation: number): Promise<Id<'_storage'> | null> => {
     if (!queue?.uri) return null;
     try {
@@ -545,20 +622,36 @@ export default function CoachCheckInFlow({
         },
       });
       const result = await task.uploadAsync();
-      if (!result || result.status < 200 || result.status >= 300)
-        throw new Error('Photo upload failed. Retry when connected.');
+      if (!result) throw new Error('No response from the upload service.');
+      if (result.status < 200 || result.status >= 300) {
+        console.warn('[CoachUpload] Rejected', result.status, result.body);
+        throw new Error(
+          result.status === 413
+            ? 'The video exceeds the upload size limit.'
+            : result.status === 401
+              ? 'Your session expired. Sign in again to upload.'
+              : result.status === 403 || result.status === 409
+                ? 'The upload session changed. Please retry.'
+                : `Upload service returned ${result.status}. Please retry.`
+        );
+      }
       const storageId = JSON.parse(result.body).storageId as Id<'_storage'> | undefined;
       if (!storageId) throw new Error('Photo upload did not return media identity.');
       if (!operations.isCurrent(operation)) return null;
       persist({ ...(queueRef.current ?? queue), storageId });
       return storageId;
-    } catch {
+    } catch (uploadError) {
       if (!operations.isCurrent(operation)) return null;
+      console.warn('[CoachUpload] Failed', uploadError);
       try {
         const saved = await convex.query(api.coachCheckIns.mySubmission, {
           submissionId: queue.submissionId,
         });
         if (!operations.isCurrent(operation)) return null;
+        if (today && saved.day !== today.day) {
+          setError(expiredProofMessage);
+          return null;
+        }
         if (saved.state === 'uploaded' && saved.storageId) {
           persist({ ...(queueRef.current ?? queue), storageId: saved.storageId });
           return saved.storageId;
@@ -566,7 +659,9 @@ export default function CoachCheckInFlow({
       } catch {
         /* Keep the local queue for an offline retry. */
       }
-      setError('Upload failed. Your photo is saved for retry.');
+      setError(
+        `${getErrorMessage(uploadError)} Your ${queue.mediaType === 'video' ? 'video' : 'photo'} is saved for retry.`
+      );
       return null;
     }
   };
@@ -579,6 +674,21 @@ export default function CoachCheckInFlow({
     setBusy(true);
     setError('');
     try {
+      if (today && queue.day !== today.day) {
+        setError(expiredProofMessage);
+        return;
+      }
+      if (queue.mediaType === 'video' && queue.uri && queueKey) {
+        enqueueWorkoutUpload({
+          userId: queue.userId,
+          submissionId: queue.submissionId,
+          uri: queue.uri,
+          caption,
+          queueKey,
+        });
+        onClose();
+        return;
+      }
       await saveProofCaption({ submissionId: queue.submissionId, caption });
       const storageId = queue.storageId ?? (await upload(operation));
       if (!storageId) return;
@@ -589,7 +699,9 @@ export default function CoachCheckInFlow({
       showPostedSuccess(result.pointsEarned, result.milestones);
     } catch {
       if (!operations.isCurrent(operation)) return;
-      setError('Could not post. Your photo is saved for retry.');
+      setError(
+        `Could not post. Your ${queue.mediaType === 'video' ? 'video' : 'photo'} is saved for retry.`
+      );
     } finally {
       if (operations.isCurrent(operation)) {
         operations.end(operation);
@@ -725,6 +837,10 @@ export default function CoachCheckInFlow({
   };
 
   const retakePhoto = async () => {
+    if (queue && workoutUploadPending(queue.submissionId)) {
+      setError('Your video is uploading in the background. Please wait until it finishes.');
+      return;
+    }
     if (!queue || queue.postedMeal || meal?.draft?.status === 'shared') return;
     if (closing.current) return;
     const operation = operations.begin();
@@ -764,6 +880,17 @@ export default function CoachCheckInFlow({
   };
 
   if (!today || !currentUser) return <ScreenLoading />;
+  if (queue && workoutUploadPending(queue.submissionId)) {
+    return (
+      <View style={{ flex: 1, padding: 22, gap: 20 }}>
+        <CheckInHeader title="Log a workout" onBack={onClose} />
+        <Text style={type.body}>
+          Uploading your video. Please keep the app open until it finishes.
+        </Text>
+        <PrototypeButton label="Back to Today" onPress={onClose} />
+      </View>
+    );
+  }
   const ready = today.status === 'no_plan' || (today.status === 'ready' && Boolean(assignment));
   const mealAnalysisLimitReached =
     category === 'meals' && mode === 'post' && (!meal || meal.analysisLimitReached);
@@ -875,10 +1002,12 @@ export default function CoachCheckInFlow({
               ref={camera}
               style={StyleSheet.absoluteFillObject}
               onCameraReady={() => {
+                if (activeCameraSession.current !== cameraSessionKey) return;
                 setCameraReady(true);
                 setCameraStartupError('');
               }}
               onMountError={() => {
+                if (activeCameraSession.current !== cameraSessionKey) return;
                 setCameraReady(false);
                 setCameraStartupError('Camera could not start. Please try again.');
               }}
@@ -916,7 +1045,8 @@ export default function CoachCheckInFlow({
                 : undefined
             }
             onFlip={() => {
-              if (busy) return;
+              if (busy || countdownActive.current || recordingActive.current) return;
+              startupRecoveryAttempts.current = 0;
               setCameraReady(false);
               setCameraFacing((value) => (value === 'back' ? 'front' : 'back'));
             }}
@@ -931,6 +1061,7 @@ export default function CoachCheckInFlow({
               <PrototypeButton
                 label="Retry camera"
                 onPress={() => {
+                  startupRecoveryAttempts.current = 0;
                   setCameraReady(false);
                   setCameraStartupError('');
                   setCameraAttempt((value) => value + 1);
@@ -944,7 +1075,9 @@ export default function CoachCheckInFlow({
                       ? 'Stop recording'
                       : countdown
                         ? 'Get ready…'
-                        : 'Start recording'
+                        : !cameraReady
+                          ? 'Preparing camera…'
+                          : 'Start recording'
                     : 'Take live photo'
                 }
                 loading={busy && !recording}

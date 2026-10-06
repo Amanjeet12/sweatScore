@@ -714,7 +714,7 @@ function DuetRecordingContent() {
     try {
       const video = await cameraRef.current.recordAsync({
         maxDuration: MAX_RECORDING_SECONDS,
-        ...(Platform.OS === 'ios' ? { codec: 'h264' as const } : {}),
+        ...(Platform.OS === 'ios' ? { codec: 'avc1' as const } : {}),
         maxFileSize: RECORDING_MAX_FILE_SIZE_BYTES,
       });
 

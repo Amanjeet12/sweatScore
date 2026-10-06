@@ -1,4 +1,4 @@
-import { TouchableOpacity } from 'react-native';
+import { ActivityIndicator, TouchableOpacity } from 'react-native';
 
 import { Text } from '~/components/ui/text';
 
@@ -6,6 +6,7 @@ type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
   variant?: 'primary' | 'secondary' | 'destructive';
   className?: string;
 };
@@ -15,6 +16,7 @@ export default function CoachActionButton({
   label,
   onPress,
   disabled = false,
+  loading = false,
   variant = 'primary',
   className,
 }: Props) {
@@ -24,9 +26,9 @@ export default function CoachActionButton({
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       activeOpacity={0.82}
-      disabled={disabled}
+      disabled={disabled || loading}
       onPress={onPress}
       className={className}
       style={{
@@ -40,19 +42,23 @@ export default function CoachActionButton({
         paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: disabled ? 0.6 : 1,
+        opacity: disabled || loading ? 0.6 : 1,
       }}>
-      <Text
-        allowFontScaling
-        style={{
-          fontFamily: 'Inter_600SemiBold',
-          fontSize: 18,
-          lineHeight: 24,
-          textAlign: 'center',
-          color: primary ? '#FFFFFF' : destructive ? '#B4232C' : '#1A1A1A',
-        }}>
-        {label}
-      </Text>
+      {loading ? (
+        <ActivityIndicator color={primary ? '#FFFFFF' : destructive ? '#B4232C' : '#1A1A1A'} />
+      ) : (
+        <Text
+          allowFontScaling
+          style={{
+            fontFamily: 'Inter_600SemiBold',
+            fontSize: 18,
+            lineHeight: 24,
+            textAlign: 'center',
+            color: primary ? '#FFFFFF' : destructive ? '#B4232C' : '#1A1A1A',
+          }}>
+          {label}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }

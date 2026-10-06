@@ -22,14 +22,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import ForceUpdateGate from '~/components/core/ForceUpdateGate';
+import { CelebrationProvider } from '~/components/providers/CelebrationProvider';
+import { ChallengeUploadProvider } from '~/components/providers/ChallengeUploadProvider';
 import { RevenueCatProvider } from '~/components/providers/RevenueCatProvider';
+import RevenueCatRedemptionHandler from '~/components/providers/RevenueCatRedemptionHandler';
+import { WorkoutUploadProvider } from '~/components/providers/WorkoutUploadProvider';
 import { Id } from '~/convex/_generated/dataModel';
 import { usePushNotifications } from '~/hooks/usePushNotifications';
 import { useAuthStore } from '~/store/useAuthStore';
 import { NOTIFICATION_TYPE } from '~/utils/types';
-import { ChallengeUploadProvider } from '~/components/providers/ChallengeUploadProvider';
-import { CelebrationProvider } from '~/components/providers/CelebrationProvider';
-import RevenueCatRedemptionHandler from '~/components/providers/RevenueCatRedemptionHandler';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -167,159 +168,161 @@ export default function Layout() {
                 <RevenueCatRedemptionHandler />
                 <CelebrationProvider>
                   <ChallengeUploadProvider>
-                    <StatusBar style="auto" />
-                    <View
-                      className="flex-1 bg-white"
-                      style={
-                        Platform.OS === 'android' ? { paddingBottom: insets.bottom } : undefined
-                      }>
-                      <Stack screenOptions={{ title: '' }}>
-                        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                        <Stack.Screen
-                          name="subscription"
-                          options={{
-                            headerShown: false,
-                            gestureEnabled: false,
-                            presentation: 'card',
-                            animation: 'none',
-                          }}
-                        />
+                    <WorkoutUploadProvider>
+                      <StatusBar style="auto" />
+                      <View
+                        className="flex-1 bg-white"
+                        style={
+                          Platform.OS === 'android' ? { paddingBottom: insets.bottom } : undefined
+                        }>
+                        <Stack screenOptions={{ title: '' }}>
+                          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                          <Stack.Screen
+                            name="subscription"
+                            options={{
+                              headerShown: false,
+                              gestureEnabled: false,
+                              presentation: 'card',
+                              animation: 'none',
+                            }}
+                          />
 
-                        <Stack.Screen name="group-chat" options={{ headerShown: false }} />
-                        <Stack.Screen
-                          name="posts/new"
-                          options={{
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="posts/edit"
-                          options={{
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="posts/comments"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="activity/new"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="activity/edit"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="creator/new"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="creator/edit"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="challenge/new"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="challenge/[challengeId]"
-                          options={{
-                            presentation: 'card',
-                            animation: 'slide_from_right',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="creator-video/edit"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="challenge-view/[challengeId]"
-                          options={{
-                            presentation: 'card',
-                            animation: 'slide_from_right',
-                            gestureEnabled: true,
-                            headerTitle: '',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="challenge-record/[challengeId]"
-                          options={{
-                            presentation: 'card',
-                            animation: 'slide_from_right',
-                            headerShown: false,
-                            gestureEnabled: false,
-                          }}
-                        />
-                        <Stack.Screen
-                          name="progress-photo"
-                          options={{
-                            presentation: 'card',
-                            animation: 'slide_from_right',
-                          }}
-                        />
-                        <Stack.Screen
-                          name="legals/terms"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                          }}
-                        />
-                        <Stack.Screen
-                          name="legals/privacy-policy"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                          }}
-                        />
-                        <Stack.Screen
-                          name="legals/official-rules"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                          }}
-                        />
-                        <Stack.Screen
-                          name="legals/community-guidelines"
-                          options={{
-                            presentation: 'modal',
-                            gestureEnabled: false,
-                          }}
-                        />
-                      </Stack>
-                    </View>
-                    {/* <ForceUpdateGate /> */}
+                          <Stack.Screen name="group-chat" options={{ headerShown: false }} />
+                          <Stack.Screen
+                            name="posts/new"
+                            options={{
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="posts/edit"
+                            options={{
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="posts/comments"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="activity/new"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="activity/edit"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="creator/new"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="creator/edit"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="challenge/new"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="challenge/[challengeId]"
+                            options={{
+                              presentation: 'card',
+                              animation: 'slide_from_right',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="creator-video/edit"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="challenge-view/[challengeId]"
+                            options={{
+                              presentation: 'card',
+                              animation: 'slide_from_right',
+                              gestureEnabled: true,
+                              headerTitle: '',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="challenge-record/[challengeId]"
+                            options={{
+                              presentation: 'card',
+                              animation: 'slide_from_right',
+                              headerShown: false,
+                              gestureEnabled: false,
+                            }}
+                          />
+                          <Stack.Screen
+                            name="progress-photo"
+                            options={{
+                              presentation: 'card',
+                              animation: 'slide_from_right',
+                            }}
+                          />
+                          <Stack.Screen
+                            name="legals/terms"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                            }}
+                          />
+                          <Stack.Screen
+                            name="legals/privacy-policy"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                            }}
+                          />
+                          <Stack.Screen
+                            name="legals/official-rules"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                            }}
+                          />
+                          <Stack.Screen
+                            name="legals/community-guidelines"
+                            options={{
+                              presentation: 'modal',
+                              gestureEnabled: false,
+                            }}
+                          />
+                        </Stack>
+                      </View>
+                      {/* <ForceUpdateGate /> */}
+                    </WorkoutUploadProvider>
                   </ChallengeUploadProvider>
                 </CelebrationProvider>
               </RevenueCatProvider>

@@ -1,47 +1,25 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import UserActivities from './Activities';
 
 import { Avatar } from '~/components/core/Avatar';
-import { leagueTypography as type } from '~/components/core/design/LeagueStyles';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 import { UserWithImageUrl } from '~/store/useAuthStore';
 
-export default function Profile({
-  user,
-  league = false,
-}: {
-  user: UserWithImageUrl;
-  league?: boolean;
-}) {
+export default function Profile({ user }: { user: UserWithImageUrl; league?: boolean }) {
   return (
-    <>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        style={{
-          flexGrow: 1,
-        }}>
-        <View
-          className="flex-col"
-          style={league ? { paddingTop: 16, paddingHorizontal: 22 } : undefined}>
-          <View className="flex-col items-center gap-y-4">
-            <View>
-              <Avatar uri={user?.image ?? undefined} name={user?.name} />
-            </View>
-            <View className="flex-col items-center">
-              <Text
-                className={league ? undefined : 'text-[20px] font-bold'}
-                style={league ? [type.heading, { textAlign: 'center' }] : undefined}>
-                {user?.name}
-              </Text>
-            </View>
+    <UserActivities
+      userId={user._id}
+      header={
+        <View style={{ paddingTop: 8, paddingBottom: 4, gap: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <Avatar uri={user.image ?? undefined} name={user.name} size={64} />
+            <Text style={[type.sectionHeading, { flex: 1, flexShrink: 1 }]}>{user.name}</Text>
           </View>
-
-          <View className="mt-4">
-            <UserActivities userId={user._id} />
-          </View>
+          <Text style={type.cardTitle}>Activity history</Text>
         </View>
-      </ScrollView>
-    </>
+      }
+    />
   );
 }

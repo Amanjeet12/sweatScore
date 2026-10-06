@@ -4,16 +4,10 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Alert, ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { BackButton } from '~/components/core/BackButton';
+import CoachActionButton from '~/components/core/CoachActionButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
@@ -123,34 +117,27 @@ export default function AdminTodayBanner() {
           Banner display size: {bannerWidth} × 240. A higher resolution image with the same
           proportions will look sharper.
         </Text>
-        <TouchableOpacity
-          accessibilityRole="button"
+        <CoachActionButton
+          label="Choose image"
+          variant="secondary"
           disabled={saving}
           onPress={chooseImage}
-          className="items-center rounded-xl bg-[#E8541E] p-4">
-          <Text className="font-semibold text-white">Choose image</Text>
-        </TouchableOpacity>
+        />
         {selectedImage ? (
-          <TouchableOpacity
-            accessibilityRole="button"
+          <CoachActionButton
+            label="Save banner"
             disabled={saving}
+            loading={saving}
             onPress={saveImage}
-            className="items-center rounded-xl bg-black p-4">
-            {saving ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="font-semibold text-white">Save banner</Text>
-            )}
-          </TouchableOpacity>
+          />
         ) : null}
         {savedImageUrl ? (
-          <TouchableOpacity
-            accessibilityRole="button"
+          <CoachActionButton
+            label="Restore default image"
+            variant="secondary"
             disabled={saving}
             onPress={useDefaultImage}
-            className="items-center p-3">
-            <Text className="font-semibold text-[#E8541E]">Restore default image</Text>
-          </TouchableOpacity>
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>

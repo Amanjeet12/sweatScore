@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack } from 'expo-router';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { Avatar } from '~/components/core/Avatar';
 import { BackButton } from '~/components/core/BackButton';
 import { HeaderButton } from '~/components/core/HeaderButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
+import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
 import MyActivities from '~/components/core/settings/MyActivities';
 import { Text } from '~/components/ui/text';
 import { useAuthStore } from '~/store/useAuthStore';
@@ -80,74 +81,28 @@ export default function TabSettings() {
           </View>
         )}
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingTop: 18,
-            paddingBottom: 32,
-          }}>
-          <View className="flex-col">
-            <View className="mx-4 flex-col items-center gap-y-4">
-              <View>
+        <MyActivities
+          header={
+            <View style={{ paddingTop: 18, paddingBottom: 8 }}>
+              <View className="flex-col items-center gap-y-4">
                 <Avatar uri={currentUser?.image ?? undefined} name={currentUser?.name} />
-              </View>
-
-              <View className="flex-col items-center">
                 <Text className="text-[20px] font-bold">{currentUser?.name}</Text>
-
-                {/* <Text className="text-[14px]">
-                  {formatDateToLocaleString(currentUser?.birthdate)}
-                </Text> */}
-
-                {/* <TouchableOpacity onPress={shareProfile}>
-                  <View className="flex-row items-center gap-x-1">
-                    <Ionicons name="paper-plane-outline" size={14} color="black" />
-                    <Text className="font-lsBold text-[14px]">Share profile</Text>
-                  </View>
-                </TouchableOpacity> */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  accessibilityRole="link"
+                  hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
+                  onPress={() => router.push('/(tabs)/dashboard/settings/profile/edit')}>
+                  <Text
+                    className="text-sm text-primary-500"
+                    style={{ fontFamily: 'Inter_600SemiBold' }}>
+                    Edit Profile
+                  </Text>
+                </TouchableOpacity>
               </View>
+              <Text style={[type.cardTitle, { marginTop: 28 }]}>Activity history</Text>
             </View>
-
-            <View className="mt-4 items-center">
-              <TouchableOpacity
-                activeOpacity={0.7}
-                accessibilityRole="link"
-                hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
-                onPress={() => {
-                  router.push({
-                    pathname: '/(tabs)/dashboard/settings/profile/edit',
-                  });
-                }}>
-                <Text
-                  className="text-sm text-primary-500"
-                  style={{ fontFamily: 'Inter_600SemiBold' }}>
-                  Edit Profile
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* <View className="mx-4 mt-4">
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={openWhatsApp}
-                className="flex-row items-center justify-center gap-x-2 rounded-full bg-primary-500 py-2.5">
-                <Text className="font-medium text-white">💬 Chat with us on WhatsApp</Text>
-
-                <ArrowRight size={18} weight="bold" color="white" />
-              </TouchableOpacity>
-
-              <View className="mt-1">
-                <Text className="text-center text-sm text-black/60">
-                  Fast help with setup and app issues.
-                </Text>
-              </View>
-            </View> */}
-
-            <View className="mt-4">
-              <MyActivities />
-            </View>
-          </View>
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
     </>
   );

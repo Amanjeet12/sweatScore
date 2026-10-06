@@ -12,6 +12,7 @@ import { formatDateToLocaleString, formatPoints } from '~/utils/formatter';
 import { pointText } from '~/utils/helpers';
 
 interface ActivityRowProps {
+  compact?: boolean;
   activity: Doc<'dailyActivities'> & {
     checkInPoints?: number;
     stepsPoints?: number;
@@ -21,7 +22,7 @@ interface ActivityRowProps {
   };
 }
 
-export default function ActivityRow({ activity }: ActivityRowProps) {
+export default function ActivityRow({ activity, compact = false }: ActivityRowProps) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const isCurrentUser = currentUser?._id === activity.userId;
   const canEdit = isCurrentUser && !activity.synced && activity.reviewStatus !== 'approved';
@@ -61,6 +62,93 @@ export default function ActivityRow({ activity }: ActivityRowProps) {
       },
     });
   };
+
+  if (compact) {
+    return (
+      <View
+        style={{
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: '#ececec',
+          backgroundColor: '#fff',
+          padding: 18,
+          gap: 16,
+        }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}>
+          <Text style={[type.cardTitle, { flex: 1 }]}>{formattedDate}</Text>
+          {canEdit ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Edit activity"
+              onPress={handleEdit}
+              style={{
+                minWidth: 44,
+                minHeight: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Icon.PencilLine size={20} color="#6f6f6f" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 8 }}>
+          <Text
+            style={{ fontFamily: 'Inter_700Bold', fontSize: 32, lineHeight: 38, color: '#ff5a1f' }}>
+            {formatPoints(Math.floor(totalPoints))}
+          </Text>
+          <Text style={type.supporting}>Sweat Points</Text>
+        </View>
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: '#ececec',
+            paddingTop: 14,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}>
+          {[
+            { label: 'Check-in', Icon: Icon.CheckFat, points: activity.checkInPoints },
+            { label: 'Steps', Icon: Icon.Footprints, points: activity.stepsPoints },
+            { label: 'Meal', Icon: Icon.Drop, points: activity.zone2Points },
+            { label: 'Challenges', Icon: Icon.Trophy, points: activity.challengePoints },
+          ].map(({ label, Icon: ActivityIcon, points }) => (
+            <View
+              key={label}
+              style={{
+                flexBasis: '45%',
+                flexGrow: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
+                  backgroundColor: '#fff3ea',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <ActivityIcon size={16} weight="fill" color="#e8541e" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={type.smallCaption}>{label}</Text>
+                <Text style={type.compactCardTitle}>{pointText(points, false)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View className="mx-4 mb-5 flex-row items-center rounded-lg py-3">
