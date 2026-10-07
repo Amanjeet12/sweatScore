@@ -164,7 +164,7 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
               accessibilityRole="button"
               accessibilityLabel="Skip Today screen tour"
               onPress={onSkip}
-              className="h-9 w-9 items-center justify-center rounded-full bg-[#F2EFED]">
+              className="h-9 w-9 items-center justify-center rounded-full bg-[#f5f5f5]">
               <X size={16} color="#77716D" weight="bold" />
             </TouchableOpacity>
           </View>
@@ -201,7 +201,7 @@ export default function TodayFeatureTour({ step, target, onNext, onSkip }: Today
               accessibilityRole="button"
               accessibilityLabel={isLastStep ? 'Finish Today screen tour' : 'Next tour step'}
               onPress={onNext}
-              className="h-12 min-w-[112px] items-center justify-center rounded-lg bg-primary-500 px-5">
+              className="h-12 min-w-[112px] items-center justify-center rounded-lg bg-[#2a2a2a] px-5">
               <Text className="font-heading text-sm font-semibold text-white">
                 {isLastStep ? 'Got it' : 'Next'}
               </Text>

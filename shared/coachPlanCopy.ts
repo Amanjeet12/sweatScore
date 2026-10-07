@@ -4,18 +4,18 @@ export const DAILY_PLAN_COPY_LIMITS = {
   workout: 180,
   steps: 30,
   sleep: 180,
-  meals: 100,
+  meals: 140,
   why: 1200,
   workoutReason: 300,
   stepsReason: 300,
 } as const;
 
-// Also clean saved plans generated before meal logging reminders were removed.
+export function dailyMealGuidance(waterLitres: number) {
+  return `Log today's meals for feedback. Aim for ${waterLitres} litres of water.`;
+}
+
+// Keep the same wording for older saved plans while retaining their water target.
 export function mealPlanSummary(value: string) {
-  return value
-    .replace(
-      /(?:[,;]\s*(?:and\s+)?|\s+and\s+|[.!?]\s*|^)(?:snap|log|photograph|take a photo of)\b[^.!?]*\bmeals?\b[^.!?]*[.!?]?/gi,
-      '.'
-    )
-    .trim();
+  const water = value.match(/\b(\d+(?:\.\d+)?) litres? of water\b/i);
+  return dailyMealGuidance(water ? Number(water[1]) : 2);
 }

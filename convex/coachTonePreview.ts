@@ -11,7 +11,7 @@ import { runDailyTonePreview, runMealTonePreview } from './coachTonePreviewRunne
 import { ToneSelection, effectiveTone, previewMealSampleConfig } from '../shared/coachTonePreview';
 import { DEFAULT_COACH_TONE } from '../shared/coachFoundation';
 import { DAILY_PLAN_V2_1_PROMPT_VERSION } from './coachDailyPromptV2_1';
-import { MEAL_PROMPT_VERSION } from './coachMealPrompt';
+import { MEAL_PROMPT_VERSION } from './coachMealPromptV2';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 type DailyPreview = Awaited<ReturnType<typeof runDailyTonePreview>>;

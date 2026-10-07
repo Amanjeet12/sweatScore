@@ -13,6 +13,8 @@ import { cssInterop } from 'nativewind';
 import React from 'react';
 import { View, Pressable, ScrollView, ViewStyle } from 'react-native';
 
+import { PopupThemeContext, popupColors } from '../popupTheme';
+
 const SCOPE = 'ALERT_DIALOG';
 
 const RootComponent = withStyleContext(View, SCOPE);
@@ -140,39 +142,42 @@ const AlertDialogContent = React.forwardRef<
   const { size: parentSize } = useStyleContext(SCOPE);
 
   return (
-    <UIAccessibleAlertDialog.Content
-      pointerEvents="auto"
-      ref={ref}
-      initial={{
-        scale: 0.9,
-        opacity: 0,
-      }}
-      animate={{
-        scale: 1,
-        opacity: 1,
-      }}
-      exit={{
-        scale: 0.9,
-        opacity: 0,
-      }}
-      transition={{
-        type: 'spring',
-        damping: 18,
-        stiffness: 250,
-        opacity: {
-          type: 'timing',
-          duration: 250,
-        },
-      }}
-      {...props}
-      className={alertDialogContentStyle({
-        parentVariants: {
-          size: parentSize,
-        },
-        size,
-        class: className,
-      })}
-    />
+    <PopupThemeContext.Provider value>
+      <UIAccessibleAlertDialog.Content
+        pointerEvents="auto"
+        ref={ref}
+        initial={{
+          scale: 0.9,
+          opacity: 0,
+        }}
+        animate={{
+          scale: 1,
+          opacity: 1,
+        }}
+        exit={{
+          scale: 0.9,
+          opacity: 0,
+        }}
+        transition={{
+          type: 'spring',
+          damping: 18,
+          stiffness: 250,
+          opacity: {
+            type: 'timing',
+            duration: 250,
+          },
+        }}
+        {...props}
+        style={[props.style, { backgroundColor: popupColors.card }]}
+        className={alertDialogContentStyle({
+          parentVariants: {
+            size: parentSize,
+          },
+          size,
+          class: className,
+        })}
+      />
+    </PopupThemeContext.Provider>
   );
 });
 

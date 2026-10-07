@@ -153,7 +153,7 @@ export const updateMonthlyLeaderboard = internalMutation({
     }
 
     // After updating points, recalculate ranks for all users in this month
-    ctx.scheduler.runAfter(0, internal.leaderboard.recalculateRanksForMonth, {
+    await ctx.scheduler.runAfter(0, internal.leaderboard.recalculateRanksForMonth, {
       yearMonth: args.yearMonth,
     });
 
@@ -175,14 +175,14 @@ export const updateMonthlyLeaderboard = internalMutation({
               .eq('date', todayFormatted)
               .eq('notificationType', 'newRewardUnlocked500')
           )
-          .unique();
+          .first();
         if (notificationHistory) return;
-        ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
+        await ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
           userId: [args.userId],
           notificationType: 'newRewardUnlocked500',
           options: {},
         });
-        ctx.db.insert('notificationHistory', {
+        await ctx.db.insert('notificationHistory', {
           userId: args.userId,
           date: todayFormatted,
           notificationType: 'newRewardUnlocked500',

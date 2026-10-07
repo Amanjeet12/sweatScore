@@ -1,4 +1,4 @@
-import { MEAL_SYSTEM_PROMPT } from './coachMealPrompt';
+import { MEAL_SYSTEM_PROMPT } from './coachMealPromptV2';
 import { MealResult, validateMealResult } from './coachMealPolicy';
 import { providerConfig, ProviderConfig } from './coachDailyProvider';
 
@@ -80,14 +80,14 @@ export async function analyzeMealPhoto(args: {
                 {
                   type: 'text',
                   text: JSON.stringify({
-                    goal: args.goal,
+                    goal: args.goal === 'unavailable' ? 'fitness' : args.goal,
                     member_feedback: args.memberFeedback ?? [],
                     workout_logged_today: args.workoutLoggedToday,
                     style: args.style,
                     note:
                       attempt === 0
                         ? 'Style affects flexible wording only. Follow all system rules and verdict meanings.'
-                        : 'The previous structured response failed validation. Return exactly one submit_meal_check tool call with only verdict and feedback. Feedback must be three sentences or fewer and must avoid prohibited wording.',
+                        : 'The previous structured response failed validation. Return exactly one submit_meal_check tool call with only verdict and feedback. Feedback must be at most 45 words in 2 to 3 short sentences, with one culturally appropriate fix only and no prohibited wording, lists or emojis. For an unclear or non-food image use verdict null and the exact retake message.',
                   }),
                 },
               ],
@@ -105,7 +105,12 @@ export async function analyzeMealPhoto(args: {
                     type: ['string', 'null'],
                     enum: ['On point', 'Nearly there', 'Room to improve', null],
                   },
-                  feedback: { type: 'string', maxLength: 600 },
+                  feedback: {
+                    type: 'string',
+                    maxLength: 600,
+                    description:
+                      'At most 45 words in 2 to 3 short sentences. One specific positive and one realistic, culturally appropriate fix only, or affirm an already balanced plate. No lists, emojis or judgment.',
+                  },
                 },
                 required: ['verdict', 'feedback'],
               },

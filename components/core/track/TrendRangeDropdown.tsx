@@ -86,7 +86,7 @@ export function ProgressDropdown<T extends string | number>({
                       paddingHorizontal: 16,
                       paddingVertical: 14,
                       borderRadius: 16,
-                      backgroundColor: selected ? colors.selected : '#fff',
+                      backgroundColor: selected ? '#f5f5f5' : '#fff',
                     }}>
                     <Text style={selected ? type.selectedOption : type.option}>{title}</Text>
                     {selected ? <Check size={20} color={colors.accent} weight="bold" /> : null}

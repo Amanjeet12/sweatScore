@@ -9,9 +9,14 @@ import { Id } from './_generated/dataModel';
 import { internalMutation, mutation, MutationCtx, query } from './_generated/server';
 import { appVersions } from './appVersions';
 import { applyFreeDailyCap } from './challengeCompletions';
+import { queueClientNotification } from './clientNotifications';
 import { formatDateInTZ } from './utils/timezone';
-import { getLoggedActivityPoints } from '../shared/loggedActivities';
+import {
+  commentNotificationPreview,
+  localNotificationClock,
+} from '../shared/clientPushNotifications';
 import { rewardSlotKey } from '../shared/coachFoundation';
+import { getLoggedActivityPoints } from '../shared/loggedActivities';
 
 const BADGE_POINTS_THRESHOLD = 500;
 
@@ -74,6 +79,8 @@ export const notifyUsersOfAdminPost = internalMutation({
     adminUserId: v.id('users'),
   },
   handler: async (ctx, args) => {
+    const post = await ctx.db.get(args.postId);
+    if (!post || post.userId !== args.adminUserId) return;
     // Get all users
     const allUsers = await ctx.db.query('users').collect();
 
@@ -84,8 +91,8 @@ export const notifyUsersOfAdminPost = internalMutation({
       // Don't send to the admin who created the post
       if (user._id === args.adminUserId) return false;
 
-      // Check if community notifications are enabled (default is true)
-      const notificationsEnabled = user.notificationEnabled ?? true;
+      // Respect the saved push preference and registered device token.
+      const notificationsEnabled = Boolean(user.notificationEnabled && user.expoPushToken);
       if (!notificationsEnabled) return false;
 
       // Check app version
@@ -97,15 +104,16 @@ export const notifyUsersOfAdminPost = internalMutation({
       return compare(userAppVersion, minVersion, '>=');
     });
 
-    // Send notification to each eligible user individually (don't await)
+    // Commit notification scheduling with the recipient checks.
     for (const user of eligibleUsers) {
-      ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-        userId: [user._id],
-        notificationType: 'newAdminPost',
-        options: {
-          postId: args.postId,
-        },
-      });
+      await queueClientNotification(
+        ctx,
+        user,
+        'newAdminPost',
+        new Date(post.createdAt ?? Date.now()).toISOString().slice(0, 10),
+        { postId: post._id },
+        `newAdminPost:${post._id}`
+      );
     }
   },
 });
@@ -633,7 +641,7 @@ export const createPost = mutation({
 
     // Send notification to all eligible users if admin created the post
     if (user.isAdmin) {
-      ctx.scheduler.runAfter(0, internal.posts.notifyUsersOfAdminPost, {
+      await ctx.scheduler.runAfter(0, internal.posts.notifyUsersOfAdminPost, {
         postId,
         adminUserId: userId,
       });
@@ -826,6 +834,31 @@ export const likePost = mutation({
       likeIcon: args.likeIcon,
       createdAt: Date.now(),
     });
+    const postUser = await ctx.db.get(post.userId);
+    if (postUser && postUser._id !== userId && postUser.commentNotificationEnabled !== false) {
+      const blocked = await ctx.db
+        .query('blockedUsers')
+        .withIndex('by_user_blocked_user', (q) =>
+          q.eq('userId', postUser._id).eq('blockedUserId', userId)
+        )
+        .first();
+      const reverseBlock = await ctx.db
+        .query('blockedUsers')
+        .withIndex('by_user_blocked_user', (q) =>
+          q.eq('userId', userId).eq('blockedUserId', postUser._id)
+        )
+        .first();
+      if (!blocked && !reverseBlock)
+        await queueClientNotification(
+          ctx,
+          postUser,
+          'newPostLiked',
+          localNotificationClock(Date.now(), postUser.timezone ?? 'UTC')?.date ??
+            new Date().toISOString().slice(0, 10),
+          { userName: user.name ?? 'Someone', postId: post._id },
+          `newPostLiked:${post._id}:${userId}`
+        );
+    }
     return true;
   },
 });
@@ -879,12 +912,18 @@ export const createComment = mutation({
     const postUser = await ctx.db.get(post.userId);
     if (!postUser) return true;
 
-    if ((postUser.commentNotificationEnabled ?? true) && postUser._id !== userId) {
-      ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
+    if (
+      postUser.notificationEnabled &&
+      postUser.expoPushToken &&
+      (postUser.commentNotificationEnabled ?? true) &&
+      postUser._id !== userId
+    ) {
+      await ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
         userId: [postUser._id],
         notificationType: 'newCommentPosted',
         options: {
           userName: user.name ?? 'Someone',
+          commentPreview: commentNotificationPreview(args.body),
           postId: post._id,
         },
       });

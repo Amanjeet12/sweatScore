@@ -913,8 +913,8 @@ function PostRow({
                 <TouchableOpacity
                   key={reason}
                   onPress={() => setReportReason(reason)}
-                  className={cn('w-full gap-x-2 rounded-[20px] bg-primary-100 px-3 py-3', {
-                    'bg-primary-500': reportReason === reason,
+                  className={cn('w-full gap-x-2 rounded-[20px] bg-[#f5f5f5] px-3 py-3', {
+                    'bg-[#2a2a2a]': reportReason === reason,
                   })}>
                   <Text
                     className={cn('text-center text-base font-semibold', {
@@ -988,8 +988,8 @@ function PostRow({
                 <TouchableOpacity
                   key={reason}
                   onPress={() => setBlockReason(reason)}
-                  className={cn('w-full gap-x-2 rounded-[20px] bg-primary-100 px-3 py-3', {
-                    'bg-primary-500': blockReason === reason,
+                  className={cn('w-full gap-x-2 rounded-[20px] bg-[#f5f5f5] px-3 py-3', {
+                    'bg-[#2a2a2a]': blockReason === reason,
                   })}>
                   <Text
                     className={cn('text-center text-base font-semibold', {

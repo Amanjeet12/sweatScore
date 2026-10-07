@@ -438,7 +438,7 @@ export const processDailyMissionNotifications = internalMutation({
       const notificationHistory = await ctx.db
         .query('notificationHistory')
         .withIndex('by_user_date', (q) => q.eq('userId', user._id).eq('date', todayFormatted))
-        .unique();
+        .first();
 
       if (notificationHistory) continue;
 

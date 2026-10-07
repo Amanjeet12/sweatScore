@@ -8,6 +8,8 @@ import { cssInterop } from 'nativewind';
 import React from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { PopupThemeContext, popupButtonColors } from '../popupTheme';
+
 const SCOPE = 'BUTTON';
 
 const Root = withStyleContext(Pressable, SCOPE);
@@ -297,10 +299,20 @@ const Button = React.forwardRef<React.ComponentRef<typeof UIButton>, IButtonProp
   { className, variant = 'solid', size = 'md', action = 'primary', ...props },
   ref
 ) {
+  const popup = React.useContext(PopupThemeContext);
+  const secondary = action === 'secondary' || variant !== 'solid';
   return (
     <UIButton
       ref={ref}
       {...props}
+      style={
+        popup
+          ? (state) => [
+              typeof props.style === 'function' ? props.style(state) : props.style,
+              { backgroundColor: popupButtonColors(secondary).backgroundColor, borderWidth: 0 },
+            ]
+          : props.style
+      }
       className={buttonStyle({ variant, size, action, class: className })}
       context={{ variant, size, action }}
     />
@@ -318,10 +330,14 @@ const ButtonText = React.forwardRef<React.ComponentRef<typeof UIButton.Text>, IB
       action: parentAction,
     } = useStyleContext(SCOPE);
 
+    const popup = React.useContext(PopupThemeContext);
+    const secondary =
+      (action ?? parentAction) === 'secondary' || (variant ?? parentVariant) !== 'solid';
     return (
       <UIButton.Text
         ref={ref}
         {...props}
+        style={[props.style, popup && { color: popupButtonColors(secondary).color }]}
         className={buttonTextStyle({
           parentVariants: {
             variant: parentVariant,
@@ -338,7 +354,21 @@ const ButtonText = React.forwardRef<React.ComponentRef<typeof UIButton.Text>, IB
   }
 );
 
-const ButtonSpinner = UIButton.Spinner;
+const ButtonSpinner = React.forwardRef<
+  React.ComponentRef<typeof UIButton.Spinner>,
+  React.ComponentPropsWithoutRef<typeof UIButton.Spinner>
+>(function ButtonSpinner(props, ref) {
+  const popup = React.useContext(PopupThemeContext);
+  const { action, variant } = useStyleContext(SCOPE);
+  const secondary = action === 'secondary' || variant !== 'solid';
+  return (
+    <UIButton.Spinner
+      ref={ref}
+      {...props}
+      color={popup ? popupButtonColors(secondary).color : props.color}
+    />
+  );
+});
 
 type IButtonIcon = React.ComponentPropsWithoutRef<typeof UIButton.Icon> &
   VariantProps<typeof buttonIconStyle> & {

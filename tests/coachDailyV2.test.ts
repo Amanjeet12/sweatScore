@@ -48,21 +48,16 @@ const output = {
   stepsReason: 'Your lighter energy today makes this target a manageable start.',
   sleep:
     "Aim for 7 hours tonight. You didn't sleep well last night, so start winding down earlier than usual.",
-  meals: 'Try eggs with vegetables and aim for 2 litres of water today.',
-  why: 'Your sore upper body can recover with lower body strength, while 5,000 steps fit your lighter day. Eggs with vegetables are one simple option toward your goal.',
+  meals: "Log today's meals for feedback. Aim for 2 litres of water.",
+  why: 'Your sore upper body can recover with lower body strength, while 5,000 steps fit your lighter day. Balanced protein, carbs and vegetables support your goal.',
 };
 const validate = (value = output, state = snapshot) => validateDailyPlanOutputV2(value, state, day);
 
 describe('daily plan section copy', () => {
-  test('removes reminders from saved meals while retaining food and water', () => {
-    expect(
-      mealPlanSummary(
-        'Try chicken with vegetables, aim for 2 litres of water today, and snap or log your meals for a portion check.'
-      )
-    ).toBe('Try chicken with vegetables, aim for 2 litres of water today.');
-    expect(
-      mealPlanSummary('Try fish and aim for 2 litres of water. Snap each meal for a portion check.')
-    ).toBe('Try fish and aim for 2 litres of water.');
+  test('saved meals use fixed wording while retaining their water target', () => {
+    expect(mealPlanSummary('Try eggs and aim for 2.5 litres of water.')).toBe(
+      "Log today's meals for feedback. Aim for 2.5 litres of water."
+    );
   });
   test('rejects every field exceeding its independent character allowance', () => {
     const limits = {
@@ -70,7 +65,7 @@ describe('daily plan section copy', () => {
       workout: 180,
       steps: 30,
       sleep: 180,
-      meals: 100,
+      meals: 140,
       why: 1200,
       workoutReason: 300,
       stepsReason: 300,
@@ -78,8 +73,7 @@ describe('daily plan section copy', () => {
     for (const [field, max] of Object.entries(limits)) {
       expect(() => validate({ ...output, [field]: 'x'.repeat(max + 1) })).toThrow('invalid_output');
     }
-    const boundaryMeal = output.meals + ' '.repeat(100 - output.meals.length);
-    expect(validate({ ...output, meals: boundaryMeal }).output.meals.length).toBe(100);
+    expect(() => validate({ ...output, meals: output.meals + ' ' })).toThrow('invalid_output');
   });
 
   test('accepts meals without reminders and keeps a detailed personalized explanation', () => {
@@ -126,7 +120,7 @@ describe('v2 daily plan contract', () => {
       validate({
         ...output,
         workoutReason: 'This leg session gives your arms room to recover today.',
-        why: 'A leg session suits your upper-body soreness; a 5,000-step target fits your light day. A meal with eggs and vegetables is a practical option.',
+        why: 'A leg session suits your upper-body soreness; a 5,000-step target fits your light day. A meal balancing protein, carbs and vegetables is a practical option.',
       }).stepTarget
     ).toBe(5000);
   });
@@ -152,7 +146,7 @@ describe('v2 daily plan contract', () => {
       workout: 'No workout today. Keep your streak going by logging your meals, steps and sleep.',
       workoutExamples: [],
       workoutReason: 'Rest lets your body recover today.',
-      why: 'Rest fits your pain answer; 5,000 steps are a gentle target and eggs with vegetables are a simple meal idea.',
+      why: 'Rest fits your pain answer; 5,000 steps are a gentle target and protein, carbs and vegetables are a balanced meal approach.',
     };
     expect(validate(rest, state).workout.type).toBe('rest');
     expect(() => validate({ ...rest, workoutExamples: ['chair squats'] }, state)).toThrow(
@@ -167,14 +161,53 @@ describe('v2 daily plan contract', () => {
       workout: 'Log a 10-minute upper body strength workout today.',
       workoutExamples: ['wall push-ups', 'seated rows'],
       workoutReason: 'A short upper-body session lets your lower body recover today.',
-      why: 'Upper body strength lets your lower body recover; 5,000 steps fit your lighter day and eggs with vegetables are a simple meal option.',
+      why: 'Upper body strength lets your lower body recover; 5,000 steps fit your lighter day and protein, carbs and vegetables are a balanced meal approach.',
     };
     expect(validate(upper, state).workout.type).toBe('upper_body_strength');
     expect(() =>
       validate({ ...upper, workoutExamples: ['chair squats', 'step-ups'] }, state)
     ).toThrow('invalid_output');
   });
-  test('prior-food claims require a recorded shared caption and never imply preference', () => {
+  test('AI water amounts vary while the meal wording stays fixed', () => {
+    const copy = (litres) => `Log today's meals for feedback. Aim for ${litres} litres of water.`;
+    for (const litres of [2, 2.5, 3])
+      expect(validate({ ...output, meals: copy(litres) }).output.meals).toBe(copy(litres));
+    expect(() => validate({ ...output, meals: copy(1.5) })).toThrow('invalid_output');
+    expect(() => validate({ ...output, meals: copy(2).replace('Log', 'Record') })).toThrow(
+      'invalid_output'
+    );
+    const full = {
+      ...snapshot,
+      daily: {
+        sleep: 'restful',
+        energy: 'full',
+        mood: 'motivated',
+        upFor: 'full_session',
+        body: 'fine',
+      },
+    };
+    const plan = buildDeterministicDailyPlanV2(full, day);
+    expect(validate(plan, full).output.meals).toBe(copy(2.5));
+    expect(() => validate({ ...plan, meals: copy(2) }, full)).toThrow('invalid_output');
+    expect(validate({ ...plan, meals: copy(3) }, full).output.meals).toBe(copy(3));
+  });
+  test('nutrient guidance is accepted and named foods are rejected in meals and why', () => {
+    expect(validate(output).output.meals).toBe(
+      "Log today's meals for feedback. Aim for 2 litres of water."
+    );
+    for (const food of ['chicken', 'rice', 'jollof', 'tofu']) {
+      expect(() =>
+        validate({
+          ...output,
+          meals: `Try ${food} with vegetables. Aim for 2 litres of water today.`,
+        })
+      ).toThrow('invalid_output');
+      expect(() => validate({ ...output, why: `${output.why} Try ${food}.` })).toThrow(
+        'invalid_output'
+      );
+    }
+  });
+  test('specific foods are rejected even when supported by a shared caption', () => {
     const claim = {
       ...output,
       meals:
@@ -187,7 +220,7 @@ describe('v2 daily plan contract', () => {
         { day: '2026-09-27', caption: 'Eggs and toast', source: 'shared_member_caption' },
       ],
     };
-    expect(validate(claim, state).output.meals).toContain('You logged eggs');
+    expect(() => validate(claim, state)).toThrow('invalid_output');
     expect(() =>
       validate(
         {

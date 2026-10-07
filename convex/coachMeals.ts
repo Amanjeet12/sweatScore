@@ -11,7 +11,7 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
-import { MEAL_PROMPT_VERSION } from './coachMealPrompt';
+import { MEAL_PROMPT_VERSION } from './coachMealPromptV2';
 import { evaluateUserMilestones } from './utils/milestones';
 import { formatDateInTZ } from './utils/timezone';
 import { rewardSlotKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
@@ -194,7 +194,7 @@ export const saveCaption = mutation({
     const revision = submission.planRevisionId ? await ctx.db.get(submission.planRevisionId) : null;
     const request = revision ? await ctx.db.get(revision.requestId) : null;
     const profile = request ? await ctx.db.get(request.profileRevisionId) : null;
-    const goal = profile?.answers.goal ?? 'unavailable';
+    const goal = profile?.answers.goal ?? 'fitness';
     const activities = await ctx.db
       .query('dailyActivities')
       .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', submission.day))

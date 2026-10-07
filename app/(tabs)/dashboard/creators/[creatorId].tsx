@@ -1,6 +1,6 @@
 import { useQuery } from 'convex/react';
 import { router, Stack, useLocalSearchParams, usePathname } from 'expo-router';
-import { Barbell, PencilSimple } from 'phosphor-react-native';
+import { Barbell } from 'phosphor-react-native';
 import { FlatList, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +18,6 @@ import {
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { Doc, Id } from '~/convex/_generated/dataModel';
-import { useAuthStore } from '~/store/useAuthStore';
 
 function WorkoutCard({
   video,
@@ -71,7 +70,6 @@ function WorkoutCard({
 export default function TabDashboardCreator() {
   const { creatorId, fromWorkouts } = useLocalSearchParams();
   const library = usePathname().startsWith('/workouts/');
-  const currentUser = useAuthStore((state) => state.currentUser);
   const creator = useQuery(
     api.admin.getCreator,
     typeof creatorId === 'string' ? { creatorId: creatorId as Id<'creators'> } : 'skip'
@@ -109,29 +107,8 @@ export default function TabDashboardCreator() {
             <CollectionHero
               name={creator.name}
               uri={creator.posterImageUrl ?? workoutThumbnail(videos[0]?.youtubeUrl)}
-              count={videos.length}>
-              {currentUser?.isAdmin ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit ${creator.name}`}
-                  onPress={() =>
-                    router.push({ pathname: '/creator/edit', params: { creatorId: creator._id } })
-                  }
-                  style={{
-                    position: 'absolute',
-                    right: 16,
-                    top: 16,
-                    width: 44,
-                    height: 44,
-                    borderRadius: 22,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <PencilSimple size={20} color="#fff" weight="bold" />
-                </TouchableOpacity>
-              ) : null}
-            </CollectionHero>
+              count={videos.length}
+            />
             {creator.description ? (
               <Text style={[type.supporting, { marginTop: 16 }]}>{creator.description}</Text>
             ) : null}

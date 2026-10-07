@@ -1,7 +1,7 @@
 import { dailyPolicy, validateDailyPlanOutput, verifiedStepAverage } from './coachDailyPolicy';
 import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPolicy';
 import { hasBodyFeeling } from '../shared/coachBodyFeeling';
-import { DAILY_PLAN_COPY_LIMITS, mealPlanSummary } from '../shared/coachPlanCopy';
+import { DAILY_PLAN_COPY_LIMITS, dailyMealGuidance } from '../shared/coachPlanCopy';
 import { addDaysToDateKey } from './utils/timezone';
 
 export type DailyOutputV2 = DailyOutput & {
@@ -39,6 +39,22 @@ const FOODS = [
   'chickpeas',
   'oats',
   'omelette',
+  'rice',
+  'bread',
+  'pasta',
+  'potatoes',
+  'potato',
+  'plantain',
+  'yam',
+  'jollof',
+  'beef',
+  'pork',
+  'goat',
+  'avocado',
+  'broccoli',
+  'cabbage',
+  'spinach',
+  'fufu',
 ];
 const unsafe =
   /\b(?:calories|macros|grams|sets?|reps?|weights?|cheat(?:ing)?|bad food|good food)\b|—/i;
@@ -91,9 +107,17 @@ export function validateDailyPlanOutputV2(
     )
       throw new Error('invalid_output');
   }
-  if (mealPlanSummary(six.meals as string) !== (six.meals as string).trim())
+  const water = (six.meals as string).match(/Aim for (\d+(?:\.\d)?) litres of water\./);
+  const waterLitres = water ? Number(water[1]) : NaN;
+  if (
+    !Number.isFinite(waterLitres) ||
+    waterLitres < 2 ||
+    dailyMealGuidance(waterLitres) !== six.meals
+  )
     throw new Error('invalid_output');
   const base = validateDailyPlanOutput(six, snapshot, day, recentPlans);
+  if (base.workout.type !== 'rest' && (base.workout.durationMinutes ?? 0) >= 45 && waterLitres <= 2)
+    throw new Error('invalid_output');
   if (!Array.isArray(workoutExamples) || workoutExamples.some((item) => typeof item !== 'string'))
     throw new Error('invalid_output');
   const examples = (workoutExamples as string[]).map((item) => item.trim().toLowerCase());
@@ -173,37 +197,14 @@ export function validateDailyPlanOutputV2(
     cardio: /cardio|walking|cycling|march/i,
   };
   if (!workoutMention[base.workout.type].test(base.output.why)) throw new Error('invalid_output');
-  const mealFood = FOODS.find((food) => new RegExp(`\\b${food}\\b`, 'i').test(base.output.meals));
-  const priorFoodClaim = remembered.test(`${base.output.meals} ${base.output.why}`);
-  const claimedFoods = FOODS.filter((food) =>
-    new RegExp(
-      `\\b(?:you (?:logged|ate|had)|your last (?:meal|food))\\b[^.!?]{0,60}\\b${food}\\b`,
-      'i'
-    ).test(`${base.output.meals} ${base.output.why}`)
-  );
-  const captionSupportsFood = (snapshot.mealHistory ?? []).some(
-    (item) =>
-      item.source === 'shared_member_caption' &&
-      new RegExp(`\\b${mealFood}\\b`, 'i').test(item.caption)
-  );
+  const nutritionCopy = `${base.output.meals} ${base.output.why}`;
   if (
-    !mealFood ||
-    !/meal|food|eggs?|fish|salmon|tuna|chicken|tofu|beans|lentils|yogurt|yoghurt|chickpeas|oats|omelette/i.test(
+    FOODS.some((food) => new RegExp(`\\b${food}\\b`, 'i').test(nutritionCopy)) ||
+    !/\b(?:meal|food|protein|carbs?|carbohydrates?|vegetables?|fibre|fiber|fats?)\b/i.test(
       base.output.why
     ) ||
-    /protein at the centre of every plate/i.test(base.output.meals) ||
-    preference.test(`${base.output.meals} ${base.output.why}`) ||
-    (priorFoodClaim &&
-      (!captionSupportsFood ||
-        !claimedFoods.length ||
-        claimedFoods.some(
-          (food) =>
-            !(snapshot.mealHistory ?? []).some(
-              (item) =>
-                item.source === 'shared_member_caption' &&
-                new RegExp(`\\b${food}\\b`, 'i').test(item.caption)
-            )
-        )))
+    preference.test(nutritionCopy) ||
+    remembered.test(nutritionCopy)
   )
     throw new Error('invalid_output');
   if (
@@ -285,7 +286,7 @@ export function buildDeterministicDailyPlanV2(
     average === undefined
       ? 'This target fits today’s sleep and energy without assuming a step history.'
       : 'Your recent step average and today’s readiness make this a practical target.';
-  const meals = 'Try eggs with vegetables and aim for 2 litres of water today.';
+  const meals = dailyMealGuidance(!rest && duration >= 45 ? 2.5 : 2);
   const workoutSummary = rest
     ? 'Rest supports recovery'
     : type === 'lower_body_strength'
@@ -302,6 +303,6 @@ export function buildDeterministicDailyPlanV2(
     stepsReason,
     sleep: policy.sleep,
     meals,
-    why: `${workoutSummary}, while ${steps} fit today’s answers. Eggs with vegetables offer a simple meal option.`,
+    why: `${workoutSummary}, while ${steps} fit today’s answers. Balanced protein, carbs and vegetables support your goal.`,
   };
 }

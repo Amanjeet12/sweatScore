@@ -5,7 +5,7 @@ import { Bell } from 'phosphor-react-native';
 import { useState } from 'react';
 import { Modal, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 
-import CoachActionButton from '~/components/core/CoachActionButton';
+import { PrototypeButton } from '~/components/core/auth/PrototypeOnboarding';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 
@@ -72,7 +72,7 @@ export default function NotificationPermissionModal({ onClose }: { onClose: () =
             maxWidth: 360,
             maxHeight: height * 0.85,
             borderRadius: 28,
-            backgroundColor: '#FFF9F5',
+            backgroundColor: '#FFFFFF',
             overflow: 'hidden',
           }}>
           <ScrollView contentContainerStyle={{ padding: 24 }} bounces={false}>
@@ -110,7 +110,7 @@ export default function NotificationPermissionModal({ onClose }: { onClose: () =
                 {error}
               </Text>
             ) : null}
-            <CoachActionButton
+            <PrototypeButton
               className="mt-6"
               label={busy ? 'Saving…' : 'Turn on notifications'}
               disabled={busy}
@@ -118,7 +118,7 @@ export default function NotificationPermissionModal({ onClose }: { onClose: () =
                 finish(true);
               }}
             />
-            <CoachActionButton
+            <PrototypeButton
               className="mt-3"
               variant="secondary"
               label="Skip for now"

@@ -138,11 +138,11 @@ const MessageReactions = ({
                     onPress={handleShowSeen}
                     accessibilityRole="button"
                     accessibilityLabel={`View ${seenCount} people who saw this message`}
-                    className="h-10 flex-row items-center justify-center rounded-full bg-[#F1ECFF] px-3">
-                    <Eye size={17} color="#7441D8" weight="bold" />
+                    className="h-10 flex-row items-center justify-center rounded-full bg-[#f5f5f5] px-3">
+                    <Eye size={17} color="#2a2a2a" weight="bold" />
 
                     {seenCount > 0 ? (
-                      <Text className="ml-1 font-body text-[11px] font-bold text-[#7441D8]">
+                      <Text className="ml-1 font-body text-[11px] font-bold text-[#2a2a2a]">
                         {seenCount}
                       </Text>
                     ) : null}
@@ -159,7 +159,7 @@ const MessageReactions = ({
                     onPress={handleTogglePin}
                     accessibilityRole="button"
                     accessibilityLabel={isPinned ? 'Unpin message' : 'Pin message'}
-                    className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF1E8]">
+                    className="h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f5]">
                     <PushPin size={18} color="#F35E16" weight={isPinned ? 'fill' : 'bold'} />
                   </TouchableOpacity>
 
@@ -172,7 +172,7 @@ const MessageReactions = ({
                 onPress={handleReply}
                 accessibilityRole="button"
                 accessibilityLabel="Reply to message"
-                className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF1E8]">
+                className="h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f5]">
                 <ArrowBendUpLeft size={18} color="#F35E16" weight="bold" />
               </TouchableOpacity>
 
@@ -185,7 +185,7 @@ const MessageReactions = ({
                     onPress={handleDelete}
                     accessibilityRole="button"
                     accessibilityLabel="Delete message"
-                    className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF0F0]">
+                    className="h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f5]">
                     <Trash size={18} color="#D14343" weight="bold" />
                   </TouchableOpacity>
                 </>

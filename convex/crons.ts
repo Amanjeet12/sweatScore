@@ -5,6 +5,13 @@ import { legacySchedulerRetired } from './legacySchedulerCutover';
 
 const crons = cronJobs();
 
+crons.interval(
+  'Send Client Trigger Notifications',
+  { minutes: 5 },
+  internal.clientNotifications.processScheduledNotifications,
+  {}
+);
+
 // Run every hour to check which users should receive notifications at 9pm their time
 crons.hourly(
   'Send Engagement Notifications',

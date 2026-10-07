@@ -29,6 +29,12 @@ export enum NOTIFICATION_TYPE {
   NEW_REWARD_UNLOCKED_100 = 'newRewardUnlocked100',
 
   NEW_COMMENT_POSTED = 'newCommentPosted',
+  NEW_POST_LIKED = 'newPostLiked',
+  TODAY_PLAN_READY = 'todayPlanReady',
+  TODAY_PLAN_QUESTIONS = 'todayPlanQuestions',
+  CHALLENGE_STARTS_TOMORROW = 'challengeStartsTomorrow',
+  WEEKLY_PROGRESS_PHOTO_DUE = 'weeklyProgressPhotoDue',
+  NEW_MONTH = 'newMonth',
 
   NEW_ADMIN_POST = 'newAdminPost',
 

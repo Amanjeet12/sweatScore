@@ -1,11 +1,13 @@
 import { PushNotifications } from '@convex-dev/expo-push-notifications';
 import { v } from 'convex/values';
 
-import { components } from './_generated/api';
-import { internalAction } from './_generated/server';
+import { components, internal } from './_generated/api';
+import { internalAction, internalQuery } from './_generated/server';
 import { legacySchedulerRetired, shouldSuppressPush } from './legacySchedulerCutover';
+import { clientNotificationContents } from '../shared/clientPushNotifications';
 
 export const notificationContents = {
+  ...clientNotificationContents,
   newActivitySubmitted: {
     title: 'New Activity Submitted',
     body: 'Heads up: {userName} just submitted an activity that needs approval.',
@@ -23,8 +25,8 @@ export const notificationContents = {
     body: 'Heads up: {userName} just claimed a reward!',
   },
   newRewardUnlocked500: {
-    title: 'Challenge complete 🏆',
-    body: "500 points earned! You finished this month's challenge. Take your flowers and keep earning. 🎉",
+    title: "You've hit 500 points 🏆",
+    body: "That's this month's goal hit. Well done 🎉",
   },
   newRewardUnlocked250: {
     title: '200 points 💪',
@@ -35,12 +37,8 @@ export const notificationContents = {
     body: 'Great start to the challenge. Keep it going, sis.',
   },
   newCommentPosted: {
-    title: ' New comment 💬',
-    body: '{userName} commented on your post. Tap to see the sisterhood love',
-  },
-  newAdminPost: {
-    title: 'Community update 📣',
-    body: `There's a fresh post in the community. Tap to see what's new.`,
+    title: '{userName} commented on your post 💬',
+    body: '{commentPreview}',
   },
   noActivityReminder: {
     title: 'SweatScore',
@@ -63,14 +61,28 @@ export const notificationContents = {
   },
 
   videoFeedLive: {
-    title: 'Your video is live 🎥',
-    body: 'Your video just dropped on the feed. 🙌🏾',
+    title: 'Your video is live 🔥',
+    body: 'Nice work. See it in the community 💪🏾',
   },
 };
 
 function interpolate(template: string, options: Record<string, string>) {
   return template.replace(/{(\w+)}/g, (_, key) => options[key] ?? '');
 }
+
+export const canReceivePush = internalQuery({
+  args: { userId: v.id('users'), notificationType: v.string() },
+  handler: async (ctx, args): Promise<boolean> => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || !user.notificationEnabled || !user.expoPushToken) return false;
+    if (
+      ['newCommentPosted', 'newPostLiked'].includes(args.notificationType) &&
+      user.commentNotificationEnabled === false
+    )
+      return false;
+    return true;
+  },
+});
 
 export const sendPushNotification = internalAction({
   args: {
@@ -90,11 +102,18 @@ export const sendPushNotification = internalAction({
 
       v.literal('dailyCheckInLive'),
       v.literal('dailyCheckInReminder'),
-      v.literal('videoFeedLive')
+      v.literal('videoFeedLive'),
+      v.literal('newPostLiked'),
+      v.literal('todayPlanReady'),
+      v.literal('todayPlanQuestions'),
+      v.literal('challengeStartsTomorrow'),
+      v.literal('weeklyProgressPhotoDue'),
+      v.literal('newMonth')
     ),
     options: v.optional(
       v.object({
         userName: v.optional(v.string()),
+        commentPreview: v.optional(v.string()),
         date: v.optional(v.string()),
         postId: v.optional(v.id('posts')),
         challengeId: v.optional(v.id('challenges')),
@@ -110,6 +129,13 @@ export const sendPushNotification = internalAction({
     const interpolatedBody = interpolate(body, args.options ?? {});
 
     for (const userId of args.userId) {
+      if (
+        !(await ctx.runQuery(internal.pushNotification.canReceivePush, {
+          userId,
+          notificationType: args.notificationType,
+        }))
+      )
+        continue;
       await pushNotifications.sendPushNotification(ctx as any, {
         userId,
         notification: {

@@ -79,8 +79,8 @@ export default function LeaderboardPeriodDropdown({
                     onPress={() => selectPeriod(option.id)}
                     className={
                       selected
-                        ? 'rounded-[16px] bg-[#fff3ea] px-4 py-3.5'
-                        : 'rounded-lg px-4 py-3.5 active:bg-[#FFF0E8]'
+                        ? 'rounded-[16px] bg-[#f5f5f5] px-4 py-3.5'
+                        : 'rounded-lg px-4 py-3.5 active:bg-[#f5f5f5]'
                     }>
                     <View className="flex-row items-center justify-between gap-x-3">
                       <Text style={[type.name, { flexShrink: 1 }]}>{option.label}</Text>

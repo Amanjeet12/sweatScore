@@ -110,7 +110,7 @@ export default function CoachProfileEditor() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 36 }}>
         <Text style={[type.body, { marginBottom: 36 }]}>
-          Your saved answers are preselected. Saving may refresh today’s plan once.
+          Your saved answers are preselected. Saving will change your plan from tomorrow.
         </Text>
         {PROFILE_QUESTIONS.map((question) => (
           <View key={question.key} style={{ marginBottom: 36, gap: 14 }}>

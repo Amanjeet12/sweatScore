@@ -960,7 +960,7 @@ export default function GroupInfoScreen() {
                 activeOpacity={0.8}
                 disabled={isSaving}
                 onPress={() => void handleSaveGroup()}
-                className="rounded-lg bg-[#F76B1C] px-5 py-2.5"
+                className="rounded-lg bg-[#2a2a2a] px-5 py-2.5"
                 style={{
                   opacity: isSaving ? 0.65 : 1,
                 }}>
@@ -1085,7 +1085,7 @@ export default function GroupInfoScreen() {
               activeOpacity={0.8}
               disabled={isSaving || selectedUserIds.length === 0}
               onPress={() => void handleAddMembers()}
-              className="rounded-lg bg-[#F76B1C] px-5 py-2.5"
+              className="rounded-lg bg-[#2a2a2a] px-5 py-2.5"
               style={{
                 opacity: isSaving || selectedUserIds.length === 0 ? 0.55 : 1,
               }}>

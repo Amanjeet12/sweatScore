@@ -31,13 +31,17 @@ export default function LeaderboardHeader({
     <View style={styles.header}>
       <View style={styles.period}>
         <Text style={type.caption}>
-          {period === 'month'
-            ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now)
-            : period === 'week'
-              ? 'This Week'
-              : 'Today'}
+          {mode === 'streak'
+            ? 'Current streak'
+            : period === 'month'
+              ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now)
+              : period === 'week'
+                ? 'This Week'
+                : 'Today'}
         </Text>
-        <LeaderboardPeriodDropdown value={period} onChange={onChangePeriod} timeLeft={timeLeft} />
+        {mode === 'points' && (
+          <LeaderboardPeriodDropdown value={period} onChange={onChangePeriod} timeLeft={timeLeft} />
+        )}
       </View>
       <View style={[styles.period, { marginTop: 4 }]}>
         <Text style={[type.title, { flexShrink: 1 }]}>{title}</Text>

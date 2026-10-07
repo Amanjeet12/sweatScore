@@ -89,6 +89,8 @@ export const DailyLimitReachedModal = ({
               </ButtonText>
             </Button>
             <TouchableOpacity
+              accessibilityRole="button"
+              className="min-h-14 w-full items-center justify-center rounded-[20px] bg-[#f5f5f5] px-5 py-3.5"
               onPress={() => {
                 persistSkipIfChecked();
                 handleClose();

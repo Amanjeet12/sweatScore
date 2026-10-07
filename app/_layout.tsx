@@ -98,6 +98,7 @@ export default function Layout() {
             pathname: '/(tabs)/rewards',
           });
         } else if (
+          notificationData.notificationType === NOTIFICATION_TYPE.NEW_POST_LIKED ||
           notificationData.notificationType === NOTIFICATION_TYPE.NEW_COMMENT_POSTED ||
           notificationData.notificationType === NOTIFICATION_TYPE.NEW_ADMIN_POST
         ) {
@@ -111,23 +112,35 @@ export default function Layout() {
               pathname: '/(tabs)/share',
             });
           }
-        } else if (notificationData.notificationType === NOTIFICATION_TYPE.CHALLENGE_POST_LIVE) {
+        } else if (
+          notificationData.notificationType === NOTIFICATION_TYPE.CHALLENGE_POST_LIVE ||
+          notificationData.notificationType === NOTIFICATION_TYPE.VIDEO_FEED_LIVE
+        ) {
           if (notificationData.postId) {
             router.push({
               pathname: '/(tabs)/share/[postId]',
               params: { postId: notificationData.postId as Id<'posts'> },
             });
           }
-        } else if (notificationData.notificationType === NOTIFICATION_TYPE.CHALLENGE_POST_LIVE) {
-          if (notificationData.postId) {
+        } else if (notificationData.notificationType === NOTIFICATION_TYPE.TODAY_PLAN_QUESTIONS) {
+          router.push('/coach-onboarding');
+        } else if (notificationData.notificationType === NOTIFICATION_TYPE.TODAY_PLAN_READY) {
+          router.push('/coach-plan');
+        } else if (
+          notificationData.notificationType === NOTIFICATION_TYPE.WEEKLY_PROGRESS_PHOTO_DUE
+        ) {
+          router.push('/progress-photo');
+        } else if (
+          notificationData.notificationType === NOTIFICATION_TYPE.CHALLENGE_STARTS_TOMORROW
+        ) {
+          if (notificationData.challengeId)
             router.push({
-              pathname: '/(tabs)/share/[postId]',
-
-              params: {
-                postId: notificationData.postId as Id<'posts'>,
-              },
+              pathname: '/challenge-view/[challengeId]',
+              params: { challengeId: notificationData.challengeId as string },
             });
-          }
+          else router.push('/(tabs)/hub');
+        } else if (notificationData.notificationType === NOTIFICATION_TYPE.NEW_MONTH) {
+          router.push('/(tabs)/dashboard');
         } else if (notificationData.notificationType === NOTIFICATION_TYPE.NEW_CHAT_MESSAGE) {
           // Group chat temporarily disabled; ignore old chat notifications.
           /*

@@ -30,6 +30,7 @@ mock.module('phosphor-react-native', () =>
 );
 const { default: CoachPlanItems } = await import('../components/core/dashboard/CoachPlanItems');
 const plan = {
+  workout: { type: 'full_body_strength', durationMinutes: 45 },
   stepTarget: 9000,
   output: {
     headline: 'Good day to push a little.',
@@ -62,7 +63,9 @@ test('shared plan shows four short recommendations and indicators, then YouTube'
   expect(positions.every((n) => n >= 0)).toBe(true);
   expect(positions).toEqual([...positions].sort((a, b) => a - b));
   expect(html).toContain('9,000 steps');
-  expect(html).toContain('Chicken with vegetables, 2 litres of water.');
+  expect(html).not.toContain('Balance protein, carbs and vegetables.');
+  expect(html).toContain('Log today&#x27;s meals for feedback.');
+  expect(html).toContain('Aim for 2 litres of water.');
   expect(html.match(/data-icon="Check"/g)).toHaveLength(2);
   for (const removed of [
     'Not logged yet',
@@ -87,4 +90,20 @@ test('a refreshed recommendation preserves existing check marks', () => {
   expect(refreshedHtml).toContain('Aim for 8 hours tonight.');
   expect(refreshedHtml).not.toContain('Reason for change');
   expect(refreshedHtml.match(/data-icon="Check"/g)).toHaveLength(2);
+});
+
+test('rest and pain plans hide YouTube even when an old workout assignment remains', () => {
+  for (const headline of ['Rest day, and that counts.', 'Rest and recover today.']) {
+    const html = render({
+      ...plan,
+      workout: { type: 'rest' },
+      output: {
+        ...plan.output,
+        headline,
+        workout: 'No workout today. Keep your streak going by logging your meals, steps and sleep.',
+      },
+    });
+    expect(html).not.toContain('Find your workout on YouTube');
+    expect(html).not.toContain('data-icon="YoutubeLogo"');
+  }
 });

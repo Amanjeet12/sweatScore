@@ -557,8 +557,17 @@ export const generateReserved = internalAction({
       return { status: outcome.status };
     }
     const config = providerConfig(claimed.promptVersion);
+    const providerInput = buildDailyProviderInput(
+      claimed.snapshot,
+      claimed.day,
+      claimed.recentPlans
+    );
     const input = {
-      ...buildDailyProviderInput(claimed.snapshot, claimed.day, claimed.recentPlans),
+      ...providerInput,
+      output_constraints: {
+        ...providerInput.output_constraints,
+        ...(isV2DailyPrompt(claimed.promptVersion) ? { include_meal_log_prompt: true } : {}),
+      },
       member_feedback: claimed.feedback,
       feedback_guidance:
         'Use the member ratings to improve personal relevance. Negative ratings are preference feedback and must never override safety rules or verified facts.',

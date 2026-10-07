@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { validateMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy';
 import { MEAL_SYSTEM_PROMPT } from '../convex/coachMealPrompt';
+import { MEAL_SYSTEM_PROMPT as ACTIVE_MEAL_PROMPT } from '../convex/coachMealPromptV2';
 import { analyzeMealPhoto } from '../convex/coachMealProvider';
 import {
   saveCaption,
@@ -20,7 +21,7 @@ import {
 import { getMondayInTZ, addDaysUTC, ymdUTC } from '../convex/utils/timezone';
 
 const day = new Date().toISOString().slice(0, 10);
-const examples = [
+const historicalExamples = [
   {
     verdict: 'Room to improve',
     feedback:
@@ -50,6 +51,38 @@ const examples = [
     verdict: 'On point',
     feedback:
       'Beautifully built plate. Plenty of greens, a good piece of fish, and just the right amount of rice for your goal.',
+  },
+];
+const examples = [
+  {
+    verdict: 'Nearly there',
+    feedback:
+      'Lovely plate, beans and plantain is a proper classic. Keep the plantain to 3 or 4 slices and add an egg or some fish so the meal keeps you full for longer.',
+  },
+  {
+    verdict: 'Nearly there',
+    feedback:
+      'Great choice, that spiced beans topping looks tasty. Keep to about 4 slices of plantain and add a palm of fish, egg or chicken to lift the protein.',
+  },
+  {
+    verdict: 'Nearly there',
+    feedback:
+      'That chicken and veg combination looks tasty. Keep the rice and plantain together to about a quarter of the plate next time.',
+  },
+  {
+    verdict: 'Room to improve',
+    feedback:
+      'Your goat provides protein alongside the rice and plantain. Next time reduce the combined carbs by about a quarter, keeping the same dish.',
+  },
+  {
+    verdict: 'Nearly there',
+    feedback:
+      'The efo riro has greens and protein. Next time keep the swallow to about a fist, reducing this portion by about a quarter.',
+  },
+  {
+    verdict: 'On point',
+    feedback:
+      'Nice balanced plate, the chicken and salad are doing their job. The rice portion looks right for you today, so enjoy it.',
   },
 ];
 function providerResponse(result: any) {
@@ -199,15 +232,39 @@ function fixture(member = 'alice', extras: Record<string, any[]> = {}) {
 }
 
 describe('client meal prompt and provider image contract', () => {
-  test('all six supplied examples remain intact and pass the structural contract', () => {
-    for (const example of examples) {
+  test('historical examples stay intact and current examples pass the client limits', () => {
+    for (const example of historicalExamples)
       expect(MEAL_SYSTEM_PROMPT).toContain(example.feedback);
-      expect(validateMealResult(example)).toEqual(example);
-    }
+    for (const example of examples) expect(validateMealResult(example)).toEqual(example);
+    expect(ACTIVE_MEAL_PROMPT).toContain(examples[0].feedback);
+    expect(ACTIVE_MEAL_PROMPT).toContain(examples[1].feedback);
+    expect(ACTIVE_MEAL_PROMPT).toContain(examples[5].feedback);
     expect(MEAL_SYSTEM_PROMPT).toContain('Bowl Depth & Layering');
     expect(MEAL_SYSTEM_PROMPT).toContain('Nigerian and other West African foods');
     expect(MEAL_SYSTEM_PROMPT).toContain('Do not call avocado olives');
     expect(MEAL_SYSTEM_PROMPT).toContain('egusi');
+  });
+  test('meal feedback enforces word, sentence and non-judgmental formatting limits', () => {
+    const validate = (feedback) => validateMealResult({ verdict: 'Nearly there', feedback });
+    const boundary = `Lovely plate. ${Array.from({ length: 43 }, () => 'protein').join(' ')}.`;
+    expect(validate(boundary)).not.toBeNull();
+    expect(validate(boundary.replace('Lovely plate.', 'Lovely colourful plate.'))).toBeNull();
+    for (const feedback of [
+      'Lovely plate, keep the portion as it is.',
+      'Lovely plate. Protein is present. Keep a fist of carbs. Add greens.',
+      'Lovely plate. Keep the carbs to a fist 😊.',
+      'Lovely plate.\n- Keep the carbs to a fist.',
+      'Lovely plate.\n1. Keep the carbs to a fist.',
+      'Lovely plate. Aim to lose weight.',
+      'Lovely plate. This is a clean treat.',
+      'Lovely plate. Count 100 grams of carbs.',
+      'Lovely plate. This food is bad and naughty.',
+    ])
+      expect(validate(feedback)).toBeNull();
+    expect(validateMealResult({ verdict: null, feedback: NON_MEAL_FEEDBACK })).toEqual({
+      verdict: null,
+      feedback: NON_MEAL_FEEDBACK,
+    });
   });
   test('same actual image is sent first under each saved goal; no text-only surrogate', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -227,8 +284,10 @@ describe('client meal prompt and provider image contract', () => {
       });
       expect(result.ok).toBe(true);
       expect(body.messages[0].content[0].source.data).toBe('actual-photo-bytes');
-      expect(JSON.parse(body.messages[0].content[1].text).goal).toBe(goal);
-      expect(body.system[0].text).toBe(MEAL_SYSTEM_PROMPT);
+      expect(JSON.parse(body.messages[0].content[1].text).goal).toBe(
+        goal === 'unavailable' ? 'fitness' : goal
+      );
+      expect(body.system[0].text).toBe(ACTIVE_MEAL_PROMPT);
     }
   });
   test('non-meal, unclear, layered bowl, stacked starch, pain and workout wording validation', () => {
@@ -237,14 +296,14 @@ describe('client meal prompt and provider image contract', () => {
       validateMealResult({
         verdict: 'Nearly there',
         feedback: 'I cannot see the food clearly. Next time aim for a quarter bowl of carbs.',
-      })?.verdict
-    ).toBe('Nearly there');
+      })
+    ).toBeNull();
     expect(validateMealResult({ verdict: null, feedback: 'Maybe a meal' })).toBeNull();
     expect(
       validateMealResult({ verdict: 'On point', feedback: 'Great food. Count your macros.' })
     ).toBeNull();
     expect(examples[2].feedback).toContain('rice and plantain');
-    expect(examples[4].feedback).toContain('trained today');
+    expect(examples[4].feedback).toContain('about a fist');
   });
   test('provider timeout and invalid output retain safe errors', async () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
@@ -339,7 +398,7 @@ describe('meal draft, scan and share transactions', () => {
       ],
     });
     const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'My meal' });
-    expect(f.rows.coachMealDraftsV1[0].goal).toBe('unavailable');
+    expect(f.rows.coachMealDraftsV1[0].goal).toBe('fitness');
     expect(
       await share._handler(f.ctx, { draftId, caption: 'My meal', skipAnalysis: true })
     ).toMatchObject({ pointsEarned: 2 });

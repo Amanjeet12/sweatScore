@@ -29,7 +29,7 @@ export default function ForceUpdateGate() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => storeUrl && Linking.openURL(storeUrl)}
-            className="mt-8 items-center justify-center rounded-lg bg-primary-500 px-6 py-4">
+            className="mt-8 items-center justify-center rounded-lg bg-[#2a2a2a] px-6 py-4">
             <Text className="font-body text-lg font-semibold text-white">Update Now</Text>
           </TouchableOpacity>
         </View>

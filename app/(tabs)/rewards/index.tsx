@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
@@ -72,6 +73,7 @@ type DashboardData = {
 };
 
 const PRIMARY = colors.icon;
+const PHOTO_ORANGE = '#E8541E';
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(Math.max(0, Math.round(value)));
@@ -186,8 +188,7 @@ export default function TabTrack() {
   const currentPhoto = photos[currentWeekIndex] ?? photos[photos.length - 1];
   const frontBaseline = photos[0];
   const sideBaseline = photos.find((photo) => photo.sideUrl);
-  const canCompareSide = Boolean(sideBaseline?.sideUrl && currentPhoto?.sideUrl);
-  const showSide = view === 'side' && canCompareSide;
+  const showSide = view === 'side';
   const baselinePhoto = showSide ? sideBaseline : frontBaseline;
   const baselineWeekNumber = baselinePhoto ? photos.indexOf(baselinePhoto) + 1 : 1;
   const comparisonLeft = showSide ? baselinePhoto?.sideUrl : baselinePhoto?.frontUrl;
@@ -456,7 +457,7 @@ export default function TabTrack() {
 
           <View className="mt-4 rounded-[24px] bg-white px-6 pb-5 pt-5">
             <View className="flex-row items-center justify-between gap-2">
-              <Text style={[type.cardTitle, { flex: 1 }]}>Your progress</Text>
+              <Text style={[type.sectionHeading, { flex: 1 }]}>Your progress</Text>
               {photos.length ? (
                 <ProgressDropdown
                   value={currentWeekIndex}
@@ -466,68 +467,109 @@ export default function TabTrack() {
                 />
               ) : null}
             </View>
-            {photos.length ? (
-              <>
-                {canCompareSide ? (
-                  <View className="mt-3">
-                    <ProgressTabs
-                      label="Progress photo view"
-                      value={showSide ? 'side' : 'front'}
-                      options={
-                        [
-                          ['front', 'Front view'],
-                          ['side', 'Side view'],
-                        ] as const
-                      }
-                      onChange={setView}
-                    />
-                  </View>
-                ) : null}
-                <View className="mt-3 flex-row gap-x-3 bg-white">
-                  {[comparisonLeft, comparisonRight].map((uri, index) => (
-                    <View
-                      key={`${uri}-${index}`}
-                      className="flex-1 overflow-hidden rounded-[24px] bg-[#F0ECE8]"
-                      style={{ aspectRatio: 0.83 }}>
-                      {uri ? (
-                        <Image
-                          source={{ uri }}
-                          style={{ width: '100%', height: '100%' }}
-                          contentFit="cover"
-                        />
-                      ) : null}
-                      <View className="absolute left-2 top-2 rounded-[20px] bg-[#382C25] px-2 py-1">
-                        <Text
-                          style={{ fontFamily: 'Inter_600SemiBold' }}
-                          className="text-xs text-white">
-                          Week {index === 0 ? baselineWeekNumber : currentWeekNumber}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </>
-            ) : (
-              <View className="mt-4 flex-row gap-x-3">
+            <View
+              className="mb-5 mt-4 flex-row gap-7"
+              accessibilityRole="tablist"
+              accessibilityLabel="Progress photo view">
+              {(['front', 'side'] as const).map((photoView) => (
                 <TouchableOpacity
-                  onPress={openProgressPhoto}
-                  className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#fff3ea]">
-                  <Camera size={28} color={PRIMARY} />
-                  <Text style={type.compactCardTitle} className="mt-2">
-                    Week 1
-                  </Text>
-                  <Text className="mt-1" style={type.smallCaption}>
-                    Add a photo
+                  key={photoView}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: view === photoView }}
+                  onPress={() => setView(photoView)}
+                  className="min-h-11 justify-center border-b-2"
+                  style={{ borderColor: view === photoView ? PHOTO_ORANGE : 'transparent' }}>
+                  <Text
+                    style={[
+                      type.photoTab,
+                      {
+                        color: view === photoView ? PHOTO_ORANGE : '#6F6F6F',
+                        fontFamily: view === photoView ? 'Inter_600SemiBold' : 'Inter_400Regular',
+                      },
+                    ]}>
+                    {photoView === 'front' ? 'Front view' : 'Side view'}
                   </Text>
                 </TouchableOpacity>
-                <View className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#f5f5f5]">
-                  <LockSimple size={22} color={PRIMARY} weight="regular" />
-                  <Text className="mt-2 text-center" style={type.smallCaption}>
-                    Unlocks after Week 1
-                  </Text>
-                </View>
-              </View>
-            )}
+              ))}
+            </View>
+            <View className="flex-row justify-between gap-3">
+              {[baselinePhoto, currentPhoto].map((photo, index) => {
+                const uri = index === 0 ? comparisonLeft : comparisonRight;
+                const available = index === 0 || photos.length > 0;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    disabled={Boolean(photo) || index !== 0}
+                    onPress={openProgressPhoto}
+                    accessibilityRole={!photo && index === 0 ? 'button' : undefined}
+                    accessibilityLabel={!photo && index === 0 ? 'Week 1, add a photo' : undefined}
+                    activeOpacity={0.88}
+                    className="flex-1 overflow-hidden rounded-[22px]"
+                    style={{
+                      aspectRatio: 0.71,
+                      backgroundColor: index === 0 ? '#FFF9F6' : '#F3F0ED',
+                    }}>
+                    {uri ? (
+                      <Image
+                        source={{ uri }}
+                        contentFit="cover"
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    ) : (
+                      <View className="flex-1 items-center justify-center p-3">
+                        {available ? (
+                          <Camera color={PHOTO_ORANGE} size={30} />
+                        ) : (
+                          <LockSimple color={PHOTO_ORANGE} size={27} />
+                        )}
+                        {available ? (
+                          <>
+                            {index !== 0 ? (
+                              <Text
+                                style={[type.compactCardTitle, { textAlign: 'center' }]}
+                                className="mt-3">
+                                Week {nextWeekNumber}
+                              </Text>
+                            ) : null}
+                            <Text
+                              style={[type.smallCaption, { color: '#77716D', textAlign: 'center' }]}
+                              className="mt-1">
+                              {photo ? 'Photo unavailable' : 'Add a photo'}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text
+                            style={[type.smallCaption, { color: '#817A76', textAlign: 'center' }]}
+                            className="mt-3">
+                            Unlocks after Week 1
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                    {photo ? (
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.55)']}
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          paddingHorizontal: 14,
+                          paddingBottom: 14,
+                          paddingTop: 40,
+                        }}>
+                        <Text style={[type.compactCardTitle, { color: '#fff' }]}>
+                          Week {index === 0 ? baselineWeekNumber : currentWeekNumber}
+                        </Text>
+                        <Text style={[type.smallCaption, { color: 'rgba(255,255,255,0.8)' }]}>
+                          {formatWeekStart(photo.weekStart)}
+                        </Text>
+                      </LinearGradient>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <View className="mt-4 flex-row gap-x-2">
               <TouchableOpacity
                 onPress={openProgressPhoto}
@@ -583,8 +625,7 @@ export default function TabTrack() {
             <View className="mt-4 flex-row bg-white py-3">
               <View className="flex-1">
                 <Text style={[type.todayTitle, { fontSize: 26, lineHeight: 32 }]}>
-                  {formatNumber(periodTotal)}{' '}
-                  {metric === 'points' ? (periodTotal === 1 ? 'pt' : 'pts') : ''}
+                  {formatNumber(periodTotal)}
                 </Text>
                 <Text className="mt-1" style={type.caption}>
                   {trendLabel} total {periodLabel}

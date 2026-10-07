@@ -23,7 +23,7 @@ export function planBannerLabel(state: PlanBannerState) {
   return {
     locked: 'Premium access unavailable',
     no_plan: 'Get today’s plan',
-    pending: 'Preparing today’s plan',
+    pending: 'Preparing',
     ready: 'View today’s plan',
     failed: 'Retry today’s plan',
     unavailable: 'Today’s plan unavailable',

@@ -256,8 +256,8 @@ export default function AchievementPopupManager({
             onPress={() => {
               void closePopup();
             }}
-            className="absolute right-4 top-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-[#DEDEDE]">
-            <Icon.X size={28} weight="bold" color="white" />
+            className="absolute right-4 top-4 z-10 h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f5]">
+            <Icon.X size={28} weight="bold" color="#2a2a2a" />
           </TouchableOpacity>
 
           <Text className="text-center text-[52px] leading-[62px]">{activePopup.icon}</Text>
@@ -280,7 +280,7 @@ export default function AchievementPopupManager({
             onPress={() => {
               void handleShare();
             }}
-            className="mt-8 h-14 items-center justify-center rounded-full bg-primary-500">
+            className="mt-8 h-14 items-center justify-center rounded-full bg-[#2a2a2a]">
             <Text className="font-heading text-base font-semibold text-white">
               {activePopup.buttonText}
             </Text>
@@ -292,7 +292,7 @@ export default function AchievementPopupManager({
             onPress={() => {
               void closePopup();
             }}
-            className="mt-4 py-1">
+            className="mt-4 min-h-14 items-center justify-center rounded-[20px] bg-[#f5f5f5] px-5 py-3.5">
             <Text className="text-center font-body text-base font-medium text-[#3C3C3C]">
               Keep sweating
             </Text>

@@ -42,7 +42,7 @@ const SeenByModal = ({ visible, members, onClose }: SeenByModalProps) => {
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel="Close seen by list"
-              className="h-10 w-10 items-center justify-center rounded-full bg-[#F5F1EE]">
+              className="h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f5]">
               <X size={19} color="#4D4743" weight="bold" />
             </TouchableOpacity>
           </View>

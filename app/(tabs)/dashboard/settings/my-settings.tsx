@@ -10,6 +10,7 @@ import { BackButton } from '~/components/core/BackButton';
 import SafeAreaView from '~/components/core/SafeAreaView';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
+import { deleteAccountAndClearSession } from '~/shared/accountDeletion';
 import { useAuthStore } from '~/store/useAuthStore';
 import { externalLinks } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
@@ -81,17 +82,21 @@ export default function TabMySettings() {
                   onPress: async () => {
                     setDeleting(true);
                     try {
-                      await deleteAccountMutation();
-                      setCurrentUser(null);
-                      await signOut();
-                      await delay(500);
-                      await Purchases.logOut();
-                      router.dismissAll();
-                      router.replace({ pathname: '/' });
+                      await deleteAccountAndClearSession({
+                        deleteAccount: deleteAccountMutation,
+                        clearUser: () => setCurrentUser(null),
+                        signOut,
+                        billingLogout: () => Purchases.logOut(),
+                        onCleanupError: (step, error) =>
+                          console.warn(`Account deletion ${step} cleanup failed`, error),
+                      });
                     } catch (error) {
                       Alert.alert('Error', 'Failed to delete account. Please try again.');
                       setDeleting(false);
+                      return;
                     }
+                    router.dismissAll();
+                    router.replace({ pathname: '/' });
                   },
                 },
               ]

@@ -117,7 +117,7 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
             gap: 12,
           }}>
           {[
-            { label: 'Check-ins', Icon: Icon.CheckFat, points: activity.checkInPoints },
+            { label: 'Check-ins', Icon: Icon.Check, points: activity.checkInPoints },
             { label: 'Steps', Icon: Icon.Footprints, points: activity.stepsPoints },
             { label: 'Active mins', Icon: Icon.Clock, points: activity.zone2Points },
             { label: 'Challenges', Icon: Icon.Trophy, points: activity.challengePoints },
@@ -140,7 +140,7 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                <ActivityIcon size={16} weight="fill" color="#e8541e" />
+                <ActivityIcon size={16} weight="regular" color="#e8541e" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={type.smallCaption}>{label}</Text>

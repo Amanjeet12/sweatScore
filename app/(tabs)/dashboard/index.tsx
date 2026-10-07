@@ -143,9 +143,9 @@ export default function TodayScreen() {
     setShowFirstPlanSpotlight(
       Boolean(
         firstPlanKey &&
-          plan?.access &&
-          plan.requestStatus === 'none' &&
-          !storage.getBoolean(firstPlanKey)
+        plan?.access &&
+        plan.requestStatus === 'none' &&
+        !storage.getBoolean(firstPlanKey)
       )
     );
   }, [firstPlanKey, plan?.access, plan?.requestStatus]);
@@ -213,15 +213,13 @@ export default function TodayScreen() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const photos = progress?.photos ?? [];
   const firstPhoto = photos[0];
-  const latestPhoto = photos.length > 1 ? photos[photos.length - 1] : undefined;
+  const latestPhoto = photos[photos.length - 1];
   const canLogProgress = Boolean(progress?.canLogCurrentWeek);
   const progressWeek = progressCardWeek(photos.length, canLogProgress);
   const comparisonBaseline =
     photoView === 'side' ? photos.find((photo) => photo.sideUrl) : firstPhoto;
   const baselineWeek = comparisonBaseline ? photos.indexOf(comparisonBaseline) + 1 : 1;
-  const nextPhotoAvailable = Boolean(
-    firstPhoto && !latestPhoto && progressWeek > 1 && canLogProgress
-  );
+  const nextPhotoAvailable = Boolean(firstPhoto);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -328,7 +326,11 @@ export default function TodayScreen() {
           className="mx-[22px] mb-10 overflow-hidden rounded-[22px] bg-[#3A3A40]"
           style={{ minHeight: 240 }}>
           <Image
-            source={bannerImageUrl ? { uri: bannerImageUrl } : require('~/assets/backgrounds/today-plan-gym.jpg')}
+            source={
+              bannerImageUrl
+                ? { uri: bannerImageUrl }
+                : require('~/assets/backgrounds/today-plan-gym.jpg')
+            }
             contentFit="cover"
             contentPosition={{ left: '50%', top: '40%' }}
             style={{ position: 'absolute', width: '100%', height: '100%' }}
@@ -628,9 +630,19 @@ export default function TodayScreen() {
             <>
               <View className="flex-row justify-between gap-3">
                 {[comparisonBaseline, latestPhoto].map((photo, index) => (
-                  <View
+                  <TouchableOpacity
                     key={index}
                     accessible
+                    accessibilityRole={
+                      !photo && canLogProgress && (index === 0 || nextPhotoAvailable)
+                        ? 'button'
+                        : undefined
+                    }
+                    disabled={
+                      Boolean(photo) || !canLogProgress || (index !== 0 && !nextPhotoAvailable)
+                    }
+                    onPress={() => router.push(TODAY_PROGRESS_ROUTES.log)}
+                    activeOpacity={0.88}
                     accessibilityLabel={
                       photo
                         ? `Week ${index === 0 ? baselineWeek : photos.length} progress photo, ${photoDate(photo.weekStart)}`
@@ -703,7 +715,7 @@ export default function TodayScreen() {
                         </Text>
                       </LinearGradient>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
               <View className="mt-5 flex-row justify-center">

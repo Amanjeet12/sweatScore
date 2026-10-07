@@ -12,6 +12,7 @@ import {
   mutation,
   query,
 } from './_generated/server';
+import { accountMediaDeleter } from './accountDeletionMedia';
 import { MailerLiteGroup } from './mailerlite';
 import { EnduranceZoneUserUpsertResponse } from './services/enduranceZone';
 import { formatDateInTZ } from './utils/timezone';
@@ -538,6 +539,8 @@ export const deleteAccount = mutation({
     const user = await ctx.db.get(userId);
     if (!user) return;
 
+    const deleteMedia = accountMediaDeleter(ctx);
+
     // Delete unattached proof media as well as member-owned coach records.
     for (const table of [
       'coachMealScansV1',
@@ -567,14 +570,14 @@ export const deleteAccount = mutation({
               : null;
           const proof = 'submissionId' in record ? await ctx.db.get(record.submissionId) : null;
           if (!linkedActivity && proof?.storageId !== record.storageId)
-            await ctx.storage.delete(record.storageId);
+            await deleteMedia(record.storageId);
         }
         if (table === 'coachProofSubmissionsV1' && 'storageId' in record && record.storageId) {
           const linkedActivity =
             'activityId' in record && record.activityId
               ? await ctx.db.get(record.activityId)
               : null;
-          if (!linkedActivity) await ctx.storage.delete(record.storageId);
+          if (!linkedActivity) await deleteMedia(record.storageId);
         }
         await ctx.db.delete(record._id);
       }
@@ -593,7 +596,7 @@ export const deleteAccount = mutation({
 
     // Delete user's profile image from storage if exists
     if (user.image) {
-      await ctx.storage.delete(user.image);
+      await deleteMedia(user.image);
     }
 
     // Delete all daily activities and their images
@@ -604,7 +607,7 @@ export const deleteAccount = mutation({
 
     for (const activity of dailyActivities) {
       if (activity.image) {
-        await ctx.storage.delete(activity.image);
+        await deleteMedia(activity.image);
       }
       await ctx.db.delete(activity._id);
     }
@@ -678,7 +681,7 @@ export const deleteAccount = mutation({
 
       // Delete post media if exists
       if (post.media) {
-        await ctx.storage.delete(post.media);
+        await deleteMedia(post.media);
       }
 
       // Delete the post
@@ -734,7 +737,7 @@ export const deleteAccount = mutation({
 
       // Delete creator's poster image if exists
       if (creator.posterImage) {
-        await ctx.storage.delete(creator.posterImage);
+        await deleteMedia(creator.posterImage);
       }
 
       // Delete the creator
@@ -766,7 +769,7 @@ export const deleteAccount = mutation({
 
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    ctx.scheduler.runAfter(0, internal.leaderboard.recalculateRanksForMonth, {
+    await ctx.scheduler.runAfter(0, internal.leaderboard.recalculateRanksForMonth, {
       yearMonth,
     });
 

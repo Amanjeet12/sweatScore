@@ -48,7 +48,8 @@ export default function CoachPlanItems({
     checkIns?.status === 'ready'
       ? checkIns.assignments.find((item) => item.category === 'workout')?.label
       : undefined;
-  const search = workoutYoutubeSearch(workoutTarget ?? output.workout);
+  const search =
+    plan.workout.type === 'rest' ? null : workoutYoutubeSearch(workoutTarget ?? output.workout);
   return (
     <>
       <View className="mt-7 gap-[22px]">
