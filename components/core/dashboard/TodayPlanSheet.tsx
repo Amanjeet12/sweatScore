@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
-import CoachPlanItems, { PLAN_ROWS } from './CoachPlanItems';
+import CoachPlanItems from './CoachPlanItems';
 import CoachPlanPreparing from './CoachPlanPreparing';
 import DailyQuestion from './DailyQuestion';
 import PlanExplanation from './PlanExplanation';
@@ -24,16 +24,11 @@ import {
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { DAILY_QUESTIONS } from '~/shared/coachQuestions';
 import { planBannerState } from '~/shared/coachToday';
+import { toggleTrainingYesterday, type TrainingYesterday } from '~/shared/coachTrainingYesterday';
 
 type Plan = FunctionReturnType<typeof api.revenueCatEntitlements.myPlan>;
 type CheckIns = FunctionReturnType<typeof api.coachCheckIns.myToday> | undefined;
-const QUESTIONS = [
-  DAILY_QUESTIONS[2],
-  DAILY_QUESTIONS[0],
-  DAILY_QUESTIONS[1],
-  DAILY_QUESTIONS[3],
-  DAILY_QUESTIONS[4],
-];
+const QUESTIONS = DAILY_QUESTIONS;
 export default function TodayPlanSheet({
   firstName,
   plan,
@@ -55,6 +50,10 @@ export default function TodayPlanSheet({
   const submit = useAction(api.coachDailyService.submitDailyAnswersAndGenerate);
   const retry = useMutation(api.coachDailyService.retryFailedPlan);
   const [step, setStep] = useState<number | null>(null);
+  const [pendingTraining, setPendingTraining] = useState<{
+    scope: string;
+    values: TrainingYesterday[];
+  } | null>(null);
   const [pendingBody, setPendingBody] = useState<{ day: string; values: BodyFeeling[] } | null>(
     null
   );
@@ -85,6 +84,35 @@ export default function TodayPlanSheet({
   const question = QUESTIONS[index];
   const selectedBody =
     pendingBody?.day === plan.day ? pendingBody.values : bodySelections(draft?.body);
+  const selectedTraining =
+    pendingTraining?.scope === plan.day ? pendingTraining.values : (draft?.trainedYesterday ?? []);
+  const chooseTraining = async (value: TrainingYesterday) => {
+    if (busy) return;
+    const values = toggleTrainingYesterday(selectedTraining, value);
+    setPendingTraining({ scope: plan.day, values });
+    setBusy(true);
+    setError('');
+    try {
+      await save({ trainedYesterday: values });
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const continueTraining = async () => {
+    if (busy || selectedTraining.length === 0) return;
+    setBusy(true);
+    setError('');
+    try {
+      await save({ trainedYesterday: selectedTraining });
+      setStep(index + 1);
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const chooseBody = async (value: BodyFeeling) => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -143,10 +171,6 @@ export default function TodayPlanSheet({
       requestStatus: plan.requestStatus,
       canRetry: plan.canRetry,
     }) === 'ready';
-  const completed = PLAN_ROWS.filter(
-    ({ category }) =>
-      (checkIns?.assignments.find((item) => item.category === category)?.consumedCount ?? 0) > 0
-  ).length;
   const output = plan.plan?.output;
 
   return (
@@ -181,29 +205,6 @@ export default function TodayPlanSheet({
             <Text style={type.planHeading} className="mt-3.5">
               {output.headline}
             </Text>
-            <View className="mt-[26px]">
-              <View className="flex-row justify-between">
-                <Text style={[type.progressLabel, { flex: 1, paddingRight: 12 }]}>
-                  Today’s progress
-                </Text>
-                <Text style={[type.progressValue, { flexShrink: 1, textAlign: 'right' }]}>
-                  {completed}/4 complete
-                </Text>
-              </View>
-              <View
-                accessibilityRole="progressbar"
-                accessibilityLabel="Today’s plan progress"
-                accessibilityValue={{ min: 0, max: 4, now: completed }}
-                className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#F1F1F1]">
-                <View
-                  style={{
-                    width: `${completed * 25}%`,
-                    backgroundColor: '#ff5a1f',
-                    height: '100%',
-                  }}
-                />
-              </View>
-            </View>
             <CoachPlanItems plan={plan.plan!} checkIns={checkIns} onCheckIn={onCheckIn} />
             <PlanExplanation explanation={output.why} />
             <PlanFeedback revisionId={plan.plan!.revisionId} />
@@ -265,28 +266,39 @@ export default function TodayPlanSheet({
           <DailyQuestion
             index={index}
             total={QUESTIONS.length}
-            title={question.key === 'mood' ? 'How’s your mood today?' : question.title}
+            title={question.title}
             description={
               index === 0 ? 'Answer 5 quick questions to get a personalised plan today.' : undefined
             }
             options={question.options}
             selected={
-              question.key === 'body'
-                ? selectedBody
-                : typeof draft?.[question.key] === 'string'
-                  ? draft[question.key]
-                  : undefined
+              question.key === 'trainedYesterday'
+                ? selectedTraining
+                : question.key === 'body'
+                  ? selectedBody
+                  : typeof draft?.[question.key] === 'string'
+                    ? draft[question.key]
+                    : undefined
             }
-            multiple={question.key === 'body'}
+            multiple={question.key === 'body' || question.key === 'trainedYesterday'}
+            continueLabel={question.key === 'body' ? 'Generate plan' : 'Continue'}
             onContinue={
-              question.key === 'body'
+              question.key === 'trainedYesterday'
                 ? () => {
-                    choose(selectedBody).catch(() => {});
+                    continueTraining().catch(() => {});
                   }
-                : undefined
+                : question.key === 'body'
+                  ? () => {
+                      choose(selectedBody).catch(() => {});
+                    }
+                  : undefined
             }
             busy={busy}
             onChoose={(value) => {
+              if (question.key === 'trainedYesterday') {
+                chooseTraining(value as TrainingYesterday).catch(() => {});
+                return;
+              }
               if (question.key === 'body') chooseBody(value as BodyFeeling).catch(() => {});
               else choose(value).catch(() => {});
             }}

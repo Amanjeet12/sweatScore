@@ -16,8 +16,7 @@ export default function PlanFeedback({ revisionId }: { revisionId: Id<'coachPlan
   return (
     <View className="my-4">
       <Text style={[type.feedbackCaption, { color: '#8A8A8A' }]}>
-        The more you check in with your coach, the more accurate your plan becomes. Completing your
-        profile helps personalise it too.
+        The more you check in and update your profile, the more accurate your plan becomes.
       </Text>
       <View className="mt-3 flex-row items-center gap-3">
         <Text style={type.feedbackQuestion} className="flex-1">

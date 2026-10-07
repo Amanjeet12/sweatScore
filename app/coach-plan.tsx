@@ -20,7 +20,6 @@ import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { planCardState } from '~/shared/coachPlanCards';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
-const categories = ['workout', 'steps', 'sleep', 'meals'] as const;
 const titles = { workout: 'Workout', steps: 'Steps', sleep: 'Sleep', meals: 'Meals' };
 export default function SavedCoachPlan() {
   const { nextCheckIn } = useLocalSearchParams<{ nextCheckIn?: string }>();
@@ -58,14 +57,6 @@ export default function SavedCoachPlan() {
   const rest = plan?.workout.type === 'rest';
   const open = (category: CoachCategory) =>
     router.dismissTo({ pathname: '/(tabs)/dashboard', params: { checkIn: category } });
-  const visibleCategories = categories.filter((category) => !(category === 'workout' && rest));
-  const completedCategories = visibleCategories.filter((category) => {
-    const assignment = checkIns?.assignments.find((item) => item.category === category);
-    return (assignment?.consumedCount ?? 0) > 0;
-  }).length;
-  const completionPercent = visibleCategories.length
-    ? Math.round((completedCategories / visibleCategories.length) * 100)
-    : 0;
   const planDate = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'short',
@@ -108,29 +99,6 @@ export default function SavedCoachPlan() {
             ) : null}
 
             <Text style={type.planHeading}>{output.headline}</Text>
-            <View className="mb-7 mt-[26px]">
-              <View className="flex-row justify-between">
-                <Text style={[type.progressLabel, { flex: 1, paddingRight: 12 }]}>
-                  Today’s progress
-                </Text>
-                <Text style={[type.progressValue, { flexShrink: 1, textAlign: 'right' }]}>
-                  {completedCategories}/{visibleCategories.length} complete
-                </Text>
-              </View>
-              <View
-                className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#F1F1F1]"
-                accessibilityRole="progressbar"
-                accessibilityLabel="Today’s plan progress"
-                accessibilityValue={{ min: 0, max: 100, now: completionPercent }}>
-                <View
-                  style={{
-                    height: '100%',
-                    width: `${completionPercent}%`,
-                    backgroundColor: '#ff5a1f',
-                  }}
-                />
-              </View>
-            </View>
             {selectedCheckIn && !(selectedCheckIn === 'workout' && rest) ? (
               <CoachActionButton
                 label={`Continue to ${titles[selectedCheckIn]} check-in`}

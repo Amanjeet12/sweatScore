@@ -90,9 +90,6 @@ export default function CoachPlanItems({
       {search ? (
         <View className="mt-[34px]">
           <Text style={type.sheetSectionHeading}>Find your workout on YouTube</Text>
-          <Text style={type.supporting} className="mt-1">
-            Search for a workout that fits today’s plan.
-          </Text>
           <TouchableOpacity
             accessibilityRole="link"
             accessibilityLabel={`Search ${search.phrase} on YouTube`}
@@ -101,7 +98,7 @@ export default function CoachPlanItems({
                 Alert.alert('YouTube could not be opened. Please try again.')
               )
             }
-            className="mt-3 min-h-16 flex-row items-center rounded-[32px] bg-[#F5F5F5] px-[22px] py-4">
+            className="mt-3 min-h-16 flex-row items-center rounded-[16px] border border-[#E0E0E0] bg-white px-4 py-4">
             <MagnifyingGlass size={24} color="#8A8A8A" />
             <Text style={type.search} className="mx-3 min-w-0 flex-1">
               {search.phrase}

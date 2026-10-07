@@ -29,6 +29,7 @@ import {
 } from '~/shared/coachBodyFeeling';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
+import { toggleTrainingYesterday, type TrainingYesterday } from '~/shared/coachTrainingYesterday';
 import { useAuthStore } from '~/store/useAuthStore';
 import { resumeMember } from '~/utils/coachResumeNavigation';
 
@@ -127,6 +128,10 @@ export default function CoachOnboarding() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
+  const [pendingTraining, setPendingTraining] = useState<{
+    scope: string;
+    values: TrainingYesterday[];
+  } | null>(null);
   const [pendingBody, setPendingBody] = useState<{ scope: string; values: BodyFeeling[] } | null>(
     null
   );
@@ -253,6 +258,44 @@ export default function CoachOnboarding() {
               ? foundation.state.dailyDraft?.body
               : undefined
         );
+  const selectedTraining =
+    pendingTraining?.scope === bodyScope
+      ? pendingTraining.values
+      : ((reanswerMode
+          ? testDraft
+          : foundation.state?.dailyDraftDay === decision.day
+            ? foundation.state.dailyDraft
+            : undefined
+        )?.trainedYesterday ?? []);
+  const chooseTraining = async (value: TrainingYesterday) => {
+    if (busy) return;
+    const values = toggleTrainingYesterday(selectedTraining, value);
+    setPendingTraining({ scope: bodyScope, values });
+    setBusy(true);
+    setError('');
+    try {
+      if (reanswerMode) await saveReanswer({ trainedYesterday: values });
+      else await saveDaily({ trainedYesterday: values });
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const continueTraining = async () => {
+    if (busy || selectedTraining.length === 0) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (reanswerMode) await saveReanswer({ trainedYesterday: selectedTraining });
+      else await saveDaily({ trainedYesterday: selectedTraining });
+      setLocalStep(step + 1);
+    } catch {
+      setError('Could not save your answer. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const chooseBody = async (value: BodyFeeling) => {
     if (busy || submissionRef.current) return;
     submissionRef.current = true;
@@ -584,17 +627,32 @@ export default function CoachOnboarding() {
                   : undefined
           }
           options={question.options}
-          selected={question.key === 'body' ? selectedBody : effectiveDailyChoice}
-          multiple={question.key === 'body'}
+          selected={
+            question.key === 'trainedYesterday'
+              ? selectedTraining
+              : question.key === 'body'
+                ? selectedBody
+                : effectiveDailyChoice
+          }
+          multiple={question.key === 'body' || question.key === 'trainedYesterday'}
+          continueLabel={question.key === 'body' ? 'Generate plan' : 'Continue'}
           onContinue={
-            question.key === 'body'
+            question.key === 'trainedYesterday'
               ? () => {
-                  submitBody().catch(() => {});
+                  continueTraining().catch(() => {});
                 }
-              : undefined
+              : question.key === 'body'
+                ? () => {
+                    submitBody().catch(() => {});
+                  }
+                : undefined
           }
           busy={busy}
           onChoose={(value) => {
+            if (question.key === 'trainedYesterday') {
+              chooseTraining(value as TrainingYesterday).catch(() => {});
+              return;
+            }
             if (question.key === 'body') {
               chooseBody(value as BodyFeeling).catch(() => {});
               return;

@@ -45,6 +45,7 @@ const dailyDraftFields = {
   sleep: v.optional(dailyAnswers.fields.sleep),
   energy: v.optional(dailyAnswers.fields.energy),
   mood: v.optional(dailyAnswers.fields.mood),
+  trainedYesterday: dailyAnswers.fields.trainedYesterday,
   upFor: v.optional(dailyAnswers.fields.upFor),
   body: v.optional(dailyAnswers.fields.body),
 };
@@ -125,13 +126,20 @@ function validatedBody(answer: BodyAnswer) {
   return typeof answer === 'string' ? answer : selected;
 }
 function completeDaily(draft: Doc<'coachOnboardingV1'>['dailyDraft']) {
-  if (!draft?.sleep || !draft.energy || !draft.mood || !draft.upFor || isUnanswered(draft.body)) {
+  if (
+    !draft?.sleep ||
+    !draft.energy ||
+    !draft.upFor ||
+    isUnanswered(draft.body) ||
+    (!draft.mood && isUnanswered(draft.trainedYesterday))
+  ) {
     throw new ConvexError('Five daily answers required');
   }
   return {
     sleep: draft.sleep,
     energy: draft.energy,
     mood: draft.mood,
+    trainedYesterday: draft.trainedYesterday,
     upFor: draft.upFor,
     body: validatedBody(draft.body!),
   };
@@ -145,6 +153,7 @@ function sameDailyAnswers(
     left.sleep === right.sleep &&
     left.energy === right.energy &&
     left.mood === right.mood &&
+    JSON.stringify(left.trainedYesterday) === JSON.stringify(right.trainedYesterday) &&
     left.upFor === right.upFor &&
     JSON.stringify(bodySelections(left.body).sort()) ===
       JSON.stringify(bodySelections(right.body).sort())

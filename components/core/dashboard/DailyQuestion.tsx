@@ -21,6 +21,7 @@ export default function DailyQuestion({
   busy,
   onChoose,
   onContinue,
+  continueLabel = 'Continue',
   onBack,
   onClose,
 }: {
@@ -34,6 +35,7 @@ export default function DailyQuestion({
   busy: boolean;
   onChoose: (value: string) => void;
   onContinue?: () => void;
+  continueLabel?: string;
   onBack?: () => void;
   onClose: () => void;
 }) {
@@ -114,7 +116,7 @@ export default function DailyQuestion({
       </View>
       {multiple && onContinue ? (
         <PrototypeButton
-          label="Get today’s plan"
+          label={continueLabel}
           onPress={onContinue}
           disabled={busy || !selected || selected.length === 0}
           style={{ marginTop: 24 }}

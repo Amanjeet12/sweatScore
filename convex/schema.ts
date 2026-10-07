@@ -403,6 +403,7 @@ const schema = defineSchema({
         sleep: v.optional(dailyAnswers.fields.sleep),
         energy: v.optional(dailyAnswers.fields.energy),
         mood: v.optional(dailyAnswers.fields.mood),
+        trainedYesterday: dailyAnswers.fields.trainedYesterday,
         upFor: v.optional(dailyAnswers.fields.upFor),
         body: v.optional(dailyAnswers.fields.body),
       })
@@ -415,6 +416,7 @@ const schema = defineSchema({
         sleep: v.optional(dailyAnswers.fields.sleep),
         energy: v.optional(dailyAnswers.fields.energy),
         mood: v.optional(dailyAnswers.fields.mood),
+        trainedYesterday: dailyAnswers.fields.trainedYesterday,
         upFor: v.optional(dailyAnswers.fields.upFor),
         body: v.optional(dailyAnswers.fields.body),
       })

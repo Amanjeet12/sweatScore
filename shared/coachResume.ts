@@ -53,7 +53,7 @@ const profileKeys = [
   'usualSleep',
   'biggestChallenge',
 ];
-const dailyKeys = ['sleep', 'energy', 'mood', 'upFor', 'body'];
+const dailyKeys = ['sleep', 'energy', 'upFor', 'trainedYesterday', 'body'];
 
 export function resumeDecision(input: ResumeInput): {
   screen: ResumeScreen;

@@ -117,9 +117,9 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
             gap: 12,
           }}>
           {[
-            { label: 'Check-in', Icon: Icon.CheckFat, points: activity.checkInPoints },
+            { label: 'Check-ins', Icon: Icon.CheckFat, points: activity.checkInPoints },
             { label: 'Steps', Icon: Icon.Footprints, points: activity.stepsPoints },
-            { label: 'Active minutes', Icon: Icon.Drop, points: activity.zone2Points },
+            { label: 'Active mins', Icon: Icon.Clock, points: activity.zone2Points },
             { label: 'Challenges', Icon: Icon.Trophy, points: activity.challengePoints },
           ].map(({ label, Icon: ActivityIcon, points }) => (
             <View
@@ -226,7 +226,7 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
             {[
               { key: 'checkIn', Icon: Icon.CheckFat, points: activity.checkInPoints },
               { key: 'steps', Icon: Icon.Footprints, points: activity.stepsPoints },
-              { key: 'zone2', Icon: Icon.Drop, points: activity.zone2Points },
+              { key: 'zone2', Icon: Icon.Clock, points: activity.zone2Points },
               { key: 'challenge', Icon: Icon.Trophy, points: activity.challengePoints },
             ].map(({ key, Icon: ActivityIcon, points }) => (
               <View

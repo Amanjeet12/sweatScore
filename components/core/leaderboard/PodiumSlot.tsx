@@ -114,14 +114,8 @@ export default function PodiumSlot({
         <View style={{ width: '100%', paddingHorizontal: 2, gap: 2 }}>
           <Text style={[type.name, { textAlign: 'center' }]}>{formatName(entry.name)}</Text>
           <Text style={[type.caption, { textAlign: 'center' }]}>
-            {entry.displayTotalPoints.toLocaleString()}{' '}
-            {mode === 'streak'
-              ? entry.displayTotalPoints === 1
-                ? 'week'
-                : 'weeks'
-              : entry.displayTotalPoints === 1
-                ? 'pt'
-                : 'pts'}
+            {entry.displayTotalPoints.toLocaleString()}
+            {mode === 'streak' ? (entry.displayTotalPoints === 1 ? ' week' : ' weeks') : ''}
           </Text>
         </View>
       ) : (

@@ -3,13 +3,20 @@ import * as FileSystem from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Camera, LockSimple, ShareNetwork } from 'phosphor-react-native';
+import {
+  Camera,
+  LockSimple,
+  ShareNetwork,
+  Star,
+  Footprints,
+  Clock,
+  Trophy,
+} from 'phosphor-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Platform,
-  Pressable,
   ScrollView,
   TouchableOpacity,
   View,
@@ -21,12 +28,16 @@ import { captureRef } from 'react-native-view-shot';
 
 import { BackButton, goBackOrReplace } from '~/components/core/BackButton';
 import { CheckInHeader, checkInStyles } from '~/components/core/design/CheckInChrome';
-import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
-import TrendRangeDropdown from '~/components/core/track/TrendRangeDropdown';
+import { ProgressTabs } from '~/components/core/design/ProgressTabs';
+import {
+  prototypeColors as colors,
+  prototypeTypography as type,
+} from '~/components/core/design/prototypeStyles';
+import TrendRangeDropdown, { ProgressDropdown } from '~/components/core/track/TrendRangeDropdown';
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
-import { TARGETS, getBarColor } from '~/shared/activityGoals';
+import { TARGETS } from '~/shared/activityGoals';
 import { useAuthStore } from '~/store/useAuthStore';
 
 type TrendMetric = 'challenges' | 'steps' | 'activeMinutes' | 'points';
@@ -60,7 +71,7 @@ type DashboardData = {
   } | null;
 };
 
-const PRIMARY = '#FF5C35';
+const PRIMARY = colors.icon;
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(Math.max(0, Math.round(value)));
@@ -94,7 +105,31 @@ function formatWeekStart(weekStart: string) {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
-function Stat({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
+function Stat({
+  label,
+  value,
+  unit,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  unit?: string;
+  icon?: typeof Star;
+}) {
+  if (Icon)
+    return (
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-[#fff3ea]">
+          <Icon size={22} color={colors.icon} weight="regular" />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text style={type.smallCaption}>{label}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={type.cardTitle}>
+            {value}
+          </Text>
+        </View>
+      </View>
+    );
   return (
     <View className="min-w-0 flex-1 px-2">
       <Text numberOfLines={1} adjustsFontSizeToFit style={type.smallCaption}>
@@ -388,17 +423,18 @@ export default function TabTrack() {
               accessibilityLabel="Go back"
               iconColor="#2a2a2a"
               iconSize={22}
-              style={[checkInStyles.back, { minWidth: 44, minHeight: 44 }]}
+              style={[
+                checkInStyles.back,
+                { minWidth: 44, minHeight: 44, backgroundColor: 'transparent' },
+              ]}
             />
             <Text style={[type.todayTitle, { flex: 1 }]}>Progress</Text>
-            <View className="mb-1 rounded-[20px] bg-[#FFF0E8] px-3 py-1.5">
-              <Text style={[type.badge, { color: '#FF4B1F' }]}>
-                {progress ? monthName(progress.currentMonth) : 'This month'}
-              </Text>
-            </View>
+            <Text style={[type.compactAction, { color: colors.muted }]}>
+              {progress ? monthName(progress.currentMonth) : 'This month'}
+            </Text>
           </View>
 
-          <View className="mt-5 min-h-[106px] flex-row items-center rounded-[24px] bg-white px-4 py-5">
+          <View className="mt-5 min-h-[106px] flex-row items-center rounded-[24px] bg-white px-6 py-5">
             <Stat
               label="Current streak"
               value={progress?.summary.currentStreak ?? 0}
@@ -418,73 +454,41 @@ export default function TabTrack() {
             />
           </View>
 
-          <View className="mt-4 rounded-[24px] bg-white px-4 pb-4 pt-5">
-            <View className="flex-row items-center justify-between">
-              <View>
-                <Text style={type.sectionHeading} className="mt-1">
-                  Your Progress Pics
-                </Text>
-              </View>
+          <View className="mt-4 rounded-[24px] bg-white px-6 pb-5 pt-5">
+            <View className="flex-row items-center justify-between gap-2">
+              <Text style={[type.cardTitle, { flex: 1 }]}>Your progress</Text>
+              {photos.length ? (
+                <ProgressDropdown
+                  value={currentWeekIndex}
+                  onChange={setSelectedWeekIndex}
+                  accessibilityLabel="Progress photo week"
+                  options={photos.map((photo, index) => [index, `Week ${index + 1}`] as const)}
+                />
+              ) : null}
             </View>
-            <Text className="mt-2" style={type.body}>
-              Compare your progress over time.
-            </Text>
-
             {photos.length ? (
               <>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="mt-3"
-                  contentContainerStyle={{ gap: 7 }}>
-                  {photos.map((photo, index) => (
-                    <TouchableOpacity
-                      key={photo._id}
-                      onPress={() => setSelectedWeekIndex(index)}
-                      className="rounded-[20px] px-3 py-1.5"
-                      style={{
-                        borderColor: index === currentWeekIndex ? PRIMARY : '#E4DED9',
-                        backgroundColor: index === currentWeekIndex ? PRIMARY : '#FFFFFF',
-                      }}>
-                      <Text
-                        className="text-[10px] font-semibold"
-                        style={{
-                          fontFamily: 'Inter_600SemiBold',
-                          color: index === currentWeekIndex ? '#FFFFFF' : '#77716D',
-                        }}>
-                        W{index + 1}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
                 {canCompareSide ? (
-                  <View className="mt-3 flex-row rounded-[20px] bg-[#F3F0ED] p-1">
-                    {(['front', 'side'] as const).map((option) => (
-                      <Pressable
-                        key={option}
-                        onPress={() => setView(option)}
-                        className="flex-1 items-center rounded-[20px] py-1.5"
-                        style={{
-                          backgroundColor:
-                            (showSide ? 'side' : 'front') === option ? '#FFFFFF' : 'transparent',
-                        }}>
-                        <Text
-                          className="text-[10px] font-semibold"
-                          style={{
-                            fontFamily: 'Inter_600SemiBold',
-                            color: (showSide ? 'side' : 'front') === option ? '#1D1B1A' : '#817A76',
-                          }}>
-                          {option === 'front' ? 'Front view' : 'Side view'}
-                        </Text>
-                      </Pressable>
-                    ))}
+                  <View className="mt-3">
+                    <ProgressTabs
+                      label="Progress photo view"
+                      value={showSide ? 'side' : 'front'}
+                      options={
+                        [
+                          ['front', 'Front view'],
+                          ['side', 'Side view'],
+                        ] as const
+                      }
+                      onChange={setView}
+                    />
                   </View>
                 ) : null}
-                <View className="mt-3 flex-row gap-x-2 bg-white">
+                <View className="mt-3 flex-row gap-x-3 bg-white">
                   {[comparisonLeft, comparisonRight].map((uri, index) => (
                     <View
                       key={`${uri}-${index}`}
-                      className="h-[174px] flex-1 overflow-hidden rounded-[24px] bg-[#F0ECE8]">
+                      className="flex-1 overflow-hidden rounded-[24px] bg-[#F0ECE8]"
+                      style={{ aspectRatio: 0.83 }}>
                       {uri ? (
                         <Image
                           source={{ uri }}
@@ -507,7 +511,7 @@ export default function TabTrack() {
               <View className="mt-4 flex-row gap-x-3">
                 <TouchableOpacity
                   onPress={openProgressPhoto}
-                  className="h-[160px] flex-1 items-center justify-center rounded-[24px]    bg-[#FFF9F6]">
+                  className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#fff3ea]">
                   <Camera size={28} color={PRIMARY} />
                   <Text style={type.compactCardTitle} className="mt-2">
                     Week 1
@@ -516,7 +520,7 @@ export default function TabTrack() {
                     Add a photo
                   </Text>
                 </TouchableOpacity>
-                <View className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#F3F0ED]">
+                <View className="h-[160px] flex-1 items-center justify-center rounded-[24px] bg-[#f5f5f5]">
                   <LockSimple size={22} color={PRIMARY} weight="regular" />
                   <Text className="mt-2 text-center" style={type.smallCaption}>
                     Unlocks after Week 1
@@ -527,8 +531,8 @@ export default function TabTrack() {
             <View className="mt-4 flex-row gap-x-2">
               <TouchableOpacity
                 onPress={openProgressPhoto}
-                className="min-h-11 flex-1 flex-row items-center justify-center rounded-[20px] bg-white py-2">
-                <Camera size={15} color={PRIMARY} />
+                className="min-h-11 flex-1 flex-row items-center justify-center py-2">
+                <Camera size={20} color={PRIMARY} />
                 <Text style={[type.compactAction, { flexShrink: 1 }]} className="ml-2">
                   Log Week {nextWeekNumber}
                 </Text>
@@ -536,13 +540,13 @@ export default function TabTrack() {
               <TouchableOpacity
                 disabled={!photos.length || sharing}
                 onPress={handleShare}
-                className="min-h-11 flex-1 flex-row items-center justify-center rounded-[20px] bg-white py-2"
-                style={{ opacity: photos.length ? 1 : 0.45 }}>
+                className="min-h-11 flex-1 flex-row items-center justify-center py-2"
+                style={{ opacity: photos.length && !sharing ? 1 : 0.45 }}>
                 {sharing ? (
                   <ActivityIndicator size="small" color={PRIMARY} />
                 ) : (
                   <>
-                    <ShareNetwork size={15} color={PRIMARY} />
+                    <ShareNetwork size={20} color={PRIMARY} />
                     <Text style={[type.compactAction, { flexShrink: 1 }]} className="ml-2">
                       Share / Save
                     </Text>
@@ -552,7 +556,7 @@ export default function TabTrack() {
             </View>
           </View>
 
-          <View className="mt-4 rounded-[24px] bg-white px-4 pb-4 pt-5">
+          <View className="mt-4 rounded-[24px] bg-white px-6 pb-5 pt-5">
             <View className="flex-row items-center justify-between" style={{ zIndex: 10 }}>
               <View>
                 <Text style={type.sectionHeading} className="mt-1">
@@ -561,34 +565,24 @@ export default function TabTrack() {
               </View>
               <TrendRangeDropdown value={range} onChange={setRange} />
             </View>
-            <View className="mt-4 flex-row rounded-[24px] bg-[#F1EEEA] p-1">
-              {(
-                [
-                  ['points', 'Points'],
-                  ['steps', 'Steps'],
-                  ['activeMinutes', 'Active Mins'],
-                  ['challenges', 'Challenges'],
-                ] as const
-              ).map(([id, label]) => (
-                <Pressable
-                  key={id}
-                  onPress={() => setMetric(id)}
-                  className="flex-1 items-center rounded-[20px] py-2"
-                  style={{ backgroundColor: metric === id ? '#FFFFFF' : 'transparent' }}>
-                  <Text
-                    className="text-[8px] font-semibold"
-                    style={{
-                      fontFamily: 'Inter_600SemiBold',
-                      color: metric === id ? '#1D1B1A' : '#817A76',
-                    }}>
-                    {label}
-                  </Text>
-                </Pressable>
-              ))}
+            <View className="mt-4">
+              <ProgressTabs
+                label="Consistency metric"
+                value={metric}
+                options={
+                  [
+                    ['points', 'Points'],
+                    ['steps', 'Steps'],
+                    ['activeMinutes', 'Active mins'],
+                    ['challenges', 'Challenges'],
+                  ] as const
+                }
+                onChange={setMetric}
+              />
             </View>
-            <View className="mt-3 flex-row rounded-[24px] bg-white px-3 py-3">
+            <View className="mt-4 flex-row bg-white py-3">
               <View className="flex-1">
-                <Text style={type.sectionHeading}>
+                <Text style={[type.todayTitle, { fontSize: 26, lineHeight: 32 }]}>
                   {formatNumber(periodTotal)}{' '}
                   {metric === 'points' ? (periodTotal === 1 ? 'pt' : 'pts') : ''}
                 </Text>
@@ -609,7 +603,7 @@ export default function TabTrack() {
               </Text>
             </View>
             <View className="px-2">
-              <View className="h-[126px] border-b border-[#EAE4DF]">
+              <View className="h-[150px] border-b border-[#EAE4DF]">
                 <View
                   pointerEvents="none"
                   className="absolute left-0 right-0"
@@ -626,7 +620,7 @@ export default function TabTrack() {
                           numberOfLines={1}
                           adjustsFontSizeToFit
                           style={{ fontFamily: 'Inter_600SemiBold' }}
-                          className="mb-1 w-full text-center text-[8px] text-[#5A5551]">
+                          className="mb-1 w-full text-center text-[10px] text-[#8a8a8a]">
                           {formatCompactNumber(trendValue(item))}
                         </Text>
                       ) : null}
@@ -634,8 +628,8 @@ export default function TabTrack() {
                         <View
                           className="w-4 rounded-t-[7px]"
                           style={{
-                            height: `${(trendValue(item) / maxTrend) * 82}%`,
-                            backgroundColor: getBarColor(range, goalCategory, trendValue(item)),
+                            height: `${(trendValue(item) / maxTrend) * 100}%`,
+                            backgroundColor: '#d9d9d9',
                           }}
                         />
                       ) : null}
@@ -657,24 +651,28 @@ export default function TabTrack() {
             </View>
           </View>
 
-          <View className="mt-4 rounded-[24px] bg-white px-4 py-5">
+          <View className="mt-4 rounded-[24px] bg-white px-6 py-5">
             <Text style={type.sectionHeading}>Lifetime stats</Text>
-            <View className="mt-4 flex-row">
+            <View className="mt-4 flex-row gap-3">
               <Stat
+                icon={Star}
                 label="Points"
                 value={progress?.lifetime ? formatNumber(progress.lifetime.points) : '—'}
               />
               <Stat
+                icon={Footprints}
                 label="Steps"
                 value={progress?.lifetime ? formatNumber(progress.lifetime.steps) : '—'}
               />
             </View>
-            <View className="mt-4 flex-row">
+            <View className="mt-4 flex-row gap-3">
               <Stat
-                label="Active minutes"
+                icon={Clock}
+                label="Active mins"
                 value={progress?.lifetime ? formatNumber(progress.lifetime.activeMinutes) : '—'}
               />
               <Stat
+                icon={Trophy}
                 label="Challenges"
                 value={progress?.lifetime ? formatNumber(progress.lifetime.challenges) : '—'}
               />

@@ -43,7 +43,19 @@ const bodyFeeling = v.union(
 export const dailyAnswers = v.object({
   sleep: v.union(v.literal('barely_rested'), v.literal('rested_enough'), v.literal('restful')),
   energy: v.union(v.literal('flat'), v.literal('steady'), v.literal('full')),
-  mood: v.union(v.literal('low'), v.literal('okay'), v.literal('good'), v.literal('motivated')),
+  mood: v.optional(
+    v.union(v.literal('low'), v.literal('okay'), v.literal('good'), v.literal('motivated'))
+  ),
+  trainedYesterday: v.optional(
+    v.array(
+      v.union(
+        v.literal('lower_body'),
+        v.literal('upper_body'),
+        v.literal('cardio'),
+        v.literal('nothing')
+      )
+    )
+  ),
   upFor: v.union(
     v.literal('full_session'),
     v.literal('short_session'),

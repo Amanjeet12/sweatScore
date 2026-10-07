@@ -264,6 +264,7 @@ export function buildDailyProviderInput(
       sleep: snapshot.daily.sleep,
       energy: snapshot.daily.energy,
       mood: snapshot.daily.mood,
+      trained_yesterday: snapshot.daily.trainedYesterday,
       up_for: snapshot.daily.upFor,
       body: snapshot.daily.body,
     },

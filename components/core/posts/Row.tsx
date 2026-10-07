@@ -715,6 +715,13 @@ function PostRow({
             <ChallengeVideoPlayer
               videoUrl={post.challenge.compositeVideoUrl}
               thumbnailUrl={post.challenge.thumbnailUrl}
+              aspectRatio={
+                post.mediaWidth && post.mediaHeight && post.mediaWidth > 0 && post.mediaHeight > 0
+                  ? post.mediaWidth / post.mediaHeight
+                  : post.challenge.isCheckIn
+                    ? 9 / 16
+                    : 1080 / 960
+              }
             />
           </View>
         ) : post.mediaUrl && post.mediaType === 'video' ? (

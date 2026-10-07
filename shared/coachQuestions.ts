@@ -70,21 +70,11 @@ export const DAILY_QUESTIONS = [
   },
   {
     key: 'energy',
-    title: "Where's your energy?",
+    title: "How's your energy today?",
     options: [
       ['flat', 'Flat'],
       ['steady', 'Steady'],
-      ['full', 'Full of energy'],
-    ],
-  },
-  {
-    key: 'mood',
-    title: "How's your mood?",
-    options: [
-      ['low', 'Low'],
-      ['okay', 'Okay'],
-      ['good', 'Good'],
-      ['motivated', 'Motivated'],
+      ['full', 'Upbeat'],
     ],
   },
   {
@@ -92,19 +82,29 @@ export const DAILY_QUESTIONS = [
     title: 'What are you up for today?',
     options: [
       ['full_session', 'Full session'],
-      ['short_session', 'Short session'],
+      ['short_session', 'Quick session'],
       ['something_light', 'Something light'],
       ['rest_day', 'Rest day'],
+    ],
+  },
+  {
+    key: 'trainedYesterday',
+    title: 'What did you train yesterday?',
+    options: [
+      ['lower_body', 'Lower body'],
+      ['upper_body', 'Upper body'],
+      ['cardio', 'Cardio'],
+      ['nothing', 'Nothing'],
     ],
   },
   {
     key: 'body',
     title: "How's your body feeling?",
     options: [
-      ['fine', 'Fine'],
+      ['fine', 'Feeling fine'],
       ['sore_upper', 'Sore upper body'],
       ['sore_lower', 'Sore lower body'],
-      ['pain_unwell', 'In pain / Unwell'],
+      ['pain_unwell', 'Unwell/ in pain'],
     ],
   },
 ] as const;
