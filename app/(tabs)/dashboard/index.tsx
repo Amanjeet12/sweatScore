@@ -11,7 +11,7 @@ import {
   LockSimple,
   MoonStars,
 } from 'phosphor-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -29,6 +29,7 @@ import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { PrototypeButton as CoachActionButton } from '~/components/core/auth/PrototypeOnboarding';
 import CoachCheckInFlow from '~/components/core/dashboard/CoachCheckInFlow';
+import FirstPlanSpotlight from '~/components/core/dashboard/FirstPlanSpotlight';
 import TodayPlanSheet from '~/components/core/dashboard/TodayPlanSheet';
 import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
 import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
@@ -53,6 +54,7 @@ import {
 } from '~/shared/coachToday';
 import { pointsLabel } from '~/shared/pointsLabel';
 import { useRefreshStore } from '~/store/useRefreshStore';
+import { storage } from '~/utils/storage';
 
 const ORANGE = '#E8541E';
 const ICONS = { workout: Barbell, meals: ForkKnife, sleep: MoonStars, steps: Footprints } as const;
@@ -116,6 +118,14 @@ export default function TodayScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [activeSheet, setActiveSheet] = useState<'plan' | CoachCategory | null>(null);
+  const planBannerRef = useRef<View>(null);
+  const [firstPlanTarget, setFirstPlanTarget] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [showFirstPlanSpotlight, setShowFirstPlanSpotlight] = useState(false);
   const planSheetOpen = activeSheet === 'plan';
   const [planContentHeight, setPlanContentHeight] = useState(0);
   const updatePlanHeight = useCallback((height: number) => {
@@ -128,6 +138,32 @@ export default function TodayScreen() {
   const [checkInPreferredHeight, setCheckInPreferredHeight] = useState(0);
   const { restorePermissions } = useRevenueCat();
   const [now, setNow] = useState(Date.now());
+  const firstPlanKey = currentUser?._id ? `first_plan_spotlight_${currentUser._id}` : null;
+  useEffect(() => {
+    setShowFirstPlanSpotlight(
+      Boolean(
+        firstPlanKey &&
+          plan?.access &&
+          plan.requestStatus === 'none' &&
+          !storage.getBoolean(firstPlanKey)
+      )
+    );
+  }, [firstPlanKey, plan?.access, plan?.requestStatus]);
+  const measurePlanBanner = useCallback(() => {
+    requestAnimationFrame(() => {
+      planBannerRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) setFirstPlanTarget({ x, y, width, height });
+      });
+    });
+  }, []);
+  const dismissFirstPlanSpotlight = () => {
+    if (firstPlanKey) storage.set(firstPlanKey, true);
+    setShowFirstPlanSpotlight(false);
+  };
+  const startFirstPlan = () => {
+    dismissFirstPlanSpotlight();
+    setTimeout(() => setActiveSheet('plan'), 300);
+  };
   useEffect(() => {
     if (
       plan?.access &&
@@ -281,6 +317,8 @@ export default function TodayScreen() {
           Your plan
         </Text>
         <TouchableOpacity
+          ref={planBannerRef}
+          onLayout={measurePlanBanner}
           accessibilityRole="button"
           accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'Be the first to check in' : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
           accessibilityState={{ disabled: bannerState === 'locked' }}
@@ -691,6 +729,13 @@ export default function TodayScreen() {
           )}
         </View>
       </ScrollView>
+      {showFirstPlanSpotlight && !activeSheet ? (
+        <FirstPlanSpotlight
+          target={firstPlanTarget}
+          onStart={startFirstPlan}
+          onDismiss={dismissFirstPlanSpotlight}
+        />
+      ) : null}
       {/* One native host avoids overlapping iOS presentation/dismissal transitions. */}
       <Modal
         visible={activeSheet !== null}
