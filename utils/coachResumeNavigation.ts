@@ -1,6 +1,7 @@
 import { ConvexReactClient } from 'convex/react';
 import { router } from 'expo-router';
 
+import { clearMissingMemberSession } from './clearMissingMemberSession';
 import { api } from '~/convex/_generated/api';
 import { enforceResumeAccess, ResumeScreen } from '~/shared/coachResume';
 
@@ -34,7 +35,12 @@ export function resumePathForDecision(decision: {
 }
 
 export async function resumeMember(convex: ConvexReactClient) {
-  const decision = enforceResumeAccess(await convex.query(api.coachResume.myDecision, {}));
+  const result = await convex.query(api.coachResume.myDecision, {});
+  if (!result) {
+    await clearMissingMemberSession(convex);
+    return null;
+  }
+  const decision = enforceResumeAccess(result);
   router.replace(resumePathForDecision(decision));
   return decision;
 }

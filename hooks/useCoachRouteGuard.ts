@@ -1,13 +1,18 @@
-import { useConvexAuth, useQuery } from 'convex/react';
-import { router } from 'expo-router';
+import { useConvex, useConvexAuth, useQuery } from 'convex/react';
+import { router, useNavigationContainerRef } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '~/convex/_generated/api';
 import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
+import { runWhenNavigationReady } from '~/shared/navigationReady';
 import { enforceResumeAccess, ResumeScreen } from '~/shared/coachResume';
 import { useAuthStore } from '~/store/useAuthStore';
+import { clearMissingMemberSession } from '~/utils/clearMissingMemberSession';
 import { resumePathForDecision } from '~/utils/coachResumeNavigation';
 
 export function useCoachRouteGuard(allowed: readonly ResumeScreen[], deferRedirect = false) {
+  const convex = useConvex();
+  const navigationRef = useNavigationContainerRef();
+  const sessionRedirect = useAuthStore((state) => state.sessionRedirect);
   const { isAuthenticated, isLoading } = useConvexAuth();
   const memberId = useAuthStore((state) => state.currentUser?._id);
   const [refresh, setRefresh] = useState(0);
@@ -23,6 +28,9 @@ export function useCoachRouteGuard(allowed: readonly ResumeScreen[], deferRedire
     isAuthenticated ? String(memberId ?? 'auth-loading') : 'signed-out'
   );
   const decision = retainedDecision ? enforceResumeAccess(retainedDecision) : undefined;
+  useEffect(() => {
+    if (isAuthenticated && queryDecision === null) void clearMissingMemberSession(convex);
+  }, [convex, isAuthenticated, queryDecision]);
   const lastRedirect = useRef<string | null>(null);
   useEffect(() => {
     const timer = setInterval(() => setRefresh((value) => value + 1), 60_000);
@@ -36,13 +44,15 @@ export function useCoachRouteGuard(allowed: readonly ResumeScreen[], deferRedire
         ? resumePathForDecision(decision)
         : null;
   useEffect(() => {
-    if (!destination || (deferRedirect && isAuthenticated)) {
+    if (sessionRedirect || !destination || (deferRedirect && isAuthenticated)) {
       lastRedirect.current = null;
       return;
     }
-    if (lastRedirect.current === destination) return;
-    lastRedirect.current = destination;
-    router.replace(destination);
-  }, [deferRedirect, destination, isAuthenticated]);
+    return runWhenNavigationReady(navigationRef, () => {
+      if (lastRedirect.current === destination) return;
+      lastRedirect.current = destination;
+      router.replace(destination);
+    });
+  }, [deferRedirect, destination, isAuthenticated, navigationRef, sessionRedirect]);
   return { decision, accepted };
 }

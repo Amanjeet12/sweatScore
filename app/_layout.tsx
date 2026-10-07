@@ -12,15 +12,15 @@ import { Montserrat_600SemiBold } from '@expo-google-fonts/montserrat';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConvexReactClient } from 'convex/react';
 import { router, Stack } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { LogBox, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import SessionRedirect from '~/components/providers/SessionRedirect';
 import ForceUpdateGate from '~/components/core/ForceUpdateGate';
 import { CelebrationProvider } from '~/components/providers/CelebrationProvider';
 import { ChallengeUploadProvider } from '~/components/providers/ChallengeUploadProvider';
@@ -30,6 +30,7 @@ import { WorkoutUploadProvider } from '~/components/providers/WorkoutUploadProvi
 import { Id } from '~/convex/_generated/dataModel';
 import { usePushNotifications } from '~/hooks/usePushNotifications';
 import { useAuthStore } from '~/store/useAuthStore';
+import { authSessionStorage } from '~/utils/authSessionStorage';
 import { NOTIFICATION_TYPE } from '~/utils/types';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -38,11 +39,6 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 
 LogBox.ignoreAllLogs();
 
-const secureStorage = {
-  getItem: SecureStore.getItemAsync,
-  setItem: SecureStore.setItemAsync,
-  removeItem: SecureStore.deleteItemAsync,
-};
 const convexQueryClient = new ConvexQueryClient(convex);
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +51,11 @@ const queryClient = new QueryClient({
 convexQueryClient.connect(queryClient);
 
 export default function Layout() {
+  const sessionVersion = useAuthStore((state) => state.sessionVersion);
+  const sessionStorage = useMemo(() => authSessionStorage.storage(), [sessionVersion]);
+  useEffect(() => {
+    if (sessionVersion > 0) queryClient.clear();
+  }, [sessionVersion]);
   const currentUser = useAuthStore((state) => state.currentUser);
   const { backgroundNotification } = usePushNotifications();
   const insets = useSafeAreaInsets();
@@ -172,9 +173,7 @@ export default function Layout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-        <ConvexAuthProvider
-          client={convex}
-          storage={Platform.OS === 'android' || Platform.OS === 'ios' ? secureStorage : undefined}>
+        <ConvexAuthProvider key={sessionVersion} client={convex} storage={sessionStorage}>
           <QueryClientProvider client={queryClient}>
             <GluestackUIProvider mode="light">
               <RevenueCatProvider>
@@ -188,6 +187,7 @@ export default function Layout() {
                         style={
                           Platform.OS === 'android' ? { paddingBottom: insets.bottom } : undefined
                         }>
+                        <SessionRedirect />
                         <Stack screenOptions={{ title: '' }}>
                           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

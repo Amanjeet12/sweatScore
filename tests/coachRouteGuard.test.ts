@@ -39,3 +39,10 @@ test('sign-out or member change never retains the previous member decision', () 
   expect(retainQueryResult(previous, undefined, 'signed-out').result).toBeUndefined();
   expect(retainQueryResult(previous, undefined, 'member-b').result).toBeUndefined();
 });
+
+test('missing member response clears the retained Today decision immediately', () => {
+  const previous = { scope: 'member-a', result: { screen: 'today' } };
+  const missing = retainQueryResult(previous, null, 'member-a');
+  expect(missing.result).toBeNull();
+  expect(retainQueryResult(missing, undefined, 'member-a').result).toBeNull();
+});

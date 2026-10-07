@@ -1,6 +1,6 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMutation } from 'convex/react';
+import { useConvex, useMutation } from 'convex/react';
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, TouchableOpacity, View } from 'react-native';
@@ -12,10 +12,13 @@ import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { deleteAccountAndClearSession } from '~/shared/accountDeletion';
 import { useAuthStore } from '~/store/useAuthStore';
+import { authSessionStorage } from '~/utils/authSessionStorage';
 import { externalLinks } from '~/utils/constants';
 import { delay } from '~/utils/helpers';
 
 export default function TabMySettings() {
+  const convex = useConvex();
+  const resetSession = useAuthStore((state) => state.resetSession);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
@@ -84,19 +87,21 @@ export default function TabMySettings() {
                     try {
                       await deleteAccountAndClearSession({
                         deleteAccount: deleteAccountMutation,
-                        clearUser: () => setCurrentUser(null),
-                        signOut,
+                        clearUser: resetSession,
+                        clearSession: async () => {
+                          convex.clearAuth();
+                          await authSessionStorage.reset();
+                        },
+                        // resetSession queues a redirect after the new navigator mounts.
+                        onDeleted: () => {},
                         billingLogout: () => Purchases.logOut(),
                         onCleanupError: (step, error) =>
                           console.warn(`Account deletion ${step} cleanup failed`, error),
                       });
-                    } catch (error) {
+                    } catch {
                       Alert.alert('Error', 'Failed to delete account. Please try again.');
                       setDeleting(false);
-                      return;
                     }
-                    router.dismissAll();
-                    router.replace({ pathname: '/' });
                   },
                 },
               ]

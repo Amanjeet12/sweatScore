@@ -1,5 +1,5 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
-import { ConvexError, v } from 'convex/values';
+import { v } from 'convex/values';
 
 import { query } from './_generated/server';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
@@ -9,36 +9,40 @@ import { resumeDecision } from '../shared/coachResume';
 export const myDecision = query({
   // Cache-busting refresh is client-owned; the decision still uses server time and member timezone.
   args: { refresh: v.optional(v.number()) },
-  returns: v.object({
-    screen: v.union(
-      v.literal('bio'),
-      v.literal('profile'),
-      v.literal('health'),
-      v.literal('setup'),
-      v.literal('daily'),
-      v.literal('paywall'),
-      v.literal('trial_notifications'),
-      v.literal('today')
-    ),
-    question: v.number(),
-    day: v.string(),
-    changedDay: v.boolean(),
-    requestStatus: v.union(
-      v.literal('none'),
-      v.literal('pending'),
-      v.literal('ready'),
-      v.literal('failed')
-    ),
-    verifiedAccess: v.boolean(),
-    canRetry: v.boolean(),
-    completedOnboarding: v.boolean(),
-    returningMember: v.boolean(),
-  }),
+  returns: v.union(
+    v.null(),
+    v.object({
+      screen: v.union(
+        v.literal('bio'),
+        v.literal('profile'),
+        v.literal('health'),
+        v.literal('setup'),
+        v.literal('daily'),
+        v.literal('paywall'),
+        v.literal('trial_notifications'),
+        v.literal('today')
+      ),
+      question: v.number(),
+      day: v.string(),
+      changedDay: v.boolean(),
+      requestStatus: v.union(
+        v.literal('none'),
+        v.literal('pending'),
+        v.literal('ready'),
+        v.literal('failed')
+      ),
+      verifiedAccess: v.boolean(),
+      canRetry: v.boolean(),
+      completedOnboarding: v.boolean(),
+      returningMember: v.boolean(),
+    })
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError('Authentication required');
+    if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user) throw new ConvexError('Member missing');
+    // Deleted members can still have an in-flight authenticated subscription.
+    if (!user) return null;
     const day = formatDateInTZ(new Date(), user.timezone);
     const [state, billing, todayRequest, todayPlan, earlierPlan] = await Promise.all([
       ctx.db

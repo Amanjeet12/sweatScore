@@ -28,7 +28,7 @@ export default function RevenueCatRedemptionHandler() {
   const handleSuccess = useCallback(async () => {
     clearPendingRedemption();
     const decision = await resumeMember(convex);
-    if (decision.screen === 'today' && decision.requestStatus === 'ready')
+    if (decision?.screen === 'today' && decision.requestStatus === 'ready')
       setTimeout(
         () =>
           Alert.alert(

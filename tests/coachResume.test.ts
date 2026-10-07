@@ -435,3 +435,16 @@ test('verified trials go to Home without a post-paywall notification gate', () =
     resumeDecision({ ...input, verifiedAccess: false, trialNotificationPending: true }).screen
   ).toBe('paywall');
 });
+
+test('missing member with a stale auth identity returns no resume decision', async () => {
+  const store = fixture({ users: [] });
+  expect(await myDecision._handler(store.ctx, {})).toBeNull();
+  expect(store.writes).toEqual([]);
+  expect(store.scheduled).toEqual([]);
+});
+
+test('signed-out subscription returns no resume decision', async () => {
+  const store = fixture();
+  store.ctx.auth.getUserIdentity = async () => null;
+  expect(await myDecision._handler(store.ctx, {})).toBeNull();
+});
