@@ -7,7 +7,7 @@ import { enforceResumeAccess, ResumeScreen } from '~/shared/coachResume';
 import { useAuthStore } from '~/store/useAuthStore';
 import { resumePathForDecision } from '~/utils/coachResumeNavigation';
 
-export function useCoachRouteGuard(allowed: readonly ResumeScreen[]) {
+export function useCoachRouteGuard(allowed: readonly ResumeScreen[], deferRedirect = false) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const memberId = useAuthStore((state) => state.currentUser?._id);
   const [refresh, setRefresh] = useState(0);
@@ -36,13 +36,13 @@ export function useCoachRouteGuard(allowed: readonly ResumeScreen[]) {
         ? resumePathForDecision(decision)
         : null;
   useEffect(() => {
-    if (!destination) {
+    if (!destination || (deferRedirect && isAuthenticated)) {
       lastRedirect.current = null;
       return;
     }
     if (lastRedirect.current === destination) return;
     lastRedirect.current = destination;
     router.replace(destination);
-  }, [destination]);
+  }, [deferRedirect, destination, isAuthenticated]);
   return { decision, accepted };
 }

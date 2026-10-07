@@ -1,7 +1,5 @@
 import { Pressable, View } from 'react-native';
 
-import LeaderboardPeriodDropdown, { LeaderboardPeriod } from './LeaderboardPeriodDropdown';
-
 import {
   leagueStyles as styles,
   leagueTypography as type,
@@ -11,32 +9,17 @@ import { Text } from '~/components/ui/text';
 type Props = {
   title: string;
   mode: 'points' | 'streak';
-  timeLeft: string;
   now: Date;
-  period: LeaderboardPeriod;
-  onChangePeriod: (period: LeaderboardPeriod) => void;
   onChangeMode: (mode: 'points' | 'streak') => void;
 };
-export default function LeaderboardHeader({
-  title,
-  mode,
-  timeLeft,
-  now,
-  period,
-  onChangePeriod,
-  onChangeMode,
-}: Props) {
+export default function LeaderboardHeader({ title, mode, now, onChangeMode }: Props) {
   return (
     <View style={styles.header}>
       <View style={styles.period}>
         <Text style={type.caption}>
           {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(now)}
         </Text>
-        <LeaderboardPeriodDropdown
-          value={period}
-          onChange={onChangePeriod}
-          timeLeft={mode === 'points' ? timeLeft : 'Current streak'}
-        />
+        {mode === 'streak' ? <Text style={type.caption}>Current streak</Text> : null}
       </View>
       <View style={[styles.period, { marginTop: 4 }]}>
         <Text style={[type.title, { flexShrink: 1 }]}>{title}</Text>

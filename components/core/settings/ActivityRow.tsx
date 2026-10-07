@@ -19,6 +19,7 @@ interface ActivityRowProps {
     zone2Points?: number;
     missionPoints?: number;
     challengePoints?: number;
+    appOpenPoints?: number;
   };
 }
 
@@ -34,8 +35,8 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
 
   // Calculate total points with fallback logic
   const totalPoints = useMemo(() => {
-    // If displayTotalPoints exists and is greater than 0, use it
-    if (activity.displayTotalPoints && activity.displayTotalPoints > 0) {
+    // Use the awarded total when available (it may include a daily cap).
+    if (activity.displayTotalPoints !== undefined) {
       return activity.displayTotalPoints;
     }
 
@@ -44,14 +45,16 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
     const stepsPoints = activity.stepsPoints ?? 0;
     const zone2Points = activity.zone2Points ?? 0;
     const challengePoints = activity.challengePoints ?? 0;
+    const appOpenPoints = activity.appOpenPoints ?? 0;
 
-    return checkInPoints + stepsPoints + zone2Points + challengePoints;
+    return checkInPoints + stepsPoints + zone2Points + challengePoints + appOpenPoints;
   }, [
     activity.displayTotalPoints,
     activity.checkInPoints,
     activity.stepsPoints,
     activity.zone2Points,
     activity.challengePoints,
+    activity.appOpenPoints,
   ]);
 
   const handleEdit = () => {
@@ -116,7 +119,7 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
           {[
             { label: 'Check-in', Icon: Icon.CheckFat, points: activity.checkInPoints },
             { label: 'Steps', Icon: Icon.Footprints, points: activity.stepsPoints },
-            { label: 'Meal', Icon: Icon.Drop, points: activity.zone2Points },
+            { label: 'Active minutes', Icon: Icon.Drop, points: activity.zone2Points },
             { label: 'Challenges', Icon: Icon.Trophy, points: activity.challengePoints },
           ].map(({ label, Icon: ActivityIcon, points }) => (
             <View
@@ -146,6 +149,12 @@ export default function ActivityRow({ activity, compact = false }: ActivityRowPr
             </View>
           ))}
         </View>
+        {activity.appOpenPoints ? (
+          <Text style={type.smallCaption}>
+            Includes {activity.appOpenPoints} {activity.appOpenPoints === 1 ? 'point' : 'points'}
+            {' for opening the app.'}
+          </Text>
+        ) : null}
       </View>
     );
   }

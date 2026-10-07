@@ -583,11 +583,21 @@ export const getUserActivities = query({
       .withIndex('by_user', (q) => q.eq('userId', targetUserId))
       .filter((q) => q.neq(q.field('removed'), true))
       .collect();
-    const challengePointsByDate = new Map<string, { points: number; record: any }>();
-    for (const c of challengeCompletions) {
+    const completedChallenges = await Promise.all(
+      challengeCompletions.map((completion) => ctx.db.get(completion.challengeId))
+    );
+    const challengePointsByDate = new Map<
+      string,
+      { checkInPoints: number; challengePoints: number; record: any }
+    >();
+    for (const [index, c] of challengeCompletions.entries()) {
       const existing = challengePointsByDate.get(c.date);
+      const isCheckIn =
+        completedChallenges[index]?.type === 'check_in' ||
+        completedChallenges[index]?.dailyChallengeType === 'check_in';
       challengePointsByDate.set(c.date, {
-        points: (existing?.points ?? 0) + c.pointsEarned,
+        checkInPoints: (existing?.checkInPoints ?? 0) + (isCheckIn ? c.pointsEarned : 0),
+        challengePoints: (existing?.challengePoints ?? 0) + (isCheckIn ? 0 : c.pointsEarned),
         record: !existing || c._creationTime > existing.record._creationTime ? c : existing.record,
       });
     }
@@ -625,7 +635,7 @@ export const getUserActivities = query({
       );
       const flooredStepsPoints = Math.floor(calculateStepsPoints(totalSteps));
       const flooredZone2Points = Math.floor(calculateZone2Points(totalZone2Minutes));
-      const flooredCheckInPoints = Math.floor(checkIn?.points ?? 0);
+      const appOpenPoints = Math.floor(checkIn?.points ?? 0);
       const flooredMissionPoints = Math.floor(
         dateActivities.reduce((sum, activity) => sum + (activity.missionPoints ?? 0), 0)
       );
@@ -636,9 +646,10 @@ export const getUserActivities = query({
           0
         )
       );
-      const challengePoints = Math.floor(challenge?.points ?? 0) + loggedActivityPoints;
+      const checkInPoints = Math.floor(challenge?.checkInPoints ?? 0) + loggedActivityPoints;
+      const challengePoints = Math.floor(challenge?.challengePoints ?? 0);
       const recalculatedPoints =
-        flooredStepsPoints + flooredZone2Points + flooredCheckInPoints + challengePoints;
+        flooredStepsPoints + flooredZone2Points + checkInPoints + challengePoints + appOpenPoints;
 
       const displayTotal = targetIsPremium
         ? Math.floor(recalculatedPoints)
@@ -659,7 +670,8 @@ export const getUserActivities = query({
         zone2Minutes: totalZone2Minutes,
         stepsPoints: flooredStepsPoints,
         zone2Points: flooredZone2Points,
-        checkInPoints: flooredCheckInPoints,
+        checkInPoints,
+        appOpenPoints,
         points: recalculatedPoints,
         missionPoints: flooredMissionPoints,
         challengePoints,

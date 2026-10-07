@@ -18,12 +18,7 @@ import { api } from '~/convex/_generated/api';
 import { Id } from '~/convex/_generated/dataModel';
 import { useHealthSync } from '~/hooks/useHealthSync';
 import { useRetainedQueryResult } from '~/hooks/useRetainedQueryResult';
-import {
-  formatLocalDate,
-  getPeriodWindow,
-  getTimeLeft,
-  LeaderboardPeriod,
-} from '~/shared/leaguePeriod';
+import { formatLocalDate, getPeriodWindow } from '~/shared/leaguePeriod';
 import { useAuthStore } from '~/store/useAuthStore';
 import { storage } from '~/utils/storage';
 
@@ -38,7 +33,6 @@ type Entry = {
 export default function TabRank() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const { isPro } = useRevenueCat();
-  const [period, setPeriod] = useState<LeaderboardPeriod>('month');
   const [mode, setMode] = useState<'points' | 'streak'>('points');
   const [now, setNow] = useState(() => new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -59,18 +53,17 @@ export default function TabRank() {
     storage.set(`today_leaderboard_viewed_${currentUser._id}_${formatLocalDate(new Date())}`, true);
   }, [currentUser?._id]);
 
-  const periodWindow = useMemo(() => getPeriodWindow(period, now), [now, period]);
-  const timeLeft = useMemo(() => getTimeLeft(period, now), [now, period]);
+  const periodWindow = useMemo(() => getPeriodWindow('month', now), [now]);
 
   const leaderboardResult = useQuery(api.leaderboard.getLeaderboardForPeriod, {
-    period,
+    period: 'month',
     mode,
     refreshToken: Math.floor(now.getTime() / 60000),
     ...periodWindow,
   });
   const leaderboard = useRetainedQueryResult(
     leaderboardResult,
-    `${currentUser?._id ?? 'guest'}:${period}:${mode}`
+    `${currentUser?._id ?? 'guest'}:month:${mode}`
   );
 
   const hasFullAccess =
@@ -134,10 +127,7 @@ export default function TabRank() {
         <LeaderboardHeader
           title={leaderboard.listTitle}
           mode={mode}
-          timeLeft={timeLeft}
           now={now}
-          period={period}
-          onChangePeriod={setPeriod}
           onChangeMode={setMode}
         />
       </View>
@@ -171,11 +161,7 @@ export default function TabRank() {
           <Text style={[leagueTypography.caption, { textAlign: 'center' }]}>
             {leaderboard.totalUsers}{' '}
             {leaderboard.totalUsers === 1 ? 'sister is taking part' : 'sisters are taking part'}{' '}
-            {mode === 'streak'
-              ? 'with an active streak.'
-              : period === 'today'
-                ? 'today.'
-                : `this ${period}.`}
+            {mode === 'streak' ? 'with an active streak.' : 'this month.'}
           </Text>
         </View>
       ) : null}

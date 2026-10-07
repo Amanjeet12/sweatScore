@@ -34,6 +34,7 @@ import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const QUESTION_ROUTES = ['profile', 'daily', 'today'] as const;
 const PROFILE_REVIEW_ROUTES = ['profile', 'health'] as const;
+const BUILDING_ROUTINE_MINIMUM_MS = 6000;
 
 const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
   weight: {
@@ -101,9 +102,11 @@ export default function CoachOnboarding() {
   }>();
   const selectedCheckIn = COACH_CATEGORIES.find((item) => item === nextCheckIn);
   const reanswerMode = __DEV__ && reanswer === '1';
+  const [completingProfile, setCompletingProfile] = useState(false);
   // Health is still a free onboarding boundary; reviewing answers grants no paid access.
   const { decision, accepted } = useCoachRouteGuard(
-    reviewProfile === '1' ? PROFILE_REVIEW_ROUTES : QUESTION_ROUTES
+    reviewProfile === '1' ? PROFILE_REVIEW_ROUTES : QUESTION_ROUTES,
+    completingProfile
   );
   const reviewingProfile = reviewProfile === '1' && decision?.screen === 'health';
   const foundation = useQuery(api.coachFoundation.getMyFoundation, accepted ? {} : 'skip');
@@ -120,7 +123,6 @@ export default function CoachOnboarding() {
   const [localStep, setLocalStep] = useState<number | null>(null);
   const [weight, setWeight] = useState('');
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
-  const [completingProfile, setCompletingProfile] = useState(false);
   const userName = useAuthStore((state) => state.currentUser?.name?.trim());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -329,10 +331,14 @@ export default function CoachOnboarding() {
         await saveReanswer({ [question.key]: value } as Parameters<typeof saveReanswer>[0]);
         setLocalStep(step + 1);
       } else if (profile) {
-        if (step === PROFILE_QUESTIONS.length - 1) setCompletingProfile(true);
+        const finishingProfile = step === PROFILE_QUESTIONS.length - 1;
+        const startedBuildingAt = Date.now();
+        if (finishingProfile) setCompletingProfile(true);
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
-        if (step === PROFILE_QUESTIONS.length - 1) {
+        if (finishingProfile) {
           await finishProfile({});
+          const remaining = BUILDING_ROUTINE_MINIMUM_MS - (Date.now() - startedBuildingAt);
+          if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
           if (decision.returningMember) router.replace('/(tabs)/dashboard');
           else await resumeMember(convex);
         } else {
