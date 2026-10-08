@@ -10,7 +10,8 @@ import {
   workoutRecommendationV2,
   stepsRecommendationV2,
 } from './coachDailyPolicyV2';
-import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
+import { isV2DailyPrompt } from './coachDailyPromptV2_1';
+import { DAILY_PLAN_V3_PROMPT_VERSION } from './coachDailyPromptV3';
 import {
   dailyAnswers,
   profileAnswers,
@@ -169,34 +170,42 @@ async function planSnapshot(
 ) {
   const weight = await ctx.db.get(profile.weightObservationId);
   if (!weight || weight.userId !== userId) throw new ConvexError('Weight does not match member');
-  const fromDay = addDaysToDateKey(day, -7);
+  const fromDay = addDaysToDateKey(day, -14);
   const nextDay = addDaysToDateKey(day, 1);
-  const [activities, weightHistory, recentPlans, lifetime, sharedMeals] = await Promise.all([
-    ctx.db
-      .query('dailyActivities')
-      .withIndex('by_user_date', (q) => q.eq('userId', userId).gte('date', fromDay).lt('date', day))
-      .collect(),
-    ctx.db
-      .query('coachWeightObservationsV1')
-      .withIndex('by_user_version', (q) => q.eq('userId', userId))
-      .collect(),
-    ctx.db
-      .query('coachPlanRevisionsV1')
-      .withIndex('by_user_day_version', (q) =>
-        q.eq('userId', userId).gte('day', fromDay).lt('day', day)
-      )
-      .collect(),
-    ctx.db
-      .query('trackLifetime')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique(),
-    ctx.db
-      .query('coachMealDraftsV1')
-      .withIndex('by_user_day', (q) =>
-        q.eq('userId', userId).gte('day', fromDay).lt('day', nextDay)
-      )
-      .collect(),
-  ]);
+  const [activities, weightHistory, recentPlans, lifetime, sharedMeals, proofs] = await Promise.all(
+    [
+      ctx.db
+        .query('dailyActivities')
+        .withIndex('by_user_date', (q) =>
+          q.eq('userId', userId).gte('date', fromDay).lt('date', day)
+        )
+        .collect(),
+      ctx.db
+        .query('coachWeightObservationsV1')
+        .withIndex('by_user_version', (q) => q.eq('userId', userId))
+        .collect(),
+      ctx.db
+        .query('coachPlanRevisionsV1')
+        .withIndex('by_user_day_version', (q) =>
+          q.eq('userId', userId).gte('day', fromDay).lt('day', day)
+        )
+        .collect(),
+      ctx.db
+        .query('trackLifetime')
+        .withIndex('by_user', (q) => q.eq('userId', userId))
+        .unique(),
+      ctx.db
+        .query('coachMealDraftsV1')
+        .withIndex('by_user_day', (q) =>
+          q.eq('userId', userId).gte('day', fromDay).lt('day', nextDay)
+        )
+        .collect(),
+      ctx.db
+        .query('coachProofSubmissionsV1')
+        .withIndex('by_user_day', (q) => q.eq('userId', userId).gte('day', fromDay).lt('day', day))
+        .collect(),
+    ]
+  );
   const stepsByDay = new Map<string, number>();
   for (const activity of activities) {
     if (activity.synced && Number.isFinite(activity.steps) && activity.steps > 0) {
@@ -209,16 +218,69 @@ async function planSnapshot(
     source: 'health_sync' as const,
     coverage: 'sensor_observed' as const,
   }));
-  const workouts: { day: string; label: string; source: 'activity_log' | 'check_in_completion' }[] =
-    activities
-      .filter(
-        (a) =>
-          (a.loggedActivityKey === 'gym_workout' || a.loggedActivityKey === 'workout') &&
-          a.reviewStatus !== 'rejected'
-      )
-      .map((a) => ({ day: a.date, label: a.loggedActivityKey!, source: 'activity_log' as const }));
-  // Legacy check-in categories are not yet reconciled to workout proof. Do not
-  // count a generic/aliased check-in as completed training in provider context.
+  const completed = proofs.filter((proof) => proof.state === 'completed');
+  const revisionsById = new Map(recentPlans.map((plan) => [String(plan._id), plan]));
+  const latestByDay = new Map<string, Doc<'coachPlanRevisionsV1'>>();
+  for (const plan of recentPlans)
+    if ((latestByDay.get(plan.day)?.version ?? 0) < plan.version) latestByDay.set(plan.day, plan);
+  const workouts = activities
+    .filter(
+      (a) =>
+        (a.loggedActivityKey === 'gym_workout' || a.loggedActivityKey === 'workout') &&
+        a.reviewStatus !== 'rejected'
+    )
+    .map((a) => {
+      const proof = completed.find((proof) => proof._id === a.coachSubmissionId);
+      const plan = proof?.planRevisionId
+        ? revisionsById.get(String(proof.planRevisionId))
+        : undefined;
+      return {
+        day: a.date,
+        label: a.loggedActivityKey!,
+        source: 'activity_log' as const,
+        plannedType: plan?.workout.type,
+        plannedMinutes: plan?.workout.durationMinutes,
+      };
+    });
+  const days = new Set([
+    ...activities.map((a) => a.date),
+    ...completed.map((proof) => proof.day),
+    ...latestByDay.keys(),
+  ]);
+  const recentDays = [...days].sort().map((day) => {
+    const categories = [
+      ...new Set(completed.filter((proof) => proof.day === day).map((proof) => proof.category)),
+    ];
+    const plan = latestByDay.get(day);
+    const required = plan
+      ? [
+          'meals',
+          'sleep',
+          ...(plan.workout.type === 'rest' ? [] : ['workout']),
+          ...(plan.stepTarget > 0 ? ['steps'] : []),
+        ]
+      : [];
+    return {
+      day,
+      checkedIn:
+        categories.length > 0 ||
+        activities.some(
+          (a) => a.date === day && a.loggedActivityKey && a.reviewStatus !== 'rejected'
+        ),
+      completedCategories: categories,
+      restPlanned: plan ? plan.workout.type === 'rest' : undefined,
+      planCompleted: plan
+        ? required.every((category) =>
+            completed.some(
+              (proof) =>
+                proof.day === day &&
+                proof.planRevisionId === plan._id &&
+                proof.category === category
+            )
+          )
+        : undefined,
+    };
+  });
   return {
     profile: profile.answers,
     weight: weight.weight,
@@ -232,13 +294,17 @@ async function planSnapshot(
     health: {
       steps,
       workouts,
+      recentDays,
       stepAverage:
         steps.length >= 3
           ? Math.round(steps.reduce((sum, item) => sum + item.count, 0) / steps.length)
           : undefined,
       streak: lifetime?.currentWeeklyStreak,
     },
-    recentPlanRevisionIds: [...new Map(recentPlans.map((item) => [item.day, item._id])).values()],
+    recentPlanRevisionIds: [...latestByDay.values()]
+      .sort((a, b) => b.day.localeCompare(a.day))
+      .slice(0, 5)
+      .map((plan) => plan._id),
     mealHistory: sharedMeals
       .filter((item) => item.status === 'shared' && item.caption.trim())
       .sort((a, b) => b.createdAt - a.createdAt)
@@ -492,7 +558,7 @@ export const finishMyTodayReanswerForTesting = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -872,7 +938,7 @@ export const finishDailyAndReserveFirst = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -948,7 +1014,7 @@ export const reserveFirstPlan = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId: daily._id,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -1040,7 +1106,7 @@ export const reserveLaterPlan = mutation({
       profileRevisionId: profile._id,
       dailyAnswerId: daily._id,
       inputSnapshot,
-      promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+      promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
       toneVersion: toneSetting?.version ?? 1,
       status: 'pending',
       createdAt: now,
@@ -1094,6 +1160,8 @@ export const recordPlanRevision = internalMutation({
       .first();
     if (latestRequest?._id !== request._id || request.dispatchedAt)
       throw new ConvexError('Stale or claimed request');
+    if (request.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION)
+      throw new ConvexError('Use validated Daily Plan generation for this prompt');
     // This internal writer predates the named client prompt. Keep its legacy
     // request versions compatible; new v2 requests require v2 details.
     const checked = isV2DailyPrompt(request.promptVersion)
@@ -1217,14 +1285,17 @@ export const materializeAssignments = internalMutation({
         category: 'sleep' as const,
         recommendation: revision.output.sleep,
         label: 'Log your sleep',
-        sleepTargetHours: 7 as const,
+        sleepTargetHours: revision.sleepTargetHours,
       },
       {
         category: 'steps' as const,
         recommendation: revision.detailsV2
           ? stepsRecommendationV2(revision.output, revision.detailsV2)
           : revision.output.steps,
-        label: `${revision.stepTarget.toLocaleString('en-US')} steps`,
+        label:
+          revision.stepTarget > 0
+            ? `${revision.stepTarget.toLocaleString('en-US')} steps`
+            : 'No step target today',
         stepTarget: revision.stepTarget,
       },
     ];

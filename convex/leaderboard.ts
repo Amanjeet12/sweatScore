@@ -188,30 +188,7 @@ export const updateMonthlyLeaderboard = internalMutation({
           notificationType: 'newRewardUnlocked500',
           notificationBody: notificationContents.newRewardUnlocked500.body,
         });
-      } else if (totalDisplayPoints >= 200) {
-        const notificationHistory = await ctx.db
-          .query('notificationHistory')
-          .withIndex('by_user_date_notification_type', (q) =>
-            q
-              .eq('userId', args.userId)
-              .eq('date', todayFormatted)
-              .eq('notificationType', 'newRewardUnlocked250')
-          )
-          .unique();
-        if (notificationHistory) return;
-        ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-          userId: [args.userId],
-          notificationType: 'newRewardUnlocked250',
-          options: {},
-        });
-        ctx.db.insert('notificationHistory', {
-          userId: args.userId,
-          date: todayFormatted,
-          notificationType: 'newRewardUnlocked250',
-          notificationBody: notificationContents.newRewardUnlocked250.body,
-        });
       }
-
       // const user = await ctx.db.get(args.userId);
       // if (!user) return;
 

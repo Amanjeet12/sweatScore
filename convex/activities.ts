@@ -4,11 +4,11 @@ import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { evaluateUserMilestones } from './utils/milestones';
 import { Id, Doc } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import { appVersions } from './appVersions';
 import { applyFreeDailyCap, getDailyPointsCap } from './challengeCompletions';
+import { evaluateUserMilestones } from './utils/milestones';
 
 // Calculate points based on activity metrics
 export function calculatePoints(steps: number, zone2Minutes: number = 0): number {
@@ -418,21 +418,6 @@ export const addHealthDataManually = mutation({
       steps: data.steps,
       storageId: data.storageId,
       synced: false,
-    });
-
-    const admins = await ctx.db
-      .query('users')
-      .withIndex('isAdmin', (q) => q.eq('isAdmin', true))
-      .collect();
-
-    admins.forEach((admin) => {
-      ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-        userId: [admin._id],
-        notificationType: 'newActivitySubmitted',
-        options: {
-          userName: user.name ?? 'User',
-        },
-      });
     });
 
     return true;

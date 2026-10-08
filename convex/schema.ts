@@ -540,6 +540,8 @@ const schema = defineSchema({
           v.object({
             day: v.string(),
             label: v.string(),
+            plannedType: v.optional(v.string()),
+            plannedMinutes: v.optional(v.number()),
             source: v.optional(
               v.union(v.literal('activity_log'), v.literal('check_in_completion'))
             ),
@@ -547,6 +549,17 @@ const schema = defineSchema({
         ),
         stepAverage: v.optional(v.number()),
         streak: v.optional(v.number()),
+        recentDays: v.optional(
+          v.array(
+            v.object({
+              day: v.string(),
+              checkedIn: v.boolean(),
+              completedCategories: v.array(v.string()),
+              restPlanned: v.optional(v.boolean()),
+              planCompleted: v.optional(v.boolean()),
+            })
+          )
+        ),
       }),
       recentPlanRevisionIds: v.array(v.id('coachPlanRevisionsV1')),
       mealHistory: v.optional(
@@ -604,7 +617,7 @@ const schema = defineSchema({
     detailsV2: v.optional(planDetailsV2),
     workout: workoutMetadata,
     stepTarget: v.number(),
-    sleepTargetHours: v.literal(7),
+    sleepTargetHours: v.number(),
     promptVersion: v.string(),
     toneVersion: v.number(),
     createdAt: v.number(),
@@ -622,7 +635,7 @@ const schema = defineSchema({
     detailsV2: v.optional(planDetailsV2),
     workout: v.optional(workoutMetadata),
     stepTarget: v.optional(v.number()),
-    sleepTargetHours: v.optional(v.literal(7)),
+    sleepTargetHours: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index('by_user_day_category_revision', ['userId', 'day', 'category', 'planRevisionId'])

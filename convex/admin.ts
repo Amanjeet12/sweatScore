@@ -20,52 +20,6 @@ import {
 import { legacySchedulerRetired } from './legacySchedulerCutover';
 import { DAILY_SCHEDULE_TIMEZONE, getNextMidnightTimestamp } from './utils/timezone';
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
-
-const DAILY_CHECK_IN_LIVE_DELAY_MS = 7 * ONE_HOUR_MS;
-const DAILY_CHECK_IN_REMINDER_BEFORE_END_MS = 5 * ONE_HOUR_MS;
-async function scheduleCheckInWindowNotifications(
-  ctx: MutationCtx,
-  challengeId: Id<'challenges'>,
-  startsAt: number,
-  endsAt: number,
-  now: number
-) {
-  if (legacySchedulerRetired()) return;
-  const liveNotificationAt = startsAt + DAILY_CHECK_IN_LIVE_DELAY_MS;
-  const reminderNotificationAt = endsAt - DAILY_CHECK_IN_REMINDER_BEFORE_END_MS;
-
-  if (liveNotificationAt > now && liveNotificationAt < endsAt) {
-    await ctx.scheduler.runAt(
-      liveNotificationAt,
-      internal.notifications.processScheduledCheckInNotification,
-      {
-        challengeId,
-        expectedStartAt: startsAt,
-        expectedEndAt: endsAt,
-        notificationType: 'dailyCheckInLive',
-      }
-    );
-  }
-
-  if (
-    reminderNotificationAt > now &&
-    reminderNotificationAt > startsAt &&
-    reminderNotificationAt < endsAt
-  ) {
-    await ctx.scheduler.runAt(
-      reminderNotificationAt,
-      internal.notifications.processScheduledCheckInNotification,
-      {
-        challengeId,
-        expectedStartAt: startsAt,
-        expectedEndAt: endsAt,
-        notificationType: 'dailyCheckInReminder',
-      }
-    );
-  }
-}
-
 async function validateCheckInCategoryId(
   ctx: MutationCtx,
   id: Id<'checkInCategories'> | undefined
@@ -506,20 +460,7 @@ export const sendMarketingPushNotificationToAllUsers = internalMutation({
     title: v.string(),
     body: v.string(),
   },
-  handler: async (ctx, args) => {
-    const users = await ctx.db
-      .query('users')
-      .filter((q) => q.eq(q.field('notificationEnabled'), true))
-      .collect();
-
-    for (const user of users) {
-      ctx.scheduler.runAfter(0, internal.pushNotification.sendMarketingPushNotification, {
-        userId: user._id,
-        title: args.title,
-        body: args.body,
-      });
-    }
-  },
+  handler: async () => {},
 });
 
 export const reviewActivity = mutation({
@@ -561,28 +502,6 @@ export const reviewActivity = mutation({
         userId: activity.userId,
         yearMonth,
       });
-
-      if (activityUser.notificationEnabled) {
-        ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-          userId: [activityUser._id],
-          notificationType: 'newActivityApproved',
-          options: {
-            userName: activityUser.name,
-            date: activity.date,
-          },
-        });
-      }
-    } else {
-      if (activityUser.notificationEnabled) {
-        ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-          userId: [activityUser._id],
-          notificationType: 'newActivityRejected',
-          options: {
-            userName: activityUser.name,
-            date: activity.date,
-          },
-        });
-      }
     }
 
     return {
@@ -1558,8 +1477,6 @@ export const setCurrentDailyChallenge = mutation({
       shortDescription,
     });
 
-    await scheduleCheckInWindowNotifications(ctx, args.challengeId, startsAt, endsAt, now);
-
     return {
       success: true,
       challengeId: args.challengeId,
@@ -1679,7 +1596,6 @@ export const setNextDailyChallenge = mutation({
       shortDescription,
     });
 
-    await scheduleCheckInWindowNotifications(ctx, args.challengeId, startsAt, endsAt, now);
     await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
 
     return {
@@ -1795,7 +1711,6 @@ export const maintainRollingDailyCheckIns = internalMutation({
           dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
         });
 
-        await scheduleCheckInWindowNotifications(ctx, future._id, startsAt, endsAt, now);
         await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
       }
 
@@ -1832,7 +1747,6 @@ export const maintainRollingDailyCheckIns = internalMutation({
       dailyTimezone: DAILY_SCHEDULE_TIMEZONE,
     });
 
-    await scheduleCheckInWindowNotifications(ctx, previous._id, startsAt, endsAt, now);
     await ctx.scheduler.runAt(startsAt, internal.admin.maintainRollingDailyCheckIns, {});
 
     return {

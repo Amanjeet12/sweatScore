@@ -1,8 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
-import { PushNotifications } from '@convex-dev/expo-push-notifications';
 import { ConvexError, v } from 'convex/values';
 
-import { internal, components } from './_generated/api';
+import { internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import {
   action,
@@ -280,24 +279,9 @@ export const applyVerifiedSnapshot = internalMutation({
       lastEventId: args.eventId,
       updatedAt: now,
     };
-    const billingId =
-      previous?._id ??
-      (await ctx.db.insert('coachBillingEntitlementsV1', { userId: args.userId, ...row }));
     if (previous) await ctx.db.patch(previous._id, row);
-    if (
-      active &&
-      row.isTrial &&
-      row.expiresAt &&
-      previous?.trialNotificationChoice === 'enabled' &&
-      previous.trialReminderScheduledFor !== row.expiresAt
-    ) {
-      await ctx.scheduler.runAfter(
-        Math.max(0, row.expiresAt - Date.now() - 2 * 86_400_000),
-        internal.revenueCatEntitlements.sendTrialReminder,
-        { userId: args.userId, expiresAt: row.expiresAt }
-      );
-      await ctx.db.patch(billingId, { trialReminderScheduledFor: row.expiresAt });
-    }
+    else await ctx.db.insert('coachBillingEntitlementsV1', { userId: args.userId, ...row });
+
     if (user.isPremium !== active) {
       await ctx.db.patch(args.userId, { isPremium: active });
       await ctx.scheduler.runAfter(0, internal.users.syncToEnduranceZoneForUser, {
@@ -468,46 +452,11 @@ export const chooseTrialNotifications = mutation({
     )
       return;
     await ctx.db.patch(row._id, { trialNotificationChoice: enabled ? 'enabled' : 'skipped' });
-    if (enabled && row.trialReminderScheduledFor !== row.expiresAt) {
-      await ctx.scheduler.runAfter(
-        Math.max(0, row.expiresAt - Date.now() - 2 * 86_400_000),
-        internal.revenueCatEntitlements.sendTrialReminder,
-        { userId, expiresAt: row.expiresAt }
-      );
-      await ctx.db.patch(row._id, { trialReminderScheduledFor: row.expiresAt });
-    }
   },
 });
 
 export const sendTrialReminder = internalMutation({
   args: { userId: v.id('users'), expiresAt: v.number() },
-  handler: async (ctx, { userId, expiresAt }) => {
-    const row = await ctx.db
-      .query('coachBillingEntitlementsV1')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .unique();
-    const user = await ctx.db.get(userId);
-    if (
-      !row ||
-      row.status !== 'active' ||
-      !row.isTrial ||
-      row.expiresAt !== expiresAt ||
-      row.trialNotificationChoice !== 'enabled' ||
-      row.trialReminderSentFor === expiresAt ||
-      expiresAt <= Date.now() ||
-      !user?.notificationEnabled ||
-      !user.expoPushToken
-    )
-      return;
-    const push = new PushNotifications(components.pushNotifications);
-    await push.sendPushNotification(ctx, {
-      userId,
-      notification: {
-        title: 'Your free access ends soon',
-        body: 'Your SweatScore free access is ending soon. Manage your subscription in Settings to stay in complete control.',
-        data: { notificationType: 'trialReminder' },
-      },
-    });
-    await ctx.db.patch(row._id, { trialReminderSentFor: expiresAt });
-  },
+  // Old scheduled reminders are safely drained; only client-list pushes are sent.
+  handler: async () => {},
 });

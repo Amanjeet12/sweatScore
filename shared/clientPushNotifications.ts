@@ -1,4 +1,10 @@
 export const clientNotificationContents = {
+  videoFeedLive: { title: 'Your video is live 🔥', body: 'Nice work. See it in the community 💪🏾' },
+  newCommentPosted: { title: '{userName} commented on your post 💬', body: '{commentPreview}' },
+  newRewardUnlocked500: {
+    title: "You've hit 500 points 🏆",
+    body: "That's this month's goal hit. Well done 🎉",
+  },
   newAdminPost: {
     title: 'Someone just posted in the community 🙌',
     body: "Come and see what's new 💛",
@@ -23,6 +29,11 @@ export const clientNotificationContents = {
   newMonth: { title: "It's a new month 🌟", body: "Fresh start. Let's earn those points 🔥" },
 } as const;
 export type ClientNotificationType = keyof typeof clientNotificationContents;
+
+/** The client's nine triggers plus the approved no-plan questions reminder. */
+export function isClientNotificationType(type: string): type is ClientNotificationType {
+  return Object.prototype.hasOwnProperty.call(clientNotificationContents, type);
+}
 
 export function localNotificationClock(now: number, timezone: string) {
   try {

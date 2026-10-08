@@ -5,6 +5,7 @@ import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
+import { Image as GuideImage } from 'expo-image';
 import { Camera, VideoCamera, X } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -969,7 +970,7 @@ export default function CoachCheckInFlow({
         ? 'Snap a picture of your smartwatch showing you met your steps target.'
         : category === 'sleep'
           ? 'Snap a picture of your smartwatch showing you met your sleep target.'
-          : 'Snap a picture of your meals to get a private analysis using AI.';
+          : 'Snap a clear picture of your plate and your AI coach will check how it fits your goals.';
   return (
     <View
       style={{
@@ -1352,6 +1353,52 @@ export default function CoachCheckInFlow({
                   <Text style={[type.supporting, { marginTop: 8 }]}>{assignment.label}</Text>
                 ) : null}
                 <Text style={[type.body, { marginTop: 10 }]}>{fixedInstruction}</Text>
+                {category === 'meals' ? (
+                  <View style={{ marginTop: 24, gap: 10 }}>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <View
+                        style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
+                        <GuideImage
+                          source={require('~/assets/meal-photo-dark.jpeg')}
+                          contentFit="contain"
+                          style={{ width: '100%', height: '100%' }}
+                          accessible
+                          accessibilityLabel="Too dark: a dim meal photo marked with a cross."
+                        />
+                      </View>
+                      <View
+                        style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
+                        <GuideImage
+                          source={require('~/assets/meal-photo-bright.jpeg')}
+                          contentFit="contain"
+                          style={{ width: '100%', height: '100%' }}
+                          accessible
+                          accessibilityLabel="Bright, from above: the full plate clearly visible, marked with a check."
+                        />
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <Text
+                        style={[
+                          type.smallCaption,
+                          { flex: 1, textAlign: 'center', color: '#C43D4B' },
+                        ]}>
+                        Too dark
+                      </Text>
+                      <Text
+                        style={[
+                          type.smallCaption,
+                          { flex: 1, textAlign: 'center', color: '#258653' },
+                        ]}>
+                        Bright, from above
+                      </Text>
+                    </View>
+                    <Text style={type.caption}>
+                      Use good light, hold your camera above the plate and keep the whole meal in
+                      view.
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={{ marginTop: 24, gap: 12 }}>
                   {canTakeLivePhoto ? (
                     <TouchableOpacity

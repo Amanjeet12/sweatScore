@@ -625,8 +625,8 @@ describe('request lifecycle', () => {
     });
     const generated = {
       ...output({
-        meals: 'Try eggs with vegetables and aim for 2 litres of water today.',
-        why: 'A short core workout fits steady energy; 7,000 steps fit your observed walking and eggs with vegetables are a practical meal option.',
+        meals: "Log today's meals for feedback. Aim for 2 litres of water.",
+        why: 'A short core workout fits steady energy; 7,000 steps fit your observed walking and balanced protein, carbs and vegetables support your goal.',
       }),
       workoutExamples: ['dead bugs', 'bird dogs'],
       workoutReason: 'A short core session fits your steady energy today.',

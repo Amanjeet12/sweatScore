@@ -388,12 +388,91 @@ describe('coach foundation invariants', () => {
         },
       ],
     });
+    const date = (offset: number) =>
+      new Date(Date.parse(today) - offset * 86400000).toISOString().slice(0, 10);
+    store.rows.coachPlanRevisionsV1 = Array.from({ length: 10 }, (_, i) => ({
+      _id: `prior_${i}`,
+      userId: 'member_a',
+      day: date(i + 1),
+      version: 1,
+      workout: {
+        type: i === 1 ? 'rest' : 'full_body_strength',
+        durationMinutes: i === 1 ? undefined : 30,
+      },
+      stepTarget: 7500,
+    }));
+    store.rows.dailyActivities = [
+      {
+        _id: 'completed_workout',
+        userId: 'member_a',
+        date: date(10),
+        steps: 6000,
+        synced: true,
+        loggedActivityKey: 'workout',
+        coachSubmissionId: 'proof_workout',
+      },
+    ];
+    store.rows.coachProofSubmissionsV1 = [
+      {
+        _id: 'proof_workout',
+        userId: 'member_a',
+        day: date(10),
+        state: 'completed',
+        category: 'workout',
+        planRevisionId: 'prior_9',
+      },
+      {
+        _id: 'proof_sleep',
+        userId: 'member_a',
+        day: date(2),
+        state: 'completed',
+        category: 'sleep',
+        planRevisionId: 'prior_1',
+      },
+      {
+        _id: 'cancelled',
+        userId: 'member_a',
+        day: date(2),
+        state: 'cancelled',
+        category: 'workout',
+      },
+      {
+        _id: 'other_member',
+        userId: 'member_b',
+        day: date(2),
+        state: 'completed',
+        category: 'workout',
+      },
+    ];
     const first = await reserveFirstPlan._handler(store.ctx, { requestKey: 'device_a_123' });
     const second = await reserveFirstPlan._handler(store.ctx, { requestKey: 'device_b_456' });
     expect(second).toBe(first);
     expect(store.rows.coachPlanRequestsV1).toHaveLength(1);
+    const history = store.rows.coachPlanRequestsV1[0].inputSnapshot;
+    expect(history.recentPlanRevisionIds).toEqual([
+      'prior_0',
+      'prior_1',
+      'prior_2',
+      'prior_3',
+      'prior_4',
+    ]);
+    expect(history.health.workouts).toEqual([
+      {
+        day: date(10),
+        label: 'workout',
+        source: 'activity_log',
+        plannedType: 'full_body_strength',
+        plannedMinutes: 30,
+      },
+    ]);
+    expect(history.health.recentDays.find((row) => row.day === date(2))).toMatchObject({
+      completedCategories: ['sleep'],
+      restPlanned: true,
+      planCompleted: false,
+    });
+
     expect(store.rows.coachPlanRequestsV1[0].inputSnapshot.daily).toEqual(daily);
-    expect(store.rows.coachPlanRequestsV1[0].promptVersion).toBe('client-daily-plan-v2.1');
+    expect(store.rows.coachPlanRequestsV1[0].promptVersion).toBe('client-daily-plan-v3');
     expect(store.rows.coachPlanRequestsV1[0].inputSnapshot.mealHistory).toEqual([
       { day: yesterday, caption: 'Eggs with toast', source: 'shared_member_caption' },
     ]);

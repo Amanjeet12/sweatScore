@@ -107,3 +107,20 @@ test('rest and pain plans hide YouTube even when an old workout assignment remai
     expect(html).not.toContain('data-icon="YoutubeLogo"');
   }
 });
+
+test('unwell plan shows recovery guidance instead of a zero-step target', () => {
+  const html = render({
+    ...plan,
+    workout: { type: 'rest' },
+    stepTarget: 0,
+    output: {
+      ...plan.output,
+      steps: 'No step target today. Rest is the priority.',
+      sleep: 'Aim for 8 hours tonight.',
+    },
+  });
+  expect(html).toContain('No step target today. Rest is the priority.');
+  expect(html).toContain('Aim for 8 hours tonight.');
+  expect(html).not.toContain('0 steps');
+  expect(html).not.toContain('Find your workout on YouTube');
+});

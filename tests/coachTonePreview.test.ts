@@ -11,21 +11,18 @@ import { getToneContract, saveToneContract } from '../convex/coachFoundation';
 import { reserve } from '../convex/coachTonePreviewStore';
 import { runDailyTonePreview, runMealTonePreview } from '../convex/coachTonePreviewRunner';
 import { compare } from '../convex/coachTonePreview';
-import { validateDailyPlanOutput } from '../convex/coachDailyPolicy';
+import { validateDailyPlanOutputV3 } from '../convex/coachDailyPolicyV3';
 
 const config = { apiKey: 'fake', model: 'fake', maxOutputTokens: 1600, timeoutMs: 1000 };
 const plan = {
-  headline: 'Rest day, and that counts.',
-  workout: 'No workout today. Keep your streak going by logging your meals, steps and sleep.',
-  workoutExamples: [],
-  workoutReason: 'Rest supports recovery today.',
-  steps: '5,000 steps',
-  stepsReason: 'Today is a rest day, so this target fits your answer.',
-  sleep: 'Aim for 7 hours tonight. Keep your usual bedtime routine.',
-  meals:
-    'Try eggs with vegetables, aim for 2 litres of water and snap each meal for a portion check.',
-  why: 'Rest matches your answer; 5,000 steps are a gentle target and eggs with vegetables are a practical meal option.',
+  headline: 'Rest is part of progress.',
+  workout: { text: 'Rest and recover today.', type: 'rest', minutes: 0, intensity: 'low' },
+  steps: { target: 6500 },
+  sleep: { text: 'Aim for 7 hours tonight.', hours: 7 },
+  meals: { text: "Log today's meals for feedback. Aim for 2 litres of water.", water_litres: 2 },
+  why: 'To support your fitness goal, a rest day honours what you feel ready for and helps you build a routine you can keep. An optional easy walk towards 6,500 steps keeps daily movement manageable without turning today into another training session. Protein at every meal supports recovery, vegetables can fill half your plate, and a fist of carbs gives you energy for your next active day. Two litres of water fit this easier day, while seven hours of sleep tonight give you time to recharge. Keeping these small habits steady is where your next bit of progress comes from.',
 };
+
 const selection = { tone: 'calm_reassuring', detail: 'concise', scope: 'both' } as const;
 const fakeStore = (admin: boolean, old = []) => {
   const rows = {
@@ -317,12 +314,12 @@ test('daily and meal previews use fictional inputs, actual image bytes and real 
   expect(mealBody.messages[0].content[0].source.data).toBe(imageBase64);
   expect(mealBody.messages[0].content[1].text).toContain('"workout_logged_today":false');
   expect(() =>
-    validateDailyPlanOutput(
-      { ...plan, headline: 'Different fixed headline.' },
+    validateDailyPlanOutputV3(
+      { ...plan, headline: 'Too short' },
       structuredClone(FICTIONAL_DAILY_SNAPSHOT),
       '2026-01-15'
     )
-  ).toThrow('invalid_output');
+  ).toThrow('headline_length');
 });
 
 test('live preview accepts an explanation that repeats the canonical step target', async () => {
@@ -338,7 +335,6 @@ test('live preview accepts an explanation that repeats the canonical step target
               name: 'submit_daily_plan',
               input: {
                 ...plan,
-                stepsReason: 'Today is a rest day, so 5,000 steps fits your answer.',
               },
             },
           ],
@@ -360,9 +356,9 @@ test('daily preview repairs one invalid provider candidate without member state'
       expect(request.messages[0].content).not.toContain('member_a');
       if (calls === 2) {
         expect(request.messages[0].content).toContain('revision_instruction');
-        expect(request.messages[0].content).toContain('Never use an em dash');
+        expect(request.messages[0].content).toContain('105 to 115 words');
         expect(request.messages[0].content).toContain(
-          'Why must include the same numeric Steps target'
+          'complete nested submit_daily_plan structure'
         );
       }
       return new Response(

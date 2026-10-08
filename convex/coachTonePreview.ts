@@ -2,16 +2,17 @@
 
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
-import { action } from './_generated/server';
+
 import { api, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
-import { detail, tone, toneScope } from './coachFoundationValidators';
+import { action } from './_generated/server';
+import { DAILY_PLAN_V3_PROMPT_VERSION } from './coachDailyPromptV3';
 import { providerConfig } from './coachDailyProvider';
-import { runDailyTonePreview, runMealTonePreview } from './coachTonePreviewRunner';
-import { ToneSelection, effectiveTone, previewMealSampleConfig } from '../shared/coachTonePreview';
-import { DEFAULT_COACH_TONE } from '../shared/coachFoundation';
-import { DAILY_PLAN_V2_1_PROMPT_VERSION } from './coachDailyPromptV2_1';
+import { detail, tone, toneScope } from './coachFoundationValidators';
 import { MEAL_PROMPT_VERSION } from './coachMealPromptV2';
+import { runDailyTonePreview, runMealTonePreview } from './coachTonePreviewRunner';
+import { DEFAULT_COACH_TONE } from '../shared/coachFoundation';
+import { ToneSelection, effectiveTone, previewMealSampleConfig } from '../shared/coachTonePreview';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 type DailyPreview = Awaited<ReturnType<typeof runDailyTonePreview>>;
@@ -45,7 +46,7 @@ export const compare = action({
       {}
     );
     const history = await ctx.runQuery(api.coachFoundation.getToneHistory, {});
-    const config = providerConfig(DAILY_PLAN_V2_1_PROMPT_VERSION);
+    const config = providerConfig(DAILY_PLAN_V3_PROMPT_VERSION);
     if (!config)
       return { status: 'unavailable' as const, reason: 'Provider configuration is unavailable.' };
 
@@ -146,7 +147,7 @@ export const compare = action({
     return {
       status: 'ready' as const,
       currentVersion: current.version,
-      promptVersions: { daily: DAILY_PLAN_V2_1_PROMPT_VERSION, meal: MEAL_PROMPT_VERSION },
+      promptVersions: { daily: DAILY_PLAN_V3_PROMPT_VERSION, meal: MEAL_PROMPT_VERSION },
       sampleMeal: {
         key: sampleKey,
         label: sampleLabel,

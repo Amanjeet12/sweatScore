@@ -255,7 +255,11 @@ export default function TodayScreen() {
       setRefreshing(false);
     }
   };
-  if (!accepted || !decision || !currentUser || !plan) return <ScreenLoading />;
+  // Undefined means the banner setting is still loading; null means use the default.
+  // Wait for the setting so the default card never flashes before the saved image.
+  if (!accepted || !decision || !currentUser || !plan || bannerImageUrl === undefined) {
+    return <ScreenLoading />;
+  }
   return (
     <SafeAreaView
       className="flex-1 bg-white"
@@ -503,7 +507,10 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        <View className="mx-[22px] mb-[52px] overflow-hidden rounded-[22px] bg-[#2A2A2E] p-5">
+        <Text style={type.sectionHeading} className="mx-[22px] mb-3.5">
+          Your activity
+        </Text>
+        <View className="mx-[22px] mb-[52px] overflow-hidden rounded-[22px] bg-[#2A2A2E] px-5 py-7">
           <Image
             source={require('~/assets/backgrounds/today-activity-equipment.jpg')}
             contentFit="cover"
@@ -517,11 +524,10 @@ export default function TodayScreen() {
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
           />
-          <Text style={[type.sectionHeading, { color: '#fff' }]}>Your activity</Text>
           {activity ? (
             <>
               <View
-                className="mt-[18px] flex-row items-center gap-4"
+                className="flex-row items-center gap-4"
                 accessible
                 accessibilityLabel={`${activity.totalZone2Minutes} of ${activeMinuteTarget} active minutes, ${activity.zone2Points} points`}>
                 <View className="h-[116px] w-[116px] items-center justify-center">
@@ -573,7 +579,7 @@ export default function TodayScreen() {
               </View>
             </>
           ) : (
-            <Text style={[type.supporting, { color: 'rgba(255,255,255,0.8)' }]} className="mt-4">
+            <Text style={[type.supporting, { color: 'rgba(255,255,255,0.8)' }]}>
               Activity is unavailable right now.
             </Text>
           )}

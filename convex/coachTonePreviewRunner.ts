@@ -1,8 +1,8 @@
-import { buildDailyProviderInput, DailySnapshot } from './coachDailyPolicy';
-import { validateDailyPlanOutputV2 } from './coachDailyPolicyV2';
-import { generateV2WithRepair } from './coachDailyRepair';
-import { DAILY_PLAN_V2_1_PROMPT_VERSION } from './coachDailyPromptV2_1';
+import { DailySnapshot } from './coachDailyPolicy';
+import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from './coachDailyPolicyV3';
+import { DAILY_PLAN_V3_PROMPT_VERSION } from './coachDailyPromptV3';
 import { generateDailyPlan, ProviderConfig } from './coachDailyProvider';
+import { generateV3WithRepair } from './coachDailyRepair';
 import { analyzeMealPhoto } from './coachMealProvider';
 import {
   effectiveTone,
@@ -19,18 +19,18 @@ export async function runDailyTonePreview(args: {
 }) {
   const snapshot = structuredClone(FICTIONAL_DAILY_SNAPSHOT) as unknown as DailySnapshot;
   const input = {
-    ...buildDailyProviderInput(snapshot, FICTIONAL_PREVIEW_DAY, []),
+    ...buildDailyProviderInputV3(snapshot, FICTIONAL_PREVIEW_DAY, []),
     recorded_meals: [],
   };
   const style = effectiveTone(args.selection, 'daily_plan', args.priorStyle);
-  const result = await generateV2WithRepair({
+  const result = await generateV3WithRepair({
     call: (retryGuidance) =>
       generateDailyPlan({
         config: args.config,
         input,
         style,
         fetchImpl: args.fetchImpl,
-        promptVersion: DAILY_PLAN_V2_1_PROMPT_VERSION,
+        promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
         retryGuidance,
       }),
     snapshot,
@@ -39,8 +39,8 @@ export async function runDailyTonePreview(args: {
   });
   if (!result.ok) return result;
   try {
-    const validated = validateDailyPlanOutputV2(result.output, snapshot, FICTIONAL_PREVIEW_DAY, []);
-    return { ...result, output: { ...validated.output, ...validated.detailsV2 } };
+    const validated = validateDailyPlanOutputV3(result.output, snapshot, FICTIONAL_PREVIEW_DAY, []);
+    return { ...result, output: validated.output };
   } catch {
     return { ok: false as const, code: 'invalid_output' as const, latencyMs: result.latencyMs };
   }

@@ -57,7 +57,9 @@ export default function CoachPlanItems({
           const assignment = checkIns?.assignments.find((item) => item.category === category);
           const target =
             category === 'steps'
-              ? `${plan.stepTarget.toLocaleString('en-US')} steps`
+              ? plan.stepTarget > 0
+                ? `${plan.stepTarget.toLocaleString('en-US')} steps`
+                : output.steps
               : category === 'workout' && workoutTarget
                 ? workoutTarget
                 : category === 'meals'

@@ -20,16 +20,19 @@ import {
   stepsRecommendationV2,
 } from './coachDailyPolicyV2';
 import type { DailyDetailsV2 } from './coachDailyPolicyV2';
+import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from './coachDailyPolicyV3';
 import { DAILY_PLAN_PROMPT_VERSION } from './coachDailyPrompt';
 import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
 import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
+import { DAILY_PLAN_V3_PROMPT_VERSION } from './coachDailyPromptV3';
 import { generateDailyPlan, providerConfig } from './coachDailyProvider';
-import { generateV2WithRepair } from './coachDailyRepair';
+import { generateV2WithRepair, generateV3WithRepair } from './coachDailyRepair';
 import {
   profileAnswers,
   weightAnswer,
   planOutput,
   planOutputV2,
+  planOutputV3,
   dailyAnswers,
 } from './coachFoundationValidators';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
@@ -239,6 +242,7 @@ export const claim = internalMutation({
         DAILY_PLAN_PROMPT_VERSION,
         DAILY_PLAN_V2_PROMPT_VERSION,
         DAILY_PLAN_V2_1_PROMPT_VERSION,
+        DAILY_PLAN_V3_PROMPT_VERSION,
       ].includes(request.promptVersion)
     ) {
       await ctx.db.patch(requestId, {
@@ -351,7 +355,7 @@ export const finish = internalMutation({
     result: v.union(
       v.object({
         ok: v.literal(true),
-        output: v.union(planOutput, planOutputV2),
+        output: v.union(planOutput, planOutputV2, planOutputV3),
         model: v.string(),
         latencyMs: v.number(),
         inputTokens: v.optional(v.number()),
@@ -419,7 +423,7 @@ export const finish = internalMutation({
       });
       return { status: 'failed' as const };
     }
-    let parsed: ValidatedPlan & { detailsV2?: DailyDetailsV2 };
+    let parsed: ValidatedPlan & { detailsV2?: DailyDetailsV2; sleepTargetHours?: number };
     const recentPlans: { day: string; output: Doc<'coachPlanRevisionsV1'>['output'] }[] = [];
     for (const revisionId of request.inputSnapshot.recentPlanRevisionIds) {
       const revision = await ctx.db.get(revisionId);
@@ -434,19 +438,27 @@ export const finish = internalMutation({
       recentPlans.push({ day: revision.day, output: revision.output });
     }
     try {
-      parsed = isV2DailyPrompt(request.promptVersion)
-        ? validateDailyPlanOutputV2(
-            args.result.output,
-            request.inputSnapshot,
-            request.day,
-            recentPlans
-          )
-        : validateDailyPlanOutput(
-            args.result.output,
-            request.inputSnapshot,
-            request.day,
-            recentPlans
-          );
+      parsed =
+        request.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+          ? validateDailyPlanOutputV3(
+              args.result.output,
+              request.inputSnapshot,
+              request.day,
+              recentPlans
+            )
+          : isV2DailyPrompt(request.promptVersion)
+            ? validateDailyPlanOutputV2(
+                args.result.output,
+                request.inputSnapshot,
+                request.day,
+                recentPlans
+              )
+            : validateDailyPlanOutput(
+                args.result.output,
+                request.inputSnapshot,
+                request.day,
+                recentPlans
+              );
     } catch (error) {
       await ctx.db.patch(request._id, {
         status: 'failed',
@@ -482,7 +494,7 @@ export const finish = internalMutation({
       detailsV2: parsed.detailsV2,
       workout: parsed.workout,
       stepTarget: parsed.stepTarget,
-      sleepTargetHours: 7,
+      sleepTargetHours: parsed.sleepTargetHours ?? 7,
       promptVersion: request.promptVersion,
       toneVersion: request.toneVersion,
       createdAt: now,
@@ -505,14 +517,17 @@ export const finish = internalMutation({
         category: 'sleep' as const,
         recommendation: parsed.output.sleep,
         label: 'Log your sleep',
-        sleepTargetHours: 7 as const,
+        sleepTargetHours: parsed.sleepTargetHours ?? 7,
       },
       {
         category: 'steps' as const,
         recommendation: parsed.detailsV2
           ? stepsRecommendationV2(parsed.output, parsed.detailsV2)
           : parsed.output.steps,
-        label: `${parsed.stepTarget.toLocaleString('en-US')} steps`,
+        label:
+          parsed.stepTarget > 0
+            ? `${parsed.stepTarget.toLocaleString('en-US')} steps`
+            : 'No step target today',
         stepTarget: parsed.stepTarget,
       },
     ];
@@ -547,8 +562,11 @@ export const generateReserved = internalAction({
   handler: async (ctx, { requestId }): Promise<{ status: 'ready' | 'failed' | 'ignored' }> => {
     const claimed = await ctx.runMutation(internal.coachDailyService.claim, { requestId });
     if (!claimed) return { status: 'ignored' };
-    const policy = dailyPolicy(claimed.snapshot, claimed.day);
-    if (policy.unresolved) {
+    const policy =
+      claimed.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+        ? null
+        : dailyPolicy(claimed.snapshot, claimed.day);
+    if (policy?.unresolved) {
       const outcome = await ctx.runMutation(internal.coachDailyService.finish, {
         requestId,
         generationAttempt: claimed.generationAttempt,
@@ -557,11 +575,11 @@ export const generateReserved = internalAction({
       return { status: outcome.status };
     }
     const config = providerConfig(claimed.promptVersion);
-    const providerInput = buildDailyProviderInput(
-      claimed.snapshot,
-      claimed.day,
-      claimed.recentPlans
-    );
+    const providerInput = (
+      claimed.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+        ? buildDailyProviderInputV3
+        : buildDailyProviderInput
+    )(claimed.snapshot, claimed.day, claimed.recentPlans);
     const input = {
       ...providerInput,
       output_constraints: {
@@ -578,7 +596,8 @@ export const generateReserved = internalAction({
     const call = (retryGuidance?: {
       previousCandidate?:
         | import('./coachDailyPolicy').DailyOutput
-        | import('./coachDailyPolicyV2').DailyOutputV2;
+        | import('./coachDailyPolicyV2').DailyOutputV2
+        | import('./coachDailyPolicyV3').DailyOutputV3;
       validationCode?: string;
     }) =>
       generateDailyPlan({
@@ -588,14 +607,22 @@ export const generateReserved = internalAction({
         promptVersion: claimed.promptVersion,
         retryGuidance,
       });
-    const result = isV2DailyPrompt(claimed.promptVersion)
-      ? await generateV2WithRepair({
-          call,
-          snapshot: claimed.snapshot,
-          day: claimed.day,
-          recentPlans: claimed.recentPlans,
-        })
-      : await call();
+    const result =
+      claimed.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+        ? await generateV3WithRepair({
+            call,
+            snapshot: claimed.snapshot,
+            day: claimed.day,
+            recentPlans: claimed.recentPlans,
+          })
+        : isV2DailyPrompt(claimed.promptVersion)
+          ? await generateV2WithRepair({
+              call,
+              snapshot: claimed.snapshot,
+              day: claimed.day,
+              recentPlans: claimed.recentPlans,
+            })
+          : await call();
     const outcome = await ctx.runMutation(internal.coachDailyService.finish, {
       requestId,
       generationAttempt: claimed.generationAttempt,

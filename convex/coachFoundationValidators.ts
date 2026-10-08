@@ -83,6 +83,19 @@ export const planDetailsV2 = v.object({
   workoutReason: v.string(),
   stepsReason: v.string(),
 });
+export const planOutputV3 = v.object({
+  headline: v.string(),
+  workout: v.object({
+    text: v.string(),
+    type: v.string(),
+    minutes: v.number(),
+    intensity: v.union(v.literal('low'), v.literal('moderate'), v.literal('high')),
+  }),
+  steps: v.object({ target: v.number() }),
+  meals: v.object({ text: v.string(), water_litres: v.number() }),
+  sleep: v.object({ text: v.string(), hours: v.number() }),
+  why: v.string(),
+});
 export const workoutMetadata = v.object({
   type: v.union(
     v.literal('full_body_strength'),
@@ -91,9 +104,13 @@ export const workoutMetadata = v.object({
     v.literal('core'),
     v.literal('jump_rope'),
     v.literal('cardio'),
+    v.literal('walking'),
+    v.literal('mobility'),
+    v.literal('stretching'),
     v.literal('rest')
   ),
   durationMinutes: v.optional(v.number()),
+  intensity: v.optional(v.union(v.literal('low'), v.literal('moderate'), v.literal('high'))),
 });
 export const category = v.union(
   v.literal('workout'),

@@ -320,20 +320,15 @@ describe('trial reminders', () => {
     payload.subscriber.subscriptions.monthly.period_type = 'normal';
     expect(parseRevenueCatSubscriber(payload, 'member_a', now).isTrial).toBe(false);
   });
-  test('opt-in queues once at expiry minus two days; skip queues nothing', async () => {
+  test('opt-in preserves notification consent without scheduling retired trial pushes', async () => {
     const store = fixture({
       users: [{ _id: 'member_a', expoPushToken: 'ExponentPushToken[test]' }],
       coachBillingEntitlementsV1: [billing],
     });
-    const before = Date.now();
     await chooseTrialNotifications._handler(store.ctx, { enabled: true });
-    const after = Date.now();
-    expect(store.scheduled).toHaveLength(1);
-    const delay = store.scheduled[0][0];
-    expect(delay).toBeGreaterThanOrEqual(expiresAt - after - 2 * 86_400_000);
-    expect(delay).toBeLessThanOrEqual(expiresAt - before - 2 * 86_400_000);
+    expect(store.scheduled).toHaveLength(0);
     await chooseTrialNotifications._handler(store.ctx, { enabled: true });
-    expect(store.scheduled).toHaveLength(1);
+    expect(store.scheduled).toHaveLength(0);
     await chooseTrialNotifications._handler(store.ctx, { enabled: false });
     expect(store.rows.coachBillingEntitlementsV1[0].trialNotificationChoice).toBe('skipped');
     await sendTrialReminder._handler(store.ctx, { userId: 'member_a', expiresAt });

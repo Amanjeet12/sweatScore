@@ -38,7 +38,7 @@ import TrendRangeDropdown, { ProgressDropdown } from '~/components/core/track/Tr
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import { useSubscriptionGuard } from '~/hooks/useSubscriptionGuard';
-import { TARGETS } from '~/shared/activityGoals';
+import { getBarColor, TARGETS } from '~/shared/activityGoals';
 import { useAuthStore } from '~/store/useAuthStore';
 
 type TrendMetric = 'challenges' | 'steps' | 'activeMinutes' | 'points';
@@ -670,7 +670,7 @@ export default function TabTrack() {
                           className="w-4 rounded-t-[7px]"
                           style={{
                             height: `${(trendValue(item) / maxTrend) * 100}%`,
-                            backgroundColor: '#d9d9d9',
+                            backgroundColor: getBarColor(range, goalCategory, trendValue(item)),
                           }}
                         />
                       ) : null}

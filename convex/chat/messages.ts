@@ -1,8 +1,9 @@
+import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
+
+import { requireCurrentUser, requireGroupMember, getGroupMembership } from './helpers';
 import type { Doc, Id } from '../_generated/dataModel';
 import { mutation, query } from '../_generated/server';
-import { requireCurrentUser, requireGroupMember, getGroupMembership } from './helpers';
-import { anyApi, paginationOptsValidator } from 'convex/server';
 import type { MutationCtx } from '../_generated/server';
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -19,8 +20,6 @@ const MAX_VOICE_DURATION_SECONDS = 300;
 
 const MAX_ATTACHMENT_NAME_LENGTH = 180;
 const MAX_MENTIONS_PER_MESSAGE = 50;
-const CHAT_PUSH_DELAY_MS = 1500;
-const chatNotificationsApi = anyApi['chat/notifications'];
 const ALL_MENTION_PATTERN = /(^|\s)@all\b/i;
 
 const mentionValidator = v.object({
@@ -426,12 +425,6 @@ export const sendMessage = mutation({
       lastMessageAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
-      groupId: args.groupId,
-      messageId,
-      senderId: currentUser._id,
-    });
-
     return messageId;
   },
 });
@@ -485,15 +478,6 @@ export const toggleReaction = mutation({
 
       emoji: args.emoji,
     });
-
-    if (String(message.senderId) !== String(currentUser._id)) {
-      await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatReactionPush, {
-        groupId: message.groupId,
-        messageId: message._id,
-        reactorId: currentUser._id,
-        emoji: args.emoji,
-      });
-    }
 
     return {
       active: true,
@@ -695,12 +679,6 @@ export const sendAttachment = mutation({
       lastMessageAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
-      groupId: args.groupId,
-      messageId,
-      senderId: currentUser._id,
-    });
-
     return messageId;
   },
 });
@@ -835,12 +813,6 @@ export const sendVoiceMessage = mutation({
       lastMessageId: messageId,
 
       lastMessageAt: Date.now(),
-    });
-
-    await ctx.scheduler.runAfter(CHAT_PUSH_DELAY_MS, chatNotificationsApi.queueChatMessagePush, {
-      groupId: args.groupId,
-      messageId,
-      senderId: currentUser._id,
     });
 
     return messageId;

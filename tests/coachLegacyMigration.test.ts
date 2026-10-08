@@ -146,7 +146,7 @@ test('retired direct scheduling calls and queued callbacks cannot write or notif
   }
 });
 
-test('retirement removes only the shared check-in cron registration', () => {
+test('retirement retains only client-list push scheduling and unrelated data jobs', () => {
   const result = Bun.spawnSync({
     cmd: [
       'bun',
@@ -159,8 +159,9 @@ test('retirement removes only the shared check-in cron registration', () => {
   expect(result.exitCode).toBe(0);
   const names = new TextDecoder().decode(result.stdout);
   expect(names).not.toContain('Maintain Rolling Daily Check-Ins');
-  expect(names).toContain('Send Engagement Notifications');
-  expect(names).toContain('Send Daily Mission Notifications');
+  expect(names).not.toContain('Send Engagement Notifications');
+  expect(names).toContain('Send Client Trigger Notifications');
+  expect(names).not.toContain('Send Daily Mission Notifications');
   expect(names).toContain('Update Monthly Leaderboard For All Users');
   expect(names).toContain('Upgrade User To Premium');
 });

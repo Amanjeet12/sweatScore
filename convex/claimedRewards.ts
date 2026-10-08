@@ -86,21 +86,6 @@ export const claimReward = mutation({
       });
     }
 
-    const admins = await ctx.db
-      .query('users')
-      .withIndex('isAdmin', (q) => q.eq('isAdmin', true))
-      .collect();
-
-    admins.forEach((admin) => {
-      ctx.scheduler.runAfter(0, internal.pushNotification.sendPushNotification, {
-        userId: [admin._id],
-        notificationType: 'newRewardClaimed',
-        options: {
-          userName: user.name ?? 'User',
-        },
-      });
-    });
-
     return { success: true };
   },
 });

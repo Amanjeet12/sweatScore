@@ -1,10 +1,12 @@
 import type { DailyOutput, DailySnapshot } from './coachDailyPolicy';
 import { buildDeterministicDailyPlanV2, validateDailyPlanOutputV2 } from './coachDailyPolicyV2';
 import type { DailyOutputV2 } from './coachDailyPolicyV2';
+import type { DailyOutputV3 } from './coachDailyPolicyV3';
+import { validateDailyPlanOutputV3 } from './coachDailyPolicyV3';
 import type { ProviderResult } from './coachDailyProvider';
 
 type Guidance = {
-  previousCandidate?: DailyOutput | DailyOutputV2;
+  previousCandidate?: DailyOutput | DailyOutputV2 | DailyOutputV3;
   validationCode?: string;
 };
 
@@ -77,5 +79,43 @@ export async function generateV2WithRepair(args: {
       first.ok && first.outputTokens !== undefined && second.outputTokens !== undefined
         ? first.outputTokens + second.outputTokens
         : second.outputTokens,
+  };
+}
+
+// The client prompt owns V3 recommendations. Never replace it with the old fixed-plan fallback.
+export async function generateV3WithRepair(args: {
+  call: (guidance?: Guidance) => Promise<ProviderResult>;
+  snapshot: DailySnapshot;
+  day: string;
+  recentPlans: { day: string; output: DailyOutput }[];
+}): Promise<ProviderResult> {
+  let latencyMs = 0;
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
+  let previousCandidate: DailyOutput | DailyOutputV2 | DailyOutputV3 | undefined;
+  let validationCode: string | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await args.call(attempt ? { previousCandidate, validationCode } : undefined);
+    latencyMs += result.latencyMs;
+    if (result.ok) {
+      if (result.inputTokens !== undefined) inputTokens = (inputTokens ?? 0) + result.inputTokens;
+      if (result.outputTokens !== undefined)
+        outputTokens = (outputTokens ?? 0) + result.outputTokens;
+    }
+    if (!result.ok && result.code !== 'invalid_output') return result;
+    try {
+      if (!result.ok) throw new Error(result.formatCode ?? 'invalid_output');
+      validateDailyPlanOutputV3(result.output, args.snapshot, args.day, args.recentPlans);
+      return { ...result, latencyMs, inputTokens, outputTokens };
+    } catch (error) {
+      validationCode = error instanceof Error ? error.message : 'invalid_output';
+      previousCandidate = result.ok ? result.output : undefined;
+    }
+  }
+  return {
+    ok: false,
+    code: 'invalid_output',
+    formatCode: 'plan_validation',
+    latencyMs,
   };
 }
