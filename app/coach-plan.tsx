@@ -1,7 +1,7 @@
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import SafeAreaView from '~/components/core/CoachSafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
@@ -18,13 +18,12 @@ import { useCoachRouteGuard } from '~/hooks/useCoachRouteGuard';
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
 import { planCardState } from '~/shared/coachPlanCards';
-import { resumeMember } from '~/utils/coachResumeNavigation';
+import { cleanDailyPlanCopy } from '~/shared/coachPlanCopy';
 
 const titles = { workout: 'Workout', steps: 'Steps', sleep: 'Sleep', meals: 'Meals' };
 export default function SavedCoachPlan() {
   const { nextCheckIn } = useLocalSearchParams<{ nextCheckIn?: string }>();
   const selectedCheckIn = COACH_CATEGORIES.find((item) => item === nextCheckIn);
-  const convex = useConvex();
   const { accepted, decision } = useCoachRouteGuard(['today']);
   const refresh = decision ? Number(decision.day.replaceAll('-', '')) : 0;
   const saved = useQuery(api.revenueCatEntitlements.myPlan, accepted ? { refresh } : 'skip');
@@ -33,14 +32,7 @@ export default function SavedCoachPlan() {
     accepted && saved?.access ? { refresh } : 'skip'
   );
   const retry = useMutation(api.coachDailyService.retryFailedPlan);
-  const resetAvailability = useQuery(
-    api.coachFoundation.canResetMyTodayPlanForTesting,
-    __DEV__ && accepted ? {} : 'skip'
-  );
-  const resetToday = useMutation(api.coachFoundation.resetMyTodayPlanForTesting);
-  const beginReanswer = useMutation(api.coachFoundation.beginMyTodayReanswerForTesting);
   const [busy, setBusy] = useState(false);
-  const [resetBusy, setResetBusy] = useState(false);
   const [error, setError] = useState('');
   const existingMemberPreparing = Boolean(
     saved?.access &&
@@ -98,7 +90,7 @@ export default function SavedCoachPlan() {
               </View>
             ) : null}
 
-            <Text style={type.planHeading}>{output.headline}</Text>
+            <Text style={type.planHeading}>{cleanDailyPlanCopy(output.headline)}</Text>
             {selectedCheckIn && !(selectedCheckIn === 'workout' && rest) ? (
               <CoachActionButton
                 label={`Continue to ${titles[selectedCheckIn]} check-in`}
@@ -121,7 +113,7 @@ export default function SavedCoachPlan() {
                 Boolean(checkIns?.assignments.some((item) => item.category === category))
               }
             />
-            <PlanExplanation explanation={output.why} />
+            <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
             <PlanFeedback revisionId={plan.revisionId} />
           </>
         ) : saved.access && saved.requestStatus === 'pending' ? (
@@ -199,78 +191,6 @@ export default function SavedCoachPlan() {
           <Text style={type.error} accessibilityLiveRegion="polite" className="mb-3">
             {error}
           </Text>
-        ) : null}
-        {__DEV__ && resetAvailability && saved.requestStatus !== 'none' ? (
-          <View className="mt-8 rounded-2xl border border-[#E3E1DE] bg-white p-5">
-            <Text style={[type.cardTitle, { color: '#1A1A1A' }]}>Development testing</Text>
-            <Text style={type.supporting} className="mt-2">
-              Clear your own plan and answers for today, then answer today’s questions again.
-              Earlier days and your profile stay saved.
-            </Text>
-            {resetAvailability.available ? (
-              <CoachActionButton
-                label={resetBusy ? 'Clearing today’s plan…' : 'Delete my plan for today'}
-                variant="secondary"
-                disabled={resetBusy}
-                onPress={() =>
-                  Alert.alert(
-                    'Delete today’s plan?',
-                    'This clears your saved plan and daily answers for today. You will answer today’s questions again.',
-                    [
-                      { text: 'Keep plan', style: 'cancel' },
-                      {
-                        text: 'Delete plan',
-                        style: 'destructive',
-                        onPress: async () => {
-                          setResetBusy(true);
-                          setError('');
-                          try {
-                            await resetToday({});
-                            await resumeMember(convex);
-                          } catch {
-                            setError('Today’s plan could not be cleared.');
-                          } finally {
-                            setResetBusy(false);
-                          }
-                        },
-                      },
-                    ]
-                  )
-                }
-                className="mt-4"
-              />
-            ) : (
-              <>
-                <Text style={type.supporting} className="mt-3">
-                  {resetAvailability.reason ===
-                  'Today has check-in or reward records and cannot be reset safely'
-                    ? 'A check-in, meal analysis or reward is linked to this plan. Deleting it would lose its original context or scan count.'
-                    : 'Today’s plan cannot be cleared right now.'}
-                </Text>
-                {resetAvailability.reason ===
-                'Today has check-in or reward records and cannot be reset safely' ? (
-                  <CoachActionButton
-                    label={resetBusy ? 'Opening questions…' : 'Re-answer today’s questions'}
-                    variant="secondary"
-                    disabled={resetBusy}
-                    onPress={async () => {
-                      setResetBusy(true);
-                      setError('');
-                      try {
-                        await beginReanswer({});
-                        router.push('/coach-onboarding?reanswer=1');
-                      } catch {
-                        setError('Could not reopen questions.');
-                      } finally {
-                        setResetBusy(false);
-                      }
-                    }}
-                    className="mt-4"
-                  />
-                ) : null}
-              </>
-            )}
-          </View>
         ) : null}
       </ScrollView>
     </SafeAreaView>

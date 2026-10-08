@@ -4,7 +4,11 @@ import type { DailyOutput, DailySnapshot, ValidatedPlan } from './coachDailyPoli
 import { observedSteps } from './coachDailyPolicy';
 import { planOutputV3 } from './coachFoundationValidators';
 import { hasBodyFeeling } from '../shared/coachBodyFeeling';
-import { dailyMealGuidance, DAILY_PLAN_COPY_LIMITS } from '../shared/coachPlanCopy';
+import {
+  cleanDailyPlanCopy,
+  dailyMealGuidance,
+  DAILY_PLAN_COPY_LIMITS,
+} from '../shared/coachPlanCopy';
 import { addDaysToDateKey } from './utils/timezone';
 
 export type DailyOutputV3 = Infer<typeof planOutputV3>;
@@ -359,14 +363,14 @@ export function validateDailyPlanOutputV3(
     fail('repeated_workout');
   return {
     output: {
-      headline: data.headline,
-      workout: data.workout.text,
+      headline: cleanDailyPlanCopy(data.headline),
+      workout: cleanDailyPlanCopy(data.workout.text),
       steps: pain
         ? 'No step target today. Rest is the priority.'
         : `${target.toLocaleString('en-US')} steps`,
-      meals: data.meals.text,
-      sleep: data.sleep.text,
-      why: data.why,
+      meals: cleanDailyPlanCopy(data.meals.text),
+      sleep: cleanDailyPlanCopy(data.sleep.text),
+      why: cleanDailyPlanCopy(data.why),
     },
     workout: rest
       ? { type: 'rest' }

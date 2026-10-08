@@ -2,7 +2,7 @@
   "name": "SweatScore",
   "slug": "sweatscore-app",
   "owner": "sweatscore",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "scheme": "sweatscore-app",
   "newArchEnabled": false,
   "web": {

@@ -14,7 +14,7 @@ import { prototypeTypography as type } from '~/components/core/design/prototypeS
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { CoachCategory } from '~/shared/coachFoundation';
-import { mealPlanSummary } from '~/shared/coachPlanCopy';
+import { cleanDailyPlanCopy, mealPlanSummary } from '~/shared/coachPlanCopy';
 import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 
 export const PLAN_ROWS = [
@@ -55,7 +55,7 @@ export default function CoachPlanItems({
       <View className="mt-7 gap-[22px]">
         {PLAN_ROWS.map(({ category, title, Icon }) => {
           const assignment = checkIns?.assignments.find((item) => item.category === category);
-          const target =
+          const rawTarget =
             category === 'steps'
               ? plan.stepTarget > 0
                 ? `${plan.stepTarget.toLocaleString('en-US')} steps`
@@ -65,6 +65,7 @@ export default function CoachPlanItems({
                 : category === 'meals'
                   ? mealPlanSummary(output.meals)
                   : concise(output[category]);
+          const target = cleanDailyPlanCopy(rawTarget);
           const done = (assignment?.consumedCount ?? 0) > 0;
           return (
             <TouchableOpacity

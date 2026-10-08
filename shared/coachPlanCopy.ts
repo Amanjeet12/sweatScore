@@ -19,3 +19,13 @@ export function mealPlanSummary(value: string) {
   const water = value.match(/\b(\d+(?:\.\d+)?) litres? of water\b/i);
   return dailyMealGuidance(water ? Number(water[1]) : 2);
 }
+
+// Apply to saved plans too, so older AI punctuation does not leak into the UI.
+export function cleanDailyPlanCopy(value: string) {
+  return value
+    .replace(/["“”«»]/g, '')
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/,\s*([.!?])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

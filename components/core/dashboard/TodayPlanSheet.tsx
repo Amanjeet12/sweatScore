@@ -22,6 +22,7 @@ import {
   type BodyFeeling,
 } from '~/shared/coachBodyFeeling';
 import type { CoachCategory } from '~/shared/coachFoundation';
+import { cleanDailyPlanCopy } from '~/shared/coachPlanCopy';
 import { DAILY_QUESTIONS } from '~/shared/coachQuestions';
 import { planBannerState } from '~/shared/coachToday';
 import { toggleTrainingYesterday, type TrainingYesterday } from '~/shared/coachTrainingYesterday';
@@ -203,10 +204,10 @@ export default function TodayPlanSheet({
               </View>
             ) : null}
             <Text style={type.planHeading} className="mt-3.5">
-              {output.headline}
+              {cleanDailyPlanCopy(output.headline)}
             </Text>
             <CoachPlanItems plan={plan.plan!} checkIns={checkIns} onCheckIn={onCheckIn} />
-            <PlanExplanation explanation={output.why} />
+            <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
             <PlanFeedback revisionId={plan.plan!.revisionId} />
             <TouchableOpacity
               accessibilityRole="button"
