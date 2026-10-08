@@ -198,7 +198,7 @@ export default function TodayPlanSheet({
               <View className="mt-4 rounded-2xl bg-[#FFF0E8] p-4">
                 <Text style={[type.supporting, { color: '#71432F' }]}>
                   {plan.requestStatus === 'pending'
-                    ? 'Your updated plan is preparing. The previous recommendation stays available until it is ready.'
+                    ? 'Your changes are saved. Your plan may update to reflect your new answers.'
                     : 'The updated plan could not be prepared. Your previous plan and check-in history remain saved.'}
                 </Text>
               </View>

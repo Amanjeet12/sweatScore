@@ -77,8 +77,7 @@ export default function SavedCoachPlan() {
             {saved.requestStatus === 'pending' ? (
               <View className="mb-4 rounded-2xl bg-[#FFF0E8] p-4">
                 <Text style={[type.supporting, { color: '#71432F' }]}>
-                  Your updated plan is preparing. The previous recommendation stays available until
-                  it is ready.
+                  Your changes are saved. Your plan may update to reflect your new answers.
                 </Text>
               </View>
             ) : saved.requestStatus === 'failed' ? (
@@ -154,11 +153,6 @@ export default function SavedCoachPlan() {
             className="mb-5 mt-4 min-h-11 items-center justify-center">
             <Text style={[type.body, { color: '#E8541E', textAlign: 'center' }]}>
               Update profile to refresh your plan →
-            </Text>
-            <Text
-              style={[type.smallCaption, { color: '#8A8A8A', textAlign: 'center' }]}
-              className="mt-2">
-              Saving changes may refresh today’s recommendation once.
             </Text>
           </TouchableOpacity>
         ) : null}
