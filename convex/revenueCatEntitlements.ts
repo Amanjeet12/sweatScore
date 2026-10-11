@@ -12,9 +12,11 @@ import {
   query,
   ActionCtx,
 } from './_generated/server';
+import { legacyPremiumWritesPaused } from './backendCompatibility';
 import { dailyPolicy } from './coachDailyPolicy';
 import { planDetailsV2, workoutMetadata } from './coachFoundationValidators';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { parseRevenueCatSubscriber, VerifiedPremium } from './revenueCatPolicy';
 import { formatDateInTZ } from './utils/timezone';
 
@@ -114,10 +116,7 @@ export const myPlan = query({
       .query('coachBillingEntitlementsV1')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique();
-    const access = Boolean(
-      user.isAdmin ||
-      (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
-    );
+    const access = hasMemberPremiumAccess(user, billing);
     return {
       day,
       requestStatus: (request?.status ?? (revision ? 'ready' : 'none')) as
@@ -186,6 +185,18 @@ export const reconcileMine = action({
     });
     if (!exists) throw new ConvexError('Member missing');
     return reconcileMember(ctx, userId, 'client');
+  },
+});
+
+/** Old mutation callers receive success immediately; verification runs server-side. */
+export const reconcileLegacyPremium = internalAction({
+  args: { userId: v.id('users') },
+  returns: v.null(),
+  handler: async (ctx, { userId }) => {
+    if (legacyPremiumWritesPaused()) return null;
+    if (await ctx.runQuery(internal.revenueCatEntitlements.getMemberForReconcile, { userId }))
+      await reconcileMember(ctx, userId, 'client');
+    return null;
   },
 });
 
@@ -282,7 +293,7 @@ export const applyVerifiedSnapshot = internalMutation({
     if (previous) await ctx.db.patch(previous._id, row);
     else await ctx.db.insert('coachBillingEntitlementsV1', { userId: args.userId, ...row });
 
-    if (user.isPremium !== active) {
+    if (!legacyPremiumWritesPaused() && user.isPremium !== active) {
       await ctx.db.patch(args.userId, { isPremium: active });
       await ctx.scheduler.runAfter(0, internal.users.syncToEnduranceZoneForUser, {
         userId: args.userId,
@@ -341,7 +352,7 @@ export const expireIfDue = internalMutation({
       return null;
     await ctx.db.patch(row._id, { status: 'inactive', updatedAt: Date.now() });
     const user = await ctx.db.get(args.userId);
-    if (user?.isPremium) {
+    if (!legacyPremiumWritesPaused() && user?.isPremium) {
       await ctx.db.patch(args.userId, { isPremium: false });
       await ctx.scheduler.runAfter(0, internal.users.syncToEnduranceZoneForUser, {
         userId: args.userId,

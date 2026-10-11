@@ -10,6 +10,8 @@ import {
   myPlan,
   recordWebhookEvent,
   reconcileMine,
+  reconcileLegacyPremium,
+  myStatus,
 } from '../convex/revenueCatEntitlements';
 import {
   parseRevenueCatEvent,
@@ -112,11 +114,77 @@ function fixture(seed: Record<string, any[]> = {}) {
 describe('server-verified Premium', () => {
   test('forged boolean cannot grant or revoke Premium', async () => {
     const store = fixture();
-    await expect(updateUserIsPremium._handler(store.ctx, { isPremium: true })).rejects.toThrow(
-      'Premium is verified by the server'
-    );
-    await expect(updateUserIsPremium._handler(store.ctx, { isPremium: false })).rejects.toThrow();
+    expect(await updateUserIsPremium._handler(store.ctx, { isPremium: true })).toEqual({
+      success: true,
+    });
+    expect(await updateUserIsPremium._handler(store.ctx, { isPremium: false })).toEqual({
+      success: true,
+    });
     expect(store.writes).toHaveLength(0);
+  });
+
+  test('legacy synchronization queues verification for the authenticated member only', async () => {
+    const secret = process.env.REVENUECAT_SECRET_API_KEY;
+    const paused = process.env.LEGACY_PREMIUM_WRITES_PAUSED;
+    process.env.REVENUECAT_SECRET_API_KEY = 'test-secret';
+    delete process.env.LEGACY_PREMIUM_WRITES_PAUSED;
+    try {
+      const store = fixture({ users: [{ _id: 'member_a', isPremium: true }] });
+      expect(await updateUserIsPremium._handler(store.ctx, { isPremium: false })).toEqual({
+        success: true,
+      });
+      expect(store.rows.users[0].isPremium).toBe(true);
+      expect(store.scheduled).toHaveLength(1);
+      expect(store.scheduled[0][2]).toEqual({ userId: 'member_a' });
+      store.ctx.auth.getUserIdentity = async () => null;
+      expect(await updateUserIsPremium._handler(store.ctx, { isPremium: true })).toBeNull();
+      expect(store.scheduled).toHaveLength(1);
+    } finally {
+      if (secret === undefined) delete process.env.REVENUECAT_SECRET_API_KEY;
+      else process.env.REVENUECAT_SECRET_API_KEY = secret;
+      if (paused === undefined) delete process.env.LEGACY_PREMIUM_WRITES_PAUSED;
+      else process.env.LEGACY_PREMIUM_WRITES_PAUSED = paused;
+    }
+  });
+
+  test('emergency brake preserves legacy access while new billing still verifies and expires', async () => {
+    const paused = process.env.LEGACY_PREMIUM_WRITES_PAUSED;
+    process.env.LEGACY_PREMIUM_WRITES_PAUSED = 'true';
+    try {
+      const store = fixture({ users: [{ _id: 'member_a', isPremium: true, timezone: 'UTC' }] });
+      await updateUserIsPremium._handler(store.ctx, { isPremium: false });
+      store.ctx.runQuery = () => {
+        throw new Error('Queued legacy work must stop');
+      };
+      await reconcileLegacyPremium._handler(store.ctx, { userId: 'member_a' });
+      expect(store.scheduled).toHaveLength(0);
+      await applyVerifiedSnapshot._handler(store.ctx, {
+        userId: 'member_a',
+        reason: 'webhook',
+        snapshot: { appUserId: 'member_a', active: false, providerCheckedAt: now },
+      });
+      expect(store.rows.users[0].isPremium).toBe(true);
+      expect((await myStatus._handler(store.ctx, {})).isPro).toBe(false);
+      await applyVerifiedSnapshot._handler(store.ctx, {
+        userId: 'member_a',
+        reason: 'client',
+        snapshot: {
+          appUserId: 'member_a',
+          active: true,
+          providerCheckedAt: now + 1,
+          expiresAt: now + 86400000,
+        },
+      });
+      expect((await myStatus._handler(store.ctx, {})).isPro).toBe(true);
+      store.rows.coachBillingEntitlementsV1[0].expiresAt = now - 1;
+      await expireIfDue._handler(store.ctx, { userId: 'member_a', providerCheckedAt: now + 1 });
+      expect(store.rows.users[0].isPremium).toBe(true);
+      expect((await myStatus._handler(store.ctx, {})).isPro).toBe(false);
+      expect(store.scheduled.filter((job) => job[2]?.level)).toHaveLength(0);
+    } finally {
+      if (paused === undefined) delete process.env.LEGACY_PREMIUM_WRITES_PAUSED;
+      else process.env.LEGACY_PREMIUM_WRITES_PAUSED = paused;
+    }
   });
 
   test('server fetch binds the authenticated member ID and rejects wrong-member data', async () => {

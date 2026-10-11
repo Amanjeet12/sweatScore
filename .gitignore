@@ -34,3 +34,7 @@ GoogleService-Info.plist
 docs/superpowers/
 
 .trigger
+
+# Local release artifacts, snapshots, and recovery scripts
+/release/
+/scripts/check-backend-compatibility.ts

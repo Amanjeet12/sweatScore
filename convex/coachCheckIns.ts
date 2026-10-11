@@ -11,6 +11,8 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
+import { isDeletedWorkoutSlot } from './deletedWorkoutSlot';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { evaluateUserMilestones } from './utils/milestones';
 import { formatDateInTZ } from './utils/timezone';
 import { rewardSlotKey } from '../shared/coachFoundation';
@@ -52,7 +54,7 @@ async function entitled(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
     .query('coachBillingEntitlementsV1')
     .withIndex('by_user', (q) => q.eq('userId', userId))
     .unique();
-  return billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now());
+  return hasMemberPremiumAccess(user, billing);
 }
 
 async function today(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
@@ -73,7 +75,7 @@ export const myToday = query({
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
       .order('desc')
       .first();
-    const [assignments, slots] = await Promise.all([
+    const [assignments, savedSlots] = await Promise.all([
       ctx.db
         .query('coachAssignmentsV1')
         .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
@@ -83,6 +85,8 @@ export const myToday = query({
         .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
         .collect(),
     ]);
+    const released = await Promise.all(savedSlots.map((slot) => isDeletedWorkoutSlot(ctx, slot)));
+    const slots = savedSlots.filter((_, index) => !released[index]);
     return {
       day,
       status: revision ? ('ready' as const) : ('no_plan' as const),

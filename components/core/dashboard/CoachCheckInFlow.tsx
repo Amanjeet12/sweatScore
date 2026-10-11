@@ -199,6 +199,10 @@ export default function CoachCheckInFlow({
     };
   }, [countingDown]);
   const cameraSessionKey = `${cameraFacing}-${cameraMode}-${cameraAttempt}`;
+  // Android CameraX switches lenses on the existing view. Remounting on every
+  // flip lets the old view's asynchronous unbindAll tear down the new preview.
+  const cameraViewKey =
+    Platform.OS === 'android' ? `${cameraMode}-${cameraAttempt}` : cameraSessionKey;
   const activeCameraSession = useRef(cameraSessionKey);
   activeCameraSession.current = cameraSessionKey;
   const startupRecoveryAttempts = useRef(0);
@@ -207,7 +211,7 @@ export default function CoachCheckInFlow({
   }, [showCamera]);
   useEffect(() => {
     setCameraStartupError('');
-    if (!showCamera || cameraReady || cameraMode === 'picture') return;
+    if (!showCamera || cameraReady) return;
     const timer = setTimeout(() => {
       if (startupRecoveryAttempts.current === 0) {
         startupRecoveryAttempts.current += 1;
@@ -999,7 +1003,7 @@ export default function CoachCheckInFlow({
         <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
           <View style={{ flex: 1, overflow: 'hidden' }} pointerEvents="none">
             <CameraView
-              key={cameraSessionKey}
+              key={cameraViewKey}
               ref={camera}
               style={StyleSheet.absoluteFillObject}
               onCameraReady={() => {

@@ -36,6 +36,7 @@ import {
   dailyAnswers,
 } from './coachFoundationValidators';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { assignmentLabel, assertRequestKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
 import { formatDateInTZ } from './utils/timezone';
 
@@ -67,10 +68,7 @@ export const currentReadyPlan = query({
       .query('coachBillingEntitlementsV1')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique();
-    const access = Boolean(
-      user?.isAdmin ||
-      (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
-    );
+    const access = hasMemberPremiumAccess(user, billing);
     return { day, revisionId: access ? (revision?._id ?? null) : null };
   },
 });
@@ -171,10 +169,7 @@ export const retryFailedPlan = mutation({
       .query('coachBillingEntitlementsV1')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique();
-    if (
-      !user?.isAdmin &&
-      !(billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
-    )
+    if (!hasMemberPremiumAccess(user, billing))
       throw new ConvexError('Verified access required for plan preparation');
     if (
       !previous ||

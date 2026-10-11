@@ -105,6 +105,11 @@ function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
   const calls: string[] = [];
   let count = 0;
   const db = {
+    delete: async (id: string) => {
+      for (const table of Object.keys(rows)) {
+        rows[table] = rows[table].filter((item) => item._id !== id);
+      }
+    },
     get: async (id: string) =>
       Object.values(rows)
         .flat()
@@ -188,6 +193,50 @@ function fixture(extra: Record<string, any[]> = {}, member = 'alice') {
 }
 
 describe('plan-bound check-ins', () => {
+  test('deleted Coach workout restores capture and reserves one replacement slot', async () => {
+    const key = `${day}:workout:1`;
+    const s = fixture({
+      coachProofSubmissionsV1: [
+        {
+          _id: 'deleted_proof',
+          userId: 'alice',
+          day,
+          category: 'workout',
+          slotKey: key,
+          state: 'reversed',
+          activityId: 'deleted_activity',
+        },
+      ],
+      coachRewardSlotsV1: [
+        {
+          _id: 'used_slot',
+          userId: 'alice',
+          day,
+          category: 'workout',
+          key,
+          ordinal: 1,
+          state: 'earned',
+          submissionId: 'deleted_proof',
+        },
+      ],
+    });
+    const today = await myToday._handler(s.ctx, {});
+    expect(today.assignments.find((item) => item.category === 'workout').consumedCount).toBe(0);
+    const id = await reserveProof._handler(s.ctx, {
+      assignmentId: 'legs',
+      requestKey: 'replacement_1',
+    });
+    const retryId = await reserveProof._handler(s.ctx, {
+      assignmentId: 'legs',
+      requestKey: 'replacement_2',
+    });
+    expect(retryId).toBe(id);
+    expect(s.rows.coachRewardSlotsV1).toHaveLength(1);
+    expect(s.rows.coachRewardSlotsV1[0].state).toBe('reserved');
+    expect(s.rows.coachProofSubmissionsV1.find((item) => item._id === 'deleted_proof').state).toBe(
+      'reversed'
+    );
+  });
   test('all four fixed check-ins are available before plan generation', async () => {
     const s = fixture({ coachPlanRevisionsV1: [], coachAssignmentsV1: [] });
     expect((await myToday._handler(s.ctx, {})).status).toBe('no_plan');

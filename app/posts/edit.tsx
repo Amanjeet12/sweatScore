@@ -195,6 +195,9 @@ export default function EditPost() {
       // Generate thumbnail from video
       try {
         const thumb = await VideoThumbnails.getThumbnailAsync(localmedia.uri, { time: 0 });
+        if (thumb.width > 0 && thumb.height > 0) {
+          setMedia({ ...localmedia, width: thumb.width, height: thumb.height });
+        }
         setMediaUri(thumb.uri);
 
         const [thumbErr, thumbUploadUrl] = await CatchPromise(generateUploadUrl());

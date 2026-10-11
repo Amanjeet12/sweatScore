@@ -230,6 +230,11 @@ export default function NewPost() {
 
       try {
         const thumb = await VideoThumbnails.getThumbnailAsync(localMedia.uri, { time: 0 });
+        // Use the decoded frame dimensions, including portrait orientation, rather
+        // than activity-sharing defaults or incomplete picker metadata.
+        if (thumb.width > 0 && thumb.height > 0) {
+          setMedia({ ...localMedia, width: thumb.width, height: thumb.height });
+        }
         setMediaUri(thumb.uri);
 
         const [thumbErr, thumbUploadUrl] = await CatchPromise(generateUploadUrl());

@@ -12,7 +12,8 @@ export type ResumeScreen =
 
 // Older servers can return Today with inactive access. Enforce the access
 // boundary on the client as well, including when opening the paywall itself.
-// verifiedAccess is server-owned and already includes the admin exemption.
+// verifiedAccess is server-owned and includes admin access and completed legacy
+// premium membership while its first billing record is still absent.
 export function enforceResumeAccess<T extends { screen: ResumeScreen; verifiedAccess: boolean }>(
   decision: T
 ): T {

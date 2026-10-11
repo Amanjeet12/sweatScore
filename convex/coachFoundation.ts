@@ -23,6 +23,8 @@ import {
   detail,
   toneScope,
 } from './coachFoundationValidators';
+import { isDeletedWorkoutSlot } from './deletedWorkoutSlot';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { bodySelections, isUnanswered, type BodyAnswer } from '../shared/coachBodyFeeling';
 import {
   assertDay,
@@ -69,7 +71,7 @@ async function hasVerifiedPremium(ctx: MutationCtx | QueryCtx, userId: Id<'users
     .query('coachBillingEntitlementsV1')
     .withIndex('by_user', (q) => q.eq('userId', userId))
     .unique();
-  return billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now());
+  return hasMemberPremiumAccess(user, billing);
 }
 async function getOrCreateProgress(ctx: MutationCtx, userId: Id<'users'>) {
   const existing = await progress(ctx, userId);
@@ -1409,7 +1411,11 @@ export const reserveProof = mutation({
         .unique();
       if (slot) {
         if (slot.state === 'reserved' && slot.submissionId) return slot.submissionId;
-        continue;
+        if (await isDeletedWorkoutSlot(ctx, slot)) {
+          await ctx.db.delete(slot._id);
+        } else {
+          continue;
+        }
       }
       const now = Date.now();
       const id = await ctx.db.insert('coachProofSubmissionsV1', {

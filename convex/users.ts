@@ -13,6 +13,7 @@ import {
   query,
 } from './_generated/server';
 import { accountMediaDeleter } from './accountDeletionMedia';
+import { legacyPremiumWritesPaused } from './backendCompatibility';
 import { MailerLiteGroup } from './mailerlite';
 import { EnduranceZoneUserUpsertResponse } from './services/enduranceZone';
 import { formatDateInTZ } from './utils/timezone';
@@ -150,10 +151,17 @@ export const updateUserIsPremium = mutation({
   args: {
     isPremium: v.boolean(),
   },
-  returns: v.null(),
-  handler: async () => {
-    // Kept for old clients; a client boolean or SDK result is never proof of payment.
-    throw new ConvexError('Premium is verified by the server');
+  returns: v.union(v.null(), v.object({ success: v.boolean() })),
+  handler: async (ctx) => {
+    // Legacy SDK synchronization must not fail launch. Ignore its boolean:
+    // only the server's authenticated RevenueCat lookup may change access.
+    const userId = await getAuthUserId(ctx);
+    if (!userId || !(await ctx.db.get(userId))) return null;
+    if (!legacyPremiumWritesPaused() && process.env.REVENUECAT_SECRET_API_KEY)
+      await ctx.scheduler.runAfter(0, internal.revenueCatEntitlements.reconcileLegacyPremium, {
+        userId,
+      });
+    return { success: true };
   },
 });
 
@@ -290,11 +298,18 @@ export const updateOnboarded = mutation({
       throw new ConvexError('User not found');
     }
 
+    // Completed legacy accounts must not need new Coach records to reach Home.
+    if (user.onboarded) return { success: true };
+
     const day = formatDateInTZ(new Date(), user.timezone);
     const state = await ctx.db
       .query('coachOnboardingV1')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique();
+    // Old clients complete the bio/activity-goal/health flow without Coach state.
+    // This marker grants no Coach billing, plan, or premium access.
+    if (!state && (!user.name?.trim() || !user.birthdate || !user.activityGoal))
+      throw new ConvexError('Saved answers and verified access required');
     const billing = await ctx.db
       .query('coachBillingEntitlementsV1')
       .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -306,22 +321,21 @@ export const updateOnboarded = mutation({
       user.isAdmin ||
       (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()));
     if (
-      !user.name?.trim() ||
-      !user.birthdate ||
-      !state?.healthContinuation ||
-      !profile ||
-      profile.userId !== userId ||
-      !daily ||
-      daily.userId !== userId ||
-      daily.day !== day ||
-      !request ||
-      request.userId !== userId ||
-      request.day !== day ||
-      !access
+      state &&
+      (!user.name?.trim() ||
+        !user.birthdate ||
+        !state?.healthContinuation ||
+        !profile ||
+        profile.userId !== userId ||
+        !daily ||
+        daily.userId !== userId ||
+        daily.day !== day ||
+        !request ||
+        request.userId !== userId ||
+        request.day !== day ||
+        !access)
     )
       throw new ConvexError('Saved answers and verified access required');
-
-    if (user.onboarded) return { success: true };
 
     if (!user.onboarded) {
       await ctx.scheduler.runAfter(
@@ -415,7 +429,7 @@ export const saveEnduranceZoneData = internalMutation({
 });
 
 // Action to sync user to Endurance Zone
-export const syncToEnduranceZone = internalAction({
+export const syncToEnduranceZone = action({
   args: {
     level: v.optional(
       v.union(
@@ -436,7 +450,10 @@ export const syncToEnduranceZone = internalAction({
 
     if (!user.email || !user.name) return;
 
-    let level = args.level ?? (user.isPremium ? 'Basic Plus' : 'Basic');
+    // Preserve the public legacy endpoint, but never accept a client-selected paid tier.
+    let level: 'Basic' | 'Basic Plus' | 'Premium' | 'Premium Plus' = user.isPremium
+      ? 'Basic Plus'
+      : 'Basic';
     const country = args.country ?? user.countryCode ?? 'UK';
 
     if (user.enduranceZoneLevel === 'Premium Plus') {
@@ -490,6 +507,8 @@ export const syncToEnduranceZoneForUser = internalAction({
     country: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Also stop queued membership changes when the emergency brake is activated.
+    if (legacyPremiumWritesPaused()) return;
     const userId = args.userId;
     const user = await ctx.runQuery(internal.users.getUserInternal, { userId });
     if (!user) return;

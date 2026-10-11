@@ -239,7 +239,8 @@ export const getDashboard = query({
 export const create = mutation({
   args: {
     frontPhoto: v.id('_storage'),
-    sidePhoto: v.id('_storage'),
+    // Old clients can submit front-only photos; new clients still collect both views.
+    sidePhoto: v.optional(v.id('_storage')),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);

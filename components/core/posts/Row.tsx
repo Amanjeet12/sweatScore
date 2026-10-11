@@ -6,6 +6,7 @@ import { Image as ExpoImage } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as Icon from 'phosphor-react-native';
 import { memo, useState, useRef, useEffect } from 'react';
 import {
@@ -72,6 +73,7 @@ export type PostWithUser = {
   mediaType?: string;
   mediaThumbnailUrl?: string;
   challengeId?: string;
+  activityId?: Id<'dailyActivities'>;
   challenge?: {
     name: string;
     points: number;
@@ -103,6 +105,23 @@ const blockReasons = [
 export let stopCurrentVideo: (() => void) | null = null;
 export function setStopCurrentVideo(fn: (() => void) | null) {
   stopCurrentVideo = fn;
+}
+
+// Avoid decoding/downloading the same video again as feed rows are recycled.
+const videoPosters = new Map<string, Promise<string>>();
+function getVideoPoster(videoUrl: string) {
+  const cached = videoPosters.get(videoUrl);
+  if (cached) return cached;
+  const pending = VideoThumbnails.getThumbnailAsync(videoUrl, { time: 1000 })
+    .catch(() => VideoThumbnails.getThumbnailAsync(videoUrl, { time: 0 }))
+    .then((frame) => frame.uri)
+    .catch((error) => {
+      videoPosters.delete(videoUrl);
+      throw error;
+    });
+  if (videoPosters.size >= 40) videoPosters.delete(videoPosters.keys().next().value!);
+  videoPosters.set(videoUrl, pending);
+  return pending;
 }
 
 // Mounts only when active — single player instance at a time
@@ -145,7 +164,7 @@ function ActiveVideoPlayer({ videoUrl, aspectRatio }: { videoUrl: string; aspect
           width: '100%',
           height: '100%',
         }}
-        contentFit="contain"
+        contentFit="cover"
         nativeControls
       />
 
@@ -178,6 +197,31 @@ function ChallengeVideoPlayer({
   aspectRatio?: number;
 }) {
   const [isActive, setIsActive] = useState(false);
+  const [generatedThumbnail, setGeneratedThumbnail] = useState<{
+    video: string;
+    uri: string;
+  } | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState<string | null>(null);
+  const suppliedThumbnail =
+    thumbnailUrl && thumbnailFailed !== thumbnailUrl ? thumbnailUrl : undefined;
+  const poster =
+    suppliedThumbnail ??
+    (generatedThumbnail?.video === videoUrl ? generatedThumbnail.uri : undefined);
+
+  useEffect(() => {
+    if (suppliedThumbnail) return;
+    let cancelled = false;
+    // Coach videos are uploaded directly, without a Trigger thumbnail job.
+    // Decode a poster for existing posts whose backend has no thumbnail.
+    getVideoPoster(videoUrl)
+      .then((uri) => {
+        if (!cancelled) setGeneratedThumbnail({ video: videoUrl, uri });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [videoUrl, suppliedThumbnail]);
 
   const resolvedAspectRatio =
     Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 9 / 16;
@@ -217,17 +261,20 @@ function ChallengeVideoPlayer({
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          {thumbnailUrl && (
+          {poster && (
             <ExpoImage
               source={{
-                uri: thumbnailUrl,
+                uri: poster,
               }}
               style={{
                 position: 'absolute',
                 width: '100%',
                 height: '100%',
               }}
-              contentFit="contain"
+              onError={() => {
+                if (suppliedThumbnail) setThumbnailFailed(suppliedThumbnail);
+              }}
+              contentFit="cover"
               contentPosition="center"
             />
           )}
@@ -394,11 +441,11 @@ function PostRow({
 
   const handleDeletePost = () => {
     if (!requireSubscription({ source: 'community_delete_post' })) return;
-    const isDuet = !!post.challengeId;
-    const title = isDuet ? 'Delete Duet?' : 'Delete Post';
-    const message = isDuet
-      ? 'Deleting this duet will remove your earned points and may affect your streak. This action cannot be undone.'
-      : 'Are you sure you want to delete this post? This action cannot be undone.';
+    const title = 'Delete post';
+    const message =
+      post.challengeId || post.activityId
+        ? 'Deleting this post will remove your earned points and may affect your streak. This action cannot be undone.'
+        : 'Are you sure you want to delete this post? This action cannot be undone.';
     Alert.alert(title, message, [
       {
         text: 'Cancel',

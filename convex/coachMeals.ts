@@ -12,6 +12,7 @@ import {
   QueryCtx,
 } from './_generated/server';
 import { MEAL_PROMPT_VERSION } from './coachMealPromptV2';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { evaluateUserMilestones } from './utils/milestones';
 import { formatDateInTZ } from './utils/timezone';
 import { rewardSlotKey, DEFAULT_COACH_TONE } from '../shared/coachFoundation';
@@ -28,7 +29,7 @@ async function entitled(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
     .query('coachBillingEntitlementsV1')
     .withIndex('by_user', (q) => q.eq('userId', userId))
     .unique();
-  return billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now());
+  return hasMemberPremiumAccess(user, billing);
 }
 async function today(ctx: QueryCtx | MutationCtx, userId: Id<'users'>) {
   return formatDateInTZ(new Date(), (await ctx.db.get(userId))?.timezone);

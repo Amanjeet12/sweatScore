@@ -153,7 +153,8 @@ describe('Stage 4 persisted resume', () => {
     });
     expect(resumeDecision({ ...base, verifiedAccess: true, dailyDraft: draft })).toMatchObject({
       screen: 'today',
-      question: 4,
+      // Training yesterday is now the first unanswered daily question.
+      question: 3,
     });
     expect(
       resumeDecision({ ...base, hasTodayRequest: true, requestStatus: 'pending' })
@@ -214,6 +215,40 @@ describe('Stage 4 persisted resume', () => {
       resumeDecision({ ...base, verifiedAccess: true, changedDay: true, completedOnboarding: true })
         .screen
     ).toBe('today');
+  });
+
+  test('completed legacy premium member reaches Today while initial billing is absent', async () => {
+    const store = fixture({
+      users: [
+        {
+          _id: 'member_a',
+          name: 'Sandy',
+          birthdate: 500000000000,
+          timezone: 'UTC',
+          onboarded: true,
+          isPremium: true,
+        },
+      ],
+    });
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'today',
+      verifiedAccess: true,
+      returningMember: true,
+    });
+    expect((await myPlan._handler(store.ctx, {})).access).toBe(true);
+    expect(store.writes).toHaveLength(0);
+    expect(store.scheduled).toHaveLength(0);
+    for (const billing of [
+      { status: 'inactive' },
+      { status: 'active', expiresAt: Date.now() - 1000 },
+    ]) {
+      store.rows.coachBillingEntitlementsV1 = [{ _id: 'billing', userId: 'member_a', ...billing }];
+      expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+        screen: 'paywall',
+        verifiedAccess: false,
+      });
+      expect((await myPlan._handler(store.ctx, {})).access).toBe(false);
+    }
   });
 
   test('legacy completed-account flag routes unpaid returning members to the paywall', async () => {
@@ -405,7 +440,7 @@ describe('Stage 4 persisted resume', () => {
     expect(store.writes.map((item) => item.table)).not.toContain('coachRewardSlotsV1');
   });
 
-  test('old completion call cannot bypass answers or billing, and app activity awards no points', async () => {
+  test('incomplete legacy completion cannot bypass profile, and app activity awards no points', async () => {
     const store = fixture();
     await expect(updateOnboarded._handler(store.ctx, { onboarded: true })).rejects.toThrow(
       'Saved answers and verified access required'
@@ -415,6 +450,58 @@ describe('Stage 4 persisted resume', () => {
     expect(store.rows.userCheckIns).toBeUndefined();
     expect(store.scheduled).toHaveLength(0);
     expect(store.writes.map((item) => item.table)).toEqual(['patch']);
+  });
+
+  test('completed legacy member can repeat completion without Coach records or side effects', async () => {
+    const store = fixture({ users: [{ _id: 'member_a', onboarded: true }] });
+    expect(await updateOnboarded._handler(store.ctx, { onboarded: true })).toEqual({
+      success: true,
+    });
+    expect(store.writes).toHaveLength(0);
+    expect(store.scheduled).toHaveLength(0);
+  });
+
+  test('legacy health completion works without granting Coach or paid access', async () => {
+    const store = fixture({
+      users: [
+        {
+          _id: 'member_a',
+          name: 'Sandy',
+          birthdate: 500000000000,
+          activityGoal: 'active',
+          timezone: 'UTC',
+        },
+      ],
+    });
+    expect(await updateOnboarded._handler(store.ctx, { onboarded: true })).toEqual({
+      success: true,
+    });
+    expect(store.rows.users[0].onboarded).toBe(true);
+    expect(store.rows.users[0].isPremium).toBeUndefined();
+    expect(store.rows.coachBillingEntitlementsV1).toBeUndefined();
+    expect(store.rows.coachOnboardingV1).toBeUndefined();
+    await updateOnboarded._handler(store.ctx, { onboarded: true });
+    expect(store.scheduled).toHaveLength(1);
+    expect(store.writes).toHaveLength(1);
+  });
+
+  test('Coach enrollment retains strict answers and billing checks even with a legacy activity goal', async () => {
+    const store = fixture({
+      users: [
+        {
+          _id: 'member_a',
+          name: 'Sandy',
+          birthdate: 500000000000,
+          activityGoal: 'active',
+          timezone: 'UTC',
+        },
+      ],
+      coachOnboardingV1: [{ _id: 'state', userId: 'member_a', stage: 'profile' }],
+    });
+    await expect(updateOnboarded._handler(store.ctx, { onboarded: true })).rejects.toThrow(
+      'Saved answers and verified access required'
+    );
+    expect(store.writes).toHaveLength(0);
   });
 });
 

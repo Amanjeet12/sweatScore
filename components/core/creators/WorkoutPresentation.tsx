@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Barbell, CaretLeft } from 'phosphor-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { workoutStyles as styles, workoutTypography as type } from '../design/WorkoutStyles';
@@ -48,23 +48,24 @@ export function WorkoutImage({
   uri?: string | null;
   collection?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [uri]);
-  if (collection)
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  if (collection && uri && failedUri !== uri)
     return (
       <Image
-        source={uri && !failed ? { uri } : require('~/assets/workouts/collection-fallback.jpeg')}
-        onError={() => setFailed(true)}
+        source={{ uri }}
+        recyclingKey={uri}
+        onError={() => setFailedUri(uri)}
         contentFit="cover"
         contentPosition={{ left: '50%', top: '40%' }}
-        transition={180}
+        transition={0}
         style={StyleSheet.absoluteFillObject}
       />
     );
-  return uri && !failed ? (
+  return uri && failedUri !== uri ? (
     <Image
       source={{ uri }}
-      onError={() => setFailed(true)}
+      recyclingKey={uri}
+      onError={() => setFailedUri(uri)}
       contentFit="cover"
       transition={180}
       style={StyleSheet.absoluteFillObject}

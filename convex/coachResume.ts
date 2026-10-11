@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 
 import { query } from './_generated/server';
 import { canRetryCurrentPlanRequest } from './coachPlanRetry';
+import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { formatDateInTZ } from './utils/timezone';
 import { resumeDecision } from '../shared/coachResume';
 
@@ -69,10 +70,7 @@ export const myDecision = query({
         .first(),
     ]);
     const previous = state?.firstPlanRequestId ? await ctx.db.get(state.firstPlanRequestId) : null;
-    const verifiedAccess = Boolean(
-      user.isAdmin ||
-      (billing?.status === 'active' && (!billing.expiresAt || billing.expiresAt > Date.now()))
-    );
+    const verifiedAccess = hasMemberPremiumAccess(user, billing);
     // The legacy completed-account marker is routing compatibility evidence,
     // not an entitlement grant. Some returning accounts retain a Coach stage
     // of `daily` after a cleared or failed first plan request.
