@@ -23,13 +23,12 @@ import {
 } from '~/shared/coachBodyFeeling';
 import type { CoachCategory } from '~/shared/coachFoundation';
 import { cleanDailyPlanCopy } from '~/shared/coachPlanCopy';
-import { DAILY_QUESTIONS } from '~/shared/coachQuestions';
+import { dailyQuestionsForBackend } from '~/shared/coachQuestions';
 import { planBannerState } from '~/shared/coachToday';
 import { toggleTrainingYesterday, type TrainingYesterday } from '~/shared/coachTrainingYesterday';
 
 type Plan = FunctionReturnType<typeof api.revenueCatEntitlements.myPlan>;
 type CheckIns = FunctionReturnType<typeof api.coachCheckIns.myToday> | undefined;
-const QUESTIONS = DAILY_QUESTIONS;
 export default function TodayPlanSheet({
   firstName,
   plan,
@@ -46,6 +45,7 @@ export default function TodayPlanSheet({
   onContentHeight?: (height: number) => void;
 }) {
   const foundation = useQuery(api.coachFoundation.getMyFoundation, {});
+  const QUESTIONS = dailyQuestionsForBackend(foundation?.supportsTrainingOther === true);
   const begin = useMutation(api.coachFoundation.beginReturningPlanSetup);
   const save = useMutation(api.coachFoundation.saveDailyDraft);
   const submit = useAction(api.coachDailyService.submitDailyAnswersAndGenerate);

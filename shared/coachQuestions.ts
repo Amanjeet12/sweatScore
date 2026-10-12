@@ -1,3 +1,14 @@
+export function dailyQuestionsForBackend(supportsOther: boolean) {
+  return DAILY_QUESTIONS.map((question) => ({
+    ...question,
+    options: question.options.map((option) =>
+      supportsOther && question.key === 'trainedYesterday' && option[0] === 'cardio'
+        ? (['other', 'Other'] as const)
+        : option
+    ),
+  }));
+}
+
 export const PROFILE_QUESTIONS = [
   { key: 'weight', title: "What's your current weight?", options: [] },
   {

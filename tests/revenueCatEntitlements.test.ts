@@ -187,7 +187,7 @@ describe('server-verified Premium', () => {
     }
   });
 
-  test('server fetch binds the authenticated member ID and rejects wrong-member data', async () => {
+  test('server fetch binds the authenticated member ID and rejects untrusted wrong-member data', async () => {
     const urls: string[] = [];
     const fetcher = async (url: string, options: any) => {
       urls.push(url);
@@ -204,6 +204,29 @@ describe('server-verified Premium', () => {
     expect(() =>
       parseRevenueCatSubscriber({ subscriber: { entitlements: { Premium: {} } } }, 'member_a', now)
     ).toThrow();
+  });
+
+  test('secret-authenticated member lookup accepts redeemed anonymous originals without aliases', async () => {
+    const payload = provider('$RCAnonymousID:web_customer');
+    delete payload.subscriber.aliases;
+    const snapshot = await fetchVerifiedPremium('member_a', {
+      secretKey: 'server-secret',
+      now,
+      fetcher: async (url, options) => {
+        expect(url).toBe('https://api.revenuecat.com/v1/subscribers/member_a');
+        expect(options.headers.Authorization).toBe('Bearer server-secret');
+        return { ok: true, json: async () => payload };
+      },
+    });
+    expect(snapshot.appUserId).toBe('member_a');
+    expect(snapshot.active).toBe(true);
+    expect(() => parseRevenueCatSubscriber(payload, 'member_a', now)).toThrow('identity_mismatch');
+    expect(() => parseRevenueCatSubscriber(payload, 'member_a', now, 'another_member')).toThrow(
+      'identity_mismatch'
+    );
+    expect(() =>
+      parseRevenueCatSubscriber({ ...payload, request_date_ms: 0 }, 'member_a', now, 'member_a')
+    ).toThrow('invalid_timestamp');
   });
 
   test('trial, restore and web redemption require the same active provider entitlement', () => {

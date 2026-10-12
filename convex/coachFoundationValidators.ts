@@ -52,6 +52,7 @@ export const dailyAnswers = v.object({
         v.literal('lower_body'),
         v.literal('upper_body'),
         v.literal('cardio'),
+        v.literal('other'),
         v.literal('nothing')
       )
     )

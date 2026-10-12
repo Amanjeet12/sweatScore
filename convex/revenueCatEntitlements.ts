@@ -168,7 +168,14 @@ export async function fetchVerifiedPremium(
       }
     );
     if (!response.ok) throw new Error(`revenuecat_http_${response.status}`);
-    return parseRevenueCatSubscriber(await response.json(), appUserId, config.now ?? Date.now());
+    // The secret-authenticated lookup URL binds this response to the member.
+    // original_app_user_id may remain anonymous after valid web redemption.
+    return parseRevenueCatSubscriber(
+      await response.json(),
+      appUserId,
+      config.now ?? Date.now(),
+      appUserId
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -216,7 +223,15 @@ async function reconcileMember(
       reason: source,
       eventId,
     });
-  } catch {
+  } catch (error) {
+    const code =
+      error instanceof Error &&
+      /^revenuecat_(http_\d{3}|identity_mismatch|invalid_timestamp|invalid_expiry)$/.test(
+        error.message
+      )
+        ? error.message
+        : 'revenuecat_lookup_failed';
+    console.warn('[RevenueCat] Server verification failed', code);
     await ctx.runMutation(internal.revenueCatEntitlements.recordCheckFailure, {
       userId,
       reason: source,

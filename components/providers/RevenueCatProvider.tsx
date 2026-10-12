@@ -32,6 +32,7 @@ export type RedemptionResult =
   | { status: 'invalid' }
   | { status: 'login_required' }
   | { status: 'not_ready' }
+  | { status: 'verification_pending' }
   | { status: 'error'; error?: unknown };
 
 interface RevenueCatProps {
@@ -45,6 +46,7 @@ interface RevenueCatProps {
   hasActiveStoreSubscription: boolean;
   isPro: boolean;
   redeemWebPurchaseUrl: (url: string) => Promise<RedemptionResult>;
+  verifyWebPurchase: () => Promise<'active' | 'inactive' | 'pending'>;
 }
 
 const RevenueCatContext = createContext<Partial<RevenueCatProps>>({});
@@ -231,9 +233,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
         switch (result.result) {
           case WebPurchaseRedemptionResultType.SUCCESS:
-            if ((await reconcileMine({})) !== 'active') {
+            // The token has already been consumed, even if verification fails.
+            if ((await reconcileMine({}).catch(() => 'pending' as const)) !== 'active') {
               return {
-                status: 'not_ready',
+                status: 'verification_pending',
               };
             }
 
@@ -270,6 +273,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       hasActiveStoreSubscription,
       isPro,
       redeemWebPurchaseUrl,
+      verifyWebPurchase: () => reconcileMine({}),
     }),
     [
       restorePermissions,
@@ -283,6 +287,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       hasActiveStoreSubscription,
       isPro,
       redeemWebPurchaseUrl,
+      reconcileMine,
     ]
   );
 

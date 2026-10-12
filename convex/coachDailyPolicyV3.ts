@@ -9,6 +9,7 @@ import {
   dailyMealGuidance,
   DAILY_PLAN_COPY_LIMITS,
 } from '../shared/coachPlanCopy';
+import { OTHER_TRAINING_MEANING } from '../shared/coachTrainingYesterday';
 import { addDaysToDateKey } from './utils/timezone';
 
 export type DailyOutputV3 = Infer<typeof planOutputV3>;
@@ -95,6 +96,9 @@ export function buildDailyProviderInputV3(
     today: {
       day,
       ...snapshot.daily,
+      ...(snapshot.daily.trainedYesterday?.includes('other')
+        ? { training_other_meaning: OTHER_TRAINING_MEANING }
+        : {}),
       energy_label: { flat: 'Flat', steady: 'Steady', full: 'Upbeat' }[snapshot.daily.energy],
     },
     recent_14_days: {

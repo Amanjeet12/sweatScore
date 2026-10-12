@@ -28,7 +28,11 @@ import {
   type BodyFeeling,
 } from '~/shared/coachBodyFeeling';
 import { COACH_CATEGORIES } from '~/shared/coachFoundation';
-import { DAILY_QUESTIONS, PROFILE_QUESTIONS } from '~/shared/coachQuestions';
+import {
+  DAILY_QUESTIONS,
+  PROFILE_QUESTIONS,
+  dailyQuestionsForBackend,
+} from '~/shared/coachQuestions';
 import { toggleTrainingYesterday, type TrainingYesterday } from '~/shared/coachTrainingYesterday';
 import { useAuthStore } from '~/store/useAuthStore';
 import { resumeMember } from '~/utils/coachResumeNavigation';
@@ -216,7 +220,9 @@ export default function CoachOnboarding() {
     (reviewingProfile ||
       decision.screen === 'profile' ||
       (decision.screen === 'today' && !foundation.state?.profileRevisionId));
-  const questions = profile ? PROFILE_QUESTIONS : DAILY_QUESTIONS;
+  const questions = profile
+    ? PROFILE_QUESTIONS
+    : dailyQuestionsForBackend(foundation.supportsTrainingOther === true);
   const testDraft = foundation.state?.testReanswerDraft;
   const nextTestStep = reanswerMode
     ? DAILY_QUESTIONS.findIndex((item) => isUnanswered(testDraft?.[item.key]))

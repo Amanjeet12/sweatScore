@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
 import { useConvex } from 'convex/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState } from 'react-native';
 
 import { useRevenueCat } from '~/components/providers/RevenueCatProvider';
 import { useAuthStore } from '~/store/useAuthStore';
+import { resumeMember } from '~/utils/coachResumeNavigation';
 import { REVENUECAT_PENDING_REDEMPTION_KEY } from '~/utils/revenuecatRedemption';
 import { getData, removeData, storage } from '~/utils/storage';
-import { resumeMember } from '~/utils/coachResumeNavigation';
+
+const PENDING_VERIFICATION_KEY = 'pending-revenuecat-verification-member';
 
 export default function RevenueCatRedemptionHandler() {
   const convex = useConvex();
   const currentUser = useAuthStore((state) => state.currentUser);
-  const { redeemWebPurchaseUrl } = useRevenueCat();
+  const { redeemWebPurchaseUrl, verifyWebPurchase } = useRevenueCat();
+  const [verificationRetry, setVerificationRetry] = useState(0);
   const processingRef = useRef(false);
   const currentProcessingUrlRef = useRef<string | null>(null);
   const attemptedErrorUrlRef = useRef<string | null>(null);
@@ -26,6 +29,7 @@ export default function RevenueCatRedemptionHandler() {
   }, []);
 
   const handleSuccess = useCallback(async () => {
+    removeData(PENDING_VERIFICATION_KEY);
     clearPendingRedemption();
     const decision = await resumeMember(convex);
     if (decision?.screen === 'today' && decision.requestStatus === 'ready')
@@ -119,9 +123,23 @@ export default function RevenueCatRedemptionHandler() {
           case 'login_required':
             break;
           case 'not_ready':
+            // Keep the untouched link until the SDK finishes initialization.
+            break;
+          case 'verification_pending':
+            // Redemption succeeded. Never spend this one-use link again.
+            storage.set(PENDING_VERIFICATION_KEY, String(currentUser._id));
+            clearPendingRedemption();
+            setVerificationRetry((value) => value + 1);
             Alert.alert(
               'Verification pending',
-              'Your redemption is saved. Premium will activate after server verification.'
+              'Your purchase was redeemed. We are checking your membership. You do not need to purchase again.',
+              [
+                { text: 'OK' },
+                {
+                  text: 'Retry verification',
+                  onPress: () => setVerificationRetry((value) => value + 1),
+                },
+              ]
             );
             break;
         }
@@ -141,8 +159,47 @@ export default function RevenueCatRedemptionHandler() {
       handleOtherUser,
       handleSuccess,
       redeemWebPurchaseUrl,
+      clearPendingRedemption,
     ]
   );
+
+  useEffect(() => {
+    if (
+      !currentUser?._id ||
+      !verifyWebPurchase ||
+      getData(PENDING_VERIFICATION_KEY) !== String(currentUser._id)
+    )
+      return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const check = async () => {
+      attempts += 1;
+      try {
+        const status = await verifyWebPurchase();
+        if (cancelled) return;
+        if (status === 'active') {
+          await handleSuccess();
+          return;
+        }
+      } catch {
+        /* Preserve the member-bound pending state for retry. */
+      }
+      if (!cancelled && attempts < 4) timer = setTimeout(check, 15000);
+    };
+    check().catch(handleError);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [currentUser?._id, verifyWebPurchase, verificationRetry, handleSuccess, handleError]);
+
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setVerificationRetry((value) => value + 1);
+    });
+    return () => listener.remove();
+  }, []);
 
   const processPendingRedemption = useCallback(async () => {
     if (!currentUser?._id) return;

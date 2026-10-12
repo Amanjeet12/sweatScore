@@ -14,6 +14,17 @@ import { materializeAssignments } from '../convex/coachFoundation';
 import { dailyMealGuidance } from '../shared/coachPlanCopy';
 
 const day = '2026-10-08';
+test('Other reaches the AI as unspecified training, while legacy cardio remains cardio', () => {
+  const snapshot = state();
+  snapshot.daily.trainedYesterday = ['other'];
+  const input = buildDailyProviderInputV3(snapshot, day, []);
+  expect(input.today.trainedYesterday).toEqual(['other']);
+  expect(input.today.training_other_meaning).toContain('does not mean cardio');
+  snapshot.daily.trainedYesterday = ['cardio'];
+  const legacy = buildDailyProviderInputV3(snapshot, day, []);
+  expect(legacy.today.trainedYesterday).toEqual(['cardio']);
+  expect(legacy.today.training_other_meaning).toBeUndefined();
+});
 function state(goal = 'recomp') {
   return {
     profile: {
@@ -232,6 +243,24 @@ test('water, sleep, explanations and repeated copy are validated independently o
       { day: '2026-10-07', output: { headline: p.headline, workout: 'other', why: 'other' } },
     ])
   ).toThrow('repeated_headline');
+});
+
+test('provider sends explicit Other guidance without treating it as legacy cardio', async () => {
+  const s = state();
+  s.daily.trainedYesterday = ['other'];
+  let body;
+  await generateDailyPlan({
+    config,
+    input: buildDailyProviderInputV3(s, day, []),
+    style: { tone: 'warm_direct', detail: 'standard' },
+    promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return response(candidate(s));
+    },
+  });
+  expect(body.system).toContain('does not mean cardio');
+  expect(JSON.parse(body.messages[0].content).input.today.trainedYesterday).toEqual(['other']);
 });
 
 test('provider uses the full client prompt, nested tool schema and moderate temperature', async () => {

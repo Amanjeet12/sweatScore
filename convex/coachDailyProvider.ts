@@ -10,6 +10,7 @@ import {
 } from './coachDailyPromptV2_1';
 import { DAILY_PLAN_V3_PROMPT_VERSION, DAILY_PLAN_V3_SYSTEM_PROMPT } from './coachDailyPromptV3';
 import { DAILY_PLAN_COPY_LIMITS } from '../shared/coachPlanCopy';
+import { OTHER_TRAINING_MEANING } from '../shared/coachTrainingYesterday';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const TOOL_NAME = 'submit_daily_plan';
@@ -186,6 +187,14 @@ export async function generateDailyPlan(args: {
     timedOut = true;
     controller.abort();
   }, args.config.timeoutMs);
+  const trainingInput = args.input as {
+    today?: { trainedYesterday?: string[]; trained_yesterday?: string[] };
+  } | null;
+  const otherTraining = (
+    trainingInput?.today?.trainedYesterday ??
+    trainingInput?.today?.trained_yesterday ??
+    []
+  ).includes('other');
   try {
     const response = await (args.fetchImpl ?? fetch)(API_URL, {
       method: 'POST',
@@ -200,13 +209,14 @@ export async function generateDailyPlan(args: {
         temperature:
           args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION ? 0.7 : args.retryGuidance ? 0.2 : 0,
         system:
-          args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+          (args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
             ? DAILY_PLAN_V3_SYSTEM_PROMPT
             : args.promptVersion === DAILY_PLAN_V2_1_PROMPT_VERSION
               ? DAILY_PLAN_V2_1_SYSTEM_PROMPT
               : args.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
                 ? DAILY_PLAN_V2_SYSTEM_PROMPT
-                : DAILY_PLAN_SYSTEM_PROMPT,
+                : DAILY_PLAN_SYSTEM_PROMPT) +
+          (otherTraining ? '\n\nTRAINED YESTERDAY ANSWER CONTRACT\n' + OTHER_TRAINING_MEANING : ''),
         messages: [
           {
             role: 'user',

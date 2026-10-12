@@ -14,7 +14,8 @@ const object = (value: unknown): Json | null =>
 export function parseRevenueCatSubscriber(
   value: unknown,
   appUserId: string,
-  now: number
+  now: number,
+  authenticatedLookupUserId?: string
 ): VerifiedPremium {
   const root = object(value);
   const subscriber = object(root?.subscriber);
@@ -23,7 +24,9 @@ export function parseRevenueCatSubscriber(
   if (
     !subscriber ||
     typeof original !== 'string' ||
-    (original !== appUserId && !(Array.isArray(aliases) && aliases.includes(appUserId)))
+    (authenticatedLookupUserId !== appUserId &&
+      original !== appUserId &&
+      !(Array.isArray(aliases) && aliases.includes(appUserId)))
   ) {
     throw new Error('revenuecat_identity_mismatch');
   }

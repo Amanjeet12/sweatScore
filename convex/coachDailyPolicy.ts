@@ -265,6 +265,12 @@ export function buildDailyProviderInput(
       energy: snapshot.daily.energy,
       mood: snapshot.daily.mood,
       trained_yesterday: snapshot.daily.trainedYesterday,
+      ...(snapshot.daily.trainedYesterday?.includes('other')
+        ? {
+            training_other_meaning:
+              'Training occurred yesterday, but its type, intensity and duration are unspecified. Other does not mean cardio or no training. Do not invent details; use readiness, soreness and verified history for today’s plan.',
+          }
+        : {}),
       up_for: snapshot.daily.upFor,
       body: snapshot.daily.body,
     },

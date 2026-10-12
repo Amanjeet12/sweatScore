@@ -583,7 +583,7 @@ export const getMyFoundation = query({
       ? await ctx.db.get(state.firstPlanRequestId as Id<'coachPlanRequestsV1'>)
       : null;
     // Before entitlement verification, expose status and saved answers, never pre-payment plan output.
-    return { day, state, firstPlanStatus: request?.status ?? null };
+    return { day, state, firstPlanStatus: request?.status ?? null, supportsTrainingOther: true };
   },
 });
 
