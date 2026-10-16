@@ -43,7 +43,6 @@
     "preview-store": {
       "extends": "preview",
       "distribution": "store",
-      "autoIncrement": true,
       "channel": "preview",
       "environment": "preview",
       "ios": {

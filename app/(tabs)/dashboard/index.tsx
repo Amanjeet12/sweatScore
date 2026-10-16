@@ -105,6 +105,8 @@ export default function TodayScreen() {
     accepted ? { refresh: dayRefresh } : 'skip'
   );
   const insets = useSafeAreaInsets();
+  // Android can report a zero bottom inset inside a translucent native Modal.
+  const sheetBottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 36) : insets.bottom;
   const { height: screenHeight } = useWindowDimensions();
   const [photoView, setPhotoView] = useState<'front' | 'side'>('front');
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
@@ -735,16 +737,16 @@ export default function TodayScreen() {
                     screenHeight - insets.top - 12,
                     screenHeight * 0.92,
                     planContentHeight
-                      ? Math.max(320, planContentHeight + insets.bottom)
+                      ? Math.max(320, planContentHeight + sheetBottomInset)
                       : screenHeight * 0.92
                   )
                 : checkInExpanded
                   ? '88%'
                   : Math.min(
-                      Math.max(checkInPreferredHeight + insets.bottom, 360),
+                      Math.max(checkInPreferredHeight + sheetBottomInset, 360),
                       screenHeight - insets.top - 20
                     ),
-              paddingBottom: insets.bottom,
+              paddingBottom: sheetBottomInset,
             }}>
             {planSheetOpen ? (
               <TodayPlanSheet

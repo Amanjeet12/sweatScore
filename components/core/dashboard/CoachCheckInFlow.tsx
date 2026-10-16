@@ -6,6 +6,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import { Image as GuideImage } from 'expo-image';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Camera, VideoCamera, X } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -86,6 +87,13 @@ type ProofQueue = {
   mediaType?: 'image' | 'video';
   caption?: string;
 };
+
+// Mount with the camera so preview, countdown, recording, and saving stay awake.
+// The hook releases the lock when the camera closes or the sheet unmounts.
+function CameraKeepAwake() {
+  useKeepAwake('coach-check-in-camera');
+  return null;
+}
 
 export default function CoachCheckInFlow({
   category,
@@ -1001,6 +1009,7 @@ export default function CoachCheckInFlow({
       </View>
       {showCamera ? (
         <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
+          <CameraKeepAwake />
           <View style={{ flex: 1, overflow: 'hidden' }} pointerEvents="none">
             <CameraView
               key={cameraViewKey}
