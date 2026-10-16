@@ -6,6 +6,9 @@ import {
   continueAfterHealth,
   finishDailyAndReserveFirst,
   saveDailyDraft,
+  finishProfile,
+  finishCoachSetup,
+  beginReturningPlanSetup,
 } from '../convex/coachFoundation';
 import { myDecision } from '../convex/coachResume';
 import { myPlan } from '../convex/revenueCatEntitlements';
@@ -120,6 +123,70 @@ const draft = {
 };
 
 describe('Stage 4 persisted resume', () => {
+  test('redeemed new Premium member completes bio, profile, health and setup independently of billing', async () => {
+    const store = fixture({
+      users: [{ _id: 'member_a', timezone: 'UTC', isPremium: true }],
+      coachBillingEntitlementsV1: [{ _id: 'bill', userId: 'member_a', status: 'active' }],
+    });
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'bio',
+      verifiedAccess: true,
+      returningMember: false,
+    });
+    Object.assign(store.rows.users[0], { name: 'New member', birthdate: 500000000000 });
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('profile');
+    await expect(beginReturningPlanSetup._handler(store.ctx, {})).rejects.toThrow(
+      'Complete onboarding first'
+    );
+    store.rows.coachOnboardingV1 = [
+      {
+        _id: 'onboarding',
+        userId: 'member_a',
+        stage: 'profile',
+        profileDraft: { weight: { value: 70, unit: 'kg' }, goal: 'lose' },
+      },
+    ];
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'profile',
+      question: 2,
+      verifiedAccess: true,
+    });
+    Object.assign(store.rows.coachOnboardingV1[0].profileDraft, {
+      bodyFeeling: 'feel_good',
+      routineFeeling: 'working_keep_going',
+      foodRelationship: 'balanced_most_days',
+      usualSleep: 'regular_restful',
+      biggestChallenge: 'time',
+    });
+    await finishProfile._handler(store.ctx, {});
+    expect(store.rows.coachOnboardingV1[0].healthContinuation).toBeUndefined();
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('health');
+    await continueAfterHealth._handler(store.ctx, { result: 'declined' });
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('setup');
+    // Reloading uses persisted setup state rather than returning to the first step.
+    expect((await myDecision._handler(store.ctx, {})).screen).toBe('setup');
+    await finishCoachSetup._handler(store.ctx, {});
+    expect(await myDecision._handler(store.ctx, {})).toMatchObject({
+      screen: 'today',
+      verifiedAccess: true,
+      completedOnboarding: true,
+    });
+    expect(store.rows.coachBillingEntitlementsV1[0].status).toBe('active');
+    expect(store.rows.users[0].isPremium).toBe(true);
+  });
+
+  test('completed legacy Premium members bypass new Coach fields; new free members retain onboarding', async () => {
+    const legacy = fixture({ users: [{ _id: 'member_a', onboarded: true, isPremium: true }] });
+    expect(await myDecision._handler(legacy.ctx, {})).toMatchObject({
+      screen: 'today',
+      verifiedAccess: true,
+    });
+    const free = fixture();
+    expect(await myDecision._handler(free.ctx, {})).toMatchObject({
+      screen: 'profile',
+      verifiedAccess: false,
+    });
+  });
   test('returning login gates purchase before missing profile fields', () => {
     const returning = { ...base, returningMember: true, hasBio: false, hasProfile: false };
     expect(resumeDecision(returning).screen).toBe('paywall');
@@ -168,7 +235,7 @@ describe('Stage 4 persisted resume', () => {
     );
     expect(
       resumeDecision({ ...base, verifiedAccess: true, hasHealthContinuation: false }).screen
-    ).toBe('today');
+    ).toBe('health');
     expect(
       resumeDecision({
         ...base,

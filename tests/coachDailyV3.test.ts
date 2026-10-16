@@ -88,8 +88,8 @@ function candidate(
     meals: { text: dailyMealGuidance(water), water_litres: water },
     sleep: { text: `Aim for ${hours} hours tonight.`, hours },
     why: pain
-      ? 'To support your fitness goal, rest is the priority while you feel unwell, and there is no training or step target today. Gentle movement is optional only if it feels comfortable, and if pain or illness continues, speak to a doctor or healthcare professional. Protein at every meal supports recovery, vegetables can fill half your plate, and a fist of carbs helps keep you nourished without a complicated menu. Two litres of water fit this quiet day, and eight hours of sleep give you more time to recover. Keeping your meals and sleep steady is enough today; your usual activity can wait until you feel better.'
-      : `To support your ${goal} goal, today's ${rest ? 'rest' : type.replaceAll('_', ' ')} plan fits the effort you feel ready for and helps you build a routine you can keep. A target of ${target.toLocaleString('en-US')} steps keeps daily movement manageable alongside ${rest ? 'recovery' : 'your session'} without making every part of today harder. Protein at every meal supports recovery, vegetables can fill half your plate, and a fist of carbs gives you energy for your active days. Your ${water} litres of water fit this plan, while ${hours} hours of sleep tonight give you time to recharge. Keeping these small habits steady is where your next bit of progress comes from.`,
+      ? 'To support your fitness goal, rest is the priority while you feel unwell, and there is no training or step target today. Gentle movement is optional only if it feels comfortable, and if pain or illness continues, speak to a doctor or healthcare professional. Protein at every meal supports recovery, vegetables can fill half your plate, and a fist of carbs, up to a third of the plate, helps keep you nourished without a complicated menu. Two litres of water fit this quiet day, and eight hours of sleep give you more time to recover. Keeping your meals and sleep steady is enough today; your usual activity can wait until you feel better.'
+      : `To support your ${goal} goal, today's ${rest ? 'rest' : type.replaceAll('_', ' ')} plan fits the effort you feel ready for and helps you build a routine you can keep. A target of ${target.toLocaleString('en-US')} steps keeps daily movement manageable alongside ${rest ? 'recovery' : 'your session'} without making every part of today harder. Protein at every meal supports recovery, vegetables can fill half your plate, and a fist of carbs, ${s.profile.goal === 'lose' ? 'a quarter' : 'up to a third'} of the plate, gives you energy for your active days. Your ${water} litres of water fit this plan, while ${hours} hours of sleep tonight give you time to recharge. Keeping these small habits steady is where your next bit of progress comes from.`,
   };
 }
 const validate = (p, s) => validateDailyPlanOutputV3(p, s, day);
@@ -285,6 +285,35 @@ test('provider uses the full client prompt, nested tool schema and moderate temp
   expect(body.messages[0].content).not.toContain('weight_history');
 });
 
+test('provider repair receives measured explanation counts and explicit rest constraints', async () => {
+  const s = state();
+  let body;
+  await generateDailyPlan({
+    config,
+    input: buildDailyProviderInputV3(s, day, []),
+    style: { tone: 'warm_direct', detail: 'standard' },
+    promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
+    retryGuidance: {
+      previousCandidate: { ...candidate(s), headline: 'Rest', why: 'Too short.' },
+      validationCode: 'why_length',
+    },
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return response(candidate(s));
+    },
+  });
+  const message = JSON.parse(body.messages[0].content);
+  expect(message.headline_length_feedback.word_count).toBe(1);
+  const headlinePattern = new RegExp(body.tools[0].input_schema.properties.headline.pattern);
+  expect(headlinePattern.test('Keep today gently active')).toBe(true);
+  expect(headlinePattern.test('Rest')).toBe(false);
+  expect(headlinePattern.test('One two three four five six seven')).toBe(false);
+  expect(message.why_length_feedback.word_count).toBe(2);
+  expect(message.why_length_feedback.sentence_count).toBe(1);
+  expect(message.rest_target_rule).toContain('workout.minutes must be 0');
+  expect(message.rest_target_rule).toContain('workout.intensity must be low');
+});
+
 test('provider repairs an invalid candidate once and never saves the fixed V2 fallback', async () => {
   const s = state();
   let calls = 0;
@@ -313,7 +342,7 @@ test('provider repairs an invalid candidate once and never saves the fixed V2 fa
   expect(failed).toMatchObject({
     ok: false,
     code: 'invalid_output',
-    formatCode: 'plan_validation',
+    formatCode: 'plan_validation:why_length',
   });
 });
 
@@ -583,4 +612,105 @@ test('approximate explanation length and optional gentle rest wording do not dis
       unwell
     ).workout
   ).toEqual({ type: 'rest' });
+});
+
+test('recovery restrictions reach the provider choices for every body/yesterday combination', () => {
+  for (const body of [
+    ['fine'],
+    ['sore_upper'],
+    ['sore_lower'],
+    ['sore_upper', 'sore_lower'],
+    ['pain_unwell'],
+  ]) {
+    for (const trainedYesterday of [
+      ['nothing'],
+      ['upper_body'],
+      ['lower_body'],
+      ['upper_body', 'lower_body'],
+      ['other'],
+    ]) {
+      const s = state();
+      s.daily.body = body;
+      s.daily.trainedYesterday = trainedYesterday;
+      const c = buildDailyProviderInputV3(s, day, []).output_constraints;
+      const upper = body.includes('sore_upper') || trainedYesterday.includes('upper_body');
+      const lower = body.includes('sore_lower') || trainedYesterday.includes('lower_body');
+      expect(c.body_parts_with_recovery_evidence).toEqual([
+        ...(upper ? ['upper'] : []),
+        ...(lower ? ['lower'] : []),
+      ]);
+      if (upper) {
+        expect(c.workout_allowed_types).not.toContain('upper_body_strength');
+        expect(c.workout_allowed_types).not.toContain('full_body_strength');
+      }
+      if (lower) {
+        expect(c.workout_allowed_types).not.toContain('lower_body_strength');
+        expect(c.workout_allowed_types).not.toContain('full_body_strength');
+      }
+      if (c.rest_required) expect(c.workout_allowed_types).toEqual(['rest']);
+      expect(c.workout_allowed_types).toContain('rest');
+    }
+  }
+});
+
+test('repaired V3 generation lowers randomness and explains both recovery failure codes', async () => {
+  const s = state();
+  s.daily.trainedYesterday = ['upper_body'];
+  let body;
+  await generateDailyPlan({
+    config,
+    input: buildDailyProviderInputV3(s, day, []),
+    style: { tone: 'friendly', detail: 'balanced' },
+    promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
+    retryGuidance: { previousCandidate: candidate(s), validationCode: 'upper_body_recovery' },
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return response(candidate(s, { type: 'lower_body_strength' }));
+    },
+  });
+  expect(body.temperature).toBe(0.2);
+  const types = body.tools[0].input_schema.properties.workout.properties.type.enum;
+  expect(types).not.toContain('upper_body_strength');
+  expect(types).not.toContain('full_body_strength');
+  expect(types).toContain('lower_body_strength');
+  const message = JSON.parse(body.messages[0].content);
+  expect(message.body_recovery_rule).toContain('invented_body_recovery');
+  expect(message.body_recovery_rule).toContain('Rewrite Workout AND Why together');
+});
+
+test('workout label comes from validated metadata rather than exact AI spelling', () => {
+  const s = state();
+  for (const text of [
+    '35 minute full-body strength session',
+    'Full body strength for 35 minutes',
+    '30-minute cardio workout',
+  ]) {
+    const p = candidate(s);
+    p.workout.text = text;
+    const result = validate(p, s);
+    expect(result.output.workout).toBe('35-minute full body strength workout');
+    expect(result.workout.type).toBe('full_body_strength');
+    expect(result.workout.durationMinutes).toBe(35);
+  }
+});
+
+test('label formatting cannot bypass load, recovery, unsafe copy or workout variety rules', () => {
+  const s = state();
+  const p = candidate(s);
+  p.workout.text = 'An easy session';
+  expect(() => validate({ ...p, workout: { ...p.workout, minutes: 33 } }, s)).toThrow(
+    'workout_duration'
+  );
+  const recovering = state();
+  recovering.daily.trainedYesterday = ['upper_body'];
+  expect(() => validate(p, recovering)).toThrow('upper_body_recovery');
+  expect(() =>
+    validate({ ...p, workout: { ...p.workout, text: 'Burn calories today' } }, s)
+  ).toThrow('unsafe_language');
+  expect(() =>
+    validateDailyPlanOutputV3(p, s, day, [
+      { day: '2026-10-07', output: { workout: '35-minute full body strength workout' } },
+      { day: '2026-10-06', output: { workout: '35-minute full body strength workout' } },
+    ])
+  ).toThrow('repeated_workout');
 });

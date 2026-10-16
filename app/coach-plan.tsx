@@ -158,7 +158,7 @@ export default function SavedCoachPlan() {
         ) : null}
         {saved.access && saved.requestStatus === 'failed' && saved.canRetry && !output ? (
           <CoachActionButton
-            label={busy ? 'Retrying…' : 'Retry plan preparation'}
+            label={busy ? 'Retrying…' : 'Retry'}
             disabled={busy}
             onPress={async () => {
               setBusy(true);

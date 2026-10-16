@@ -229,6 +229,32 @@ describe('server-verified Premium', () => {
     ).toThrow('invalid_timestamp');
   });
 
+  test('verified web Premium does not mark incomplete onboarding complete even with a ready plan', async () => {
+    const store = fixture({
+      coachOnboardingV1: [
+        {
+          _id: 'onboarding',
+          userId: 'member_a',
+          stage: 'profile',
+          entitlement: 'unverified',
+          firstPlanRequestId: 'plan_request',
+        },
+      ],
+      coachPlanRequestsV1: [
+        { _id: 'plan_request', userId: 'member_a', day: today, status: 'ready' },
+      ],
+    });
+    await applyVerifiedSnapshot._handler(store.ctx, {
+      userId: 'member_a',
+      snapshot: parseRevenueCatSubscriber(provider(), 'member_a', now),
+      reason: 'client',
+    });
+    expect(store.rows.users[0].isPremium).toBe(true);
+    expect(store.rows.coachOnboardingV1[0].entitlement).toBe('verified');
+    expect(store.rows.coachOnboardingV1[0].stage).toBe('profile');
+    expect(store.rows.users[0].onboarded).toBeUndefined();
+  });
+
   test('trial, restore and web redemption require the same active provider entitlement', () => {
     expect(parseRevenueCatSubscriber(provider(), 'member_a', now).active).toBe(true);
     expect(

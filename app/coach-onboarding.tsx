@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, Keyboard, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BuildingRoutine } from '~/components/core/auth/BuildingRoutine';
 import { CoachSurveyBridge } from '~/components/core/auth/CoachSurveyBridge';
 import {
   PrototypeOnboarding,
@@ -39,7 +38,6 @@ import { resumeMember } from '~/utils/coachResumeNavigation';
 
 const QUESTION_ROUTES = ['profile', 'daily', 'today'] as const;
 const PROFILE_REVIEW_ROUTES = ['profile', 'health'] as const;
-const BUILDING_ROUTINE_MINIMUM_MS = 6000;
 
 const PROFILE_COPY: Record<string, { eyebrow: string; description: string }> = {
   weight: {
@@ -128,7 +126,6 @@ export default function CoachOnboarding() {
   const [localStep, setLocalStep] = useState<number | null>(null);
   const [weight, setWeight] = useState('');
   const [unit, setUnit] = useState<'lb' | 'kg'>('lb');
-  const userName = useAuthStore((state) => state.currentUser?.name?.trim());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingProfileChoice, setPendingProfileChoice] = useState<string | null>(null);
@@ -200,8 +197,6 @@ export default function CoachOnboarding() {
       setUnit(saved.unit);
     }
   }, [foundation?.state?.profileDraft?.weight]);
-
-  if (completingProfile) return <BuildingRoutine name={userName} />;
 
   if (
     !accepted ||
@@ -381,13 +376,10 @@ export default function CoachOnboarding() {
         setLocalStep(step + 1);
       } else if (profile) {
         const finishingProfile = step === PROFILE_QUESTIONS.length - 1;
-        const startedBuildingAt = Date.now();
         if (finishingProfile) setCompletingProfile(true);
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
         if (finishingProfile) {
           await finishProfile({});
-          const remaining = BUILDING_ROUTINE_MINIMUM_MS - (Date.now() - startedBuildingAt);
-          if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
           if (decision.returningMember) router.replace('/(tabs)/dashboard');
           else await resumeMember(convex);
         } else {

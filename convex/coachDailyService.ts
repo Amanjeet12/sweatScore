@@ -20,7 +20,11 @@ import {
   stepsRecommendationV2,
 } from './coachDailyPolicyV2';
 import type { DailyDetailsV2 } from './coachDailyPolicyV2';
-import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from './coachDailyPolicyV3';
+import {
+  DailyPlanValidationErrorV3,
+  buildDailyProviderInputV3,
+  validateDailyPlanOutputV3,
+} from './coachDailyPolicyV3';
 import { DAILY_PLAN_PROMPT_VERSION } from './coachDailyPrompt';
 import { DAILY_PLAN_V2_PROMPT_VERSION } from './coachDailyPromptV2';
 import { DAILY_PLAN_V2_1_PROMPT_VERSION, isV2DailyPrompt } from './coachDailyPromptV2_1';
@@ -405,7 +409,7 @@ export const finish = internalMutation({
         errorCode: args.result.code,
         validationStage:
           args.result.code === 'invalid_output'
-            ? args.result.formatCode === 'plan_validation'
+            ? args.result.formatCode?.startsWith('plan_validation')
               ? 'plan_validation'
               : 'provider_format'
             : undefined,
@@ -465,6 +469,10 @@ export const finish = internalMutation({
           error instanceof Error && error.message === 'policy_unresolved'
             ? undefined
             : 'plan_validation',
+        failureFormatCode:
+          error instanceof DailyPlanValidationErrorV3
+            ? `plan_validation:${error.codes[0]}`
+            : undefined,
         provider: 'anthropic',
         model: args.result.model,
         latencyMs: args.result.latencyMs,
@@ -594,6 +602,8 @@ export const generateReserved = internalAction({
         | import('./coachDailyPolicyV2').DailyOutputV2
         | import('./coachDailyPolicyV3').DailyOutputV3;
       validationCode?: string;
+      validationCodes?: string[];
+      validationFeedback?: { prohibited_terms: string[]; food_names: string[] };
     }) =>
       generateDailyPlan({
         config,
@@ -625,7 +635,7 @@ export const generateReserved = internalAction({
         ? {
             ok: true,
             output: result.output,
-            model: config!.model,
+            model: result.model ?? config!.model,
             latencyMs: result.latencyMs,
             inputTokens: result.inputTokens,
             outputTokens: result.outputTokens,
@@ -635,7 +645,7 @@ export const generateReserved = internalAction({
             code: result.code,
             formatCode: result.formatCode,
             latencyMs: result.latencyMs,
-            model: config?.model,
+            model: result.model ?? config?.model,
           },
     });
     return { status: outcome.status };

@@ -61,7 +61,7 @@ describe('Stage 7 Today model', () => {
       ['failed', true, true, true, 'ready', 'View today’s plan'],
       ['none', false, true, false, 'no_plan', 'Get today’s plan'],
       ['pending', false, true, false, 'pending', 'Preparing'],
-      ['failed', false, true, true, 'failed', 'Retry today’s plan'],
+      ['failed', false, true, true, 'failed', 'Retry'],
       ['failed', false, true, false, 'unavailable', 'Today’s plan unavailable'],
       ['ready', true, false, false, 'locked', 'Premium access unavailable'],
     ] as const) {

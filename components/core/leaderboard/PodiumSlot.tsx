@@ -1,4 +1,3 @@
-import { Fire } from 'phosphor-react-native';
 import { useState } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 
@@ -91,24 +90,6 @@ export default function PodiumSlot({
             <Text style={type.caption}>—</Text>
           </View>
         )}
-        {mode === 'streak' && entry ? (
-          <View
-            style={{
-              position: 'absolute',
-              right: -2,
-              bottom: -2,
-              width: 26,
-              height: 26,
-              borderRadius: 13,
-              borderWidth: 2,
-              borderColor: '#fff',
-              backgroundColor: entry.displayTotalPoints > 0 ? '#ff5a1f' : '#c9c9c9',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Fire size={14} color="#fff" weight="fill" />
-          </View>
-        ) : null}
       </View>
       {entry ? (
         <View style={{ width: '100%', paddingHorizontal: 2, gap: 2 }}>

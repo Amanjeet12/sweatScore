@@ -329,14 +329,8 @@ export const applyVerifiedSnapshot = internalMutation({
         entitlementCheckedAt: now,
         updatedAt: now,
       });
-      if (active && onboarding.firstPlanRequestId) {
-        const request = await ctx.db.get(onboarding.firstPlanRequestId);
-        if (
-          request?.status === 'ready' &&
-          request.day === formatDateInTZ(new Date(), user.timezone)
-        )
-          await ctx.db.patch(onboarding._id, { stage: 'complete' });
-      }
+      // Billing updates access only. Onboarding completion belongs to its
+      // explicit setup actions, never purchase/redemption/reconciliation.
     }
     if (active && args.snapshot.expiresAt) {
       await ctx.scheduler.runAfter(

@@ -79,8 +79,7 @@ export const myDecision = query({
       user.onboarded ||
       state?.returningMember ||
       state?.stage === 'complete' ||
-      earlierPlan ||
-      (!state && verifiedAccess)
+      earlierPlan
     );
     const decided = resumeDecision({
       hasBio: Boolean(user.name?.trim() && user.birthdate),

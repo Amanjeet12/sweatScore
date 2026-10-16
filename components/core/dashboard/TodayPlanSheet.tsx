@@ -239,7 +239,7 @@ export default function TodayPlanSheet({
                 </Text>
                 {plan.canRetry && plan.requestId ? (
                   <PrototypeButton
-                    label="Retry plan preparation"
+                    label="Retry"
                     loading={busy}
                     disabled={busy}
                     onPress={async () => {

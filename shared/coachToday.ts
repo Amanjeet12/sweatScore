@@ -25,7 +25,7 @@ export function planBannerLabel(state: PlanBannerState) {
     no_plan: 'Get today’s plan',
     pending: 'Preparing',
     ready: 'View today’s plan',
-    failed: 'Retry today’s plan',
+    failed: 'Retry',
     unavailable: 'Today’s plan unavailable',
   }[state];
 }

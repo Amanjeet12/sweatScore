@@ -607,9 +607,8 @@ export const beginReturningPlanSetup = mutation({
             .first();
     // Incomplete new-member onboarding still follows its server resume path.
     if (
-      existing &&
-      existing.stage !== 'complete' &&
-      !existing.returningMember &&
+      existing?.stage !== 'complete' &&
+      !existing?.returningMember &&
       !earlierPlan &&
       !user.onboarded
     )
@@ -663,10 +662,7 @@ export const finishProfile = mutation({
       if (weight && JSON.stringify(weight.weight) === JSON.stringify(state.profileDraft!.weight)) {
         await ctx.db.patch(state._id, {
           profileRevisionId: latest._id,
-          stage: (await hasVerifiedPremium(ctx, userId)) ? 'daily' : 'health',
-          healthContinuation: (await hasVerifiedPremium(ctx, userId))
-            ? (state.healthContinuation ?? 'unavailable')
-            : state.healthContinuation,
+          stage: state.healthContinuation ? 'daily' : 'health',
           updatedAt: Date.now(),
         });
         return latest._id;
@@ -690,13 +686,9 @@ export const finishProfile = mutation({
       source: 'member',
       createdAt: now,
     });
-    const entitled = await hasVerifiedPremium(ctx, userId);
     await ctx.db.patch(state._id, {
       profileRevisionId: id,
-      stage: entitled ? 'daily' : 'health',
-      healthContinuation: entitled
-        ? (state.healthContinuation ?? 'unavailable')
-        : state.healthContinuation,
+      stage: state.healthContinuation ? 'daily' : 'health',
       updatedAt: now,
     });
     return id;
@@ -784,9 +776,8 @@ export const continueAfterHealth = mutation({
     if (state.firstPlanRequestId) return state._id;
     await ctx.db.patch(state._id, {
       healthContinuation: result,
-      // The health choice is the final free-onboarding step. Persist the
-      // paywall stage now so resumeMember cannot briefly route through Home.
-      stage: 'paywall',
+      // Billing does not replace the member's health choice or Coach setup.
+      stage: (await hasVerifiedPremium(ctx, userId)) ? 'setup' : 'paywall',
       updatedAt: Date.now(),
     });
     return state._id;
@@ -803,7 +794,7 @@ export const finishCoachSetup = mutation({
       throw new ConvexError('Profile and health continuation required');
     if (state.stage === 'setup')
       await ctx.db.patch(state._id, {
-        stage: (await hasVerifiedPremium(ctx, userId)) ? 'daily' : 'paywall',
+        stage: (await hasVerifiedPremium(ctx, userId)) ? 'complete' : 'paywall',
         updatedAt: Date.now(),
       });
     return state._id;

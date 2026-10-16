@@ -9,15 +9,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as Icon from 'phosphor-react-native';
 import { memo, useState, useRef, useEffect } from 'react';
-import {
-  TouchableOpacity,
-  View,
-  Pressable,
-  Modal,
-  ActivityIndicator,
-  Alert,
-  Image,
-} from 'react-native';
+import { TouchableOpacity, View, Pressable, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Menu, MenuOptions, MenuOption, MenuTrigger } from 'react-native-popup-menu';
 import Share from 'react-native-share';
 
@@ -224,7 +216,10 @@ function ChallengeVideoPlayer({
   }, [videoUrl, suppliedThumbnail]);
 
   const resolvedAspectRatio =
-    Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 9 / 16;
+    // Keep portrait videos taller and give square/landscape clips a taller cropped feed frame.
+    Number.isFinite(aspectRatio) && aspectRatio > 0
+      ? Math.max(9 / 16, Math.min(aspectRatio, 3 / 4))
+      : 3 / 4;
 
   const handlePlay = () => {
     stopCurrentVideo?.();
@@ -791,23 +786,24 @@ function PostRow({
                   </View>
                 )}
                 {imageWidth > 0 && (
-                  <Image
+                  <ExpoImage
                     source={{ uri: post.mediaUrl }}
                     key={`${post.mediaUrl}-${imageRetry}`}
-                    resizeMode="contain"
+                    contentFit="contain"
+                    cachePolicy={imageRetry > 0 ? 'none' : 'memory-disk'}
                     onLoadStart={() => {
                       setImageError(false);
                       setImageLoading(true);
                     }}
                     onLoad={(event) => {
                       setImageLoading(false);
-                      const { width, height } = event.nativeEvent.source;
+                      const { width, height } = event.source;
                       if (width > 0 && height > 0) {
                         setLoadedImageAspectRatio(width / height);
                       }
                     }}
                     onError={(event) => {
-                      console.warn('Community post image failed to load:', event.nativeEvent.error);
+                      console.warn('Community post image failed to load:', event.error);
                       setImageLoading(false);
                       setImageError(true);
                     }}
@@ -816,7 +812,12 @@ function PostRow({
                       height:
                         imageWidth /
                         (loadedImageAspectRatio ??
-                          (post.mediaWidth ?? 1) / (post.mediaHeight ?? 1)),
+                          (post.mediaWidth &&
+                          post.mediaHeight &&
+                          post.mediaWidth > 0 &&
+                          post.mediaHeight > 0
+                            ? Math.max(9 / 16, Math.min(post.mediaWidth / post.mediaHeight, 2))
+                            : 3 / 4)),
                     }}
                   />
                 )}
@@ -824,7 +825,11 @@ function PostRow({
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel="Retry loading post image"
-                    onPress={() => setImageRetry((retry) => retry + 1)}
+                    onPress={() => {
+                      setImageError(false);
+                      setImageLoading(true);
+                      setImageRetry((retry) => retry + 1);
+                    }}
                     className="absolute inset-0 items-center justify-center bg-[#F6F3F0]">
                     <Text className="font-body text-sm text-[#55504D]">
                       Image unavailable. Tap to retry.

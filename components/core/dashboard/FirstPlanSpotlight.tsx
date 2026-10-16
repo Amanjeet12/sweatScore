@@ -18,10 +18,12 @@ export default function FirstPlanSpotlight({
   target,
   onStart,
   onDismiss,
+  onShown,
 }: {
   target: Target | null;
   onStart: () => void;
   onDismiss: () => void;
+  onShown: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const { width, height } = Dimensions.get(Platform.OS === 'android' ? 'screen' : 'window');
@@ -39,7 +41,13 @@ export default function FirstPlanSpotlight({
   const cardTop = bottom + 14;
 
   return (
-    <Modal visible transparent statusBarTranslucent animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      visible
+      transparent
+      statusBarTranslucent
+      animationType="fade"
+      onShow={onShown}
+      onRequestClose={onDismiss}>
       <View className="flex-1" accessibilityViewIsModal>
         <Svg width={width} height={height} style={StyleSheet.absoluteFillObject}>
           <Defs>

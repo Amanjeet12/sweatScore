@@ -38,3 +38,10 @@ docs/superpowers/
 # Local release artifacts, snapshots, and recovery scripts
 /release/
 /scripts/check-backend-compatibility.ts
+
+# Local Coach audit output and one-off audit tools
+/artifacts/coach-v3-audit/
+/scripts/audit-coach-v3-live.ts
+/scripts/audit-coach-v3-preflight.ts
+/scripts/refine-coach-v3-audit.ts
+/scripts/review-coach-v3-audit.ts

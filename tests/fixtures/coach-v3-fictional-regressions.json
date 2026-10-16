@@ -1,0 +1,854 @@
+[
+  {
+    "scenario": "upper-trained-yesterday",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "rested_enough",
+        "energy": "steady",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "upper_body"
+        ],
+        "body": [
+          "fine"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Lower body strength, upper body recovers",
+      "workout": {
+        "text": "45-minute lower body strength workout",
+        "type": "lower_body_strength",
+        "minutes": 45,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 8 hours tonight.",
+        "hours": 8
+      },
+      "why": "Your goal is body recomp, and strength training is the real driver of that progress. You trained upper body yesterday, so today is the perfect time to hit your lower body while your upper half recovers. Keep your steps steady at 7,500, which supports your recomp goal without pulling energy away from strength. Fuel this workout with protein at every meal, half your plate in vegetables, and a fist-sized carb portion about a third of your plate; the carbs around your strength session will power your workout and help your muscles recover and grow. Drink 2.5 litres of water today and aim for 8 hours of sleep tonight, because muscle actually grows during rest, not during the workout itself."
+    }
+  },
+  {
+    "scenario": "upper-sore",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "rested_enough",
+        "energy": "steady",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": [
+          "sore_upper"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Strength builds your body recomp goal",
+      "workout": {
+        "text": "40-minute lower body strength workout",
+        "type": "lower_body_strength",
+        "minutes": 40,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 8 hours tonight.",
+        "hours": 8
+      },
+      "why": "Your goal is body recomp, and strength training is the main driver, so today you'll focus on lower body while your upper body recovers from soreness. You've done three solid strength sessions in the last week and asked for a full session, so this moderate-intensity workout keeps you progressing without overloading tired muscles. Holding your steps steady at 7,500 supports your recomp goal because consistency matters more than chasing higher numbers. Fuel this session with protein at every meal, half your plate in vegetables, and a fist-sized carb portion, especially around your workout to support strength and recovery. This water amount and an 8-hour sleep target help your muscles rebuild and adapt, which is where the real body recomp happens. Rest is when you get stronger, so tonight's sleep is as important as today's workout.\""
+    }
+  },
+  {
+    "scenario": "upper-sore",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "rested_enough",
+        "energy": "steady",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": [
+          "sore_upper"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Strength keeps your recomp on track",
+      "workout": {
+        "text": "40-minute lower body strength workout",
+        "type": "lower_body_strength",
+        "minutes": 40,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 8 hours tonight.",
+        "hours": 8
+      },
+      "why": "Your goal is body recomp, and strength is the main driver, so today you'll train lower body while your upper body gets a break from soreness. You've completed three solid strength sessions recently and asked for a full session, so this moderate-intensity workout keeps you progressing steadily. Holding your steps at 7,500 supports recomp because consistency matters more than chasing higher numbers. Fuel with protein at every meal, half your plate vegetables, and a fist-sized carb portion to support strength and recovery. This water amount and 8 hours of sleep help your muscles rebuild, which is where real body recomp happens."
+    }
+  },
+  {
+    "scenario": "legacy-scalar-sore",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "rested_enough",
+        "energy": "steady",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": "sore_upper"
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Lower body strength, upper body rest",
+      "workout": {
+        "text": "35-minute lower body strength workout",
+        "type": "lower_body_strength",
+        "minutes": 35,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 8 hours tonight.",
+        "hours": 8
+      },
+      "why": "Your goal is body recomp, which means building muscle while managing your weight, and today you're ready for a solid strength session. Your upper body is sore, so lower body strength is the smart choice, letting your upper body recover while you train fresh legs. Your steps stay steady at 7500 daily, which supports body recomp by keeping you active without draining energy from the strength work that drives your goal. Fuel with protein at every meal, half your plate vegetables, and a fist-sized carb portion to support your muscles and recovery, and drink 2.5 litres of water to support the work. Sleep 8 hours tonight because that's when your muscles adapt and grow stronger from today's work."
+    }
+  },
+  {
+    "scenario": "full-rested-flat",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "restful",
+        "energy": "flat",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": [
+          "fine"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Strength keeps you moving forward",
+      "workout": {
+        "text": "35-minute full body strength workout",
+        "type": "full_body_strength",
+        "minutes": 35,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 7 hours tonight.",
+        "hours": 7
+      },
+      "why": "Because your goal is body recomp, strength training is where your progress comes from, and you've completed three good sessions this week so today's moderate strength workout keeps that momentum going. Your steps have been steady at 7,500 daily, which is right for body recomp where strength matters more than high step counts. Fuel this session with protein at every meal, half your plate as vegetables, and a fist-sized carb portion up to a third of the plate, especially helpful around your strength work when your muscles need energy and building blocks. This water amount and seven hours of sleep support your recovery and help your body adapt to the training you're doing. You've got a solid routine going, so keep showing up for these strength sessions and trust that consistency builds the body you want."
+    }
+  },
+  {
+    "scenario": "full-rested-flat",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "restful",
+        "energy": "flat",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": [
+          "fine"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Strength keeps momentum going",
+      "workout": {
+        "text": "35-minute full body strength workout",
+        "type": "full_body_strength",
+        "minutes": 35,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 7 hours tonight.",
+        "hours": 7
+      },
+      "why": "Because your goal is body recomp, strength training is your main driver, and you've completed three solid sessions this week so today's moderate strength keeps that momentum going. Your steps stay steady at 7,500 daily, which is right for body recomp where strength matters more than high step counts. Fuel this session with protein at every meal, half your plate as vegetables, and a fist-sized carb portion up to a third of the plate, especially around strength work when your muscles need energy. This water amount and seven hours of sleep support your recovery and help your body adapt to training. You've built a solid routine, so keep showing up for these strength sessions and trust that consistency builds the body you want."
+    }
+  },
+  {
+    "scenario": "full-rested-flat",
+    "snapshot": {
+      "profile": {
+        "goal": "recomp",
+        "bodyFeeling": "feel_good",
+        "routineFeeling": "working_keep_going",
+        "foodRelationship": "balanced_most_days",
+        "usualSleep": "regular_restful",
+        "biggestChallenge": "time"
+      },
+      "weight": {
+        "value": 75,
+        "unit": "kg"
+      },
+      "weightHistory": [],
+      "daily": {
+        "sleep": "restful",
+        "energy": "flat",
+        "upFor": "full_session",
+        "trainedYesterday": [
+          "nothing"
+        ],
+        "body": [
+          "fine"
+        ]
+      },
+      "health": {
+        "steps": [
+          {
+            "day": "2026-10-15",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-14",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-13",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-12",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-11",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-10",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          },
+          {
+            "day": "2026-10-09",
+            "count": 7500,
+            "source": "health_sync",
+            "coverage": "sensor_observed"
+          }
+        ],
+        "workouts": [
+          {
+            "day": "2026-10-14",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-12",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          },
+          {
+            "day": "2026-10-10",
+            "label": "workout",
+            "source": "activity_log",
+            "plannedType": "full_body_strength",
+            "plannedMinutes": 45
+          }
+        ],
+        "recentDays": []
+      },
+      "recentPlanRevisionIds": []
+    },
+    "day": "2026-10-16",
+    "output": {
+      "headline": "Strength keeps your momentum strong",
+      "workout": {
+        "text": "35-minute full body strength workout",
+        "type": "full_body_strength",
+        "minutes": 35,
+        "intensity": "moderate"
+      },
+      "steps": {
+        "target": 7500
+      },
+      "meals": {
+        "text": "Log today's meals for feedback. Aim for 2.5 litres of water.",
+        "water_litres": 2.5
+      },
+      "sleep": {
+        "text": "Aim for 7 hours tonight.",
+        "hours": 7
+      },
+      "why": "Because your goal is body recomp, strength training is your main driver, and you've completed three solid sessions this week so today's moderate strength keeps that momentum going. Your steps stay steady at 7,500 daily, which is right for body recomp where strength matters more than high step counts. Fuel this session with protein at every meal, half your plate as vegetables, and a fist-sized carb portion up to a third of the plate, especially around strength work when your muscles need energy to perform. This water amount and seven hours of sleep support your recovery and help your body adapt to training. You've built a solid routine, so keep showing up for these strength sessions and trust that consistency builds the body you want."
+    }
+  }
+]

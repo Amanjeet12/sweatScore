@@ -286,20 +286,22 @@ describe('v2 daily plan contract', () => {
     expect(source).toContain('api.coachCheckIns.myToday');
     expect(source.match(/useMutation\(api\.[^)]+\)/g)).toEqual([
       'useMutation(api.coachDailyService.retryFailedPlan)',
-      'useMutation(api.coachFoundation.resetMyTodayPlanForTesting)',
-      'useMutation(api.coachFoundation.beginMyTodayReanswerForTesting)',
     ]);
     expect(source).not.toContain('generateDailyPlan');
     expect(source).not.toContain('completeProof');
   });
   test('saved plan uses a concise personalised dashboard without changing its actions', () => {
     const source = readFileSync(new URL('../app/coach-plan.tsx', import.meta.url), 'utf8');
-    expect(source).toContain('Today’s progress');
-    expect(source).toContain('<PlanExplanation explanation={output.why} />');
+    expect(source).toContain('<CoachPlanItems');
+    expect(source).toContain('<PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />');
     expect(source).not.toContain('numberOfLines={2}');
     expect(source).toContain("router.dismissTo({ pathname: '/(tabs)/dashboard'");
-    expect(source).toContain('supportingPlanText(fullBody)');
-    expect(source).toContain('workoutYoutubeSearch(assignment?.label ?? fullBody)');
+    const items = readFileSync(
+      new URL('../components/core/dashboard/CoachPlanItems.tsx', import.meta.url),
+      'utf8'
+    );
+    expect(items).toContain('workoutYoutubeSearch');
+    expect(source).toContain('plan={plan}');
     expect(source).not.toContain('workoutExamples.slice');
     expect(source).toContain('accessibilityLabel="Update your profile"');
     expect(source).toContain("router.push('/coach-profile')");
@@ -464,7 +466,9 @@ describe('v2 daily plan contract', () => {
   test('daily questions retain all five questions and draft selection in the shared presentation', () => {
     const source = readFileSync(new URL('../app/coach-onboarding.tsx', import.meta.url), 'utf8');
     expect(source).toContain('total={DAILY_QUESTIONS.length}');
-    expect(source).toContain('selected={effectiveDailyChoice}');
+    expect(source).toContain('? selectedTraining');
+    expect(source).toContain('? selectedBody');
+    expect(source).toContain(': effectiveDailyChoice');
     expect(source).toContain('options={question.options}');
     expect(source).toContain('onBack={step > 0 ? goBack : undefined}');
   });

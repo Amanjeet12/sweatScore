@@ -60,7 +60,7 @@ export default function CoachPlanLoading() {
               </Text>
               {saved.canRetry && saved.requestId ? (
                 <CoachActionButton
-                  label={retryBusy ? 'Retrying…' : 'Retry plan preparation'}
+                  label={retryBusy ? 'Retrying…' : 'Retry'}
                   disabled={retryBusy}
                   onPress={async () => {
                     if (retryInFlight.current || !saved.requestId) return;

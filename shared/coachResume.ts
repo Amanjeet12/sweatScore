@@ -79,8 +79,8 @@ export function resumeDecision(input: ResumeInput): {
   if (!input.hasBio) return { screen: 'bio', question: 0, ...base };
   if (!input.hasProfile)
     return { screen: 'profile', question: firstMissing(profileKeys, input.profileDraft), ...base };
-  if (!input.hasHealthContinuation && !input.verifiedAccess)
-    return { screen: 'health', question: 0, ...base };
+  if (!input.hasHealthContinuation) return { screen: 'health', question: 0, ...base };
+  if (input.setupPending && input.verifiedAccess) return { screen: 'setup', question: 0, ...base };
   if (!input.verifiedAccess) return { screen: 'paywall', question: 0, ...base };
   if (input.hasTodayRequest || input.hasTodayPlan || input.completedOnboarding)
     return { screen: 'today', question: 0, ...base };
