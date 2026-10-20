@@ -767,6 +767,10 @@ export const myTodayMeals = query({
         };
       })
     );
-    return { count: meals.length, items };
+    const scans = await ctx.db
+      .query('coachMealScansV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .collect();
+    return { count: meals.length, scanCount: await usableScanCount(ctx, scans), items };
   },
 });

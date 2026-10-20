@@ -7,7 +7,7 @@ import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import { Image as GuideImage } from 'expo-image';
 import { useKeepAwake } from 'expo-keep-awake';
-import { Camera, VideoCamera, X } from 'phosphor-react-native';
+import { Camera, CaretLeft, VideoCamera, X } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -103,6 +103,7 @@ export default function CoachCheckInFlow({
   onClose,
   onOpenPlan,
   onExpandedChange,
+  onFullPageChange,
   onPreferredHeightChange,
   mode = 'details',
   onCaptured,
@@ -113,6 +114,7 @@ export default function CoachCheckInFlow({
   onClose: () => void;
   onOpenPlan: (status: 'no_plan' | 'pending' | 'ready' | 'locked') => void;
   onExpandedChange?: (expanded: boolean) => void;
+  onFullPageChange?: (fullPage: boolean) => void;
   onPreferredHeightChange?: (height: number) => void;
   mode?: 'details' | 'post';
   onCaptured?: () => void;
@@ -263,6 +265,10 @@ export default function CoachCheckInFlow({
   );
   const [viewedMealId, setViewedMealId] = useState<string | null>(null);
   const viewedMeal = mealHistory?.items.find((item) => item.activityId === viewedMealId);
+  const showingSavedFeedback = Boolean(viewedMeal);
+  useEffect(() => {
+    onFullPageChange?.(showingSavedFeedback);
+  }, [showingSavedFeedback, onFullPageChange]);
 
   const [mealRefresh, setMealRefresh] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -1032,24 +1038,87 @@ export default function CoachCheckInFlow({
   if (viewedMeal) {
     return (
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <CheckInHeader title="Meal feedback" onBack={() => setViewedMealId(null)} />
-        <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 32 }}>
+        <View
+          style={{
+            paddingTop: 33,
+            paddingHorizontal: 24,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+          }}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Back to logged meals"
+            onPress={() => setViewedMealId(null)}
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: '#F4F4F4',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <CaretLeft size={22} color={colors.ink} />
+          </TouchableOpacity>
+          <Text style={[type.compactPageHeading, { flex: 1, fontSize: 19 }]}>Log a meal</Text>
+          <View style={{ width: 48 }} accessibilityElementsHidden />
+        </View>
+        <ScrollView contentContainerStyle={{ paddingTop: 6, paddingBottom: 40 }}>
           {viewedMeal.imageUrl ? (
             <Image
               source={{ uri: viewedMeal.imageUrl }}
-              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 22 }}
+              accessibilityLabel="Your meal"
+              style={{
+                width: '100%',
+                height: 250,
+                borderBottomLeftRadius: 24,
+                borderBottomRightRadius: 24,
+              }}
             />
           ) : null}
-          <Text style={[type.sheetSectionHeading, { marginTop: 24 }]}>Private feedback</Text>
-          {viewedMeal.verdict ? (
-            <Text style={[chrome.badgeText, { marginTop: 8 }]}>{viewedMeal.verdict}</Text>
-          ) : null}
-          <Text style={[type.explanation, { marginTop: 14 }]}>
-            {viewedMeal.feedback ?? 'This meal was shared without AI analysis.'}
-          </Text>
-          {viewedMeal.nextMeal ? (
-            <Text style={[type.explanation, { marginTop: 16 }]}>{viewedMeal.nextMeal}</Text>
-          ) : null}
+          <View style={{ paddingHorizontal: 24, paddingTop: 24 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}>
+              <Text style={[type.sheetSectionHeading, { fontSize: 19.4, lineHeight: 26 }]}>
+                Private feedback
+              </Text>
+              {viewedMeal.verdict ? (
+                <View
+                  style={[
+                    chrome.badge,
+                    {
+                      backgroundColor: '#FFF1E8',
+                      borderRadius: 16,
+                      paddingVertical: 7,
+                      paddingHorizontal: 12,
+                    },
+                  ]}>
+                  <Text style={[chrome.badgeText, { fontSize: 12.5, color: '#E8541A' }]}>
+                    {viewedMeal.verdict}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {typeof mealHistory?.scanCount === 'number' ? (
+              <Text style={[type.caption, { fontSize: 13.5, color: colors.subtle, marginTop: 6 }]}>
+                {mealHistory.scanCount} of 3 checked
+              </Text>
+            ) : null}
+            <Text style={[type.explanation, { lineHeight: 24.75, marginTop: 18 }]}>
+              {viewedMeal.feedback ?? 'This meal was shared without AI analysis.'}
+            </Text>
+            {viewedMeal.nextMeal ? (
+              <Text style={[type.explanation, { lineHeight: 24.75, marginTop: 12 }]}>
+                {viewedMeal.nextMeal}
+              </Text>
+            ) : null}
+          </View>
         </ScrollView>
       </View>
     );
@@ -1457,19 +1526,28 @@ export default function CoachCheckInFlow({
                     gap: 12,
                     justifyContent: 'space-between',
                   }}>
-                  <Text style={[type.checkInSheetHeading, { flex: 1 }]}>
-                    {category === 'workout'
-                      ? 'Log a workout'
-                      : category === 'meals'
-                        ? 'Log a meal'
-                        : fixedTitle}
+                  <View
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      columnGap: 8,
+                      rowGap: 2,
+                    }}>
+                    <Text style={[type.checkInSheetHeading, { flexShrink: 1 }]}>
+                      {category === 'workout'
+                        ? 'Log a workout'
+                        : category === 'meals'
+                          ? 'Log a meal'
+                          : fixedTitle}
+                    </Text>
                     {category === 'meals' ? (
                       <Text style={[type.supporting, { color: '#8A8A8A' }]}>
-                        {'  '}
                         {mealHistory?.count ?? assignment?.consumedCount ?? 0}/3
                       </Text>
                     ) : null}
-                  </Text>
+                  </View>
                   <View style={[chrome.badge, { marginTop: 4 }]}>
                     <Text style={chrome.badgeText}>
                       +{points} {pointsLabel(points)}

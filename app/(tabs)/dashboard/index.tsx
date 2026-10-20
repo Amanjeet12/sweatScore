@@ -129,6 +129,7 @@ export default function TodayScreen() {
   const [restoreMessage, setRestoreMessage] = useState('');
   const { checkIn } = useLocalSearchParams<{ checkIn?: string }>();
   const [checkInExpanded, setCheckInExpanded] = useState(false);
+  const [checkInFullPage, setCheckInFullPage] = useState(false);
   const [checkInPreferredHeight, setCheckInPreferredHeight] = useState(0);
   const { restorePermissions } = useRevenueCat();
   const [now, setNow] = useState(Date.now());
@@ -204,12 +205,14 @@ export default function TodayScreen() {
   const openTile = (category: CoachCategory) => {
     if (!plan?.access) return;
     setCheckInExpanded(false);
+    setCheckInFullPage(false);
     setCheckInPreferredHeight(0);
     setActiveSheet(category);
   };
   const closeCheckIn = useCallback(() => {
     setActiveSheet(null);
     setCheckInExpanded(false);
+    setCheckInFullPage(false);
     setCheckInPreferredHeight(0);
   }, []);
   const updateCheckInHeight = useCallback((height: number) => {
@@ -737,7 +740,10 @@ export default function TodayScreen() {
         animationType="slide"
         statusBarTranslucent
         onRequestClose={closeCheckIn}>
-        <View className="flex-1 justify-end bg-black/45" accessibilityViewIsModal>
+        <View
+          className="flex-1 justify-end bg-black/45"
+          style={checkInFullPage ? { backgroundColor: '#fff' } : undefined}
+          accessibilityViewIsModal>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={planSheetOpen ? 'Dismiss today’s plan' : 'Dismiss check-in'}
@@ -748,21 +754,26 @@ export default function TodayScreen() {
           <View
             className="overflow-hidden rounded-t-[28px] bg-white"
             style={{
-              maxHeight: screenHeight - insets.top - 12,
-              height: planSheetOpen
-                ? Math.min(
-                    screenHeight - insets.top - 12,
-                    screenHeight * 0.92,
-                    planContentHeight
-                      ? Math.max(320, planContentHeight + sheetBottomInset)
-                      : screenHeight * 0.92
-                  )
-                : checkInExpanded
-                  ? '88%'
-                  : Math.min(
-                      Math.max(checkInPreferredHeight + sheetBottomInset, 360),
-                      screenHeight - insets.top - 20
-                    ),
+              maxHeight: checkInFullPage ? '100%' : screenHeight - insets.top - 12,
+              ...(checkInFullPage
+                ? { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingTop: insets.top }
+                : {}),
+              height: checkInFullPage
+                ? '100%'
+                : planSheetOpen
+                  ? Math.min(
+                      screenHeight - insets.top - 12,
+                      screenHeight * 0.92,
+                      planContentHeight
+                        ? Math.max(320, planContentHeight + sheetBottomInset)
+                        : screenHeight * 0.92
+                    )
+                  : checkInExpanded
+                    ? '88%'
+                    : Math.min(
+                        Math.max(checkInPreferredHeight + sheetBottomInset, 360),
+                        screenHeight - insets.top - 20
+                      ),
               paddingBottom: sheetBottomInset,
             }}>
             {planSheetOpen ? (
@@ -787,6 +798,7 @@ export default function TodayScreen() {
                   router.push(checkInPostRoute(selected));
                 }}
                 onExpandedChange={setCheckInExpanded}
+                onFullPageChange={setCheckInFullPage}
                 onPreferredHeightChange={updateCheckInHeight}
                 onOpenPlan={() => {
                   setCheckInExpanded(false);

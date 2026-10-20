@@ -1288,8 +1288,15 @@ test('meal history is member-bound and excludes unshared and rejected meals', as
     ],
   });
   f.ctx.storage = { getUrl: async (id) => `storage:${id}` };
+  f.rows.coachMealScansV1.push(
+    { _id: 'ready-shared', userId: 'alice', day, status: 'ready', usable: true },
+    { _id: 'ready-unshared', userId: 'alice', day, status: 'ready', usable: true },
+    { _id: 'failed-scan', userId: 'alice', day, status: 'failed', usable: false },
+    { _id: 'other-member', userId: 'bob', day, status: 'ready', usable: true }
+  );
   const result = await myTodayMeals._handler(f.ctx, {});
   expect(result.count).toBe(1);
+  expect(result.scanCount).toBe(2);
   expect(result.items[0]).toMatchObject({
     activityId: 'a1',
     imageUrl: 'storage:photo',
