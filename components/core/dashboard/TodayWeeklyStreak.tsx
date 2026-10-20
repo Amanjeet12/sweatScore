@@ -23,7 +23,7 @@ export default function TodayWeeklyStreak({
 }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const circleSize = Math.min(40, Math.max(28, (width - insets.left - insets.right - 44) / 8));
+  const circleSize = Math.min(32, Math.max(26, (width - insets.left - insets.right - 44) / 8));
   const week = useQuery(api.challengeCompletions.getUserCompletionsForWeek, { refresh });
 
   return (
@@ -31,7 +31,7 @@ export default function TodayWeeklyStreak({
       <View className="flex-row items-center justify-between">
         <Text style={[type.sectionHeading, { flex: 1, paddingRight: 12 }]}>Your streak</Text>
         <Text style={[type.caption, { flexShrink: 1, textAlign: 'right' }]}>
-          {Math.min(daysEarned, target)} of {target} days
+          {Math.min(daysEarned, target)} of {target}
         </Text>
       </View>
       {currentWeeklyStreak > 0 ? (
@@ -61,7 +61,7 @@ export default function TodayWeeklyStreak({
                 borderWidth: day.isToday ? 2 : 0,
                 borderColor: '#ff5a1f',
               }}>
-              {day.earned ? <Fire size={20} color="#ff5a1f" weight="fill" /> : null}
+              {day.earned ? <Fire size={16} color="#ff5a1f" weight="fill" /> : null}
             </View>
           </View>
         ))}

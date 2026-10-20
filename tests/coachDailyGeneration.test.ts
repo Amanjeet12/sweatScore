@@ -192,7 +192,7 @@ describe('daily-plan source and policy', () => {
       },
     });
     expect(result.ok).toBe(true);
-    expect(sent.system).toBe(DAILY_PLAN_SYSTEM_PROMPT);
+    expect(sent.system[0].text).toBe(DAILY_PLAN_SYSTEM_PROMPT);
     expect(sent.max_tokens).toBeGreaterThanOrEqual(1600);
     expect(sent.tools[0].input_schema.required).toEqual([
       'headline',

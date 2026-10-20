@@ -45,7 +45,10 @@ export default function TodayPlanSheet({
   onContentHeight?: (height: number) => void;
 }) {
   const foundation = useQuery(api.coachFoundation.getMyFoundation, {});
-  const QUESTIONS = dailyQuestionsForBackend(foundation?.supportsTrainingOther === true);
+  const QUESTIONS = dailyQuestionsForBackend(
+    foundation?.supportsTrainingOther === true,
+    foundation?.supportsClientUpdate === true
+  );
   const begin = useMutation(api.coachFoundation.beginReturningPlanSetup);
   const save = useMutation(api.coachFoundation.saveDailyDraft);
   const submit = useAction(api.coachDailyService.submitDailyAnswersAndGenerate);
@@ -207,7 +210,9 @@ export default function TodayPlanSheet({
               {cleanDailyPlanCopy(output.headline)}
             </Text>
             <CoachPlanItems plan={plan.plan!} checkIns={checkIns} onCheckIn={onCheckIn} />
-            <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
+            {!plan.plan?.detailsV2?.sleepReason ? (
+              <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
+            ) : null}
             <PlanFeedback revisionId={plan.plan!.revisionId} />
             <TouchableOpacity
               accessibilityRole="button"

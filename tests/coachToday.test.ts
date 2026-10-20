@@ -93,19 +93,19 @@ describe('Stage 7 Today model', () => {
   });
   test('four distinct recommendations, rest exemption, three meal slots and matching step target', () => {
     const tiles = todayTiles([workout, meals, sleep, steps]);
-    expect(tiles.map((t) => t.category)).toEqual(['workout', 'meals', 'sleep', 'steps']);
-    expect(tiles[0].assignment?.recommendation).toContain('lower body');
-    expect(tiles[1]).toMatchObject({ earned: 2, total: 3, completed: false });
-    expect(displayStepTarget(tiles[3].assignment)).toBe('5,500');
+    expect(tiles.map((t) => t.category)).toEqual(['sleep', 'workout', 'steps', 'meals']);
+    expect(tiles[1].assignment?.recommendation).toContain('lower body');
+    expect(tiles[3]).toMatchObject({ earned: 2, total: 3, completed: false });
+    expect(displayStepTarget(tiles[2].assignment)).toBe('5,500');
     expect(
       todayTiles([
         { ...workout, mandatory: false, label: 'Rest and recover' },
         meals,
         sleep,
         steps,
-      ])[0].available
-    ).toBe(false);
-    expect(todayTiles([workout, { ...meals, consumedCount: 3 }, sleep, steps])[1].completed).toBe(
+      ])[1].available
+    ).toBe(true);
+    expect(todayTiles([workout, { ...meals, consumedCount: 3 }, sleep, steps])[3].completed).toBe(
       true
     );
   });
@@ -122,7 +122,7 @@ describe('Stage 7 Today model', () => {
       recommendation: 'Aim for 6,500 steps',
       consumedCount: 1,
     };
-    const tile = todayTiles([workout, meals, sleep, refreshed])[3];
+    const tile = todayTiles([workout, meals, sleep, refreshed])[2];
     expect(tile.completed).toBe(true);
     expect(displayStepTarget(tile.assignment)).toBe('6,500');
     expect(oldProof.recommendation).toBe('Aim for 5,500 steps');
@@ -236,7 +236,7 @@ test('banner avatars support loading, legacy and current server responses', () =
 
 test('Meals check marks are independent of completion, remaining slots and count', () => {
   for (const consumedCount of [0, 1, 2, 3]) {
-    const tile = todayTiles([{ ...meals, consumedCount }])[1];
+    const tile = todayTiles([{ ...meals, consumedCount }])[3];
     expect(tile.checked).toBe(consumedCount > 0);
     expect(tile.completed).toBe(consumedCount === 3);
     expect(tile.available).toBe(consumedCount < 3);
@@ -244,7 +244,7 @@ test('Meals check marks are independent of completion, remaining slots and count
     expect(tile.total).toBe(3);
   }
   expect(todayTiles(undefined)[1].checked).toBe(false);
-  expect(todayTiles([{ ...steps, consumedCount: 1 }])[3]).toMatchObject({
+  expect(todayTiles([{ ...steps, consumedCount: 1 }])[2]).toMatchObject({
     checked: true,
     completed: true,
   });

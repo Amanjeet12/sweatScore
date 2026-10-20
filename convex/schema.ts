@@ -542,6 +542,7 @@ const schema = defineSchema({
             label: v.string(),
             plannedType: v.optional(v.string()),
             plannedMinutes: v.optional(v.number()),
+            memberNote: v.optional(v.string()),
             source: v.optional(
               v.union(v.literal('activity_log'), v.literal('check_in_completion'))
             ),
@@ -554,6 +555,7 @@ const schema = defineSchema({
             v.object({
               day: v.string(),
               checkedIn: v.boolean(),
+              activeMinutes: v.optional(v.number()),
               completedCategories: v.array(v.string()),
               restPlanned: v.optional(v.boolean()),
               planCompleted: v.optional(v.boolean()),
@@ -718,6 +720,8 @@ const schema = defineSchema({
     recommendation: v.string(),
     storageId: v.id('_storage'),
     caption: v.string(),
+    plateDescription: v.optional(v.string()),
+    nextMeal: v.optional(v.string()),
     goal: v.union(
       v.literal('lose'),
       v.literal('recomp'),

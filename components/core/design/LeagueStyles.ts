@@ -48,7 +48,8 @@ export const leagueStyles = StyleSheet.create({
   podium: {
     marginHorizontal: 22,
     marginTop: 24,
-    paddingBottom: 4,
+    paddingBottom: 12,
+    gap: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
@@ -57,8 +58,8 @@ export const leagueStyles = StyleSheet.create({
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
+    gap: 16,
+    paddingVertical: 18,
   },
   me: {
     marginHorizontal: 22,
@@ -80,8 +81,8 @@ export const leagueStyles = StyleSheet.create({
   rank: { minWidth: 18, flexShrink: 0 },
   progress: {
     marginTop: 8,
-    height: 4,
-    borderRadius: 2,
+    height: 2,
+    borderRadius: 1,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
   },

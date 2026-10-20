@@ -1,14 +1,18 @@
 // @ts-nocheck -- Bun Convex handler fixtures.
 import { describe, expect, test } from 'bun:test';
 
-import { validateMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy';
+import { validateMealResult, checkMealResult, NON_MEAL_FEEDBACK } from '../convex/coachMealPolicy';
 import { MEAL_SYSTEM_PROMPT } from '../convex/coachMealPrompt';
-import { MEAL_SYSTEM_PROMPT as ACTIVE_MEAL_PROMPT } from '../convex/coachMealPromptV2';
+import {
+  CLIENT_MEAL_UPDATE,
+  MEAL_SYSTEM_PROMPT as ACTIVE_MEAL_PROMPT,
+} from '../convex/coachMealPromptV2';
 import { analyzeMealPhoto } from '../convex/coachMealProvider';
 import {
   saveCaption,
   submitReportFeedback,
   myDraft,
+  myTodayMeals,
   reserveScan,
   scanInput,
   claimDispatch,
@@ -232,6 +236,64 @@ function fixture(member = 'alice', extras: Record<string, any[]> = {}) {
 }
 
 describe('client meal prompt and provider image contract', () => {
+  test('current goal wording and separate portion guidance satisfy the same safety rules', () => {
+    for (const goal of ['weight loss', 'body recomp', 'improving fitness']) {
+      const report = {
+        verdict: 'On point',
+        feedback: `Your protein and vegetables support ${goal}. The carb portion fits the guide, so keep this balance.`,
+        nextMeal:
+          'For your next meal, aim for one palm of protein, about a third of your plate as carbs and the rest vegetables.',
+      };
+      expect(checkMealResult(report)).toEqual({ ok: true, result: report });
+    }
+    expect(ACTIVE_MEAL_PROMPT).not.toContain('with only verdict and feedback');
+    expect(
+      checkMealResult({
+        ...examples[0],
+        nextMeal: 'For your next meal, add chicken and rice.',
+      })
+    ).toEqual({ ok: false, issue: 'next_meal_guidance' });
+    expect(
+      validateMealResult({
+        ...examples[0],
+        feedback: 'Your plate supports maintaining weight. Keep the same balance.',
+      })
+    ).toBeNull();
+    expect(
+      validateMealResult({
+        verdict: null,
+        feedback: NON_MEAL_FEEDBACK,
+        nextMeal: '',
+      })
+    ).toEqual({ verdict: null, feedback: NON_MEAL_FEEDBACK, nextMeal: '' });
+  });
+  test('repair identifies the rejected field without sending rejected feedback as instructions', async () => {
+    const requests = [];
+    const invalid = { ...examples[0], nextMeal: 'For your next meal, add chicken and rice.' };
+    const repaired = {
+      ...examples[0],
+      nextMeal: 'For your next meal, aim for one palm of protein and a fist of carbs.',
+    };
+    const result = await analyzeMealPhoto({
+      imageBase64: 'photo',
+      mediaType: 'image/jpeg',
+      goal: 'lose',
+      workoutLoggedToday: false,
+      style: { tone: 'supportive', detail: 'concise' },
+      config: { apiKey: 'test-key', model: 'mock-model', maxOutputTokens: 768, timeoutMs: 1000 },
+      fetchImpl: async (_url, init) => {
+        requests.push(JSON.parse(init.body));
+        return providerResponse(requests.length === 1 ? invalid : repaired);
+      },
+    });
+    expect(result).toMatchObject({ ok: true, result: repaired });
+    expect(requests).toHaveLength(2);
+    const retry = JSON.parse(requests[1].messages[0].content[1].text).note;
+    expect(retry).toContain('next_meal_guidance');
+    expect(retry).toContain('no named food or dish');
+    expect(retry).not.toContain(invalid.nextMeal);
+    expect(requests[1].messages[0].content[0]).toEqual(requests[0].messages[0].content[0]);
+  });
   test('historical examples stay intact and current examples pass the client limits', () => {
     for (const example of historicalExamples)
       expect(MEAL_SYSTEM_PROMPT).toContain(example.feedback);
@@ -287,7 +349,7 @@ describe('client meal prompt and provider image contract', () => {
       expect(JSON.parse(body.messages[0].content[1].text).goal).toBe(
         goal === 'unavailable' ? 'fitness' : goal
       );
-      expect(body.system[0].text).toBe(ACTIVE_MEAL_PROMPT);
+      expect(body.system[0].text).toBe(ACTIVE_MEAL_PROMPT + CLIENT_MEAL_UPDATE);
     }
   });
   test('non-meal, unclear, layered bowl, stacked starch, pain and workout wording validation', () => {
@@ -398,7 +460,7 @@ describe('meal draft, scan and share transactions', () => {
       ],
     });
     const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'My meal' });
-    expect(f.rows.coachMealDraftsV1[0].goal).toBe('fitness');
+    expect(f.rows.coachMealDraftsV1[0].goal).toBe('lose');
     expect(
       await share._handler(f.ctx, { draftId, caption: 'My meal', skipAnalysis: true })
     ).toMatchObject({ pointsEarned: 2 });
@@ -1109,4 +1171,129 @@ test('a dispatched result cannot attach to media that no longer matches its draf
     })
   ).toBe('ignored');
   expect(f.rows.coachMealDraftsV1[0].feedback).toBeUndefined();
+});
+
+test('plate description is separate from the caption and reaches the photo provider', async () => {
+  const f = fixture();
+  const id = await saveCaption._handler(f.ctx, {
+    submissionId: 'sub',
+    caption: 'Public meal caption',
+    plateDescription: 'Beans and plantain',
+  });
+  const draft = f.rows.coachMealDraftsV1.find((d) => d._id === id);
+  expect(draft.caption).toBe('Public meal caption');
+  expect(draft.plateDescription).toBe('Beans and plantain');
+  let sent;
+  const outcome = await analyzeMealPhoto({
+    imageBase64: 'real-photo',
+    mediaType: 'image/jpeg',
+    goal: 'recomp',
+    plateDescription: draft.plateDescription,
+    workoutLoggedToday: false,
+    dailyPlan: {
+      workout: { type: 'upper_body_strength', durationMinutes: 25 },
+      recommendation: '25-minute upper body workout',
+      meals: 'Portions and water',
+    },
+    style: { tone: 'warm_direct', detail: 'standard' },
+    config: { apiKey: 'fake', model: 'fake', maxOutputTokens: 768, timeoutMs: 1000 },
+    fetchImpl: async (_, request) => {
+      sent = JSON.parse(request.body);
+      return providerResponse({
+        verdict: 'Nearly there',
+        feedback:
+          'Lovely plate with protein. For body recomp, add a palm of protein to support recovery.',
+        nextMeal: 'For your next meal, aim for a palm of protein and half your plate vegetables.',
+      });
+    },
+  });
+  expect(outcome.ok).toBe(true);
+  const context = JSON.parse(sent.messages[0].content[1].text);
+  expect(context.plate_description).toBe('Beans and plantain');
+  expect(context.daily_plan.workout.type).toBe('upper_body_strength');
+  expect(sent.messages[0].content[0].source.data).toBe('real-photo');
+});
+
+test('next meal advice is portions only, and unclear photos cannot receive advice', () => {
+  const plate = {
+    verdict: 'On point',
+    feedback:
+      'Your protein and vegetables look balanced. For your weight loss goal, this portion works well.',
+  };
+  expect(
+    validateMealResult({
+      ...plate,
+      nextMeal: 'For your next meal, keep protein to a palm and vegetables to half your plate.',
+    })
+  ).not.toBeNull();
+  expect(
+    validateMealResult({ ...plate, nextMeal: 'For your next meal, eat chicken and rice.' })
+  ).toBeNull();
+  expect(
+    validateMealResult({
+      verdict: null,
+      feedback: NON_MEAL_FEEDBACK,
+      nextMeal: 'For your next meal, add protein.',
+    })
+  ).toBeNull();
+});
+
+test('meal history is member-bound and excludes unshared and rejected meals', async () => {
+  const f = fixture('alice', {
+    dailyActivities: [
+      {
+        _id: 'a1',
+        userId: 'alice',
+        date: day,
+        loggedActivityKey: 'healthy_meal',
+        reviewStatus: 'approved',
+        image: 'photo',
+      },
+      {
+        _id: 'b1',
+        userId: 'bob',
+        date: day,
+        loggedActivityKey: 'healthy_meal',
+        reviewStatus: 'approved',
+        image: 'bob-photo',
+      },
+      {
+        _id: 'a2',
+        userId: 'alice',
+        date: day,
+        loggedActivityKey: 'healthy_meal',
+        reviewStatus: 'rejected',
+      },
+    ],
+    coachMealDraftsV1: [
+      {
+        _id: 'd1',
+        userId: 'alice',
+        day,
+        status: 'shared',
+        activityId: 'a1',
+        storageId: 'photo',
+        verdict: 'Nearly there',
+        feedback: 'Private plate report',
+        nextMeal: 'For your next meal, add protein.',
+      },
+      {
+        _id: 'unshared',
+        userId: 'alice',
+        day,
+        status: 'ready',
+        storageId: 'draft-photo',
+        feedback: 'Not shared',
+      },
+    ],
+  });
+  f.ctx.storage = { getUrl: async (id) => `storage:${id}` };
+  const result = await myTodayMeals._handler(f.ctx, {});
+  expect(result.count).toBe(1);
+  expect(result.items[0]).toMatchObject({
+    activityId: 'a1',
+    imageUrl: 'storage:photo',
+    feedback: 'Private plate report',
+  });
+  expect(result.items.some((i) => i.activityId === 'b1')).toBe(false);
 });

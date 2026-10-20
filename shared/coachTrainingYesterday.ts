@@ -1,4 +1,10 @@
-export type TrainingYesterday = 'lower_body' | 'upper_body' | 'cardio' | 'other' | 'nothing';
+export type TrainingYesterday =
+  | 'lower_body'
+  | 'upper_body'
+  | 'cardio'
+  | 'core'
+  | 'other'
+  | 'nothing';
 
 export const OTHER_TRAINING_MEANING =
   'Other means training occurred yesterday but its type, intensity and duration are unspecified. It does not mean cardio or no training. Do not invent training details; use readiness, soreness and verified history for today’s plan. Legacy cardio answers still mean cardio.';

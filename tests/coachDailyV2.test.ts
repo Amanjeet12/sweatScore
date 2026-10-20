@@ -152,7 +152,7 @@ describe('v2 daily plan contract', () => {
     expect(() => validate({ ...rest, workoutExamples: ['chair squats'] }, state)).toThrow(
       'invalid_output'
     );
-    expect(planCardState('workout', true, 0).canLog).toBe(false);
+    expect(planCardState('workout', true, 0).canLog).toBe(true);
   });
   test('lower-body soreness yields upper-body examples while preserving the light duration', () => {
     const state = { ...snapshot, daily: { ...snapshot.daily, body: 'sore_lower' } };
@@ -250,7 +250,7 @@ describe('v2 daily plan contract', () => {
       },
     });
     expect(result.ok).toBe(true);
-    expect(sent.system).toBe(DAILY_PLAN_V2_SYSTEM_PROMPT);
+    expect(sent.system[0].text).toBe(DAILY_PLAN_V2_SYSTEM_PROMPT);
     expect(sent.tools[0].input_schema.required).toContain('workoutExamples');
     await generateDailyPlan({
       config: { apiKey: 'test', model: 'test', maxOutputTokens: V2_OUTPUT_TOKENS, timeoutMs: 1000 },
@@ -270,7 +270,7 @@ describe('v2 daily plan contract', () => {
     });
     expect(sent.temperature).toBe(0.2);
     expect(sent.messages[0].content).toContain('previous_candidate');
-    expect(planCardState('meals', false, 2).status).toBe('2 of 3 shared');
+    expect(planCardState('meals', false, 2).status).toBe('2 meals logged');
     expect(planCardState('meals', false, 3).canLog).toBe(false);
     expect(planCardState('meals', false, 3).canOpen).toBe(true);
     expect(['workout', 'steps', 'sleep', 'meals'].map(planCardRoute)).toEqual([

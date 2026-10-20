@@ -35,9 +35,9 @@ const DEFAULT_ASSIGNMENTS = [
   },
   {
     category: 'steps',
-    label: 'Hit 10,000 Steps',
-    recommendation: '10,000 steps',
-    stepTarget: 10000,
+    label: 'Hit 8,000 Steps',
+    recommendation: '8,000 steps',
+    stepTarget: 8000,
   },
 ] as const;
 
@@ -129,7 +129,28 @@ export const ensureStandaloneAssignments = mutation({
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
       .collect();
     for (const item of DEFAULT_ASSIGNMENTS) {
-      if (existing.some((row) => row.category === item.category && !row.planRevisionId)) continue;
+      const current = existing.find((row) => row.category === item.category && !row.planRevisionId);
+      if (current) {
+        if (item.category === 'steps' && current.stepTarget !== 8000) {
+          const proofs = await ctx.db
+            .query('coachProofSubmissionsV1')
+            .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+            .collect();
+          // Never rewrite guidance pinned to an in-flight or completed proof.
+          if (
+            !proofs.some(
+              (proof) =>
+                proof.assignmentId === current._id && !['cancelled', 'failed'].includes(proof.state)
+            )
+          )
+            await ctx.db.patch(current._id, {
+              stepTarget: 8000,
+              label: item.label,
+              recommendation: item.recommendation,
+            });
+        }
+        continue;
+      }
       await ctx.db.insert('coachAssignmentsV1', {
         userId,
         day,
@@ -364,8 +385,7 @@ export const complete = mutation({
       assignment.planRevisionId !== submission.planRevisionId ||
       assignment.day !== submission.day ||
       assignment.category !== submission.category ||
-      assignment.recommendation !== submission.recommendation ||
-      (submission.category === 'workout' && assignment.workout?.type === 'rest')
+      assignment.recommendation !== submission.recommendation
     )
       throw new ConvexError('Saved proof context is invalid');
     const slot = await ctx.db

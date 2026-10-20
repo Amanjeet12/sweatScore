@@ -63,7 +63,26 @@ export function isDailyPlanOutputV3(value: unknown): value is DailyOutputV3 {
     sleep: 'object',
     why: 'string',
   };
-  if (Object.keys(row).sort().join('|') !== Object.keys(fields).sort().join('|')) return false;
+  if (
+    Object.keys(row)
+      .filter((key) => key !== 'explanations')
+      .sort()
+      .join('|') !== Object.keys(fields).sort().join('|')
+  )
+    return false;
+  if (row.explanations !== undefined) {
+    const reasons = row.explanations as Record<string, unknown>;
+    if (
+      !reasons ||
+      typeof reasons !== 'object' ||
+      Array.isArray(reasons) ||
+      Object.keys(reasons).sort().join('|') !== 'meals|sleep|steps|workout' ||
+      Object.values(reasons).some(
+        (text) => typeof text !== 'string' || !text.trim() || text.length > 800
+      )
+    )
+      return false;
+  }
   if (typeof row.headline !== 'string' || typeof row.why !== 'string') return false;
   for (const [key, shape] of Object.entries({
     workout: { text: 'string', type: 'string', minutes: 'number', intensity: 'string' },
@@ -115,9 +134,7 @@ export function buildDailyProviderInputV3(
   );
   const workoutDays = new Set(
     workouts
-      .filter(
-        (row) => !['walking', 'mobility', 'stretching', 'rest'].includes(row.plannedType ?? '')
-      )
+      .filter((row) => !['walking', 'mobility', 'stretching'].includes(row.plannedType ?? ''))
       .map((row) => row.day)
   );
   let consecutive = 0;
@@ -126,6 +143,7 @@ export function buildDailyProviderInputV3(
     consecutive++;
   }
   const recentDays = (snapshot.health.recentDays ?? []).filter((row) => inWindow(row.day));
+  const monday = addDaysToDateKey(day, -((new Date(day + 'T12:00:00Z').getUTCDay() + 6) % 7));
   const strengthCount = workouts.filter(
     (row) => row.day >= addDaysToDateKey(day, -7) && row.plannedType?.endsWith('_strength')
   ).length;
@@ -158,6 +176,11 @@ export function buildDailyProviderInputV3(
         ? { training_other_meaning: OTHER_TRAINING_MEANING }
         : {}),
       energy_label: { flat: 'Flat', steady: 'Steady', full: 'Upbeat' }[snapshot.daily.energy],
+    },
+    calendar_week: {
+      starts_on: monday,
+      rule: 'This week starts Monday at 00:00 in the member local day calendar. Last 7 days is a separate rolling window, never the week since joining.',
+      workout_check_ins: workouts.filter((row) => row.day >= monday),
     },
     recent_14_days: {
       steps,
@@ -193,6 +216,7 @@ export function buildDailyProviderInputV3(
       unwell_guidance_required: pain,
       workout_allowed_types: TYPES.filter((type) => {
         if (restRequired) return type === 'rest';
+        if (type === 'core' && snapshot.daily.trainedYesterday?.includes('core')) return false;
         if (snapshot.daily.upFor === 'something_light' && type.endsWith('_strength')) return false;
         if (
           (hasBodyFeeling(snapshot.daily.body, 'sore_upper') ||
@@ -268,7 +292,16 @@ export function validateDailyPlanOutputV3(
   snapshot: DailySnapshot,
   day: string,
   recentPlans: { day: string; output: DailyOutput }[] = []
-): ValidatedPlan & { sleepTargetHours: number } {
+): ValidatedPlan & {
+  sleepTargetHours: number;
+  detailsV2?: {
+    workoutExamples: string[];
+    workoutReason: string;
+    stepsReason: string;
+    sleepReason?: string;
+    mealsReason?: string;
+  };
+} {
   if (!isDailyPlanOutputV3(value)) fail('invalid_structure');
   const data = value;
   const issues: string[] = [];
@@ -282,14 +315,19 @@ export function validateDailyPlanOutputV3(
     meals: data.meals.text,
     sleep: data.sleep.text,
     why: data.why,
+    ...(data.explanations
+      ? Object.fromEntries(
+          Object.entries(data.explanations).map(([key, text]) => [`${key}Reason`, text])
+        )
+      : {}),
   };
   for (const [key, text] of Object.entries(fields)) {
     if (
       typeof text !== 'string' ||
       !text.trim() ||
-      text.length > DAILY_PLAN_COPY_LIMITS[key as keyof typeof fields]
+      text.length > (DAILY_PLAN_COPY_LIMITS[key as keyof typeof DAILY_PLAN_COPY_LIMITS] ?? 800)
     )
-      fail('invalid_copy');
+      fail(`invalid_copy:${key}`);
     if (UNSAFE_COPY.test(text)) reject('unsafe_language');
     if (INTERNAL_COPY.test(text)) reject('internal_copy');
     if (FOOD_NAMES.test(text)) reject('food_names');
@@ -366,6 +404,7 @@ export function validateDailyPlanOutputV3(
     )
       reject('light_session_load');
     const yesterday = snapshot.daily.trainedYesterday ?? [];
+    if (yesterday.includes('core') && data.workout.type === 'core') reject('core_recovery');
     if (
       (hasBodyFeeling(snapshot.daily.body, 'sore_upper') || yesterday.includes('upper_body')) &&
       ['upper_body_strength', 'full_body_strength'].includes(data.workout.type)
@@ -494,5 +533,16 @@ export function validateDailyPlanOutputV3(
         },
     stepTarget: target,
     sleepTargetHours: hours,
+    ...(data.explanations
+      ? {
+          detailsV2: {
+            workoutExamples: [],
+            workoutReason: cleanDailyPlanCopy(data.explanations.workout),
+            stepsReason: cleanDailyPlanCopy(data.explanations.steps),
+            sleepReason: cleanDailyPlanCopy(data.explanations.sleep),
+            mealsReason: cleanDailyPlanCopy(data.explanations.meals),
+          },
+        }
+      : {}),
   };
 }

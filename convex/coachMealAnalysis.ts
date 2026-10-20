@@ -2,11 +2,12 @@
 
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
-import { action } from './_generated/server';
+
 import { internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
-import { analyzeMealPhoto } from './coachMealProvider';
+import { action } from './_generated/server';
 import { providerConfig } from './coachDailyProvider';
+import { analyzeMealPhoto } from './coachMealProvider';
 
 async function owner(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -30,10 +31,13 @@ export const analyze = action({
       draftId,
       requestKey,
     });
-    const { scan, draft, memberFeedback }: any = await ctx.runQuery(internal.coachMeals.scanInput, {
-      userId,
-      scanId,
-    });
+    const { scan, draft, memberFeedback, dailyPlan }: any = await ctx.runQuery(
+      internal.coachMeals.scanInput,
+      {
+        userId,
+        scanId,
+      }
+    );
     if (scan.status !== 'reserved') return { status: scan.status, draftId };
     const blob = await ctx.storage.get(draft.storageId);
     const media = blob?.type;
@@ -62,6 +66,8 @@ export const analyze = action({
         mediaType: media as 'image/jpeg',
         goal: draft.goal,
         memberFeedback,
+        plateDescription: draft.plateDescription,
+        dailyPlan,
         workoutLoggedToday: draft.workoutLoggedToday,
         style: { tone: draft.tone, detail: draft.detail },
         config,

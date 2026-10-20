@@ -12,8 +12,10 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
   StyleSheet,
+  ScrollView,
   TextInput,
   TouchableOpacity,
   View,
@@ -86,6 +88,7 @@ type ProofQueue = {
   storageId?: Id<'_storage'>;
   mediaType?: 'image' | 'video';
   caption?: string;
+  plateDescription?: string;
 };
 
 // Mount with the camera so preview, countdown, recording, and saving stay awake.
@@ -143,6 +146,7 @@ export default function CoachCheckInFlow({
   const submitMealFeedback = useMutation(api.coachMeals.submitReportFeedback);
   const [queue, setQueue] = useState<ProofQueue | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [showMealGuide, setShowMealGuide] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [cameraStartupError, setCameraStartupError] = useState('');
@@ -245,8 +249,21 @@ export default function CoachCheckInFlow({
     []
   );
   const [busy, setBusy] = useState(false);
+  const [scanningMeal, setScanningMeal] = useState(false);
   const [error, setError] = useState('');
   const [caption, setCaption] = useState('');
+  const [plateDescription, setPlateDescription] = useState('');
+  const foundation = useQuery(api.coachFoundation.getMyFoundation, {});
+  const supportsClientUpdate = foundation?.supportsClientUpdate === true;
+  const mealHistory = useQuery(
+    api.coachMeals.myTodayMeals,
+    category === 'meals' && supportsClientUpdate
+      ? { refresh: Number((initialToday?.day ?? today?.day ?? '').replaceAll('-', '')) }
+      : 'skip'
+  );
+  const [viewedMealId, setViewedMealId] = useState<string | null>(null);
+  const viewedMeal = mealHistory?.items.find((item) => item.activityId === viewedMealId);
+
   const [mealRefresh, setMealRefresh] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -254,11 +271,16 @@ export default function CoachCheckInFlow({
   const closing = useRef(false);
   useEffect(() => {
     if (headerHeight && contentHeight)
-      onPreferredHeightChange?.(headerHeight + contentHeight + footerHeight + 12);
-  }, [headerHeight, contentHeight, footerHeight, onPreferredHeightChange]);
+      onPreferredHeightChange?.(
+        headerHeight +
+          contentHeight +
+          footerHeight +
+          (category === 'meals' && mode === 'details' ? 0 : 12)
+      );
+  }, [headerHeight, contentHeight, footerHeight, onPreferredHeightChange, category, mode]);
   useEffect(() => {
-    onExpandedChange?.(showCamera);
-  }, [showCamera, onExpandedChange]);
+    onExpandedChange?.(showCamera || Boolean(viewedMealId));
+  }, [showCamera, viewedMealId, onExpandedChange]);
   const rawMeal = useQuery(
     api.coachMeals.myDraft,
     category === 'meals' && queue?.submissionId
@@ -301,6 +323,7 @@ export default function CoachCheckInFlow({
   const proofImage = queue?.storageId === remotePreview?.storageId ? remotePreview?.uri : null;
   useEffect(() => {
     if (meal?.draft?.caption && !caption) setCaption(meal.draft.caption);
+    setPlateDescription(meal?.draft?.plateDescription ?? queueRef.current?.plateDescription ?? '');
   }, [meal?.draft?._id]);
   const assignment = today?.assignments.find((item) => item.category === category);
   useEffect(() => {
@@ -352,6 +375,7 @@ export default function CoachCheckInFlow({
           queueRef.current = nextRecovered;
           setQueue(nextRecovered);
           setCaption(recoveredCaption);
+          setPlateDescription(recovered.plateDescription ?? '');
           storeData(queueKey, nextRecovered);
         } else removeData(queueKey);
       })
@@ -729,11 +753,16 @@ export default function CoachCheckInFlow({
     const operation = operations.begin();
     if (operation === null) return;
     setBusy(true);
+    setScanningMeal(true);
     setError('');
     try {
       const storageId = queue.storageId ?? (await upload(operation));
       if (!storageId || !operations.isCurrent(operation)) return;
-      const draftId = await saveMealCaption({ submissionId: queue.submissionId, caption });
+      const draftId = await saveMealCaption({
+        submissionId: queue.submissionId,
+        caption,
+        ...(supportsClientUpdate ? { plateDescription } : {}),
+      });
       if (!operations.isCurrent(operation)) return;
       const result = await analyzeMeal({
         draftId,
@@ -766,6 +795,7 @@ export default function CoachCheckInFlow({
     } finally {
       if (operations.isCurrent(operation)) {
         operations.end(operation);
+        setScanningMeal(false);
         setBusy(false);
       }
     }
@@ -781,7 +811,12 @@ export default function CoachCheckInFlow({
       const storageId = queue.storageId ?? (await upload(operation));
       if (!storageId || !operations.isCurrent(operation)) return;
       const draftId =
-        meal?.draft?._id ?? (await saveMealCaption({ submissionId: queue.submissionId, caption }));
+        meal?.draft?._id ??
+        (await saveMealCaption({
+          submissionId: queue.submissionId,
+          caption,
+          ...(supportsClientUpdate ? { plateDescription } : {}),
+        }));
       if (!operations.isCurrent(operation)) return;
       const feedback =
         !skipAnalysis && queueRef.current?.mealFeedback?.draftId === draftId
@@ -866,8 +901,10 @@ export default function CoachCheckInFlow({
         else await retakeProof({ submissionId: queue.submissionId });
       }
       if (!operations.isCurrent(operation)) return;
+      setPlateDescription('');
       persist({
         ...queue,
+        plateDescription: undefined,
         storageId: undefined,
         uri: undefined,
         captureId: undefined,
@@ -907,6 +944,11 @@ export default function CoachCheckInFlow({
   const ready = today.status === 'no_plan' || (today.status === 'ready' && Boolean(assignment));
   const mealAnalysisLimitReached =
     category === 'meals' && mode === 'post' && (!meal || meal.analysisLimitReached);
+  const hasMealReport =
+    (meal?.draft?.status === 'ready' || meal?.draft?.status === 'shared') &&
+    Boolean(meal.draft.verdict);
+  const showingMealAnalysis =
+    !hasMealReport && (scanningMeal || meal?.draft?.status === 'analyzing');
   let primaryLabel = 'Close';
   let primaryAction: () => void = onClose;
   let showPrimaryAction = true;
@@ -957,7 +999,11 @@ export default function CoachCheckInFlow({
     category,
     mode,
     today.status,
-    assignment ?? (today.status === 'no_plan' ? { mandatory: true, consumedCount: 0 } : undefined),
+    assignment
+      ? { ...assignment, mandatory: true }
+      : today.status === 'no_plan'
+        ? { mandatory: true, consumedCount: 0 }
+        : undefined,
     Boolean(queue?.uri || queue?.storageId)
   );
   const showFooter = mode === 'post' || Boolean(queue?.uri || queue?.storageId);
@@ -971,9 +1017,9 @@ export default function CoachCheckInFlow({
     category === 'workout'
       ? (assignment?.label ?? 'Log a workout')
       : category === 'steps'
-        ? `Hit ${(assignment?.stepTarget ?? 10000).toLocaleString('en-US')} Steps`
+        ? `Hit ${(assignment?.stepTarget ?? 8000).toLocaleString('en-US')} Steps`
         : category === 'sleep'
-          ? 'Aim for 7 Hours Sleep'
+          ? 'Log your sleep'
           : 'Log Your Meals';
   const fixedInstruction =
     category === 'workout'
@@ -981,8 +1027,33 @@ export default function CoachCheckInFlow({
       : category === 'steps'
         ? 'Snap a picture of your smartwatch showing you met your steps target.'
         : category === 'sleep'
-          ? 'Snap a picture of your smartwatch showing you met your sleep target.'
+          ? "Snap a picture of your smartwatch showing last night's sleep."
           : 'Snap a clear picture of your plate and your AI coach will check how it fits your goals.';
+  if (viewedMeal) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <CheckInHeader title="Meal feedback" onBack={() => setViewedMealId(null)} />
+        <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 32 }}>
+          {viewedMeal.imageUrl ? (
+            <Image
+              source={{ uri: viewedMeal.imageUrl }}
+              style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 22 }}
+            />
+          ) : null}
+          <Text style={[type.sheetSectionHeading, { marginTop: 24 }]}>Private feedback</Text>
+          {viewedMeal.verdict ? (
+            <Text style={[chrome.badgeText, { marginTop: 8 }]}>{viewedMeal.verdict}</Text>
+          ) : null}
+          <Text style={[type.explanation, { marginTop: 14 }]}>
+            {viewedMeal.feedback ?? 'This meal was shared without AI analysis.'}
+          </Text>
+          {viewedMeal.nextMeal ? (
+            <Text style={[type.explanation, { marginTop: 16 }]}>{viewedMeal.nextMeal}</Text>
+          ) : null}
+        </ScrollView>
+      </View>
+    );
+  }
   return (
     <View
       style={{
@@ -1004,7 +1075,7 @@ export default function CoachCheckInFlow({
             onBack={onClose}
           />
         ) : (
-          <CheckInSheetHeader onClose={closeSheet} />
+          <CheckInSheetHeader onClose={closeSheet} circularBack={category === 'meals'} />
         )}
       </View>
       {showCamera ? (
@@ -1122,40 +1193,72 @@ export default function CoachCheckInFlow({
             contentContainerStyle={{
               paddingHorizontal: 22,
               paddingTop: mode === 'post' ? 12 : 16,
-              paddingBottom: mode === 'post' ? 24 : 40,
+              paddingBottom: mode === 'post' ? 24 : category === 'meals' ? 8 : 40,
             }}>
             {mode === 'post' ? (
               queue && today.status !== 'locked' ? (
                 <>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                    <Text style={type.supporting}>Caption</Text>
-                    <Text style={[type.caption, { color: colors.subtle }]}>
-                      {caption.length}/150
-                    </Text>
-                  </View>
-                  <TextInput
-                    editable={!busy && !queue.postedMeal && meal?.draft?.status !== 'shared'}
-                    value={caption}
-                    onChangeText={(value) => {
-                      setCaption(value);
-                      persist({ ...(queueRef.current ?? queue), caption: value });
-                    }}
-                    onEndEditing={() => {
-                      const save =
-                        category === 'meals'
-                          ? queue.storageId && !queue.postedMeal && meal?.draft?.status !== 'shared'
-                            ? saveMealCaption({ submissionId: queue.submissionId, caption })
-                            : Promise.resolve()
-                          : saveProofCaption({ submissionId: queue.submissionId, caption });
-                      save.catch(() => {});
-                    }}
-                    placeholder="Add a caption"
-                    placeholderTextColor={colors.subtle}
-                    accessibilityLabel="Check-in caption"
-                    multiline
-                    maxLength={150}
-                    style={chrome.caption}
-                  />
+                  {category !== 'meals' || !meal?.draft?.verdict ? (
+                    <>
+                      <View
+                        style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                        <Text style={type.supporting}>
+                          {category === 'meals' && supportsClientUpdate
+                            ? "What's on your plate?"
+                            : 'Caption'}
+                        </Text>
+                        <Text style={[type.caption, { color: colors.subtle }]}>
+                          {category === 'meals' && supportsClientUpdate
+                            ? 'Optional'
+                            : `${caption.length}/150`}
+                        </Text>
+                      </View>
+                      <TextInput
+                        editable={!busy && !queue.postedMeal && meal?.draft?.status !== 'shared'}
+                        value={
+                          category === 'meals' && supportsClientUpdate ? plateDescription : caption
+                        }
+                        onChangeText={(value) => {
+                          if (category === 'meals' && supportsClientUpdate) {
+                            setPlateDescription(value);
+                            persist({ ...(queueRef.current ?? queue), plateDescription: value });
+                            return;
+                          }
+                          setCaption(value);
+                          persist({ ...(queueRef.current ?? queue), caption: value });
+                        }}
+                        onEndEditing={() => {
+                          const save =
+                            category === 'meals'
+                              ? queue.storageId &&
+                                !queue.postedMeal &&
+                                meal?.draft?.status !== 'shared'
+                                ? saveMealCaption({
+                                    submissionId: queue.submissionId,
+                                    caption,
+                                    ...(supportsClientUpdate ? { plateDescription } : {}),
+                                  })
+                                : Promise.resolve()
+                              : saveProofCaption({ submissionId: queue.submissionId, caption });
+                          save.catch(() => {});
+                        }}
+                        placeholder={
+                          category === 'meals' && supportsClientUpdate
+                            ? 'Describe the food on your plate'
+                            : 'Add a caption'
+                        }
+                        placeholderTextColor={colors.subtle}
+                        accessibilityLabel={
+                          category === 'meals' && supportsClientUpdate
+                            ? "What's on your plate?"
+                            : 'Check-in caption'
+                        }
+                        multiline
+                        maxLength={category === 'meals' && supportsClientUpdate ? 500 : 150}
+                        style={chrome.caption}
+                      />
+                    </>
+                  ) : null}
                   {queue.uri || proofImage ? (
                     <View style={{ position: 'relative', marginTop: 20 }}>
                       {queue.mediaType === 'video' ? (
@@ -1256,7 +1359,7 @@ export default function CoachCheckInFlow({
                   )}
                   {category === 'meals' ? (
                     <View style={{ marginTop: 26 }}>
-                      {busy || meal?.draft?.status === 'analyzing' ? <MealAnalysisLoading /> : null}
+                      {showingMealAnalysis ? <MealAnalysisLoading /> : null}
                       {(meal?.draft?.status === 'ready' || meal?.draft?.status === 'shared') &&
                       meal.draft.verdict ? (
                         <View>
@@ -1281,6 +1384,11 @@ export default function CoachCheckInFlow({
                           <Text style={[type.explanation, { marginTop: 14 }]}>
                             {meal.draft.feedback}
                           </Text>
+                          {meal.draft.nextMeal ? (
+                            <Text style={[type.explanation, { marginTop: 16 }]}>
+                              {meal.draft.nextMeal}
+                            </Text>
+                          ) : null}
                           <MealReportFeedback
                             key={meal.draft._id}
                             draft={meal.draft}
@@ -1355,6 +1463,12 @@ export default function CoachCheckInFlow({
                       : category === 'meals'
                         ? 'Log a meal'
                         : fixedTitle}
+                    {category === 'meals' ? (
+                      <Text style={[type.supporting, { color: '#8A8A8A' }]}>
+                        {'  '}
+                        {mealHistory?.count ?? assignment?.consumedCount ?? 0}/3
+                      </Text>
+                    ) : null}
                   </Text>
                   <View style={[chrome.badge, { marginTop: 4 }]}>
                     <Text style={chrome.badgeText}>
@@ -1366,63 +1480,53 @@ export default function CoachCheckInFlow({
                   <Text style={[type.supporting, { marginTop: 8 }]}>{assignment.label}</Text>
                 ) : null}
                 <Text style={[type.body, { marginTop: 10 }]}>{fixedInstruction}</Text>
-                {category === 'meals' ? (
-                  <View style={{ marginTop: 24, gap: 10 }}>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <View
-                        style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
-                        <GuideImage
-                          source={require('~/assets/meal-photo-dark.jpeg')}
-                          contentFit="contain"
-                          style={{ width: '100%', height: '100%' }}
-                          accessible
-                          accessibilityLabel="Too dark: a dim meal photo marked with a cross."
-                        />
-                      </View>
-                      <View
-                        style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
-                        <GuideImage
-                          source={require('~/assets/meal-photo-bright.jpeg')}
-                          contentFit="contain"
-                          style={{ width: '100%', height: '100%' }}
-                          accessible
-                          accessibilityLabel="Bright, from above: the full plate clearly visible, marked with a check."
-                        />
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <Text
-                        style={[
-                          type.smallCaption,
-                          { flex: 1, textAlign: 'center', color: '#C43D4B' },
-                        ]}>
-                        Too dark
-                      </Text>
-                      <Text
-                        style={[
-                          type.smallCaption,
-                          { flex: 1, textAlign: 'center', color: '#258653' },
-                        ]}>
-                        Bright, from above
-                      </Text>
-                    </View>
-                    <Text style={type.caption}>
-                      Use good light, hold your camera above the plate and keep the whole meal in
-                      view.
-                    </Text>
+                {category === 'meals' && mealHistory?.items.length ? (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+                    {mealHistory.items.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.activityId}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Read feedback for meal ${index + 1}`}
+                        onPress={() => setViewedMealId(item.activityId)}
+                        style={{
+                          flex: 1,
+                          maxWidth: 100,
+                          aspectRatio: 1,
+                          borderRadius: 16,
+                          overflow: 'hidden',
+                          backgroundColor: '#F2F2F2',
+                        }}>
+                        {item.imageUrl ? (
+                          <Image
+                            source={{ uri: item.imageUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <Text>Meal {index + 1}</Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 ) : null}
                 <View style={{ marginTop: 24, gap: 12 }}>
-                  {canTakeLivePhoto ? (
+                  {canTakeLivePhoto || category === 'meals' ? (
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel="Take live photo"
-                      accessibilityState={{ disabled: busy, busy }}
-                      disabled={busy}
+                      accessibilityState={{
+                        disabled: busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3,
+                        busy,
+                      }}
+                      disabled={busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3}
                       onPress={() => {
                         start('image').catch(() => {});
                       }}
-                      style={[chrome.actionCard, busy && { opacity: 0.6 }]}>
+                      style={[
+                        chrome.actionCard,
+                        (busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3) && {
+                          opacity: 0.4,
+                        },
+                      ]}>
                       <View style={components.iconTile}>
                         <Camera size={24} color={colors.icon} />
                       </View>
@@ -1453,6 +1557,19 @@ export default function CoachCheckInFlow({
                     </TouchableOpacity>
                   ) : null}
                 </View>
+                {category === 'meals' ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={() => setShowMealGuide(true)}
+                    style={{
+                      minHeight: 44,
+                      marginTop: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Text style={type.supporting}>How to take the picture</Text>
+                  </TouchableOpacity>
+                ) : null}
                 {error && !showFooter ? (
                   <Text accessibilityRole="alert" style={[type.error, { marginTop: 12 }]}>
                     {error}
@@ -1505,6 +1622,70 @@ export default function CoachCheckInFlow({
           ) : null}
         </>
       )}
+      <Modal
+        visible={showMealGuide}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMealGuide(false)}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            paddingHorizontal: 24,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+          }}>
+          <View
+            accessibilityViewIsModal
+            style={{ backgroundColor: '#fff', borderRadius: 30, padding: 22, gap: 14 }}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close photo guidance"
+              onPress={() => setShowMealGuide(false)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: '#F2F2F2',
+                alignSelf: 'flex-end',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <X size={24} color={colors.ink} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
+                <GuideImage
+                  source={require('~/assets/meal-photo-dark.jpeg')}
+                  contentFit="contain"
+                  style={{ width: '100%', height: '100%' }}
+                  accessible
+                  accessibilityLabel="Too dark: a dim meal photo marked with a cross."
+                />
+              </View>
+              <View style={{ flex: 1, aspectRatio: 1, overflow: 'hidden', borderRadius: 20 }}>
+                <GuideImage
+                  source={require('~/assets/meal-photo-bright.jpeg')}
+                  contentFit="contain"
+                  style={{ width: '100%', height: '100%' }}
+                  accessible
+                  accessibilityLabel="Bright, from above: the full plate clearly visible, marked with a check."
+                />
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Text style={[type.smallCaption, { flex: 1, textAlign: 'center', color: '#C43D4B' }]}>
+                Too dark
+              </Text>
+              <Text style={[type.smallCaption, { flex: 1, textAlign: 'center', color: '#258653' }]}>
+                Bright, from above
+              </Text>
+            </View>
+            <Text style={type.caption}>
+              Use good light, hold your camera above the plate and keep the whole meal in view.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

@@ -166,8 +166,12 @@ export const resetMyMealAnalysisCountForTesting = mutation({
 });
 
 export const saveCaption = mutation({
-  args: { submissionId: v.id('coachProofSubmissionsV1'), caption: v.string() },
-  handler: async (ctx, { submissionId, caption }) => {
+  args: {
+    submissionId: v.id('coachProofSubmissionsV1'),
+    caption: v.string(),
+    plateDescription: v.optional(v.string()),
+  },
+  handler: async (ctx, { submissionId, caption, plateDescription }) => {
     const userId = await owner(ctx);
     if (!(await entitled(ctx, userId))) asError('Verified entitlement required');
     const submission = await ctx.db.get(submissionId);
@@ -181,6 +185,8 @@ export const saveCaption = mutation({
     )
       asError('Uploaded live meal photo required');
     if (submission.day !== (await today(ctx, userId))) asError('Meal day has changed');
+    if (plateDescription && plateDescription.length > 500)
+      asError('Please keep the plate description to 500 characters');
     if (caption.length > 500) asError('Caption is too long');
     const drafts = await ctx.db
       .query('coachMealDraftsV1')
@@ -189,12 +195,22 @@ export const saveCaption = mutation({
     const existing = drafts.find((d) => d.storageId === submission.storageId);
     if (existing) {
       if (existing.status === 'shared') return existing._id;
-      await ctx.db.patch(existing._id, { caption: caption.trim(), updatedAt: Date.now() });
+      await ctx.db.patch(existing._id, {
+        caption: caption.trim(),
+        ...(plateDescription !== undefined ? { plateDescription: plateDescription.trim() } : {}),
+        updatedAt: Date.now(),
+      });
       return existing._id;
     }
     const revision = submission.planRevisionId ? await ctx.db.get(submission.planRevisionId) : null;
     const request = revision ? await ctx.db.get(revision.requestId) : null;
-    const profile = request ? await ctx.db.get(request.profileRevisionId) : null;
+    const profile = request
+      ? await ctx.db.get(request.profileRevisionId)
+      : await ctx.db
+          .query('coachProfileRevisionsV1')
+          .withIndex('by_user_version', (q) => q.eq('userId', userId))
+          .order('desc')
+          .first();
     const goal = profile?.answers.goal ?? 'fitness';
     const activities = await ctx.db
       .query('dailyActivities')
@@ -223,6 +239,7 @@ export const saveCaption = mutation({
       recommendation: submission.recommendation,
       storageId: submission.storageId,
       caption: caption.trim(),
+      plateDescription: plateDescription?.trim(),
       goal,
       workoutLoggedToday,
       promptVersion: MEAL_PROMPT_VERSION,
@@ -433,7 +450,15 @@ export const scanInput = internalQuery({
         helpful: item.memberHelpful,
         correction: item.memberCorrection,
       }));
-    return { scan, draft, memberFeedback };
+    const plans = await ctx.db
+      .query('coachPlanRevisionsV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', draft.day))
+      .order('desc')
+      .first();
+    const dailyPlan = plans?.output
+      ? { workout: plans.workout, recommendation: plans.output.workout, meals: plans.output.meals }
+      : null;
+    return { scan, draft, memberFeedback, dailyPlan };
   },
 });
 export const claimDispatch = internalMutation({
@@ -493,6 +518,7 @@ export const finishScan = internalMutation({
           v.null()
         ),
         feedback: v.string(),
+        nextMeal: v.optional(v.string()),
       })
     ),
     errorCode: v.optional(v.string()),
@@ -527,6 +553,7 @@ export const finishScan = internalMutation({
       status: args.result && !unclear ? 'ready' : 'failed',
       verdict: args.result?.verdict,
       feedback: args.result?.feedback,
+      nextMeal: args.result?.nextMeal,
       errorCode: unclear ? 'unclear_image' : args.errorCode,
       inputTokens: args.inputTokens,
       outputTokens: args.outputTokens,
@@ -703,5 +730,43 @@ export const submitReportFeedback = mutation({
       memberCorrection: correction,
       memberFeedbackAt: Date.now(),
     });
+  },
+});
+
+// Authenticated, member-only history. Public posts never expose private AI feedback.
+export const myTodayMeals = query({
+  args: { refresh: v.optional(v.number()) },
+  handler: async (ctx) => {
+    const userId = await owner(ctx);
+    if (!(await entitled(ctx, userId))) asError('Verified entitlement required');
+    const day = await today(ctx, userId);
+    const drafts = await ctx.db
+      .query('coachMealDraftsV1')
+      .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
+      .collect();
+    const activities = await ctx.db
+      .query('dailyActivities')
+      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', day))
+      .collect();
+    const meals = activities.filter(
+      (a) => a.loggedActivityKey === 'healthy_meal' && a.reviewStatus !== 'rejected'
+    );
+    const items = await Promise.all(
+      meals.map(async (activity) => {
+        const draft = drafts.find((d) => d.activityId === activity._id && d.status === 'shared');
+        const storageId = draft?.storageId ?? activity.image;
+        return {
+          activityId: activity._id,
+          draftId: draft?._id,
+          imageUrl: storageId ? await ctx.storage.getUrl(storageId) : null,
+          verdict: draft?.verdict,
+          feedback: draft?.feedback,
+          nextMeal: draft?.nextMeal,
+          // Position in the successful-check allowance at the time of capture.
+          checked: draft?.scanId ? (await ctx.db.get(draft.scanId))?.usable !== false : false,
+        };
+      })
+    );
+    return { count: meals.length, items };
   },
 });

@@ -1,3 +1,5 @@
+import { cacheSystemPrompt, promptCacheUsage, logPromptCacheUsage } from './anthropicPromptCache';
+import { CLIENT_PLAN_UPDATE } from './coachClientUpdate';
 import type { DailyOutput } from './coachDailyPolicy';
 import type { DailyOutputV2 } from './coachDailyPolicyV2';
 import { isDailyPlanOutputV3, type DailyOutputV3 } from './coachDailyPolicyV3';
@@ -9,7 +11,7 @@ import {
   isV2DailyPrompt,
 } from './coachDailyPromptV2_1';
 import { DAILY_PLAN_V3_PROMPT_VERSION, DAILY_PLAN_V3_SYSTEM_PROMPT } from './coachDailyPromptV3';
-import { DAILY_PLAN_COPY_LIMITS } from '../shared/coachPlanCopy';
+import { DAILY_PLAN_COPY_LIMITS, DAILY_PLAN_EXPLANATION_LIMITS } from '../shared/coachPlanCopy';
 import { OTHER_TRAINING_MEANING } from '../shared/coachTrainingYesterday';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -109,7 +111,7 @@ function parse(
       typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : undefined;
     return {
       output: data as unknown as DailyOutputV3,
-      inputTokens: count(usage?.input_tokens),
+      inputTokens: promptCacheUsage(usage)?.totalInputTokens,
       outputTokens: count(usage?.output_tokens),
     };
   }
@@ -142,7 +144,7 @@ function parse(
       | DailyOutput
       | DailyOutputV2
       | DailyOutputV3,
-    inputTokens: integer(usage.input_tokens),
+    inputTokens: promptCacheUsage(usage)?.totalInputTokens,
     outputTokens: integer(usage.output_tokens),
   };
 }
@@ -226,15 +228,18 @@ export async function generateDailyPlan(args: {
           : args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
             ? 0.7
             : 0,
-        system:
+        system: cacheSystemPrompt(
           (args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
-            ? DAILY_PLAN_V3_SYSTEM_PROMPT
+            ? DAILY_PLAN_V3_SYSTEM_PROMPT + CLIENT_PLAN_UPDATE
             : args.promptVersion === DAILY_PLAN_V2_1_PROMPT_VERSION
               ? DAILY_PLAN_V2_1_SYSTEM_PROMPT
               : args.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
                 ? DAILY_PLAN_V2_SYSTEM_PROMPT
                 : DAILY_PLAN_SYSTEM_PROMPT) +
-          (otherTraining ? '\n\nTRAINED YESTERDAY ANSWER CONTRACT\n' + OTHER_TRAINING_MEANING : ''),
+            (otherTraining
+              ? '\n\nTRAINED YESTERDAY ANSWER CONTRACT\n' + OTHER_TRAINING_MEANING
+              : '')
+        ),
         messages: [
           {
             role: 'user',
@@ -264,6 +269,13 @@ export async function generateDailyPlan(args: {
                   : isV2DailyPrompt(args.promptVersion ?? '')
                     ? V2_LIMITS
                     : OUTPUT_LIMITS,
+              ...(args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+                ? {
+                    explanation_character_limits: DAILY_PLAN_EXPLANATION_LIMITS,
+                    copy_validation_rule:
+                      'Every text field must be nonempty and within its character limit, including spaces and punctuation. Each explanations entry uses explanation_character_limits for its own key. A validation failure invalid_copy:FIELD names the exact field to shorten or fill, for example workoutReason means explanations.workout. Repair that field while retaining the supported recommendation and required topics.',
+                  }
+                : {}),
               length_instruction:
                 'Never exceed any field character limit. Keep the individual sections concise. Keep why personalized and explanatory within its separate allowance.',
               style: args.style,
@@ -384,6 +396,11 @@ export async function generateDailyPlan(args: {
         latencyMs: Date.now() - started,
       };
     }
+    logPromptCacheUsage(
+      'daily-plan',
+      selectedModel,
+      (body as Record<string, unknown> | null)?.usage
+    );
     const parsed = parse(body, args.promptVersion ?? DAILY_PLAN_PROMPT_VERSION);
     if (!parsed)
       return {
@@ -587,8 +604,19 @@ const V3_TOOL_SCHEMA = {
       required: ['text', 'hours'],
     },
     why: { type: 'string', maxLength: 1200 },
+    explanations: {
+      type: 'object',
+      additionalProperties: false,
+      properties: Object.fromEntries(
+        (['sleep', 'workout', 'steps', 'meals'] as const).map((key) => [
+          key,
+          { type: 'string', maxLength: DAILY_PLAN_EXPLANATION_LIMITS[key] },
+        ])
+      ),
+      required: ['sleep', 'workout', 'steps', 'meals'],
+    },
   },
-  required: ['headline', 'workout', 'steps', 'meals', 'sleep', 'why'],
+  required: ['headline', 'workout', 'steps', 'meals', 'sleep', 'why', 'explanations'],
 };
 function validV3Shape(data: Record<string, unknown>) {
   return isDailyPlanOutputV3(data);

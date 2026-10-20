@@ -1,11 +1,12 @@
 // @ts-nocheck -- Offline reliability audit: no live provider or member writes.
 import { expect, test } from 'bun:test';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+
+import { auditDay, auditSnapshot, auditCandidate } from './coachDailyAuditFixtures';
 import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from '../convex/coachDailyPolicyV3';
+import { DAILY_PLAN_V3_PROMPT_VERSION } from '../convex/coachDailyPromptV3';
 import { generateDailyPlan, v3ToolSchema } from '../convex/coachDailyProvider';
 import { generateV3WithRepair } from '../convex/coachDailyRepair';
-import { DAILY_PLAN_V3_PROMPT_VERSION } from '../convex/coachDailyPromptV3';
-import { auditDay, auditSnapshot, auditCandidate } from './coachDailyAuditFixtures';
 
 const bodies = [
   ['fine'],
@@ -303,7 +304,7 @@ test('strict schema is supported by the production model and contains only suppo
     },
   });
   expect(body.tools[0].strict).toBe(true);
-  expect(body.system).toContain('THE MOST IMPORTANT RULE: RESPECT HER GOAL');
+  expect(body.system[0].text).toContain('THE MOST IMPORTANT RULE: RESPECT HER GOAL');
 });
 
 test('yesterday training with today advice is distinct from claiming completion today', () => {
@@ -450,7 +451,7 @@ test('invalid Haiku candidates use Sonnet repair with the same V3 instructions a
   expect(JSON.parse(body.messages[0].content).input).toEqual(
     buildDailyProviderInputV3(s, auditDay, [])
   );
-  expect(body.system).toContain('THE MOST IMPORTANT RULE: RESPECT HER GOAL');
+  expect(body.system[0].text).toContain('THE MOST IMPORTANT RULE: RESPECT HER GOAL');
   expect(r.model).toBe(body.model);
   expect(r.ok).toBe(true);
 });

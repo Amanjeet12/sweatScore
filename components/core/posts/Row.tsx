@@ -63,6 +63,7 @@ export type PostWithUser = {
   };
   mediaUrl?: string;
   mediaType?: string;
+  activityLabel?: string;
   mediaThumbnailUrl?: string;
   challengeId?: string;
   activityId?: Id<'dailyActivities'>;
@@ -622,13 +623,14 @@ function PostRow({
                 </View>
                 <Text style={type.metadata}>
                   {formatDistanceToNow(post.createdAt)} ·{' '}
-                  {post.challenge
-                    ? post.challenge.name
-                    : post.mediaType === 'image'
-                      ? 'Photo'
-                      : post.mediaType === 'video'
-                        ? 'Video'
-                        : 'Community'}
+                  {post.activityLabel ??
+                    (post.challenge
+                      ? post.challenge.name
+                      : post.mediaType === 'image'
+                        ? 'Photo'
+                        : post.mediaType === 'video'
+                          ? 'Video'
+                          : 'Community')}
                 </Text>
               </View>
 

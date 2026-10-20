@@ -1,4 +1,4 @@
-import { CaretLeft } from 'phosphor-react-native';
+import { ArrowLeft, CaretLeft } from 'phosphor-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { PrototypeSheetControl } from './PrototypeControl';
@@ -23,12 +23,28 @@ export function CheckInHeader({ title, onBack }: { title: string; onBack: () => 
   );
 }
 
-export function CheckInSheetHeader({ onClose }: { onClose: () => void }) {
+export function CheckInSheetHeader({
+  onClose,
+  circularBack = false,
+}: {
+  onClose: () => void;
+  circularBack?: boolean;
+}) {
   return (
     <View style={{ paddingHorizontal: 18, paddingTop: 10 }}>
       <View style={checkInStyles.handle} accessibilityElementsHidden />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 }}>
-        <PrototypeSheetControl kind="back" label="Back to Today" onPress={onClose} />
+        {circularBack ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Back to Today"
+            onPress={onClose}
+            style={checkInStyles.back}>
+            <ArrowLeft size={24} color={colors.ink} />
+          </TouchableOpacity>
+        ) : (
+          <PrototypeSheetControl kind="back" label="Back to Today" onPress={onClose} />
+        )}
         <PrototypeSheetControl kind="close" label="Close check-in" onPress={onClose} />
       </View>
     </View>

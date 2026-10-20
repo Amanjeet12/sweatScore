@@ -310,7 +310,7 @@ describe('plan-bound check-ins', () => {
     expect(alice.assignments.some((x) => x.userId === 'bob')).toBe(false);
   });
 
-  test('no plan cannot offer fabricated detail; rest/pain has no mandatory workout', async () => {
+  test('no-plan and rest recommendations still allow members to log their own workout', async () => {
     const missing = fixture({ coachPlanRevisionsV1: [] });
     expect((await myToday._handler(missing.ctx, {})).status).toBe('no_plan');
     const rest = fixture({
@@ -360,7 +360,7 @@ describe('plan-bound check-ins', () => {
     ).toBe(false);
     await expect(
       reserveProof._handler(rest.ctx, { assignmentId: 'rest', requestKey: 'rest_device_1' })
-    ).rejects.toThrow('Rest guidance');
+    ).resolves.toBeDefined();
     expect((await myToday._handler(rest.ctx, {})).assignments).toHaveLength(4);
   });
 
@@ -729,4 +729,43 @@ describe('plan-bound check-ins', () => {
       reserveProof._handler(s.ctx, { assignmentId: 'legs', requestKey: 'after_delete_1' })
     ).rejects.toThrow('limit');
   });
+});
+
+test('standalone steps default to 8000 without rewriting a captured proof target', async () => {
+  const assignment = {
+    _id: 'standalone_steps',
+    userId: 'alice',
+    day,
+    category: 'steps',
+    label: 'Hit 10,000 Steps',
+    recommendation: '10,000 steps',
+    stepTarget: 10000,
+  };
+  const fresh = fixture({
+    coachPlanRevisionsV1: [],
+    coachAssignmentsV1: [assignment],
+    coachProofSubmissionsV1: [],
+  });
+  await ensureStandaloneAssignments._handler(fresh.ctx, {});
+  expect(fresh.rows.coachAssignmentsV1.find((a) => a._id === 'standalone_steps').stepTarget).toBe(
+    8000
+  );
+  const pinned = fixture({
+    coachPlanRevisionsV1: [],
+    coachAssignmentsV1: [assignment],
+    coachProofSubmissionsV1: [
+      {
+        _id: 'pinned',
+        userId: 'alice',
+        day,
+        assignmentId: 'standalone_steps',
+        category: 'steps',
+        state: 'uploaded',
+      },
+    ],
+  });
+  await ensureStandaloneAssignments._handler(pinned.ctx, {});
+  expect(pinned.rows.coachAssignmentsV1.find((a) => a._id === 'standalone_steps').stepTarget).toBe(
+    10000
+  );
 });

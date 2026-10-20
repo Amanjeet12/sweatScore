@@ -52,6 +52,7 @@ export const dailyAnswers = v.object({
         v.literal('lower_body'),
         v.literal('upper_body'),
         v.literal('cardio'),
+        v.literal('core'),
         v.literal('other'),
         v.literal('nothing')
       )
@@ -61,7 +62,8 @@ export const dailyAnswers = v.object({
     v.literal('full_session'),
     v.literal('short_session'),
     v.literal('something_light'),
-    v.literal('rest_day')
+    v.literal('rest_day'),
+    v.literal('coach_decide')
   ),
   body: v.union(bodyFeeling, v.array(bodyFeeling)),
 });
@@ -80,11 +82,16 @@ export const planOutputV2 = v.object({
   stepsReason: v.string(),
 });
 export const planDetailsV2 = v.object({
+  sleepReason: v.optional(v.string()),
+  mealsReason: v.optional(v.string()),
   workoutExamples: v.array(v.string()),
   workoutReason: v.string(),
   stepsReason: v.string(),
 });
 export const planOutputV3 = v.object({
+  explanations: v.optional(
+    v.object({ sleep: v.string(), workout: v.string(), steps: v.string(), meals: v.string() })
+  ),
   headline: v.string(),
   workout: v.object({
     text: v.string(),

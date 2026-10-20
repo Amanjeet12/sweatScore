@@ -37,7 +37,7 @@ export type TileInput = {
   consumedCount: number;
   stepTarget?: number;
 };
-export const TODAY_CATEGORIES: CoachCategory[] = ['workout', 'meals', 'sleep', 'steps'];
+export const TODAY_CATEGORIES: CoachCategory[] = ['sleep', 'workout', 'steps', 'meals'];
 export function todayTiles(assignments: TileInput[] | undefined) {
   return TODAY_CATEGORIES.map((category) => {
     const assignment = assignments?.find((item) => item.category === category);
@@ -49,7 +49,7 @@ export function todayTiles(assignments: TileInput[] | undefined) {
       total,
       checked: Boolean(assignment && assignment.consumedCount > 0),
       completed: Boolean(assignment && assignment.consumedCount >= total),
-      available: Boolean(assignment && assignment.mandatory && assignment.consumedCount < total),
+      available: Boolean(assignment && assignment.consumedCount < total),
     };
   });
 }

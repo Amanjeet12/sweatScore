@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, Keyboard, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BuildingRoutine } from '~/components/core/auth/BuildingRoutine';
 import { CoachSurveyBridge } from '~/components/core/auth/CoachSurveyBridge';
 import {
   PrototypeOnboarding,
@@ -86,6 +87,7 @@ const PROFILE_OPTION_DESCRIPTIONS: Record<string, Record<string, string>> = {
 export default function CoachOnboarding() {
   const convex = useConvex();
   const memberId = useAuthStore((state) => state.currentUser?._id);
+  const firstName = useAuthStore((state) => state.currentUser?.name?.trim().split(/\s+/)[0]);
   const [showProfileIntro, setShowProfileIntro] = useState(false);
   const [surveyStartedFor, setSurveyStartedFor] = useState<typeof memberId>(undefined);
   const previousScreen = useRef<{ memberId: typeof memberId; content: ReactNode }>({
@@ -198,6 +200,8 @@ export default function CoachOnboarding() {
     }
   }, [foundation?.state?.profileDraft?.weight]);
 
+  if (completingProfile) return <BuildingRoutine name={firstName} />;
+
   if (
     !accepted ||
     !decision ||
@@ -217,7 +221,10 @@ export default function CoachOnboarding() {
       (decision.screen === 'today' && !foundation.state?.profileRevisionId));
   const questions = profile
     ? PROFILE_QUESTIONS
-    : dailyQuestionsForBackend(foundation.supportsTrainingOther === true);
+    : dailyQuestionsForBackend(
+        foundation.supportsTrainingOther === true,
+        foundation.supportsClientUpdate === true
+      );
   const testDraft = foundation.state?.testReanswerDraft;
   const nextTestStep = reanswerMode
     ? DAILY_QUESTIONS.findIndex((item) => isUnanswered(testDraft?.[item.key]))

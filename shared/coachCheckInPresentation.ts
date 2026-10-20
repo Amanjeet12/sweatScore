@@ -37,7 +37,7 @@ export function canStartCoachLivePhoto(
   return Boolean(
     mode === 'details' &&
     (status === 'ready' || status === 'no_plan') &&
-    assignment?.mandatory &&
+    assignment &&
     assignment.consumedCount < (category === 'meals' ? 3 : 1) &&
     !hasCapturedPhoto
   );

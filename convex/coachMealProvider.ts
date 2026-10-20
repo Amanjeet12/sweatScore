@@ -1,6 +1,7 @@
-import { MEAL_SYSTEM_PROMPT } from './coachMealPromptV2';
-import { MealResult, validateMealResult } from './coachMealPolicy';
+import { cacheSystemPrompt, promptCacheUsage, logPromptCacheUsage } from './anthropicPromptCache';
 import { providerConfig, ProviderConfig } from './coachDailyProvider';
+import { MealResult, checkMealResult, NON_MEAL_FEEDBACK } from './coachMealPolicy';
+import { MEAL_SYSTEM_PROMPT, CLIENT_MEAL_UPDATE } from './coachMealPromptV2';
 
 export type MealProviderOutcome =
   | { ok: true; result: MealResult; inputTokens?: number; outputTokens?: number; latencyMs: number }
@@ -15,12 +16,18 @@ export type MealProviderOutcome =
     };
 
 export async function analyzeMealPhoto(args: {
-  memberFeedback?: Array<{
+  memberFeedback?: {
     report?: string;
     verdict?: string | null;
     helpful?: boolean;
     correction?: string;
-  }>;
+  }[];
+  plateDescription?: string;
+  dailyPlan?: {
+    workout: { type: string; durationMinutes?: number };
+    recommendation: string;
+    meals: string;
+  } | null;
   imageBase64: string;
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
   goal: 'lose' | 'recomp' | 'fitness' | 'unavailable';
@@ -43,6 +50,7 @@ export async function analyzeMealPhoto(args: {
     let outputTokens = 0;
     let hasInputTokens = true;
     let hasOutputTokens = true;
+    let validationIssue = '';
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await (args.fetchImpl ?? fetch)('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -55,10 +63,10 @@ export async function analyzeMealPhoto(args: {
           model: config.model,
           max_tokens: Math.max(config.maxOutputTokens, 768),
           temperature: 0,
-          system: [
+          system: cacheSystemPrompt([
             {
               type: 'text',
-              text: MEAL_SYSTEM_PROMPT,
+              text: MEAL_SYSTEM_PROMPT + CLIENT_MEAL_UPDATE,
             },
             {
               type: 'text',
@@ -68,7 +76,7 @@ export async function analyzeMealPhoto(args: {
               type: 'text',
               text: 'Only describe food visible in the actual photo. Nigerian and West African meals are normal primary use cases. Do not invent ingredients or assert what is hidden beneath a layer. Distinguish large creamy avocado pieces from small whole or ring-shaped olives. If a food identity is uncertain, discuss visible plate groups without naming it. If visibility is insufficient, use the unclear-image rule. Style changes flexible wording only.',
             },
-          ],
+          ]),
           messages: [
             {
               role: 'user',
@@ -81,13 +89,15 @@ export async function analyzeMealPhoto(args: {
                   type: 'text',
                   text: JSON.stringify({
                     goal: args.goal === 'unavailable' ? 'fitness' : args.goal,
+                    plate_description: args.plateDescription ?? null,
+                    daily_plan: args.dailyPlan ?? null,
                     member_feedback: args.memberFeedback ?? [],
                     workout_logged_today: args.workoutLoggedToday,
                     style: args.style,
                     note:
                       attempt === 0
                         ? 'Style affects flexible wording only. Follow all system rules and verdict meanings.'
-                        : 'The previous structured response failed validation. Return exactly one submit_meal_check tool call with only verdict and feedback. Feedback must be at most 45 words in 2 to 3 short sentences, with one culturally appropriate fix only and no prohibited wording, lists or emojis. For an unclear or non-food image use verdict null and the exact retake message.',
+                        : `The previous structured response failed validation: ${validationIssue}. Return exactly one submit_meal_check tool call with verdict, feedback and nextMeal. Feedback must be at most 45 words in 2 to 3 short sentences, with one culturally appropriate fix only or affirmation of a balanced plate, and no prohibited wording, lists or emojis. The only permitted weight wording is the exact goal phrase "weight loss"; use "body recomp" for recomp. nextMeal must start "For your next meal", use portions only with no named food or dish, and stay within 60 words. No em dashes in either field. For an unclear or non-food image use verdict null, feedback exactly ${JSON.stringify(NON_MEAL_FEEDBACK)} and nextMeal exactly an empty string.`,
                   }),
                 },
               ],
@@ -105,6 +115,12 @@ export async function analyzeMealPhoto(args: {
                     type: ['string', 'null'],
                     enum: ['On point', 'Nearly there', 'Room to improve', null],
                   },
+                  nextMeal: {
+                    type: 'string',
+                    maxLength: 500,
+                    description:
+                      'A separate paragraph starting For your next meal with portion guidance only, no foods or dishes. Empty for a non-food or unclear image.',
+                  },
                   feedback: {
                     type: 'string',
                     maxLength: 600,
@@ -112,7 +128,7 @@ export async function analyzeMealPhoto(args: {
                       'At most 45 words in 2 to 3 short sentences. One specific positive and one realistic, culturally appropriate fix only, or affirm an already balanced plate. No lists, emojis or judgment.',
                   },
                 },
-                required: ['verdict', 'feedback'],
+                required: ['verdict', 'feedback', 'nextMeal'],
               },
             },
           ],
@@ -125,8 +141,9 @@ export async function analyzeMealPhoto(args: {
       if (!response.ok)
         return { ok: false, code: 'provider_unavailable', latencyMs: Date.now() - started };
       const body = (await response.json()) as Record<string, any>;
-      if (Number.isInteger(body.usage?.input_tokens) && body.usage.input_tokens >= 0)
-        inputTokens += body.usage.input_tokens;
+      logPromptCacheUsage('meal-analysis', config.model, body.usage);
+      const inputUsage = promptCacheUsage(body.usage);
+      if (inputUsage) inputTokens += inputUsage.totalInputTokens;
       else hasInputTokens = false;
       if (Number.isInteger(body.usage?.output_tokens) && body.usage.output_tokens >= 0)
         outputTokens += body.usage.output_tokens;
@@ -136,15 +153,21 @@ export async function analyzeMealPhoto(args: {
             (item: any) => item.type === 'tool_use' && item.name === 'submit_meal_check'
           )
         : [];
-      const result = calls.length === 1 ? validateMealResult(calls[0].input) : null;
-      if (result)
+      const checked = calls.length === 1 ? checkMealResult(calls[0].input) : null;
+      if (checked?.ok)
         return {
           ok: true,
-          result,
+          result: checked.result,
           inputTokens: hasInputTokens ? inputTokens : undefined,
           outputTokens: hasOutputTokens ? outputTokens : undefined,
           latencyMs: Date.now() - started,
         };
+      validationIssue = checked && !checked.ok ? checked.issue : 'tool_call_count';
+      console.warn('[AI meal validation]', {
+        attempt: attempt + 1,
+        issue: validationIssue,
+        truncated: body.stop_reason === 'max_tokens',
+      });
     }
     return { ok: false, code: 'invalid_output', latencyMs: Date.now() - started };
   } catch {

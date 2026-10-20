@@ -72,7 +72,7 @@ describe('plan-derived check-in presentation', () => {
           { mandatory: false, consumedCount: 0 },
           false
         )
-      ).toBe(false);
+      ).toBe(true);
     }
     expect(
       canStartCoachLivePhoto(
@@ -141,7 +141,7 @@ describe('plan-derived check-in presentation', () => {
     expect(source).toContain('<CheckInSheetHeader onClose={closeSheet}');
     expect(chrome).toContain('label="Close check-in"');
     expect(source).toContain("category === 'meals'");
-    expect(source).toContain('placeholder="Add a caption"');
+    expect(source).toContain("What's on your plate?");
     expect(source).toContain('Retake photo');
     expect(source).toContain('publishProof');
     expect(source).toContain('publishMeal');

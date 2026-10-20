@@ -6,6 +6,7 @@ import { ConvexError, v } from 'convex/values';
 
 import { components, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
+import type { QueryCtx } from './_generated/server';
 import { internalMutation, mutation, MutationCtx, query } from './_generated/server';
 import { appVersions } from './appVersions';
 import { applyFreeDailyCap } from './challengeCompletions';
@@ -130,6 +131,7 @@ export const getPinnedPost = query({
       mediaWidth: v.optional(v.union(v.number(), v.null())),
       mediaHeight: v.optional(v.union(v.number(), v.null())),
       mediaType: v.optional(v.string()),
+      activityLabel: v.optional(v.string()),
       mediaThumbnailUrl: v.optional(v.string()),
       mediaUrl: v.optional(v.string()),
       challengeId: v.optional(v.id('challenges')),
@@ -227,6 +229,7 @@ export const getPinnedPost = query({
       mediaWidth: pinnedPost.mediaWidth,
       mediaHeight: pinnedPost.mediaHeight,
       mediaType: pinnedPost.mediaType,
+      activityLabel: await checkInLabel(ctx, pinnedPost),
       mediaThumbnailUrl: pinnedPost.mediaThumbnail
         ? ((await ctx.storage.getUrl(pinnedPost.mediaThumbnail)) ?? undefined)
         : undefined,
@@ -487,6 +490,7 @@ export const createPost = mutation({
     mediaWidth: v.optional(v.number()),
     mediaHeight: v.optional(v.number()),
     mediaType: v.optional(v.string()),
+    activityLabel: v.optional(v.string()),
     mediaThumbnail: v.optional(v.id('_storage')),
     activityKey: v.optional(
       v.union(
@@ -1059,6 +1063,7 @@ export const getLatestPosts = query({
         mediaHeight: v.optional(v.union(v.number(), v.null())),
 
         mediaType: v.optional(v.string()),
+        activityLabel: v.optional(v.string()),
 
         mediaThumbnailUrl: v.optional(v.string()),
 
@@ -1388,6 +1393,7 @@ export const getLatestPosts = query({
           mediaHeight: post.mediaHeight,
 
           mediaType: post.mediaType,
+          activityLabel: await checkInLabel(ctx, post),
 
           ...(mediaThumbnailUrl
             ? {
@@ -1469,6 +1475,7 @@ export const getSinglePost = query({
       mediaWidth: v.optional(v.union(v.number(), v.null())),
       mediaHeight: v.optional(v.union(v.number(), v.null())),
       mediaType: v.optional(v.string()),
+      activityLabel: v.optional(v.string()),
       mediaThumbnailUrl: v.optional(v.string()),
       mediaUrl: v.optional(v.string()),
       challengeId: v.optional(v.id('challenges')),
@@ -1530,6 +1537,7 @@ export const getSinglePost = query({
       mediaWidth: post.mediaWidth,
       mediaHeight: post.mediaHeight,
       mediaType: post.mediaType,
+      activityLabel: await checkInLabel(ctx, post),
       mediaThumbnailUrl: post.mediaThumbnail
         ? ((await ctx.storage.getUrl(post.mediaThumbnail)) ?? undefined)
         : undefined,
@@ -1610,6 +1618,7 @@ export const getPost = query({
       mediaWidth: v.optional(v.union(v.number(), v.null())),
       mediaHeight: v.optional(v.union(v.number(), v.null())),
       mediaType: v.optional(v.string()),
+      activityLabel: v.optional(v.string()),
       mediaThumbnailUrl: v.optional(v.string()),
       mediaUrl: v.optional(v.string()),
     }),
@@ -1629,6 +1638,7 @@ export const getPost = query({
       mediaWidth: post.mediaWidth,
       mediaHeight: post.mediaHeight,
       mediaType: post.mediaType,
+      activityLabel: await checkInLabel(ctx, post),
       mediaThumbnailUrl: post.mediaThumbnail
         ? ((await ctx.storage.getUrl(post.mediaThumbnail)) ?? undefined)
         : undefined,
@@ -1636,3 +1646,23 @@ export const getPost = query({
     };
   },
 });
+
+async function checkInLabel(
+  ctx: QueryCtx,
+  post: { activityId?: Id<'dailyActivities'>; userId: Id<'users'> }
+) {
+  if (!post.activityId) return undefined;
+  const activity = await ctx.db.get(post.activityId);
+  if (!activity || activity.userId !== post.userId) return undefined;
+  const key = activity.loggedActivityKey;
+  if (key === 'healthy_meal') return 'Meal';
+  if (key === 'workout' || key === 'gym_workout') return 'Workout';
+  if (key === 'sleep') return 'Sleep';
+  if (key === 'steps') {
+    const proof = activity.coachSubmissionId ? await ctx.db.get(activity.coachSubmissionId) : null;
+    const assignment = proof ? await ctx.db.get(proof.assignmentId) : null;
+    const target = assignment?.stepTarget ?? 8000;
+    return `${target.toLocaleString('en-US')} steps`;
+  }
+  return undefined;
+}

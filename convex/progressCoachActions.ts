@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
+import { cacheSystemPrompt, promptCacheUsage, logPromptCacheUsage } from './anthropicPromptCache';
 import { buildDeterministicCoachFallback } from './progressCoachPolicy';
 import type {
   CoachComputedTargets,
@@ -236,7 +237,7 @@ function parseProviderResponse(value: unknown): ProviderResult {
     ) {
       return { ok: false, errorCode: 'provider_invalid_response' };
     }
-    inputTokens = value.usage.input_tokens;
+    inputTokens = promptCacheUsage(value.usage)?.totalInputTokens;
     outputTokens = value.usage.output_tokens;
   }
 
@@ -269,7 +270,7 @@ export async function requestCoachGeneratedCopy(args: {
         model: args.config.model,
         max_tokens: args.config.maxOutputTokens,
         temperature: 0,
-        system: SYSTEM_INSTRUCTION,
+        system: cacheSystemPrompt(SYSTEM_INSTRUCTION),
         messages: [{ role: 'user', content: JSON.stringify(args.payload) }],
         tools: [
           {
@@ -304,6 +305,11 @@ export async function requestCoachGeneratedCopy(args: {
     } catch {
       return { ok: false, errorCode: 'provider_invalid_response' };
     }
+    logPromptCacheUsage(
+      'progress-coach',
+      args.config.model,
+      (body as Record<string, unknown> | null)?.usage
+    );
     return parseProviderResponse(body);
   } catch {
     return {

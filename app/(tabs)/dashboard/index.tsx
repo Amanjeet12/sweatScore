@@ -10,6 +10,8 @@ import {
   Check,
   LockSimple,
   MoonStars,
+  Plus,
+  ClipboardText,
 } from 'phosphor-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -29,6 +31,7 @@ import SafeAreaView from '~/components/core/SafeAreaView';
 import ScreenLoading from '~/components/core/ScreenLoading';
 import { PrototypeButton as CoachActionButton } from '~/components/core/auth/PrototypeOnboarding';
 import CoachCheckInFlow from '~/components/core/dashboard/CoachCheckInFlow';
+import PlanButtonGlow from '~/components/core/dashboard/PlanButtonGlow';
 import TodayPlanSheet from '~/components/core/dashboard/TodayPlanSheet';
 import TodayWeeklyStreak from '~/components/core/dashboard/TodayWeeklyStreak';
 import { prototypeTypography as type } from '~/components/core/design/prototypeStyles';
@@ -51,7 +54,6 @@ import {
   TODAY_PROGRESS_ROUTES,
   progressCardWeek,
 } from '~/shared/coachToday';
-import { pointsLabel } from '~/shared/pointsLabel';
 import { useRefreshStore } from '~/store/useRefreshStore';
 
 const ORANGE = '#E8541E';
@@ -107,7 +109,7 @@ export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   // Android can report a zero bottom inset inside a translucent native Modal.
   const sheetBottomInset = Platform.OS === 'android' ? Math.max(insets.bottom, 36) : insets.bottom;
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const [photoView, setPhotoView] = useState<'front' | 'side'>('front');
   const incrementRefreshKey = useRefreshStore((state) => state.incrementRefreshKey);
   const { syncAllMissedDays } = useHealthSync(
@@ -135,7 +137,8 @@ export default function TodayScreen() {
       plan?.access &&
       !plan.plan &&
       checkIns?.status === 'no_plan' &&
-      checkIns.assignments.length < 4
+      (checkIns.assignments.length < 4 ||
+        checkIns.assignments.some((item) => item.category === 'steps' && item.stepTarget !== 8000))
     )
       ensureStandaloneAssignments({}).catch(() => {});
   }, [
@@ -281,12 +284,15 @@ export default function TodayScreen() {
           </View>
         )}
 
-        <Text style={type.sectionHeading} className="mx-[22px] mb-3.5">
-          Your plan
-        </Text>
+        <View className="mx-[22px] mb-3.5 flex-row items-center justify-between gap-3">
+          <Text style={type.sectionHeading}>Your daily plan</Text>
+          <Text style={type.caption}>
+            {banner ? localRemaining(banner.nextMidnightAt, now) : 'Day timer unavailable'}
+          </Text>
+        </View>
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'Be the first to check in' : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
+          accessibilityLabel={`${planBannerLabel(bannerState)}. ${banner ? (banner.memberCount === 0 ? 'Be the first to check in' : `${banner.memberCount} ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in today`) : 'Community check-ins unavailable'}`}
           accessibilityState={{ disabled: bannerState === 'locked' }}
           disabled={bannerState === 'locked'}
           activeOpacity={0.88}
@@ -328,9 +334,7 @@ export default function TodayScreen() {
               paddingVertical: 16,
               justifyContent: 'space-between',
             }}>
-            <Text style={[type.supporting, { color: 'rgba(255,255,255,0.85)' }]}>
-              {banner ? localRemaining(banner.nextMidnightAt, now) : 'Day timer unavailable'}
-            </Text>
+            <View />
             <View className="flex-row items-end justify-between gap-3">
               <View className="min-w-0 flex-1">
                 {avatarMembers.length ? (
@@ -362,21 +366,21 @@ export default function TodayScreen() {
                   {banner
                     ? banner.memberCount === 0
                       ? 'Be the first to check in'
-                      : `${banner.memberCount} sweat ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in`
+                      : `${banner.memberCount} ${banner.memberCount === 1 ? 'sister' : 'sisters'} checked in`
                     : 'Community check-ins unavailable'}
                 </Text>
               </View>
-              <View className="min-h-10 max-w-[48%] flex-row items-center justify-center rounded-full bg-white px-[26px] py-2">
+              <PlanButtonGlow active={bannerState === 'no_plan'}>
                 <Text
                   style={[type.bannerButton, { textAlign: 'center' }]}
                   className="min-w-0 shrink">
                   {bannerState === 'no_plan'
-                    ? 'Get plan'
+                    ? 'Get my plan'
                     : bannerState === 'ready'
                       ? 'View plan'
                       : planBannerLabel(bannerState)}
                 </Text>
-              </View>
+              </PlanButtonGlow>
             </View>
           </View>
         </TouchableOpacity>
@@ -433,19 +437,19 @@ export default function TodayScreen() {
                 : tile.category === 'workout' && !plan.plan
                   ? 'Log a workout'
                   : tile.category === 'meals'
-                    ? `${tile.earned} of 3 logged`
+                    ? tile.earned
+                      ? `${tile.earned} ${tile.earned === 1 ? 'meal' : 'meals'} logged`
+                      : 'Log a meal'
                     : tile.category === 'sleep'
-                      ? (tile.assignment?.recommendation ??
-                        plan.plan?.output.sleep ??
-                        'Log your sleep')
+                      ? 'Log your sleep'
                       : tile.category === 'steps'
-                        ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '10,000'} steps`
+                        ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '8,000'} steps`
                         : (tile.assignment?.label ?? '');
               return (
                 <TouchableOpacity
                   key={tile.category}
                   accessibilityRole="button"
-                  accessibilityLabel={`${LABELS[tile.category]}, ${detail}${tile.category === 'meals' ? `, ${tile.earned} of 3 shared` : tile.completed ? ', completed' : ''}`}
+                  accessibilityLabel={`${LABELS[tile.category]}, ${detail}${tile.completed ? ', completed' : ''}`}
                   accessibilityState={{ disabled: !plan.access }}
                   disabled={!plan.access}
                   onPress={() => openTile(tile.category)}
@@ -464,9 +468,15 @@ export default function TodayScreen() {
                       {detail}
                     </Text>
                   </View>
-                  <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
-                    {tile.checked ? <Check size={17} color="#8A8A8A" /> : null}
-                  </View>
+                  {tile.category === 'meals' && tile.earned > 0 ? (
+                    <ClipboardText size={24} color="#B3B3B3" weight="thin" />
+                  ) : tile.completed ? (
+                    <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
+                      <Check size={17} color="#8A8A8A" />
+                    </View>
+                  ) : (
+                    <Plus size={24} color="#B3B3B3" weight="thin" />
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -476,16 +486,18 @@ export default function TodayScreen() {
         <Text style={type.sectionHeading} className="mx-[22px] mb-3.5">
           Your activity
         </Text>
-        <View className="mx-[22px] mb-[52px] overflow-hidden rounded-[22px] bg-[#2A2A2E] px-5 py-7">
+        <View
+          className="mx-[22px] mb-[52px] justify-center overflow-hidden rounded-[24px] bg-[#2A2A2E] px-4"
+          style={{ width: screenWidth - 44, aspectRatio: 1.71 }}>
           <Image
-            source={require('~/assets/backgrounds/today-activity-equipment.jpg')}
+            source={require('~/assets/backgrounds/today-activity-workout.jpg')}
             contentFit="cover"
-            contentPosition={{ left: '70%', top: '50%' }}
+            contentPosition={{ left: '50%', top: '50%' }}
             style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
             accessibilityIgnoresInvertColors
           />
           <LinearGradient
-            colors={['rgba(14,12,12,0.84)', 'rgba(14,12,12,0.68)', 'rgba(14,12,12,0.46)']}
+            colors={['rgba(14,12,12,0.72)', 'rgba(14,12,12,0.40)', 'rgba(14,12,12,0.04)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
@@ -493,29 +505,25 @@ export default function TodayScreen() {
           {activity ? (
             <>
               <View
-                className="flex-row items-center gap-4"
+                className="flex-row items-center gap-2"
                 accessible
                 accessibilityLabel={`${activity.totalZone2Minutes} of ${activeMinuteTarget} active minutes, ${activity.zone2Points} points`}>
-                <View className="h-[116px] w-[116px] items-center justify-center">
-                  <Svg
-                    width={116}
-                    height={116}
-                    style={{ position: 'absolute' }}
-                    viewBox="0 0 116 116">
+                <View style={{ width: 98, height: 98 }} className="items-center justify-center">
+                  <Svg width={98} height={98} style={{ position: 'absolute' }} viewBox="0 0 98 98">
                     <Circle
-                      cx={58}
-                      cy={58}
+                      cx={49}
+                      cy={49}
                       r={46}
-                      stroke="rgba(255,255,255,0.16)"
-                      strokeWidth={10}
+                      stroke="rgba(255,112,40,0.25)"
+                      strokeWidth={4}
                       fill="none"
                     />
                     <Circle
-                      cx={58}
-                      cy={58}
+                      cx={49}
+                      cy={49}
                       r={46}
-                      stroke="#FFD9B8"
-                      strokeWidth={10}
+                      stroke="#FF7028"
+                      strokeWidth={4}
                       fill="none"
                       strokeLinecap="round"
                       strokeDasharray={2 * Math.PI * 46}
@@ -527,19 +535,28 @@ export default function TodayScreen() {
                           activityProgressFraction(activity.totalZone2Minutes, activeMinuteTarget))
                       }
                       rotation={-90}
-                      origin="58, 58"
+                      origin="49, 49"
                     />
                   </Svg>
-                  <Text style={type.activityMetric}>{activity.totalZone2Minutes}</Text>
-                  <Text style={[type.smallCaption, { color: 'rgba(255,255,255,0.7)' }]}>mins</Text>
+                  <Text style={[type.activityMetric, { fontSize: 32, lineHeight: 40 }]}>
+                    {activity.totalZone2Minutes}
+                  </Text>
                 </View>
                 <View className="min-w-0 flex-1">
-                  <Text style={[type.compactCardTitle, { color: '#fff' }]}>Active minutes</Text>
-                  <Text style={[type.caption, { color: 'rgba(255,255,255,0.7)' }]} className="mt-1">
-                    {activity.totalZone2Minutes} / {activeMinuteTarget} mins
+                  <Text
+                    style={[
+                      type.compactCardTitle,
+                      { color: '#fff', fontSize: 20, lineHeight: 26 },
+                    ]}>
+                    Active min
                   </Text>
-                  <Text style={[type.caption, { color: '#FFD9B8' }]} className="mt-2">
-                    {activity.zone2Points} {pointsLabel(activity.zone2Points)}
+                  <Text
+                    style={[
+                      type.caption,
+                      { color: 'rgba(255,255,255,0.85)', fontSize: 18, lineHeight: 24 },
+                    ]}
+                    className="mt-1">
+                    / {activeMinuteTarget} mins
                   </Text>
                 </View>
               </View>

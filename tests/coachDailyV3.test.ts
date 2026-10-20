@@ -1,17 +1,19 @@
 // @ts-nocheck -- Client scenarios and mocked provider, without real member data.
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+
+import { CLIENT_PLAN_UPDATE } from '../convex/coachClientUpdate';
+import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from '../convex/coachDailyPolicyV3';
 import {
   DAILY_PLAN_V3_CLIENT_PROMPT,
   DAILY_PLAN_V3_PROMPT_VERSION,
   DAILY_PLAN_V3_SYSTEM_PROMPT,
 } from '../convex/coachDailyPromptV3';
-import { buildDailyProviderInputV3, validateDailyPlanOutputV3 } from '../convex/coachDailyPolicyV3';
 import { generateDailyPlan } from '../convex/coachDailyProvider';
 import { generateV3WithRepair } from '../convex/coachDailyRepair';
 import { finish, generateReserved } from '../convex/coachDailyService';
 import { materializeAssignments } from '../convex/coachFoundation';
-import { dailyMealGuidance } from '../shared/coachPlanCopy';
+import { dailyMealGuidance, DAILY_PLAN_EXPLANATION_LIMITS } from '../shared/coachPlanCopy';
 
 const day = '2026-10-08';
 test('Other reaches the AI as unspecified training, while legacy cardio remains cardio', () => {
@@ -259,7 +261,7 @@ test('provider sends explicit Other guidance without treating it as legacy cardi
       return response(candidate(s));
     },
   });
-  expect(body.system).toContain('does not mean cardio');
+  expect(body.system[0].text).toContain('does not mean cardio');
   expect(JSON.parse(body.messages[0].content).input.today.trainedYesterday).toEqual(['other']);
 });
 
@@ -278,7 +280,7 @@ test('provider uses the full client prompt, nested tool schema and moderate temp
     },
   });
   expect(result.ok).toBe(true);
-  expect(body.system).toBe(DAILY_PLAN_V3_SYSTEM_PROMPT);
+  expect(body.system[0].text).toBe(DAILY_PLAN_V3_SYSTEM_PROMPT + CLIENT_PLAN_UPDATE);
   expect(body.temperature).toBe(0.7);
   expect(body.tools[0].input_schema.properties.workout.properties.minutes).toBeDefined();
   expect(body.messages[0].content).not.toContain('duration_minutes');
@@ -521,7 +523,7 @@ test('reserved V3 action calls the new prompt and persists the AI result through
       { requestId: 'request' }
     );
     expect(outcome.status).toBe('ready');
-    expect(body.system).toBe(DAILY_PLAN_V3_SYSTEM_PROMPT);
+    expect(body.system[0].text).toBe(DAILY_PLAN_V3_SYSTEM_PROMPT + CLIENT_PLAN_UPDATE);
     expect(body.temperature).toBe(0.7);
     const input = JSON.parse(body.messages[0].content).input;
     expect(input).toHaveProperty('recent_14_days');
@@ -713,4 +715,115 @@ test('label formatting cannot bypass load, recovery, unsafe copy or workout vari
       { day: '2026-10-06', output: { workout: '35-minute full body strength workout' } },
     ])
   ).toThrow('repeated_workout');
+});
+
+test('new explanations persist separately while legacy V3 remains readable', () => {
+  const snapshot = state();
+  const output = candidate(snapshot);
+  expect(validate(output, snapshot).detailsV2).toBeUndefined();
+  output.explanations = {
+    sleep: 'For body recomp, seven hours of sleep supports recovery after your activity.',
+    workout:
+      'For body recomp, this 35-minute full body session builds strength at a manageable effort.',
+    steps: 'For body recomp, 7,500 steps adds steady movement alongside your strength session.',
+    meals:
+      'For body recomp, protein at every meal, half the plate vegetables, a fist of carbs and 2.5 litres of water support recovery.',
+  };
+  const plan = validate(output, snapshot);
+  expect(plan.detailsV2?.workoutReason).toBe(output.explanations.workout);
+  expect(plan.detailsV2?.sleepReason).toBe(output.explanations.sleep);
+  expect(plan.detailsV2?.mealsReason).toBe(output.explanations.meals);
+  expect(plan.detailsV2?.stepsReason).toBe(output.explanations.steps);
+  output.explanations.sleep = 'Count calories before sleep.';
+  expect(() => validate(output, snapshot)).toThrow();
+});
+
+test('explanation length failures name the field and repair preserves the plan targets', async () => {
+  const snapshot = state();
+  const valid = candidate(snapshot);
+  valid.explanations = {
+    sleep: 'Rest supports your goal.',
+    workout: 'Movement supports your goal.',
+    steps: 'Daily movement supports your goal.',
+    meals: 'Balanced portions and water support your goal.',
+  };
+  for (const key of ['workout', 'steps', 'sleep', 'meals']) {
+    const limit = DAILY_PLAN_EXPLANATION_LIMITS[key];
+    const boundary = structuredClone(valid);
+    boundary.explanations[key] = 'a'.repeat(limit);
+    expect(() => validate(boundary, snapshot)).not.toThrow();
+    boundary.explanations[key] += 'a';
+    // The structural guard rejects entries above 800 before copy validation.
+    expect(() => validate(boundary, snapshot)).toThrow(
+      limit === 800 ? 'invalid_structure' : `invalid_copy:${key}Reason`
+    );
+  }
+  const invalid = structuredClone(valid);
+  invalid.explanations.workout = 'a'.repeat(301);
+  const guidance = [];
+  const result = await generateV3WithRepair({
+    snapshot,
+    day,
+    recentPlans: [],
+    call: async (retry) => {
+      guidance.push(retry);
+      return { ok: true, output: retry ? valid : invalid, latencyMs: 1 };
+    },
+  });
+  expect(result.ok).toBe(true);
+  expect(guidance[1].validationCode).toBe('invalid_copy:workoutReason');
+  expect(result.output.workout).toEqual(valid.workout);
+});
+
+test('provider tool and instructions use the same explanation limits as validation', async () => {
+  const snapshot = state();
+  let body;
+  await generateDailyPlan({
+    config,
+    input: buildDailyProviderInputV3(snapshot, day, []),
+    style: { tone: 'warm_direct', detail: 'standard' },
+    promptVersion: DAILY_PLAN_V3_PROMPT_VERSION,
+    retryGuidance: {
+      previousCandidate: candidate(snapshot),
+      validationCode: 'invalid_copy:workoutReason',
+    },
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return response(candidate(snapshot));
+    },
+  });
+  const message = JSON.parse(body.messages[0].content);
+  for (const key of ['workout', 'steps', 'sleep', 'meals']) {
+    const limit = DAILY_PLAN_EXPLANATION_LIMITS[key];
+    expect(body.tools[0].input_schema.properties.explanations.properties[key].maxLength).toBe(
+      limit
+    );
+    expect(message.explanation_character_limits[key]).toBe(limit);
+  }
+  expect(message.copy_validation_rule).toContain('workoutReason means explanations.workout');
+  expect(message.validation_failure).toBe('invalid_copy:workoutReason');
+});
+
+test('week boundaries use Monday and coach choice retains broad safe options', () => {
+  const snapshot = state();
+  snapshot.daily.upFor = 'coach_decide';
+  snapshot.daily.trainedYesterday = ['nothing'];
+  const monday = buildDailyProviderInputV3(snapshot, '2026-10-19', []);
+  expect(monday.calendar_week.starts_on).toBe('2026-10-19');
+  const sunday = buildDailyProviderInputV3(snapshot, '2026-10-18', []);
+  expect(sunday.calendar_week.starts_on).toBe('2026-10-12');
+  expect(monday.output_constraints.workout_allowed_types).toContain('full_body_strength');
+  expect(monday.output_constraints.workout_allowed_types).toContain('mobility');
+  snapshot.daily.trainedYesterday = ['core'];
+  expect(
+    buildDailyProviderInputV3(snapshot, day, []).output_constraints.workout_allowed_types
+  ).not.toContain('core');
+});
+
+test('core yesterday is respected by the output validator as well as the provider bounds', () => {
+  const snapshot = state();
+  snapshot.daily.trainedYesterday = ['core'];
+  expect(() => validate(candidate(snapshot, { type: 'core', minutes: 25 }), snapshot)).toThrow(
+    'core_recovery'
+  );
 });

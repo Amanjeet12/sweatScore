@@ -10,6 +10,14 @@ export const DAILY_PLAN_COPY_LIMITS = {
   stepsReason: 300,
 } as const;
 
+// Keep optional V3 explanations separate from the required legacy V2 copy fields.
+export const DAILY_PLAN_EXPLANATION_LIMITS = {
+  workout: DAILY_PLAN_COPY_LIMITS.workoutReason,
+  steps: DAILY_PLAN_COPY_LIMITS.stepsReason,
+  sleep: 800,
+  meals: 800,
+} as const;
+
 export function dailyMealGuidance(waterLitres: number) {
   return `Log today's meals for feedback. Aim for ${waterLitres} litres of water.`;
 }

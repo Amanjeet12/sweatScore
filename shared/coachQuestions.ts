@@ -1,11 +1,27 @@
-export function dailyQuestionsForBackend(supportsOther: boolean) {
+export function dailyQuestionsForBackend(supportsOther: boolean, supportsClientUpdate = false) {
   return DAILY_QUESTIONS.map((question) => ({
     ...question,
-    options: question.options.map((option) =>
-      supportsOther && question.key === 'trainedYesterday' && option[0] === 'cardio'
-        ? (['other', 'Other'] as const)
-        : option
-    ),
+    options:
+      supportsClientUpdate && question.key === 'upFor'
+        ? ([
+            ['full_session', 'Full session'],
+            ['short_session', 'Quick session'],
+            ['rest_day', 'Rest day'],
+            ['coach_decide', 'Let my coach decide'],
+          ] as const)
+        : supportsClientUpdate && question.key === 'trainedYesterday'
+          ? ([
+              ['upper_body', 'Upper body'],
+              ['lower_body', 'Lower body'],
+              ['core', 'Core'],
+              ['cardio', 'Cardio'],
+              ['nothing', 'Nothing'],
+            ] as const)
+          : question.options.map((option) =>
+              supportsOther && question.key === 'trainedYesterday' && option[0] === 'cardio'
+                ? (['other', 'Other'] as const)
+                : option
+            ),
   }));
 }
 

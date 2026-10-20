@@ -14,14 +14,14 @@ import { prototypeTypography as type } from '~/components/core/design/prototypeS
 import { Text } from '~/components/ui/text';
 import { api } from '~/convex/_generated/api';
 import type { CoachCategory } from '~/shared/coachFoundation';
-import { cleanDailyPlanCopy, mealPlanSummary } from '~/shared/coachPlanCopy';
+import { cleanDailyPlanCopy } from '~/shared/coachPlanCopy';
 import { workoutYoutubeSearch } from '~/shared/coachYoutubeSearch';
 
 export const PLAN_ROWS = [
+  { category: 'sleep', title: 'Sleep', Icon: MoonStars },
   { category: 'workout', title: 'Workout', Icon: Barbell },
   { category: 'steps', title: 'Steps', Icon: Footprints },
   { category: 'meals', title: 'Meals', Icon: ForkKnife },
-  { category: 'sleep', title: 'Sleep', Icon: MoonStars },
 ] as const;
 const ORANGE = '#E8541E';
 function concise(value: string) {
@@ -63,9 +63,17 @@ export default function CoachPlanItems({
               : category === 'workout' && workoutTarget
                 ? workoutTarget
                 : category === 'meals'
-                  ? mealPlanSummary(output.meals)
+                  ? 'Log meals for feedback.'
                   : concise(output[category]);
           const target = cleanDailyPlanCopy(rawTarget);
+          const reason =
+            category === 'sleep'
+              ? plan.detailsV2?.sleepReason
+              : category === 'workout'
+                ? plan.detailsV2?.workoutReason
+                : category === 'steps'
+                  ? plan.detailsV2?.stepsReason
+                  : plan.detailsV2?.mealsReason;
           const done = (assignment?.consumedCount ?? 0) > 0;
           return (
             <TouchableOpacity
@@ -83,6 +91,7 @@ export default function CoachPlanItems({
                 <Text style={type.supporting} className="mt-1">
                   {target}
                 </Text>
+                {reason ? <Text style={[type.caption, { marginTop: 8 }]}>{reason}</Text> : null}
               </View>
               <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
                 {done ? <Check size={17} color="#8A8A8A" /> : null}

@@ -242,6 +242,7 @@ async function planSnapshot(
         source: 'activity_log' as const,
         plannedType: plan?.workout.type,
         plannedMinutes: plan?.workout.durationMinutes,
+        memberNote: proof?.caption?.slice(0, 500),
       };
     });
   const days = new Set([
@@ -264,6 +265,14 @@ async function planSnapshot(
       : [];
     return {
       day,
+      activeMinutes: activities.some(
+        (a) => a.date === day && a.synced && a.zone2Minutes !== undefined
+      )
+        ? Math.max(
+            0,
+            ...activities.filter((a) => a.date === day && a.synced).map((a) => a.zone2Minutes ?? 0)
+          )
+        : undefined,
       checkedIn:
         categories.length > 0 ||
         activities.some(
@@ -583,7 +592,13 @@ export const getMyFoundation = query({
       ? await ctx.db.get(state.firstPlanRequestId as Id<'coachPlanRequestsV1'>)
       : null;
     // Before entitlement verification, expose status and saved answers, never pre-payment plan output.
-    return { day, state, firstPlanStatus: request?.status ?? null, supportsTrainingOther: true };
+    return {
+      day,
+      state,
+      firstPlanStatus: request?.status ?? null,
+      supportsTrainingOther: true,
+      supportsClientUpdate: true,
+    };
   },
 });
 
@@ -1351,8 +1366,6 @@ export const reserveProof = mutation({
       (!revision || revision.userId !== userId || revision.day !== assignment.day)
     )
       throw new ConvexError('Assignment plan does not match member/day');
-    if (assignment.category === 'workout' && assignment.workout?.type === 'rest')
-      throw new ConvexError('Rest guidance has no mandatory workout proof');
     const latestRevision = await ctx.db
       .query('coachPlanRevisionsV1')
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', assignment.day))

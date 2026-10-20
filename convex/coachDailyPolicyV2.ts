@@ -12,7 +12,7 @@ export type DailyOutputV2 = DailyOutput & {
 export type DailyDetailsV2 = Pick<
   DailyOutputV2,
   'workoutExamples' | 'workoutReason' | 'stepsReason'
->;
+> & { sleepReason?: string; mealsReason?: string };
 
 const EXAMPLES: Record<string, readonly string[]> = {
   full_body_strength: ['chair squats', 'wall push-ups', 'glute bridges'],

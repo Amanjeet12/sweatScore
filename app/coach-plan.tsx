@@ -90,7 +90,7 @@ export default function SavedCoachPlan() {
             ) : null}
 
             <Text style={type.planHeading}>{cleanDailyPlanCopy(output.headline)}</Text>
-            {selectedCheckIn && !(selectedCheckIn === 'workout' && rest) ? (
+            {selectedCheckIn ? (
               <CoachActionButton
                 label={`Continue to ${titles[selectedCheckIn]} check-in`}
                 disabled={!checkIns?.assignments.some((item) => item.category === selectedCheckIn)}
@@ -112,7 +112,9 @@ export default function SavedCoachPlan() {
                 Boolean(checkIns?.assignments.some((item) => item.category === category))
               }
             />
-            <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
+            {!plan.detailsV2?.sleepReason ? (
+              <PlanExplanation explanation={cleanDailyPlanCopy(output.why)} />
+            ) : null}
             <PlanFeedback revisionId={plan.revisionId} />
           </>
         ) : saved.access && saved.requestStatus === 'pending' ? (

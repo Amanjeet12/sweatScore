@@ -63,6 +63,7 @@ export function reconcileCapture<
     mealFeedback?: unknown;
     postedMeal?: unknown;
     shareWithoutAnalysis?: boolean;
+    plateDescription?: string;
   },
 >(saved: T, storageId: T['storageId']) {
   const discarded = Boolean(saved.storageId && saved.storageId !== storageId);
@@ -72,6 +73,7 @@ export function reconcileCapture<
     ...(discarded
       ? {
           uri: undefined,
+          plateDescription: undefined,
           captureId: undefined,
           mealFeedback: undefined,
           postedMeal: undefined,

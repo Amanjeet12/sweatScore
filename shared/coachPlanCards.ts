@@ -4,14 +4,14 @@ export function planCardRoute(category: CoachCategory) {
   return `/coach-check-in/${category}` as const;
 }
 
-export function planCardState(category: CoachCategory, rest: boolean, consumedCount: number) {
-  if (category === 'workout' && rest)
-    return { canLog: false, canOpen: false, status: 'Rest guidance' };
+export function planCardState(category: CoachCategory, _rest: boolean, consumedCount: number) {
   if (category === 'meals')
     return {
       canLog: consumedCount < 3,
       canOpen: true,
-      status: `${Math.min(consumedCount, 3)} of 3 shared`,
+      status: consumedCount
+        ? `${Math.min(consumedCount, 3)} ${consumedCount === 1 ? 'meal' : 'meals'} logged`
+        : 'Log a meal',
     };
   return {
     canLog: consumedCount < 1,

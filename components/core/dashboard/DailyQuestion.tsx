@@ -70,9 +70,9 @@ export default function DailyQuestion({
       <Text style={type.dailyQuestionHeading} className="mt-1.5">
         {title}
       </Text>
-      {description ? (
+      {description || multiple ? (
         <Text style={type.supporting} className="mt-2">
-          {description}
+          {description || 'Select all that apply'}
         </Text>
       ) : null}
       <View className="mt-6 gap-3">
@@ -116,6 +116,7 @@ export default function DailyQuestion({
       </View>
       {multiple && onContinue ? (
         <PrototypeButton
+          loading={busy && continueLabel === 'Generate plan'}
           label={continueLabel}
           onPress={onContinue}
           disabled={busy || !selected || selected.length === 0}
