@@ -1408,3 +1408,80 @@ test('meal provider repairs conflicting carb advice before returning it', async 
   expect(context.carb_target_from_plan).toBe('third');
   expect(context.verified_activity.steps).toBe(15000);
 });
+
+test('meal library retains the newest 15 across days independently of today count and other members', async () => {
+  const saved = Array.from({ length: 20 }, (_, i) => {
+    const date = new Date(`${day}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - (20 - i));
+    return {
+      _id: `saved_${i}`,
+      userId: 'alice',
+      day: date.toISOString().slice(0, 10),
+      status: 'shared',
+      activityId: `activity_${i}`,
+      storageId: `photo_${i}`,
+      feedback: `Original feedback ${i}`,
+      nextMeal: `Original next meal ${i}`,
+      updatedAt: i,
+    };
+  });
+  const f = fixture('alice', {
+    coachMealDraftsV1: [
+      ...saved,
+      {
+        _id: 'other_draft',
+        userId: 'bob',
+        day,
+        status: 'shared',
+        activityId: 'other_activity',
+        storageId: 'other_photo',
+      },
+    ],
+    dailyActivities: [
+      ...saved.map((d) => ({
+        _id: d.activityId,
+        userId: 'alice',
+        date: d.day,
+        loggedActivityKey: 'healthy_meal',
+        reviewStatus: 'approved',
+      })),
+      { _id: 'other_activity', userId: 'bob', date: day, loggedActivityKey: 'healthy_meal' },
+    ],
+  });
+  f.ctx.storage = { getUrl: async (id) => `storage:${id}` };
+  const result = await myTodayMeals._handler(f.ctx, {});
+  expect(result.count).toBe(0);
+  expect(result.items).toEqual([]);
+  expect(result.libraryItems).toHaveLength(15);
+  expect(result.libraryItems[0]).toMatchObject({
+    activityId: 'activity_19',
+    feedback: 'Original feedback 19',
+    nextMeal: 'Original next meal 19',
+  });
+  expect(result.libraryItems[14].activityId).toBe('activity_5');
+  expect(result.libraryItems.some((m) => m.activityId === 'other_activity')).toBe(false);
+
+  // The next logged meal replaces the oldest library entry without changing old posts/logs.
+  f.rows.coachMealDraftsV1.push({
+    _id: 'new_meal',
+    userId: 'alice',
+    day,
+    status: 'shared',
+    activityId: 'new_activity',
+    storageId: 'new_photo',
+    updatedAt: 21,
+  });
+  f.rows.dailyActivities.push({
+    _id: 'new_activity',
+    userId: 'alice',
+    date: day,
+    loggedActivityKey: 'healthy_meal',
+    reviewStatus: 'approved',
+  });
+  const next = await myTodayMeals._handler(f.ctx, {});
+  expect(next.count).toBe(1);
+  expect(next.libraryItems).toHaveLength(15);
+  expect(next.libraryItems[0].activityId).toBe('new_activity');
+  expect(next.libraryItems.some((m) => m.activityId === 'activity_5')).toBe(false);
+  expect(f.rows.dailyActivities.some((a) => a._id === 'activity_5')).toBe(true);
+});

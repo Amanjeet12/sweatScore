@@ -73,7 +73,7 @@ export default function PlanButtonGlow({
           }}
         />
       ) : null}
-      <View className="min-h-11 flex-row items-center justify-center rounded-full bg-white px-7 py-3">
+      <View className="min-h-9 flex-row items-center justify-center rounded-full bg-white px-7 py-2">
         {children}
       </View>
     </View>

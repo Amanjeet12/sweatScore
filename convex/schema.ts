@@ -765,6 +765,7 @@ const schema = defineSchema({
   })
     .index('by_user_day', ['userId', 'day'])
     .index('by_submission', ['submissionId'])
+    .index('by_user_status_updated', ['userId', 'status', 'updatedAt'])
     .index('by_user', ['userId']),
   coachMealScansV1: defineTable({
     userId: v.id('users'),

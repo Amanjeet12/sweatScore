@@ -38,6 +38,16 @@ export type TileInput = {
   stepTarget?: number;
 };
 export const TODAY_CATEGORIES: CoachCategory[] = ['sleep', 'workout', 'steps', 'meals'];
+
+// Compact only the Today row; full plan and proof wording stay unchanged.
+export function todayWorkoutSubtitle(label: string): string {
+  return label
+    .replace(/\b(\d+(?:\.\d+)?)\s*[-–]?\s*minutes?\b/gi, '$1-min')
+    .replace(/\bworkout\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function todayTiles(assignments: TileInput[] | undefined) {
   return TODAY_CATEGORIES.map((category) => {
     const assignment = assignments?.find((item) => item.category === category);

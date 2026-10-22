@@ -41,6 +41,7 @@ const RESERVATION_MS = 120_000;
 const DISPATCH_MS = 60_000;
 // Provider-cost throttle is separate from the three successful scans shown to members.
 const MAX_DISPATCHES_PER_HOUR = 8;
+const MEAL_LIBRARY_LIMIT = 15;
 const UNCLEAR_IMAGE =
   /\b(?:unclear|blurry|blurred|cannot see|can't see|unable to (?:see|assess|identify)|not (?:clear|visible)|hard to (?:see|identify)|too dark)\b/i;
 
@@ -806,6 +807,36 @@ export const myTodayMeals = query({
       .query('coachMealScansV1')
       .withIndex('by_user_day', (q) => q.eq('userId', userId).eq('day', day))
       .collect();
-    return { count: meals.length, scanCount: await usableScanCount(ctx, scans), items };
+    // The saved library is the newest 15 shared meals across all days. Older entries
+    // drop out here; their public posts, reward ledger and activity history remain intact.
+    const saved = await ctx.db
+      .query('coachMealDraftsV1')
+      .withIndex('by_user_status_updated', (q) => q.eq('userId', userId).eq('status', 'shared'))
+      .order('desc')
+      .take(MEAL_LIBRARY_LIMIT);
+    const libraryItems = (
+      await Promise.all(
+        saved.map(async (draft) => {
+          const activity = draft.activityId ? await ctx.db.get(draft.activityId) : null;
+          if (!activity || activity.userId !== userId || activity.reviewStatus === 'rejected')
+            return null;
+          return {
+            activityId: activity._id,
+            draftId: draft._id,
+            day: draft.day,
+            imageUrl: await ctx.storage.getUrl(draft.storageId),
+            verdict: draft.verdict,
+            feedback: draft.feedback,
+            nextMeal: draft.nextMeal,
+          };
+        })
+      )
+    ).filter((item): item is NonNullable<typeof item> => item !== null);
+    return {
+      count: meals.length,
+      scanCount: await usableScanCount(ctx, scans),
+      items,
+      libraryItems,
+    };
   },
 });

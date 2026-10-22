@@ -249,3 +249,13 @@ test('Meals check marks are independent of completion, remaining slots and count
     completed: true,
   });
 });
+
+test('Today workout subtitles shorten duration and remove workout without changing source wording', async () => {
+  const { todayWorkoutSubtitle } = await import('../shared/coachToday');
+  const full = '35-minute full body strength workout';
+  expect(todayWorkoutSubtitle(full)).toBe('35-min full body strength');
+  expect(todayWorkoutSubtitle('20-minute upper body workout')).toBe('20-min upper body');
+  expect(todayWorkoutSubtitle('25 minutes cardio workout')).toBe('25-min cardio');
+  expect(todayWorkoutSubtitle('Rest day')).toBe('Rest day');
+  expect(full).toBe('35-minute full body strength workout');
+});

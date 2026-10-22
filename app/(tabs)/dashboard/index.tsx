@@ -11,7 +11,6 @@ import {
   LockSimple,
   MoonStars,
   Plus,
-  ClipboardText,
 } from 'phosphor-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -50,6 +49,7 @@ import {
   planBannerLabel,
   planBannerState,
   todayTiles,
+  todayWorkoutSubtitle,
   displayStepTarget,
   TODAY_PROGRESS_ROUTES,
   progressCardWeek,
@@ -313,22 +313,11 @@ export default function TodayScreen() {
             style={{ position: 'absolute', width: '100%', height: '100%' }}
             accessibilityIgnoresInvertColors
           />
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              left: 0,
-              backgroundColor: 'rgba(12,10,16,0.42)',
-            }}
-          />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
-            style={{ position: 'absolute', height: 170, right: 0, bottom: 0, left: 0 }}
+            style={{ position: 'absolute', height: '50%', right: 0, bottom: 0, left: 0 }}
           />
           <View
             style={{
@@ -438,7 +427,7 @@ export default function TodayScreen() {
             {tiles.map((tile) => {
               const Icon = ICONS[tile.category];
               const inactive = tile.completed;
-              const disabled = !plan.access || (tile.category === 'meals' && tile.completed);
+              const disabled = !plan.access;
               const detail = !plan.access
                 ? 'Premium access unavailable'
                 : tile.category === 'workout' && !plan.plan
@@ -451,7 +440,9 @@ export default function TodayScreen() {
                       ? `Log ${checkIns?.sleepTargetHours ?? 7} hours sleep`
                       : tile.category === 'steps'
                         ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '8,000'} steps`
-                        : (tile.assignment?.label ?? '');
+                        : tile.category === 'workout'
+                          ? todayWorkoutSubtitle(tile.assignment?.label ?? '')
+                          : (tile.assignment?.label ?? '');
               return (
                 <TouchableOpacity
                   key={tile.category}
@@ -471,13 +462,14 @@ export default function TodayScreen() {
                       style={[type.compactCardTitle, { color: inactive ? '#8A8A8A' : '#2A2A2A' }]}>
                       {LABELS[tile.category]}
                     </Text>
-                    <Text style={type.caption} className="mt-[1px]">
+                    <Text
+                      style={type.caption}
+                      className="mt-[1px]"
+                      numberOfLines={tile.category === 'workout' ? 1 : undefined}>
                       {detail}
                     </Text>
                   </View>
-                  {tile.category === 'meals' && tile.earned > 0 ? (
-                    <ClipboardText size={24} color="#B3B3B3" weight="thin" />
-                  ) : tile.completed ? (
+                  {tile.checked ? (
                     <View className="h-[26px] w-[26px] items-center justify-center rounded-full border-[1.5px] border-[#D9D9D9]">
                       <Check size={17} color="#8A8A8A" />
                     </View>

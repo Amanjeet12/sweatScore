@@ -264,7 +264,8 @@ export default function CoachCheckInFlow({
       : 'skip'
   );
   const [viewedMealId, setViewedMealId] = useState<string | null>(null);
-  const viewedMeal = mealHistory?.items.find((item) => item.activityId === viewedMealId);
+  const savedMeals = mealHistory?.libraryItems ?? mealHistory?.items ?? [];
+  const viewedMeal = savedMeals.find((item) => item.activityId === viewedMealId);
   const showingSavedFeedback = Boolean(viewedMeal);
   useEffect(() => {
     onFullPageChange?.(showingSavedFeedback);
@@ -1113,11 +1114,6 @@ export default function CoachCheckInFlow({
                 </View>
               ) : null}
             </View>
-            {typeof mealHistory?.scanCount === 'number' ? (
-              <Text style={[type.caption, { fontSize: 13.5, color: colors.subtle, marginTop: 6 }]}>
-                {mealHistory.scanCount} of 3 checked
-              </Text>
-            ) : null}
             <Text style={[type.explanation, { lineHeight: 24.75, marginTop: 18 }]}>
               {viewedMeal.feedback ?? 'This meal was shared without AI analysis.'}
             </Text>
@@ -1566,36 +1562,8 @@ export default function CoachCheckInFlow({
                   <Text style={[type.supporting, { marginTop: 8 }]}>{assignment.label}</Text>
                 ) : null}
                 <Text style={[type.body, { marginTop: 10 }]}>{fixedInstruction}</Text>
-                {category === 'meals' && mealHistory?.items.length ? (
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
-                    {mealHistory.items.map((item, index) => (
-                      <TouchableOpacity
-                        key={item.activityId}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Read feedback for meal ${index + 1}`}
-                        onPress={() => setViewedMealId(item.activityId)}
-                        style={{
-                          flex: 1,
-                          maxWidth: 100,
-                          aspectRatio: 1,
-                          borderRadius: 16,
-                          overflow: 'hidden',
-                          backgroundColor: '#F2F2F2',
-                        }}>
-                        {item.imageUrl ? (
-                          <Image
-                            source={{ uri: item.imageUrl }}
-                            style={{ width: '100%', height: '100%' }}
-                          />
-                        ) : (
-                          <Text>Meal {index + 1}</Text>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
                 <View style={{ marginTop: 24, gap: 12 }}>
-                  {canTakeLivePhoto || category === 'meals' ? (
+                  {!mealLimitReached && (canTakeLivePhoto || category === 'meals') ? (
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel="Take live photo"
@@ -1643,7 +1611,38 @@ export default function CoachCheckInFlow({
                     </TouchableOpacity>
                   ) : null}
                 </View>
-                {category === 'meals' ? (
+                {category === 'meals' && savedMeals.length ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ marginTop: 20, height: 100, flexGrow: 0 }}
+                    contentContainerStyle={{ gap: 12 }}>
+                    {savedMeals.map((item, index) => (
+                      <TouchableOpacity
+                        key={item.activityId}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Read feedback for meal ${index + 1}`}
+                        onPress={() => setViewedMealId(item.activityId)}
+                        style={{
+                          width: 100,
+                          aspectRatio: 1,
+                          borderRadius: 16,
+                          overflow: 'hidden',
+                          backgroundColor: '#F2F2F2',
+                        }}>
+                        {item.imageUrl ? (
+                          <Image
+                            source={{ uri: item.imageUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <Text>Meal {index + 1}</Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : null}
+                {category === 'meals' && !mealLimitReached ? (
                   <TouchableOpacity
                     accessibilityRole="button"
                     onPress={() => setShowMealGuide(true)}
