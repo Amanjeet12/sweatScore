@@ -53,27 +53,27 @@ export default function PlanButtonGlow({
   }, [active, reduceMotion, pulse]);
 
   return (
-    <View style={{ maxWidth: '48%' }}>
+    <View style={{ maxWidth: '48%', marginRight: 6, marginBottom: 6 }}>
       {active ? (
         <Animated.View
           pointerEvents="none"
           accessible={false}
           style={{
             position: 'absolute',
-            top: -10,
-            bottom: -10,
-            left: -10,
-            right: -10,
+            top: -4,
+            bottom: -4,
+            left: -4,
+            right: -4,
             borderRadius: 100,
             backgroundColor: '#FFFFFF',
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.1, 0.28] }),
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.18] }),
             transform: [
-              { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] }) },
+              { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.02] }) },
             ],
           }}
         />
       ) : null}
-      <View className="min-h-10 flex-row items-center justify-center rounded-full bg-white px-[26px] py-2">
+      <View className="min-h-11 flex-row items-center justify-center rounded-full bg-white px-7 py-3">
         {children}
       </View>
     </View>

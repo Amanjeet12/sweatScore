@@ -1,6 +1,7 @@
 import { cacheSystemPrompt, promptCacheUsage, logPromptCacheUsage } from './anthropicPromptCache';
 import { providerConfig, ProviderConfig } from './coachDailyProvider';
 import { MealResult, checkMealResult, NON_MEAL_FEEDBACK } from './coachMealPolicy';
+import { consistentMealPortions, planCarbTarget } from './coachMealPortions';
 import { MEAL_SYSTEM_PROMPT, CLIENT_MEAL_UPDATE } from './coachMealPromptV2';
 
 export type MealProviderOutcome =
@@ -27,7 +28,17 @@ export async function analyzeMealPhoto(args: {
     workout: { type: string; durationMinutes?: number };
     recommendation: string;
     meals: string;
+    nutritionGuidance?: string;
   } | null;
+  verifiedActivity?: {
+    steps: number | null;
+    activeMinutes: number | null;
+    workoutLoggedToday: boolean;
+    sleepCheckInLogged: boolean;
+    mealsLogged: number;
+    sleepReadiness: string | null;
+    workoutType: string;
+  };
   imageBase64: string;
   mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
   goal: 'lose' | 'recomp' | 'fitness' | 'unavailable';
@@ -91,6 +102,9 @@ export async function analyzeMealPhoto(args: {
                     goal: args.goal === 'unavailable' ? 'fitness' : args.goal,
                     plate_description: args.plateDescription ?? null,
                     daily_plan: args.dailyPlan ?? null,
+                    verified_activity: args.verifiedActivity ?? null,
+                    carb_target_from_plan:
+                      planCarbTarget(args.dailyPlan?.nutritionGuidance) ?? null,
                     member_feedback: args.memberFeedback ?? [],
                     workout_logged_today: args.workoutLoggedToday,
                     style: args.style,
@@ -154,7 +168,7 @@ export async function analyzeMealPhoto(args: {
           )
         : [];
       const checked = calls.length === 1 ? checkMealResult(calls[0].input) : null;
-      if (checked?.ok)
+      if (checked?.ok && consistentMealPortions(checked.result, args.dailyPlan?.nutritionGuidance))
         return {
           ok: true,
           result: checked.result,
@@ -162,7 +176,11 @@ export async function analyzeMealPhoto(args: {
           outputTokens: hasOutputTokens ? outputTokens : undefined,
           latencyMs: Date.now() - started,
         };
-      validationIssue = checked && !checked.ok ? checked.issue : 'tool_call_count';
+      validationIssue = checked?.ok
+        ? 'inconsistent_carb_target: use one carb measure in both paragraphs, matching carb_target_from_plan; never mix fist and plate targets'
+        : checked
+          ? checked.issue
+          : 'tool_call_count';
       console.warn('[AI meal validation]', {
         attempt: attempt + 1,
         issue: validationIssue,

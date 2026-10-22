@@ -367,7 +367,9 @@ test('history includes only the past 14 days and last five plans; keeps planned 
   const input = buildDailyProviderInputV3(s, day, plans);
   expect(input.last_5_plans).toHaveLength(5);
   expect(input.recent_14_days.completed_workout_check_ins).toHaveLength(1);
-  expect(input.recent_14_days.completed_workout_check_ins[0].plannedMinutes).toBe(30);
+  expect(input.recent_14_days.completed_workout_check_ins[0].plannedMinutes).toBeUndefined();
+  expect(input.recent_14_days.completed_workout_check_ins[0].plannedType).toBeUndefined();
+  expect(input.recent_14_days.completed_strength_plan_check_ins_last_7_days).toBe(0);
   expect(input.recent_14_days.sleep_check_ins).toEqual([{ day: '2026-10-06' }]);
   expect(input.recent_14_days.rest_days_planned).toEqual(['2026-10-06']);
 });
@@ -826,4 +828,72 @@ test('core yesterday is respected by the output validator as well as the provide
   expect(() => validate(candidate(snapshot, { type: 'core', minutes: 25 }), snapshot)).toThrow(
     'core_recovery'
   );
+});
+
+test('Nothing overrides a suggested core session and conflicting yesterday log', () => {
+  const s = state();
+  s.health.workouts = [
+    {
+      day: '2026-10-07',
+      label: 'workout',
+      source: 'activity_log',
+      plannedType: 'core',
+      plannedMinutes: 30,
+    },
+  ];
+  const input = buildDailyProviderInputV3(s, day, [
+    {
+      day: '2026-10-07',
+      output: { workout: '30-minute core workout', why: "After yesterday's core session" },
+    },
+  ]);
+  expect(input.recent_14_days.completed_workout_check_ins).toEqual([]);
+  expect(input.last_5_plans[0].completed).toBe('unknown');
+  expect(input.last_5_plans[0].output).toBeUndefined();
+  const p = candidate(s);
+  p.why = p.why.replace(
+    "today's full body strength plan",
+    "after yesterday's core session, today's full body strength plan"
+  );
+  expect(() => validate(p, s)).toThrow('invented_yesterday_training');
+});
+
+test('logged lower body description overrides the suggested upper body workout', () => {
+  const s = state();
+  delete s.daily.trainedYesterday;
+  s.health.workouts = [
+    {
+      day: '2026-10-07',
+      label: 'workout',
+      source: 'activity_log',
+      memberNote: 'Finished my lower body workout today',
+      plannedType: 'upper_body_strength',
+      plannedMinutes: 60,
+    },
+  ];
+  const input = buildDailyProviderInputV3(s, day, []);
+  expect(input.today.trainedYesterday).toEqual(['lower_body']);
+  expect(input.output_constraints.workout_allowed_types).not.toContain('lower_body_strength');
+  expect(input.output_constraints.workout_allowed_types).toContain('upper_body_strength');
+  expect(input.recent_14_days.completed_workout_check_ins[0].plannedType).toBeUndefined();
+  expect(() => validate(candidate(s, { type: 'lower_body_strength' }), s)).toThrow(
+    'lower_body_recovery'
+  );
+  s.daily.trainedYesterday = ['upper_body'];
+  expect(buildDailyProviderInputV3(s, day, []).today.trainedYesterday).toEqual(['upper_body']);
+});
+
+test('coach choice uses observed 15000 steps rather than an 8000 step suggestion', () => {
+  const s = state();
+  s.daily.upFor = 'coach_decide';
+  s.health.steps = ['2026-10-04', '2026-10-05', '2026-10-06'].map((day) => ({
+    day,
+    count: 15000,
+    source: 'health_sync',
+    coverage: 'sensor_observed',
+  }));
+  const input = buildDailyProviderInputV3(s, day, [
+    { day: '2026-10-07', output: { steps: '8000 steps', workout: 'Core' } },
+  ]);
+  expect(input.recent_14_days.step_average).toBe(15000);
 });

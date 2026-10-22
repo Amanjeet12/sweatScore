@@ -886,6 +886,40 @@ describe('meal draft, scan and share transactions', () => {
     expect(f.rows.posts[0].body).toBe('My meal today');
     expect(f.rows.coachMealDraftsV1[0]).toMatchObject({ status: 'shared' });
   });
+  test('exhausted AI checks still allow sharing without analysis within the meal sharing limit', async () => {
+    const f = fixture('alice', {
+      coachMealScansV1: Array.from({ length: 3 }, (_, i) => ({
+        _id: `used_scan_${i}`,
+        userId: 'alice',
+        day,
+        status: 'ready',
+        usable: true,
+      })),
+    });
+    const draftId = await saveCaption._handler(f.ctx, {
+      submissionId: 'sub',
+      caption: 'Meal without another check',
+    });
+    const allowance = await myDraft._handler(f.ctx, { submissionId: 'sub' });
+    expect(allowance.analysisLimitReached).toBe(true);
+    expect(allowance.analysisChecksRemaining).toBe(0);
+    await expect(
+      reserveScan._handler(f.ctx, {
+        userId: 'alice',
+        draftId,
+        requestKey: 'exhausted_scan',
+      })
+    ).rejects.toThrow('Three successful meal scans');
+    const result = await share._handler(f.ctx, {
+      draftId,
+      caption: 'Meal without another check',
+      skipAnalysis: true,
+    });
+    expect(result.pointsEarned).toBe(2);
+    expect(f.rows.posts).toHaveLength(1);
+    expect(f.rows.coachMealScansV1).toHaveLength(3);
+  });
+
   test('non-meal and failed analysis cannot share; retake retains scan history and no award', async () => {
     const f = fixture();
     const draftId = await saveCaption._handler(f.ctx, { submissionId: 'sub', caption: 'Plate' });
@@ -1303,4 +1337,74 @@ test('meal history is member-bound and excludes unshared and rejected meals', as
     feedback: 'Private plate report',
   });
   expect(result.items.some((i) => i.activityId === 'b1')).toBe(false);
+});
+
+test('carb portions reject mixed fist/plate advice and a target conflicting with the plan', async () => {
+  const { consistentMealPortions, planCarbTarget } = await import('../convex/coachMealPortions');
+  const plan =
+    'Protein at every meal, vegetables can fill half your plate, and a fist of carbs, up to a third of the plate, supports today.';
+  expect(planCarbTarget(plan)).toBe('third');
+  const report = {
+    verdict: 'On point',
+    feedback: 'Your protein supports body recomp. The carbs fit a third of your plate today.',
+    nextMeal:
+      'For your next meal, aim for a palm of protein, a third of your plate as carbs and the rest vegetables.',
+  };
+  expect(consistentMealPortions(report, plan)).toBe(true);
+  expect(
+    consistentMealPortions(
+      { ...report, feedback: 'Your protein supports body recomp. Keep carbs to a closed fist.' },
+      plan
+    )
+  ).toBe(false);
+  expect(
+    consistentMealPortions(
+      { ...report, nextMeal: 'For your next meal, aim for a quarter of your plate as carbs.' },
+      plan
+    )
+  ).toBe(false);
+});
+
+test('meal provider repairs conflicting carb advice before returning it', async () => {
+  let calls = 0;
+  let context;
+  const result = await analyzeMealPhoto({
+    imageBase64: 'photo',
+    mediaType: 'image/jpeg',
+    goal: 'recomp',
+    workoutLoggedToday: true,
+    dailyPlan: {
+      workout: { type: 'upper_body_strength' },
+      recommendation: 'Strength',
+      meals: 'Water',
+      nutritionGuidance: 'Carbs up to a third of the plate.',
+    },
+    verifiedActivity: {
+      steps: 15000,
+      activeMinutes: 40,
+      workoutLoggedToday: true,
+      sleepCheckInLogged: true,
+      mealsLogged: 1,
+      sleepReadiness: 'restful',
+      workoutType: 'unknown',
+    },
+    style: { tone: 'warm_direct', detail: 'standard' },
+    config: { apiKey: 'fake', model: 'fake', maxOutputTokens: 768, timeoutMs: 1000 },
+    fetchImpl: async (_, request) => {
+      calls++;
+      context = JSON.parse(JSON.parse(request.body).messages[0].content[1].text);
+      return providerResponse({
+        verdict: 'On point',
+        feedback: 'Your protein supports body recomp. The carbs fit a third of your plate.',
+        nextMeal:
+          calls === 1
+            ? 'For your next meal, keep carbs to a fist.'
+            : 'For your next meal, aim for a palm of protein, a third of your plate as carbs and the rest vegetables.',
+      });
+    },
+  });
+  expect(result.ok).toBe(true);
+  expect(calls).toBe(2);
+  expect(context.carb_target_from_plan).toBe('third');
+  expect(context.verified_activity.steps).toBe(15000);
 });

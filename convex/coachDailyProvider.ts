@@ -1,5 +1,5 @@
 import { cacheSystemPrompt, promptCacheUsage, logPromptCacheUsage } from './anthropicPromptCache';
-import { CLIENT_PLAN_UPDATE } from './coachClientUpdate';
+import { ACTIVITY_EVIDENCE_ORDER, CLIENT_PLAN_UPDATE } from './coachClientUpdate';
 import type { DailyOutput } from './coachDailyPolicy';
 import type { DailyOutputV2 } from './coachDailyPolicyV2';
 import { isDailyPlanOutputV3, type DailyOutputV3 } from './coachDailyPolicyV3';
@@ -236,6 +236,9 @@ export async function generateDailyPlan(args: {
               : args.promptVersion === DAILY_PLAN_V2_PROMPT_VERSION
                 ? DAILY_PLAN_V2_SYSTEM_PROMPT
                 : DAILY_PLAN_SYSTEM_PROMPT) +
+            (args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
+              ? ''
+              : '\n' + ACTIVITY_EVIDENCE_ORDER) +
             (otherTraining
               ? '\n\nTRAINED YESTERDAY ANSWER CONTRACT\n' + OTHER_TRAINING_MEANING
               : '')
@@ -248,7 +251,7 @@ export async function generateDailyPlan(args: {
               ...(args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
                 ? {
                     explanation_completion_check:
-                      'Before calling the tool, count Why: 4 to 6 complete sentences and about 90 to 130 words (aim 105 to 115). Verify the first two sentences name the goal, and Why explicitly includes protein, carbs, vegetables, water and sleep, even on rest days. Include the carb portion and plate proportions from the client instructions. Match all stated targets and workout details to the structured output. If the text is too long, rewrite it; do not omit topics. Compare recent strength check-ins before claiming a strength gap.',
+                      'Before calling the tool, count Why: 4 to 6 complete sentences and about 90 to 130 words (aim 105 to 115). Verify the first two sentences name the goal, and Why explicitly includes protein, carbs, vegetables, water and sleep, even on rest days. Include the carb portion and plate proportions from the client instructions. Match all stated targets and workout details to the structured output. If the text is too long, rewrite it; do not omit topics. Compare actual reported strength activity before claiming a strength gap; a planned workout type never proves completion.',
                   }
                 : {}),
               ...(args.promptVersion === DAILY_PLAN_V3_PROMPT_VERSION
@@ -256,7 +259,7 @@ export async function generateDailyPlan(args: {
                     unwell_guidance_rule:
                       'If input.output_constraints.unwell_guidance_required is true, Why MUST say that if pain or illness continues she can speak to a doctor or healthcare professional. Include this within the 4 to 6 sentences, alongside goal, steps/rest, protein, carbs, vegetables, water and sleep. unwell_guidance means this exact professional-advice topic was missing; add it now.',
                     body_recovery_rule:
-                      'Choose workout.type only from input.output_constraints.workout_allowed_types. upper_body_recovery means do not choose upper_body_strength or full_body_strength; lower_body_recovery means do not choose lower_body_strength or full_body_strength. Rewrite Workout AND Why together. Mention a specific body part needing recovery or being sore ONLY if it is listed in input.output_constraints.body_parts_with_recovery_evidence. An empty list means no body-part recovery claims are supported. Other does not establish which muscles trained. For invented_body_recovery remove the unsupported body-part claim from Why and Workout; explain the choice using the actual goal, energy, sleep and preference instead. General recovery from sleep and nutrition is allowed.',
+                      'Choose workout.type only from input.output_constraints.workout_allowed_types. upper_body_recovery means do not choose upper_body_strength or full_body_strength; lower_body_recovery means do not choose lower_body_strength or full_body_strength. Rewrite Workout AND Why together. Mention a specific body part needing recovery or being sore ONLY if it is listed in input.output_constraints.body_parts_with_recovery_evidence. An empty list means no body-part recovery claims are supported. Other does not establish which muscles trained. For invented_yesterday_training, remove every claim that she trained yesterday when her check-in says Nothing, including explanations. For invented_body_recovery remove the unsupported body-part claim from Why and Workout; explain the choice using the actual goal, energy, sleep and preference instead. General recovery from sleep and nutrition is allowed.',
                     rest_target_rule:
                       'When workout.type is rest, workout.minutes must be 0 and workout.intensity must be low. Workout.text must explicitly say rest or recovery and must not contain workout, strength, interval, or high-intensity, even in a sentence saying to avoid them. Describe recovery positively. For validation_failure rest_target, correct all three fields together and ensure Why agrees with the rest choice. If input.output_constraints.rest_required is true, choose rest; otherwise a rest choice still follows these rules.',
                     step_target_rule:

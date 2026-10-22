@@ -1,6 +1,8 @@
 // @ts-nocheck -- Bun test runtime hooks are outside the app TypeScript project.
 import { describe, expect, test } from 'bun:test';
 
+import { ACTIVITY_EVIDENCE_ORDER } from '../convex/coachClientUpdate';
+
 import {
   buildDailyProviderInput,
   dailyPolicy,
@@ -192,7 +194,7 @@ describe('daily-plan source and policy', () => {
       },
     });
     expect(result.ok).toBe(true);
-    expect(sent.system[0].text).toBe(DAILY_PLAN_SYSTEM_PROMPT);
+    expect(sent.system[0].text).toBe(DAILY_PLAN_SYSTEM_PROMPT + '\n' + ACTIVITY_EVIDENCE_ORDER);
     expect(sent.max_tokens).toBeGreaterThanOrEqual(1600);
     expect(sent.tools[0].input_schema.required).toEqual([
       'headline',
@@ -369,7 +371,7 @@ describe('daily-plan source and policy', () => {
     expect(() => validateDailyPlanOutput(output({ steps: '7000 steps' }), base, day)).toThrow();
   });
 
-  test('recent plans guide strength frequency without calling suggestions completed workouts', () => {
+  test('previous suggestions cannot establish completed training or a strength gap', () => {
     const recent = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', yesterday].map(
       (date) => ({
         day: date,
@@ -383,7 +385,7 @@ describe('daily-plan source and policy', () => {
         day,
         recent
       )
-    ).toThrow();
+    ).not.toThrow();
     expect(
       validateDailyPlanOutput(
         output({ workout: 'Log a 20-minute full body strength workout today.' }),
@@ -395,7 +397,7 @@ describe('daily-plan source and policy', () => {
     const yesterdayCore = [
       { day: yesterday, output: output({ workout: 'Log a 20-minute core workout today.' }) },
     ];
-    expect(() => validateDailyPlanOutput(output(), base, day, yesterdayCore)).toThrow();
+    expect(() => validateDailyPlanOutput(output(), base, day, yesterdayCore)).not.toThrow();
     expect(buildDailyProviderInput(base, day, yesterdayCore).activity.workouts_logged).toEqual([]);
   });
 

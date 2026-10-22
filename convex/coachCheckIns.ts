@@ -11,6 +11,7 @@ import {
   MutationCtx,
   QueryCtx,
 } from './_generated/server';
+import { previousNightSleepTarget } from './coachSleepTarget';
 import { isDeletedWorkoutSlot } from './deletedWorkoutSlot';
 import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { evaluateUserMilestones } from './utils/milestones';
@@ -29,7 +30,7 @@ const DEFAULT_ASSIGNMENTS = [
   { category: 'meals', label: 'Log Your Meals', recommendation: 'Log a meal' },
   {
     category: 'sleep',
-    label: 'Aim for 7 Hours Sleep',
+    label: 'Log 7 hours sleep',
     recommendation: '7 hours sleep',
     sleepTargetHours: 7,
   },
@@ -69,7 +70,9 @@ export const myToday = query({
   handler: async (ctx) => {
     const userId = await owner(ctx);
     const day = await today(ctx, userId);
-    if (!(await entitled(ctx, userId))) return { day, status: 'locked' as const, assignments: [] };
+    if (!(await entitled(ctx, userId)))
+      return { day, status: 'locked' as const, assignments: [], sleepTargetHours: 7 };
+    const sleepTargetHours = await previousNightSleepTarget(ctx, userId, day);
     const revision = await ctx.db
       .query('coachPlanRevisionsV1')
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
@@ -89,12 +92,20 @@ export const myToday = query({
     const slots = savedSlots.filter((_, index) => !released[index]);
     return {
       day,
+      sleepTargetHours,
       status: revision ? ('ready' as const) : ('no_plan' as const),
       assignments: await Promise.all(
         assignments
           .filter((item) => item.planRevisionId === revision?._id)
           .map(async (item) => ({
             ...item,
+            ...(item.category === 'sleep'
+              ? {
+                  sleepTargetHours,
+                  label: `Log ${sleepTargetHours} hours sleep`,
+                  recommendation: `${sleepTargetHours} hours sleep`,
+                }
+              : {}),
             mandatory: item.category !== 'workout' || item.workout?.type !== 'rest',
             earnedCount: slots.filter(
               (slot) => slot.category === item.category && slot.state === 'earned'
@@ -118,6 +129,7 @@ export const ensureStandaloneAssignments = mutation({
     const userId = await owner(ctx);
     if (!(await entitled(ctx, userId))) throw new ConvexError('Verified entitlement required');
     const day = await today(ctx, userId);
+    const sleepTargetHours = await previousNightSleepTarget(ctx, userId, day);
     const revision = await ctx.db
       .query('coachPlanRevisionsV1')
       .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', day))
@@ -155,6 +167,13 @@ export const ensureStandaloneAssignments = mutation({
         userId,
         day,
         ...item,
+        ...(item.category === 'sleep'
+          ? {
+              sleepTargetHours,
+              label: `Log ${sleepTargetHours} hours sleep`,
+              recommendation: `${sleepTargetHours} hours sleep`,
+            }
+          : {}),
         createdAt: Date.now(),
       });
     }
@@ -385,7 +404,12 @@ export const complete = mutation({
       assignment.planRevisionId !== submission.planRevisionId ||
       assignment.day !== submission.day ||
       assignment.category !== submission.category ||
-      assignment.recommendation !== submission.recommendation
+      (assignment.recommendation !== submission.recommendation &&
+        !(
+          submission.category === 'sleep' &&
+          submission.recommendation ===
+            `${await previousNightSleepTarget(ctx, userId, submission.day)} hours sleep`
+        ))
     )
       throw new ConvexError('Saved proof context is invalid');
     const slot = await ctx.db

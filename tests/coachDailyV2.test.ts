@@ -1,5 +1,7 @@
 // @ts-nocheck -- Bun test runtime hooks are outside the app TypeScript project.
 import { describe, expect, test } from 'bun:test';
+
+import { ACTIVITY_EVIDENCE_ORDER } from '../convex/coachClientUpdate';
 import { readFileSync } from 'node:fs';
 
 import {
@@ -250,7 +252,7 @@ describe('v2 daily plan contract', () => {
       },
     });
     expect(result.ok).toBe(true);
-    expect(sent.system[0].text).toBe(DAILY_PLAN_V2_SYSTEM_PROMPT);
+    expect(sent.system[0].text).toBe(DAILY_PLAN_V2_SYSTEM_PROMPT + '\n' + ACTIVITY_EVIDENCE_ORDER);
     expect(sent.tools[0].input_schema.required).toContain('workoutExamples');
     await generateDailyPlan({
       config: { apiKey: 'test', model: 'test', maxOutputTokens: V2_OUTPUT_TOKENS, timeoutMs: 1000 },

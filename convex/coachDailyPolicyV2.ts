@@ -249,18 +249,11 @@ export function buildDeterministicDailyPlanV2(
       : Math.max(500, Math.floor((average + 2000) / 500) * 500);
   const steps = `${stepTarget.toLocaleString('en-US')} steps`;
   const rest = policy.rest;
-  let type = hasBodyFeeling(snapshot.daily.body, 'sore_upper')
+  const type = hasBodyFeeling(snapshot.daily.body, 'sore_upper')
     ? 'lower_body_strength'
     : hasBodyFeeling(snapshot.daily.body, 'sore_lower')
       ? 'upper_body_strength'
       : 'full_body_strength';
-  const yesterday = recentPlans.find((plan) => plan.day === addDaysToDateKey(day, -1));
-  if (
-    !rest &&
-    hasBodyFeeling(snapshot.daily.body, 'fine') &&
-    yesterday?.output.workout.includes('full body strength')
-  )
-    type = 'upper_body_strength';
   const duration =
     policy.duration === 'light'
       ? 10

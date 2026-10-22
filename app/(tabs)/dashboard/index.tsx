@@ -375,7 +375,10 @@ export default function TodayScreen() {
               </View>
               <PlanButtonGlow active={bannerState === 'no_plan'}>
                 <Text
-                  style={[type.bannerButton, { textAlign: 'center' }]}
+                  style={[
+                    type.bannerButton,
+                    { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 14 },
+                  ]}
                   className="min-w-0 shrink">
                   {bannerState === 'no_plan'
                     ? 'Get my plan'
@@ -435,6 +438,7 @@ export default function TodayScreen() {
             {tiles.map((tile) => {
               const Icon = ICONS[tile.category];
               const inactive = tile.completed;
+              const disabled = !plan.access || (tile.category === 'meals' && tile.completed);
               const detail = !plan.access
                 ? 'Premium access unavailable'
                 : tile.category === 'workout' && !plan.plan
@@ -444,7 +448,7 @@ export default function TodayScreen() {
                       ? `${tile.earned} ${tile.earned === 1 ? 'meal' : 'meals'} logged`
                       : 'Log a meal'
                     : tile.category === 'sleep'
-                      ? 'Log your sleep'
+                      ? `Log ${checkIns?.sleepTargetHours ?? 7} hours sleep`
                       : tile.category === 'steps'
                         ? `${new Intl.NumberFormat('en-US').format(activity?.totalSteps ?? 0)} / ${stepTarget ?? '8,000'} steps`
                         : (tile.assignment?.label ?? '');
@@ -453,8 +457,8 @@ export default function TodayScreen() {
                   key={tile.category}
                   accessibilityRole="button"
                   accessibilityLabel={`${LABELS[tile.category]}, ${detail}${tile.completed ? ', completed' : ''}`}
-                  accessibilityState={{ disabled: !plan.access }}
-                  disabled={!plan.access}
+                  accessibilityState={{ disabled }}
+                  disabled={disabled}
                   onPress={() => openTile(tile.category)}
                   className="min-h-12 flex-row items-center">
                   <View
@@ -556,7 +560,11 @@ export default function TodayScreen() {
                   <Text
                     style={[
                       type.caption,
-                      { color: 'rgba(255,255,255,0.85)', fontSize: 18, lineHeight: 24 },
+                      {
+                        color: 'rgba(255,255,255,0.85)',
+                        fontSize: type.photoTab.fontSize,
+                        lineHeight: type.photoTab.lineHeight,
+                      },
                     ]}
                     className="mt-1">
                     / {activeMinuteTarget} mins

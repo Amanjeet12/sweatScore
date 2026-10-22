@@ -456,9 +456,44 @@ export const scanInput = internalQuery({
       .order('desc')
       .first();
     const dailyPlan = plans?.output
-      ? { workout: plans.workout, recommendation: plans.output.workout, meals: plans.output.meals }
+      ? {
+          workout: plans.workout,
+          recommendation: plans.output.workout,
+          meals: plans.output.meals,
+          nutritionGuidance: `${plans.detailsV2?.mealsReason ?? ''} ${plans.output.why}`.trim(),
+        }
       : null;
-    return { scan, draft, memberFeedback, dailyPlan };
+    const activities = await ctx.db
+      .query('dailyActivities')
+      .withIndex('by_user_date', (q) => q.eq('userId', userId).eq('date', draft.day))
+      .collect();
+    const dailyAnswers = await ctx.db
+      .query('coachDailyAnswersV1')
+      .withIndex('by_user_day_version', (q) => q.eq('userId', userId).eq('day', draft.day))
+      .order('desc')
+      .first();
+    const verifiedActivity = {
+      steps: activities.some((a) => a.synced)
+        ? Math.max(0, ...activities.filter((a) => a.synced).map((a) => a.steps))
+        : null,
+      activeMinutes: activities.some((a) => a.synced && a.zone2Minutes !== undefined)
+        ? Math.max(0, ...activities.filter((a) => a.synced).map((a) => a.zone2Minutes ?? 0))
+        : null,
+      workoutLoggedToday: activities.some(
+        (a) =>
+          ['workout', 'gym_workout'].includes(a.loggedActivityKey ?? '') &&
+          a.reviewStatus === 'approved'
+      ),
+      sleepCheckInLogged: activities.some(
+        (a) => a.loggedActivityKey === 'sleep' && a.reviewStatus === 'approved'
+      ),
+      mealsLogged: activities.filter(
+        (a) => a.loggedActivityKey === 'healthy_meal' && a.reviewStatus !== 'rejected'
+      ).length,
+      sleepReadiness: dailyAnswers?.answers.sleep ?? null,
+      workoutType: 'unknown', // The suggested workout is never a completed workout type.
+    };
+    return { scan, draft, memberFeedback, dailyPlan, verifiedActivity };
   },
 });
 export const claimDispatch = internalMutation({

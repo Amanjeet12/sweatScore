@@ -1,3 +1,4 @@
+import { workoutEvidence } from './coachActivityEvidence';
 import { hasBodyFeeling } from '../shared/coachBodyFeeling';
 import type { Doc } from './_generated/dataModel';
 import { addDaysToDateKey } from './utils/timezone';
@@ -202,18 +203,6 @@ export function validateDailyPlanOutput(
       (hasBodyFeeling(snapshot.daily.body, 'sore_upper') && type !== 'lower_body_strength')
     )
       throw new Error('invalid_output');
-    if (policy.headline === HEADLINES.push && hasBodyFeeling(snapshot.daily.body, 'fine')) {
-      const last = recentPlans.find((plan) => plan.day === addDaysToDateKey(day, -1));
-      const lastType = last?.output.workout.match(
-        /\b(full body strength|upper body strength|lower body strength|core|jump rope|cardio) workout today\./
-      )?.[1];
-      if (lastType && lastType === match[2]) throw new Error('invalid_output');
-      const suggestedStrength = recentPlans.filter((plan) =>
-        /\b(full body|upper body|lower body) strength workout today\./.test(plan.output.workout)
-      ).length;
-      if (recentPlans.length >= 5 && suggestedStrength < 2 && !type.endsWith('_strength'))
-        throw new Error('invalid_output');
-    }
     workout = { type, durationMinutes };
   }
   if (
@@ -278,7 +267,7 @@ export function buildDailyProviderInput(
       steps,
       step_average: average ?? null,
       usable_step_days: steps.length,
-      workouts_logged: snapshot.health.workouts.filter((item) => item.source === 'activity_log'),
+      workouts_logged: workoutEvidence(snapshot, day),
       completed_workout_days_in_a_row: consecutiveCompletedWorkoutDays(snapshot, day),
       weekly_streak: snapshot.health.streak ?? null,
     },

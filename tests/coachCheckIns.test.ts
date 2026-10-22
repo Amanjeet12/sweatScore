@@ -769,3 +769,33 @@ test('standalone steps default to 8000 without rewriting a captured proof target
     10000
   );
 });
+
+test('morning sleep target uses yesterday latest plan and pins it to the proof', async () => {
+  const s = fixture();
+  const yesterday = new Date(`${day}T12:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const date = yesterday.toISOString().slice(0, 10);
+  s.rows.coachPlanRevisionsV1.push(
+    { _id: 'yesterday_old', userId: 'alice', day: date, version: 1, sleepTargetHours: 7.5 },
+    { _id: 'yesterday_new', userId: 'alice', day: date, version: 2, sleepTargetHours: 8 },
+    { _id: 'other_member', userId: 'bob', day: date, version: 3, sleepTargetHours: 9 }
+  );
+  const result = await myToday._handler(s.ctx, {});
+  expect(result.sleepTargetHours).toBe(8);
+  expect(result.assignments.find((a) => a.category === 'sleep').recommendation).toBe(
+    '8 hours sleep'
+  );
+  const id = await reserveProof._handler(s.ctx, {
+    assignmentId: 'sleep_a',
+    requestKey: 'sleep_yesterday_target',
+  });
+  expect(s.rows.coachProofSubmissionsV1.find((p) => p._id === id).recommendation).toBe(
+    '8 hours sleep'
+  );
+});
+
+test('without yesterday plan sleep target is seven even when today recommends more', async () => {
+  const s = fixture();
+  s.rows.coachPlanRevisionsV1.find((p) => p._id === 'plan_a').sleepTargetHours = 9;
+  expect((await myToday._handler(s.ctx, {})).sleepTargetHours).toBe(7);
+});

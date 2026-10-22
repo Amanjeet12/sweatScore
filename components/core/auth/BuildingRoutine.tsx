@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Sparkle } from 'phosphor-react-native';
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, ScrollView, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { onboardingStyles } from '~/components/core/auth/PrototypeOnboarding';
@@ -12,44 +12,20 @@ import {
 } from '~/components/core/design/prototypeStyles';
 import { Text } from '~/components/ui/text';
 
-// This presentation exists only while the existing profile completion request is in flight.
-// It does not simulate plan generation or advance onboarding on a timer.
+// Keep the onboarding presentation visible for the six-second profile setup interval.
 export function BuildingRoutine({ name }: { name?: string }) {
   const insets = useSafeAreaInsets();
-  const pulse = useRef(new Animated.Value(0.35)).current;
-  const [reduceMotion, setReduceMotion] = useState(true);
+  const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    let active = true;
-    let changed = false;
-    const listener = AccessibilityInfo.addEventListener('reduceMotionChanged', (value) => {
-      changed = true;
-      setReduceMotion(value);
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: 6000,
+      easing: Easing.linear,
+      useNativeDriver: false,
     });
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((value) => {
-        if (active && !changed) setReduceMotion(value);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      listener.remove();
-    };
-  }, []);
-  useEffect(() => {
-    pulse.stopAnimation();
-    if (reduceMotion) {
-      pulse.setValue(1);
-      return;
-    }
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.35, duration: 750, useNativeDriver: true }),
-      ])
-    );
     animation.start();
     return () => animation.stop();
-  }, [pulse, reduceMotion]);
+  }, [progress]);
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
@@ -92,15 +68,13 @@ export function BuildingRoutine({ name }: { name?: string }) {
           }}>
           <Animated.View
             style={{
-              opacity: pulse,
-              width: '40%',
+              width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
               height: 6,
               borderRadius: 3,
               backgroundColor: '#ff5a1f',
             }}
           />
         </View>
-        <ActivityIndicator color="#e8541e" style={{ marginTop: 16, alignSelf: 'flex-start' }} />
       </ScrollView>
     </View>
   );

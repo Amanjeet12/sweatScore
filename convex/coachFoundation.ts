@@ -23,6 +23,7 @@ import {
   detail,
   toneScope,
 } from './coachFoundationValidators';
+import { previousNightSleepTarget } from './coachSleepTarget';
 import { isDeletedWorkoutSlot } from './deletedWorkoutSlot';
 import { hasMemberPremiumAccess } from './memberPremiumAccess';
 import { bodySelections, isUnanswered, type BodyAnswer } from '../shared/coachBodyFeeling';
@@ -221,7 +222,6 @@ async function planSnapshot(
     coverage: 'sensor_observed' as const,
   }));
   const completed = proofs.filter((proof) => proof.state === 'completed');
-  const revisionsById = new Map(recentPlans.map((plan) => [String(plan._id), plan]));
   const latestByDay = new Map<string, Doc<'coachPlanRevisionsV1'>>();
   for (const plan of recentPlans)
     if ((latestByDay.get(plan.day)?.version ?? 0) < plan.version) latestByDay.set(plan.day, plan);
@@ -233,15 +233,10 @@ async function planSnapshot(
     )
     .map((a) => {
       const proof = completed.find((proof) => proof._id === a.coachSubmissionId);
-      const plan = proof?.planRevisionId
-        ? revisionsById.get(String(proof.planRevisionId))
-        : undefined;
       return {
         day: a.date,
         label: a.loggedActivityKey!,
         source: 'activity_log' as const,
-        plannedType: plan?.workout.type,
-        plannedMinutes: plan?.workout.durationMinutes,
         memberNote: proof?.caption?.slice(0, 500),
       };
     });
@@ -1406,6 +1401,10 @@ export const reserveProof = mutation({
           ).length;
     if (legacyCount >= (assignment.category === 'meals' ? 3 : 1))
       throw new ConvexError('Legacy activity already consumed this category');
+    const sleepTargetHours =
+      assignment.category === 'sleep'
+        ? await previousNightSleepTarget(ctx, userId, assignment.day)
+        : null;
     const max = assignment.category === 'meals' ? 3 : 1;
     for (let ordinal = legacyCount + 1; ordinal <= max; ordinal++) {
       const key = rewardSlotKey(assignment.day, assignment.category, ordinal);
@@ -1429,8 +1428,9 @@ export const reserveProof = mutation({
         assignmentId: assignment._id,
         planRevisionId: assignment.planRevisionId,
         category: assignment.category,
-        recommendation: assignment.recommendation,
-        label: assignment.label,
+        recommendation:
+          sleepTargetHours === null ? assignment.recommendation : `${sleepTargetHours} hours sleep`,
+        label: sleepTargetHours === null ? assignment.label : `Log ${sleepTargetHours} hours sleep`,
         slotKey: key,
         state: 'reserved',
         createdAt: now,

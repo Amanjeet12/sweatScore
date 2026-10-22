@@ -31,7 +31,7 @@ export const analyze = action({
       draftId,
       requestKey,
     });
-    const { scan, draft, memberFeedback, dailyPlan }: any = await ctx.runQuery(
+    const { scan, draft, memberFeedback, dailyPlan, verifiedActivity }: any = await ctx.runQuery(
       internal.coachMeals.scanInput,
       {
         userId,
@@ -68,7 +68,8 @@ export const analyze = action({
         memberFeedback,
         plateDescription: draft.plateDescription,
         dailyPlan,
-        workoutLoggedToday: draft.workoutLoggedToday,
+        verifiedActivity,
+        workoutLoggedToday: verifiedActivity.workoutLoggedToday,
         style: { tone: draft.tone, detail: draft.detail },
         config,
       });

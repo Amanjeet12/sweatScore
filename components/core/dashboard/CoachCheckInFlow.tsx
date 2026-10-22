@@ -332,6 +332,9 @@ export default function CoachCheckInFlow({
     setPlateDescription(meal?.draft?.plateDescription ?? queueRef.current?.plateDescription ?? '');
   }, [meal?.draft?._id]);
   const assignment = today?.assignments.find((item) => item.category === category);
+  const mealCount = Math.max(mealHistory?.count ?? 0, assignment?.consumedCount ?? 0);
+  const mealLimitReached = category === 'meals' && mealCount >= 3;
+  const mealTitle = mealCount > 0 ? 'Log another meal' : 'Log a meal';
   useEffect(() => {
     if (today?.status === 'no_plan' && !assignment)
       ensureStandaloneAssignments({}).catch(() =>
@@ -433,7 +436,7 @@ export default function CoachCheckInFlow({
   };
 
   const start = async (mediaType: 'image' | 'video' = 'image') => {
-    if (!currentUser || !today || !category || !queueKey) return;
+    if (!currentUser || !today || !category || !queueKey || mealLimitReached) return;
     if (closing.current) return;
     const operation = operations.begin();
     if (operation === null) return;
@@ -481,6 +484,7 @@ export default function CoachCheckInFlow({
         detailsV2: selectedAssignment.detailsV2,
         mediaType,
       });
+      setCameraFacing(category === 'workout' && mediaType === 'video' ? 'front' : 'back');
       setCameraMode(mediaType === 'video' ? 'video' : 'picture');
       setCameraReady(false);
       setShowCamera(true);
@@ -920,6 +924,7 @@ export default function CoachCheckInFlow({
       });
       if (queue.uri) await FileSystem.deleteAsync(queue.uri, { idempotent: true }).catch(() => {});
       if (!operations.isCurrent(operation)) return;
+      setCameraFacing(category === 'workout' && queue.mediaType === 'video' ? 'front' : 'back');
       setCameraMode(queue.mediaType === 'video' ? 'video' : 'picture');
       setCameraReady(false);
       setPhotoPreviewError(false);
@@ -962,6 +967,7 @@ export default function CoachCheckInFlow({
     if (!queue.uri && !queue.storageId) {
       primaryLabel = queue.mediaType === 'video' ? 'Record video' : 'Take live photo';
       primaryAction = () => {
+        setCameraFacing(category === 'workout' && queue.mediaType === 'video' ? 'front' : 'back');
         setCameraMode(queue.mediaType === 'video' ? 'video' : 'picture');
         setCameraReady(false);
         setShowCamera(true);
@@ -1017,7 +1023,9 @@ export default function CoachCheckInFlow({
     mode === 'post' &&
     category === 'meals' &&
     Boolean(queue?.uri || queue?.storageId) &&
-    meal?.draft?.status !== 'analyzing';
+    !hasMealReport &&
+    !showingMealAnalysis &&
+    meal?.draft?.status !== 'shared';
   const points = coachCheckInPoints(category);
   const fixedTitle =
     category === 'workout'
@@ -1025,11 +1033,11 @@ export default function CoachCheckInFlow({
       : category === 'steps'
         ? `Hit ${(assignment?.stepTarget ?? 8000).toLocaleString('en-US')} Steps`
         : category === 'sleep'
-          ? 'Log your sleep'
+          ? `Log ${today.sleepTargetHours ?? 7} hours sleep`
           : 'Log Your Meals';
   const fixedInstruction =
     category === 'workout'
-      ? 'Snap a picture of your smartwatch or record a video showing your workout today.'
+      ? "Snap a picture or record a video showing today's workout."
       : category === 'steps'
         ? 'Snap a picture of your smartwatch showing you met your steps target.'
         : category === 'sleep'
@@ -1136,7 +1144,7 @@ export default function CoachCheckInFlow({
           <CheckInHeader
             title={
               category === 'meals'
-                ? 'Log a meal'
+                ? mealTitle
                 : category === 'workout'
                   ? 'Log a workout'
                   : 'Log Activity'
@@ -1535,18 +1543,18 @@ export default function CoachCheckInFlow({
                       columnGap: 8,
                       rowGap: 2,
                     }}>
-                    <Text style={[type.checkInSheetHeading, { flexShrink: 1 }]}>
+                    <Text
+                      style={[
+                        type.checkInSheetHeading,
+                        { flexShrink: 1 },
+                        mealLimitReached && { color: '#8A8A8A' },
+                      ]}>
                       {category === 'workout'
                         ? 'Log a workout'
                         : category === 'meals'
-                          ? 'Log a meal'
+                          ? mealTitle
                           : fixedTitle}
                     </Text>
-                    {category === 'meals' ? (
-                      <Text style={[type.supporting, { color: '#8A8A8A' }]}>
-                        {mealHistory?.count ?? assignment?.consumedCount ?? 0}/3
-                      </Text>
-                    ) : null}
                   </View>
                   <View style={[chrome.badge, { marginTop: 4 }]}>
                     <Text style={chrome.badgeText}>
@@ -1592,16 +1600,16 @@ export default function CoachCheckInFlow({
                       accessibilityRole="button"
                       accessibilityLabel="Take live photo"
                       accessibilityState={{
-                        disabled: busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3,
+                        disabled: busy || !canTakeLivePhoto || mealLimitReached,
                         busy,
                       }}
-                      disabled={busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3}
+                      disabled={busy || !canTakeLivePhoto || mealLimitReached}
                       onPress={() => {
                         start('image').catch(() => {});
                       }}
                       style={[
                         chrome.actionCard,
-                        (busy || !canTakeLivePhoto || (mealHistory?.count ?? 0) >= 3) && {
+                        (busy || !canTakeLivePhoto || mealLimitReached) && {
                           opacity: 0.4,
                         },
                       ]}>

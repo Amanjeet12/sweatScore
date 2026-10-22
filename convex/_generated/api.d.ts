@@ -31,6 +31,7 @@ import type * as chat_userPresentation from "../chat/userPresentation.js";
 import type * as checkInCategories from "../checkInCategories.js";
 import type * as claimedRewards from "../claimedRewards.js";
 import type * as clientNotifications from "../clientNotifications.js";
+import type * as coachActivityEvidence from "../coachActivityEvidence.js";
 import type * as coachCheckIns from "../coachCheckIns.js";
 import type * as coachClientUpdate from "../coachClientUpdate.js";
 import type * as coachDailyEvaluation from "../coachDailyEvaluation.js";
@@ -50,6 +51,7 @@ import type * as coachFoundationValidators from "../coachFoundationValidators.js
 import type * as coachLegacyInventory from "../coachLegacyInventory.js";
 import type * as coachMealAnalysis from "../coachMealAnalysis.js";
 import type * as coachMealPolicy from "../coachMealPolicy.js";
+import type * as coachMealPortions from "../coachMealPortions.js";
 import type * as coachMealPrompt from "../coachMealPrompt.js";
 import type * as coachMealPromptV2 from "../coachMealPromptV2.js";
 import type * as coachMealProvider from "../coachMealProvider.js";
@@ -57,6 +59,7 @@ import type * as coachMeals from "../coachMeals.js";
 import type * as coachPlanRetry from "../coachPlanRetry.js";
 import type * as coachProfileEditor from "../coachProfileEditor.js";
 import type * as coachResume from "../coachResume.js";
+import type * as coachSleepTarget from "../coachSleepTarget.js";
 import type * as coachToday from "../coachToday.js";
 import type * as coachTonePreview from "../coachTonePreview.js";
 import type * as coachTonePreviewRunner from "../coachTonePreviewRunner.js";
@@ -125,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   checkInCategories: typeof checkInCategories;
   claimedRewards: typeof claimedRewards;
   clientNotifications: typeof clientNotifications;
+  coachActivityEvidence: typeof coachActivityEvidence;
   coachCheckIns: typeof coachCheckIns;
   coachClientUpdate: typeof coachClientUpdate;
   coachDailyEvaluation: typeof coachDailyEvaluation;
@@ -144,6 +148,7 @@ declare const fullApi: ApiFromModules<{
   coachLegacyInventory: typeof coachLegacyInventory;
   coachMealAnalysis: typeof coachMealAnalysis;
   coachMealPolicy: typeof coachMealPolicy;
+  coachMealPortions: typeof coachMealPortions;
   coachMealPrompt: typeof coachMealPrompt;
   coachMealPromptV2: typeof coachMealPromptV2;
   coachMealProvider: typeof coachMealProvider;
@@ -151,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   coachPlanRetry: typeof coachPlanRetry;
   coachProfileEditor: typeof coachProfileEditor;
   coachResume: typeof coachResume;
+  coachSleepTarget: typeof coachSleepTarget;
   coachToday: typeof coachToday;
   coachTonePreview: typeof coachTonePreview;
   coachTonePreviewRunner: typeof coachTonePreviewRunner;

@@ -383,10 +383,14 @@ export default function CoachOnboarding() {
         setLocalStep(step + 1);
       } else if (profile) {
         const finishingProfile = step === PROFILE_QUESTIONS.length - 1;
+        const profileStartedAt = Date.now();
         if (finishingProfile) setCompletingProfile(true);
         await saveProfile({ [question.key]: value } as Parameters<typeof saveProfile>[0]);
         if (finishingProfile) {
           await finishProfile({});
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.max(0, 6000 - (Date.now() - profileStartedAt)))
+          );
           if (decision.returningMember) router.replace('/(tabs)/dashboard');
           else await resumeMember(convex);
         } else {
