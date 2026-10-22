@@ -24,7 +24,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Share from 'react-native-share';
-import Svg, { Line } from 'react-native-svg';
 import { captureRef } from 'react-native-view-shot';
 
 import { BackButton, goBackOrReplace } from '~/components/core/BackButton';
@@ -121,12 +120,12 @@ function Stat({
   if (Icon)
     return (
       <View className="min-w-0 flex-1 flex-row items-center gap-2">
-        <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-[#fff3ea]">
-          <Icon size={22} color={colors.icon} weight="regular" />
+        <View className="h-10 w-10 items-center justify-center rounded-[14px] bg-[#fff3ea]">
+          <Icon size={20} color={colors.icon} weight="regular" />
         </View>
         <View className="min-w-0 flex-1">
-          <Text style={type.smallCaption}>{label}</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={type.cardTitle}>
+          <Text style={type.caption}>{label}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={[type.cardTitle, { lineHeight: 20 }]}>
             {value}
           </Text>
         </View>
@@ -634,9 +633,6 @@ export default function TabTrack() {
               <Text style={[type.smallCaption, { color: '#16865B' }]}>Live data</Text>
             </View>
             <View className="mb-2 mt-4 flex-row items-center justify-end gap-x-2">
-              <Svg width={20} height={2}>
-                <Line x1={0} y1={1} x2={20} y2={1} stroke="#999999" strokeDasharray="4 3" />
-              </Svg>
               <Text style={[type.smallCaption, { flexShrink: 1 }]}>
                 Goal: {formatNumber(trendTarget)}{' '}
                 {metric === 'challenges' && trendTarget === 1 ? 'challenge' : trendLabel} per{' '}
@@ -645,14 +641,6 @@ export default function TabTrack() {
             </View>
             <View className="px-2">
               <View className="h-[150px] border-b border-[#EAE4DF]">
-                <View
-                  pointerEvents="none"
-                  className="absolute left-0 right-0"
-                  style={{ bottom: `${(trendTarget / maxTrend) * 100}%` }}>
-                  <Svg width="100%" height={2}>
-                    <Line x1={0} y1={1} x2="100%" y2={1} stroke="#999999" strokeDasharray="4 3" />
-                  </Svg>
-                </View>
                 <View className="h-full flex-row items-end gap-x-1">
                   {trend.map((item) => (
                     <View key={item.key} className="h-full flex-1 items-center justify-end">

@@ -1558,9 +1558,6 @@ export default function CoachCheckInFlow({
                     </Text>
                   </View>
                 </View>
-                {category === 'workout' && assignment?.label ? (
-                  <Text style={[type.supporting, { marginTop: 8 }]}>{assignment.label}</Text>
-                ) : null}
                 <Text style={[type.body, { marginTop: 10 }]}>{fixedInstruction}</Text>
                 <View style={{ marginTop: 24, gap: 12 }}>
                   {!mealLimitReached && (canTakeLivePhoto || category === 'meals') ? (
